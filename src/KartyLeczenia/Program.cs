@@ -32,6 +32,13 @@ sealed class MainForm : Form
     readonly Label status = new() { AutoSize = true, Text = "Podaj połączenie i numer dokumentu." };
     readonly string[] columns = ["Opis zwierząt / numer siedziby stada", "Liczba zwierząt", "Rozpoznanie", "Produkt", "Seria", "Ważność", "Ilość wydana", "Dawkowanie i okres stosowania", "Karencja", "Zalecenia / uwagi", "Sekcja (II lub III)"];
     string[] addresses = ["", ""];
+    bool changingRegistry;
+    string documentScope = "";
+    const string RegistryState = "Status karencji";
+    const string RegistrySource = "Źródło karencji";
+    const string RegistryHash = "SHA256 źródła";
+    const string RegistryExcerpt = "Pełna sekcja karencji źródła";
+
 
     public MainForm()
     {
@@ -54,6 +61,7 @@ sealed class MainForm : Form
 
         var top = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true };
         document.Width = 180; document.PlaceholderText = "Pełny numer FS / PA / WZ";
+        source.Items.Add("Rejestr RPL (podstawowe źródło)");
         source.Items.Add("Opis leku");
         for (int i = 1; i <= 8; i++) source.Items.Add("Pole własne " + i);
         source.SelectedIndex = 0;
@@ -69,6 +77,7 @@ sealed class MainForm : Form
             finally { load.Enabled = true; }
         };
         top.Controls.Add(load);
+        AddButton(top, "Karencja z rejestru…", ApplyRegistry);
         AddButton(top, "Zapisz kartę", SaveCard);
         AddButton(top, "Otwórz kartę", OpenCard);
         AddButton(top, "Podgląd / druk", Preview);
@@ -82,6 +91,19 @@ sealed class MainForm : Form
         }
         grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Drukuj", HeaderText = "Drukuj" });
         foreach (string name in columns) grid.Columns.Add(name, name);
+        foreach (string name in new[] { "Gatunek", "Droga podania", "Produkt spożywczy", RegistryState, RegistrySource, RegistryHash, RegistryExcerpt, "Produkt rejestru", "ID towaru" })
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = name, HeaderText = name, ReadOnly = name is RegistryState or RegistryHash or RegistryExcerpt or RegistrySource or "ID towaru" });
+        grid.Columns[RegistryHash].Visible = false;
+        grid.Columns[RegistryExcerpt].Visible = false;
+        grid.Columns["ID towaru"].Visible = false;
+        grid.CellValueChanged += (_, e) =>
+        {
+            if (changingRegistry || e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            string name = grid.Columns[e.ColumnIndex].Name;
+            var row = grid.Rows[e.RowIndex];
+            if (name is "Karencja" or "Produkt" or "Gatunek" or "Droga podania" or "Produkt spożywczy" or "Produkt rejestru" or "Dawkowanie i okres stosowania" or "Opis zwierząt / numer siedziby stada")
+                row.Cells[RegistryState].Value = "Zmieniono ręcznie — sprawdź przed wydrukiem";
+        };
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
         bottom.Controls.Add(status);
         card.Controls.Add(grid); card.Controls.Add(editor); card.Controls.Add(top); card.Controls.Add(bottom);
@@ -143,9 +165,10 @@ sealed class MainForm : Form
                             Name("ONa", "OS") + "\n" + V("OA") + "\n" + V("OKo") + " " + V("OM")];
             if (await reader.ReadAsync()) throw new InvalidOperationException("Numer nie jest jednoznaczny. Wybór po identyfikatorze wymaga rozszerzenia.");
         }
-        string withdrawal = source.SelectedIndex == 0 ? "t.tw_Opis" : "t.tw_Pole" + source.SelectedIndex;
+        int selectedSource = source.SelectedIndex;
+        string withdrawal = selectedSource == 0 ? "CAST(NULL AS nvarchar(4000))" : selectedSource == 1 ? "t.tw_Opis" : "t.tw_Pole" + (selectedSource - 1);
         using var cmd = new SqlCommand($"""
-            SELECT p.ob_Id, t.tw_Nazwa, p.ob_Opis, p.ob_Ilosc, p.ob_Jm,
+            SELECT p.ob_Id, p.ob_TowId, t.tw_Nazwa, p.ob_Opis, p.ob_Ilosc, p.ob_Jm,
               {withdrawal} AS Karencja,
               r.mr_Id, r.mr_Ilosc, r.mr_DoId,
               zp.ob_NumerSeryjny AS Seria,
@@ -172,18 +195,50 @@ sealed class MainForm : Form
                 if (quantity == "") quantity = V("ob_Ilosc");
                 string note = V("Seria") == "" || expiry == "" ? "Sprawdź / uzupełnij serię i ważność." : "";
                 if (reader["mr_DoId"] is DBNull) note += " Brak powiązania z dostawą źródłową — sprawdź ręcznie.";
-                rows.Add([true, "", "", "", product, V("Seria"), expiry, quantity + " " + V("ob_Jm"), "", V("Karencja"), note, "II"]);
+                rows.Add([true, "", "", "", product, V("Seria"), expiry, quantity + " " + V("ob_Jm"), "", V("Karencja"), note, "II",
+                    "", "", "", selectedSource == 0 ? "Brak karencji — wybierz produkt w RPL" : "Dane Subiekta — do weryfikacji",
+                    selectedSource == 0 ? "" : "Subiekt: " + withdrawal, "", "", "", V("ob_TowId")]);
             }
         }
-        grid.Rows.Clear();
-        foreach (var row in rows) grid.Rows.Add(row);
+        changingRegistry = true;
+        try { grid.Rows.Clear(); foreach (var row in rows) grid.Rows.Add(row); }
+        finally { changingRegistry = false; }
+        documentScope = server.Text.Trim().ToUpperInvariant() + "|" + database.Text.Trim().ToUpperInvariant();
         addresses = newAddresses;
         fields["Właściciel i adres"].Text = addresses[owner.SelectedIndex];
         fields["Dokument źródłowy"].Text = number;
         status.Text = $"Pobrano {rows.Count} wierszy. Sprawdź produkty, jednostki, dawki i brakujące dane przed wydrukiem.";
     }
 
-    Card Capture()
+    void ApplyRegistry()
+    {
+        grid.EndEdit();
+        var row = grid.CurrentRow;
+        if (row is null || row.IsNewRow) throw new InvalidOperationException("Wybierz wiersz produktu na karcie.");
+        string product = row.Cells["Produkt"].Value?.ToString() ?? "";
+        string key = documentScope + "|" + (row.Cells["ID towaru"].Value?.ToString() ?? "") + "|" + product;
+        using var dialog = new RegistryDialog(product, RegistryService.ReadMapping(key));
+        if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Selection is not { } selection) return;
+        // Persist only medicine identity. Species, route and withdrawal must be confirmed for every use.
+        RegistryService.SaveMapping(key, selection.Document.Id);
+        changingRegistry = true;
+        try
+        {
+            row.Cells["Karencja"].Value = selection.Text;
+            row.Cells["Gatunek"].Value = selection.Species;
+            row.Cells["Droga podania"].Value = selection.Route;
+            row.Cells["Produkt spożywczy"].Value = selection.Food;
+            row.Cells["Produkt rejestru"].Value = selection.Medicine;
+            row.Cells[RegistrySource].Value = selection.Document.Url + " | pobrano " + selection.Document.DownloadedUtc.ToString("O") + " | zatwierdzono " + DateTimeOffset.UtcNow.ToString("O");
+            row.Cells[RegistryHash].Value = selection.Document.Sha256;
+            row.Cells[RegistryExcerpt].Value = selection.Document.WithdrawalSection;
+            row.Cells[RegistryState].Value = "RPL — sprawdzono i zatwierdzono";
+        }
+        finally { changingRegistry = false; }
+        status.Text = "Zastosowano karencję wyłącznie do wybranego wiersza. Inne zwierzęta lub drogi podania wymagają osobnego wyboru.";
+    }
+
+    Card CaptureCard()
     {
         grid.EndEdit();
         var rows = new List<Dictionary<string, string>>();
@@ -194,13 +249,15 @@ sealed class MainForm : Form
             foreach (DataGridViewColumn c in grid.Columns) values[c.Name] = row.Cells[c.Index].Value?.ToString() ?? "";
             rows.Add(values);
         }
-        return new(fields.ToDictionary(p => p.Key, p => p.Value.Text), rows);
+        var snapshot = fields.ToDictionary(p => p.Key, p => p.Value.Text);
+        snapshot["Zakres mapowania towarów"] = documentScope;
+        return new(snapshot, rows);
     }
     void SaveCard()
     {
         using var dialog = new SaveFileDialog { Filter = "Karta JSON|*.json", FileName = "karta-" + Guid.NewGuid().ToString("N") + ".json" };
         if (dialog.ShowDialog() != DialogResult.OK) return;
-        File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(Capture(), new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+        File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(CaptureCard(), new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
         status.Text = "Zapisano kartę: " + dialog.FileName;
     }
     void OpenCard()
@@ -210,6 +267,9 @@ sealed class MainForm : Form
         var card = JsonSerializer.Deserialize<Card>(File.ReadAllText(dialog.FileName)) ?? throw new InvalidDataException("Nieprawidłowy plik.");
         if (MessageBox.Show("Otwarcie zastąpi aktualnie edytowaną kartę. Kontynuować?", "Otwórz", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
         foreach (var p in fields) p.Value.Text = card.Fields.GetValueOrDefault(p.Key, "");
+        changingRegistry = true;
+        try
+        {
         grid.Rows.Clear();
         foreach (var row in card.Rows)
         {
@@ -218,16 +278,23 @@ sealed class MainForm : Form
                 : row.GetValueOrDefault(c.Name, "")).ToArray();
             grid.Rows.Add(values);
         }
+        }
+        finally { changingRegistry = false; }
+        documentScope = card.Fields.GetValueOrDefault("Zakres mapowania towarów", "archiwum");
         addresses = [fields["Właściciel i adres"].Text, fields["Właściciel i adres"].Text];
         status.Text = "Otworzono kartę.";
     }
     void Preview()
     {
-        var card = Capture();
+        var card = CaptureCard();
         var selected = card.Rows.Where(r => string.Equals(r.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)).ToList();
         if (selected.Count == 0) throw new InvalidOperationException("Zaznacz co najmniej jedną pozycję do wydruku.");
         if (selected.Any(r => r.GetValueOrDefault("Sekcja (II lub III)") is not ("II" or "III")))
             throw new InvalidOperationException("Każda zaznaczona pozycja musi mieć sekcję II lub III.");
+        if (selected.Any(r => string.IsNullOrWhiteSpace(r.GetValueOrDefault("Karencja")) || r.GetValueOrDefault(RegistryState) != "RPL — sprawdzono i zatwierdzono"))
+        {
+            if (MessageBox.Show(this, "Część pozycji ma brak karencji, dane spoza RPL lub ręczne zmiany. Sprawdź każdą z nich. Czy potwierdzasz dane i chcesz otworzyć podgląd?", "Weryfikacja karencji", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+        }
         static string E(string? v) => WebUtility.HtmlEncode(v ?? "").Replace("\r\n", "\n").Replace("\n", "<br>");
         string Field(string k) => E(card.Fields.GetValueOrDefault(k));
         var html = new StringBuilder("""
@@ -259,11 +326,14 @@ sealed class MainForm : Form
             foreach (var row in selected.Where(r => r.GetValueOrDefault("Sekcja (II lub III)") == section))
             {
                 string V(string k) => E(row.GetValueOrDefault(k));
-                html.Append($"<tr><td>{++index}</td><td>{V(columns[0])}</td><td>{V(columns[1])}</td><td>{V(columns[2])}</td><td>{V(columns[3])}</td><td>{V(columns[4])}<br>{V(columns[5])}</td><td>Ilość wydana: {V(columns[6])}<br>{V(columns[7])}</td><td>{V(columns[8])}</td><td>{V(columns[9])}</td></tr>");
+                html.Append($"<tr><td>{++index}</td><td>{V(columns[0])}</td><td>{V(columns[1])}</td><td>{V(columns[2])}</td><td>{V(columns[3])}</td><td>{V(columns[4])}<br>{V(columns[5])}</td><td>Ilość wydana: {V(columns[6])}<br>{V(columns[7])}</td><td>{V(columns[8])}<br><small>{V("Gatunek")} / {V("Droga podania")} / {V("Produkt spożywczy")}</small></td><td>{V(columns[9])}</td></tr>");
             }
             if (index == 0) html.Append("<tr><td colspan='9' style='height:25px'></td></tr>");
             html.Append("</tbody></table>");
         }
+        html.Append("<details class='tools'><summary>Źródła karencji (nie drukowane)</summary>");
+        foreach (var row in selected) html.Append("<p>" + E(row.GetValueOrDefault("Produkt")) + "<br>" + E(row.GetValueOrDefault(RegistrySource)) + "<br>" + E(row.GetValueOrDefault(RegistryState)) + "</p>");
+        html.Append("</details>");
         html.Append("<p>Oświadczam, że nabyte produkty lecznicze weterynaryjne / pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</p>");
         html.Append($"<div class='sign'><div>{Field("Lekarz i nr prawa wykonywania zawodu")}<br><br>................................................<br>podpis i pieczęć lekarza weterynarii</div><div>................................................<br>podpis posiadacza zwierzęcia</div></div><p>IV. Wyniki badań uzupełniających: {Field("Wyniki badań")}</p></body></html>");
         using var dialog = new SaveFileDialog { Filter = "Podgląd HTML|*.html", FileName = "karta-" + Guid.NewGuid().ToString("N") + ".html" };
