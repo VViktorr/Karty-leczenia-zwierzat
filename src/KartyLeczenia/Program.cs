@@ -1,0 +1,274 @@
+using System.Data;
+using System.Diagnostics;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Data.SqlClient;
+
+namespace KartyLeczenia;
+
+static class Program
+{
+    [STAThread]
+    static void Main()
+    {
+        ApplicationConfiguration.Initialize();
+        Application.Run(new MainForm());
+    }
+}
+
+public sealed record Card(Dictionary<string, string> Fields, List<Dictionary<string, string>> Rows);
+
+sealed class MainForm : Form
+{
+    readonly TextBox server = new(), database = new(), login = new(), password = new() { UseSystemPasswordChar = true };
+    readonly CheckBox windows = new() { Text = "Logowanie Windows", Checked = true, AutoSize = true };
+    readonly CheckBox trust = new() { Text = "Zaufaj certyfikatowi serwera", AutoSize = true };
+    readonly TextBox document = new();
+    readonly ComboBox source = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+    readonly ComboBox owner = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+    readonly Dictionary<string, TextBox> fields = new();
+    readonly DataGridView grid = new() { Dock = DockStyle.Fill, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells, AllowUserToAddRows = true };
+    readonly Label status = new() { AutoSize = true, Text = "Podaj połączenie i numer dokumentu." };
+    readonly string[] columns = ["Opis zwierząt / numer siedziby stada", "Liczba zwierząt", "Rozpoznanie", "Produkt", "Seria", "Ważność", "Ilość wydana", "Dawkowanie i okres stosowania", "Karencja", "Zalecenia / uwagi", "Sekcja (II lub III)"];
+    string[] addresses = ["", ""];
+
+    public MainForm()
+    {
+        Text = "Karty leczenia zwierząt — pierwsza wersja";
+        Width = 1400; Height = 900;
+        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var connection = new TabPage("Połączenie z Subiektem");
+        var card = new TabPage("Karta leczenia");
+        tabs.TabPages.AddRange([connection, card]);
+        Controls.Add(tabs);
+        var settings = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        connection.Controls.Add(settings);
+        AddInput(settings, "Serwer SQL (komputer lub komputer\\instancja)", server);
+        AddInput(settings, "Baza firmy", database);
+        settings.Controls.Add(windows);
+        AddInput(settings, "Login SQL", login);
+        AddInput(settings, "Hasło SQL — tylko na czas sesji", password);
+        settings.Controls.Add(trust);
+        settings.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(700, 0), Text = "Wymagane konto z uprawnieniami wyłącznie SELECT. Program nie zapisuje nic do bazy Subiekta. Ustawienia połączenia nie są zapisywane na dysku." });
+
+        var top = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true };
+        document.Width = 180; document.PlaceholderText = "Pełny numer FS / PA / WZ";
+        source.Items.Add("Opis leku");
+        for (int i = 1; i <= 8; i++) source.Items.Add("Pole własne " + i);
+        source.SelectedIndex = 0;
+        owner.Items.AddRange(["Płatnik", "Odbiorca"]); owner.SelectedIndex = 0;
+        owner.SelectedIndexChanged += (_, _) => fields["Właściciel i adres"].Text = addresses[owner.SelectedIndex];
+        top.Controls.AddRange([document, source, owner]);
+        Button load = new() { Text = "Pobierz dokument", AutoSize = true };
+        load.Click += async (_, _) =>
+        {
+            load.Enabled = false;
+            try { await LoadDocument(); }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Nie udało się pobrać dokumentu"); }
+            finally { load.Enabled = true; }
+        };
+        top.Controls.Add(load);
+        AddButton(top, "Zapisz kartę", SaveCard);
+        AddButton(top, "Otwórz kartę", OpenCard);
+        AddButton(top, "Podgląd / druk", Preview);
+        var editor = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true };
+        foreach (string name in new[] { "Nr karty", "Lecznica i adres", "Lekarz i nr prawa wykonywania zawodu", "Właściciel i adres", "Zgłoszenie — data i godzina", "Wykonanie — data i godzina", "Wyniki badań", "Dokument źródłowy" })
+        {
+            var box = new TextBox { Width = 285, Multiline = true, Height = 44 };
+            fields.Add(name, box);
+            var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true };
+            panel.Controls.Add(new Label { Text = name, AutoSize = true }); panel.Controls.Add(box); editor.Controls.Add(panel);
+        }
+        grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Drukuj", HeaderText = "Drukuj" });
+        foreach (string name in columns) grid.Columns.Add(name, name);
+        var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
+        bottom.Controls.Add(status);
+        card.Controls.Add(grid); card.Controls.Add(editor); card.Controls.Add(top); card.Controls.Add(bottom);
+    }
+
+    static void AddInput(FlowLayoutPanel panel, string label, TextBox input)
+    {
+        panel.Controls.Add(new Label { Text = label, AutoSize = true });
+        input.Width = 400; panel.Controls.Add(input);
+    }
+    static void AddButton(FlowLayoutPanel panel, string label, Action action)
+    {
+        var button = new Button { Text = label, AutoSize = true };
+        button.Click += (_, _) => { try { action(); } catch (Exception ex) { MessageBox.Show(ex.Message); } };
+        panel.Controls.Add(button);
+    }
+    string ConnectionString()
+    {
+        if (string.IsNullOrWhiteSpace(server.Text) || string.IsNullOrWhiteSpace(database.Text))
+            throw new InvalidOperationException("Podaj serwer SQL i bazę firmy w zakładce połączenia.");
+        var b = new SqlConnectionStringBuilder
+        {
+            DataSource = server.Text.Trim(), InitialCatalog = database.Text.Trim(),
+            IntegratedSecurity = windows.Checked, TrustServerCertificate = trust.Checked,
+            ApplicationIntent = ApplicationIntent.ReadOnly, ConnectTimeout = 10,
+            ApplicationName = "KartyLeczenia"
+        };
+        if (!windows.Checked) { b.UserID = login.Text; b.Password = password.Text; }
+        return b.ConnectionString;
+    }
+
+    async Task LoadDocument()
+    {
+        if (string.IsNullOrWhiteSpace(document.Text)) throw new InvalidOperationException("Podaj pełny numer dokumentu.");
+        if (grid.Rows.Cast<DataGridViewRow>().Any(r => !r.IsNewRow) &&
+            MessageBox.Show("Pobranie zastąpi aktualnie edytowane pozycje. Kontynuować?", "Nowy dokument", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+        await using var con = new SqlConnection(ConnectionString());
+        await con.OpenAsync();
+        using var head = new SqlCommand("""
+            SELECT d.dok_Id, d.dok_NrPelny,
+              pl.adrh_NazwaPelna AS PN, pl.adrh_Nazwa AS PS, pl.adrh_Adres AS PA,
+              pl.adrh_Kod AS PK, pl.adrh_Miejscowosc AS PM,
+              od.adrh_NazwaPelna AS ONa, od.adrh_Nazwa AS OS, od.adrh_Adres AS OA,
+              od.adrh_Kod AS OKo, od.adrh_Miejscowosc AS OM
+            FROM dbo.dok__Dokument d
+            LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
+            LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
+            WHERE d.dok_NrPelny=@number
+            """, con);
+        head.Parameters.Add("@number", SqlDbType.NVarChar, 100).Value = document.Text.Trim();
+        int id; string number; string[] newAddresses;
+        await using (var reader = await head.ExecuteReaderAsync())
+        {
+            if (!await reader.ReadAsync()) throw new InvalidOperationException("Nie znaleziono dokumentu.");
+            string V(string n) => reader[n]?.ToString() ?? "";
+            id = Convert.ToInt32(reader["dok_Id"]); number = V("dok_NrPelny");
+            string Name(string full, string shortName) => string.IsNullOrWhiteSpace(V(full)) ? V(shortName) : V(full);
+            newAddresses = [Name("PN", "PS") + "\n" + V("PA") + "\n" + V("PK") + " " + V("PM"),
+                            Name("ONa", "OS") + "\n" + V("OA") + "\n" + V("OKo") + " " + V("OM")];
+            if (await reader.ReadAsync()) throw new InvalidOperationException("Numer nie jest jednoznaczny. Wybór po identyfikatorze wymaga rozszerzenia.");
+        }
+        string withdrawal = source.SelectedIndex == 0 ? "t.tw_Opis" : "t.tw_Pole" + source.SelectedIndex;
+        using var cmd = new SqlCommand($"""
+            SELECT p.ob_Id, t.tw_Nazwa, p.ob_Opis, p.ob_Ilosc, p.ob_Jm,
+              {withdrawal} AS Karencja,
+              r.mr_Id, r.mr_Ilosc, r.mr_DoId,
+              zp.ob_NumerSeryjny AS Seria,
+              zp.ob_Termin AS Waznosc, z.mr_Termin AS TerminRuchu
+            FROM dbo.dok_Pozycja p
+            LEFT JOIN dbo.tw__Towar t ON t.tw_Id=p.ob_TowId
+            LEFT JOIN dbo.dok_MagRuch r ON r.mr_PozId=p.ob_Id
+            LEFT JOIN dbo.dok_MagRuch z ON z.mr_Id=r.mr_DoId AND z.mr_TowId=r.mr_TowId
+            LEFT JOIN dbo.dok_Pozycja zp ON zp.ob_Id=z.mr_PozId
+            WHERE p.ob_DokHanId=@id OR p.ob_DokMagId=@id
+            ORDER BY p.ob_Id, r.mr_Id
+            """, con);
+        cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
+        var rows = new List<object[]>();
+        await using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                string V(string n) => reader[n] is DBNull ? "" : reader[n].ToString() ?? "";
+                object date = reader["Waznosc"] is DBNull ? reader["TerminRuchu"] : reader["Waznosc"];
+                string expiry = date is DateTime dt ? dt.ToString("dd.MM.yyyy") : "";
+                string product = string.IsNullOrWhiteSpace(V("tw_Nazwa")) ? V("ob_Opis") : V("tw_Nazwa");
+                string quantity = V("mr_Ilosc");
+                if (quantity == "") quantity = V("ob_Ilosc");
+                string note = V("Seria") == "" || expiry == "" ? "Sprawdź / uzupełnij serię i ważność." : "";
+                if (reader["mr_DoId"] is DBNull) note += " Brak powiązania z dostawą źródłową — sprawdź ręcznie.";
+                rows.Add([true, "", "", "", product, V("Seria"), expiry, quantity + " " + V("ob_Jm"), "", V("Karencja"), note, "II"]);
+            }
+        }
+        grid.Rows.Clear();
+        foreach (var row in rows) grid.Rows.Add(row);
+        addresses = newAddresses;
+        fields["Właściciel i adres"].Text = addresses[owner.SelectedIndex];
+        fields["Dokument źródłowy"].Text = number;
+        status.Text = $"Pobrano {rows.Count} wierszy. Sprawdź produkty, jednostki, dawki i brakujące dane przed wydrukiem.";
+    }
+
+    Card Capture()
+    {
+        grid.EndEdit();
+        var rows = new List<Dictionary<string, string>>();
+        foreach (DataGridViewRow row in grid.Rows)
+        {
+            if (row.IsNewRow) continue;
+            var values = new Dictionary<string, string>();
+            foreach (DataGridViewColumn c in grid.Columns) values[c.Name] = row.Cells[c.Index].Value?.ToString() ?? "";
+            rows.Add(values);
+        }
+        return new(fields.ToDictionary(p => p.Key, p => p.Value.Text), rows);
+    }
+    void SaveCard()
+    {
+        using var dialog = new SaveFileDialog { Filter = "Karta JSON|*.json", FileName = "karta-" + Guid.NewGuid().ToString("N") + ".json" };
+        if (dialog.ShowDialog() != DialogResult.OK) return;
+        File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(Capture(), new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+        status.Text = "Zapisano kartę: " + dialog.FileName;
+    }
+    void OpenCard()
+    {
+        using var dialog = new OpenFileDialog { Filter = "Karta JSON|*.json" };
+        if (dialog.ShowDialog() != DialogResult.OK) return;
+        var card = JsonSerializer.Deserialize<Card>(File.ReadAllText(dialog.FileName)) ?? throw new InvalidDataException("Nieprawidłowy plik.");
+        if (MessageBox.Show("Otwarcie zastąpi aktualnie edytowaną kartę. Kontynuować?", "Otwórz", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+        foreach (var p in fields) p.Value.Text = card.Fields.GetValueOrDefault(p.Key, "");
+        grid.Rows.Clear();
+        foreach (var row in card.Rows)
+        {
+            object[] values = grid.Columns.Cast<DataGridViewColumn>().Select(c => c.Index == 0
+                ? (object)string.Equals(row.GetValueOrDefault(c.Name), "True", StringComparison.OrdinalIgnoreCase)
+                : row.GetValueOrDefault(c.Name, "")).ToArray();
+            grid.Rows.Add(values);
+        }
+        addresses = [fields["Właściciel i adres"].Text, fields["Właściciel i adres"].Text];
+        status.Text = "Otworzono kartę.";
+    }
+    void Preview()
+    {
+        var card = Capture();
+        var selected = card.Rows.Where(r => string.Equals(r.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (selected.Count == 0) throw new InvalidOperationException("Zaznacz co najmniej jedną pozycję do wydruku.");
+        if (selected.Any(r => r.GetValueOrDefault("Sekcja (II lub III)") is not ("II" or "III")))
+            throw new InvalidOperationException("Każda zaznaczona pozycja musi mieć sekcję II lub III.");
+        static string E(string? v) => WebUtility.HtmlEncode(v ?? "").Replace("\r\n", "\n").Replace("\n", "<br>");
+        string Field(string k) => E(card.Fields.GetValueOrDefault(k));
+        var html = new StringBuilder("""
+            <!doctype html><html lang="pl"><meta charset="utf-8">
+            <title>Karta leczenia zwierząt</title>
+            <style>
+            @page { size:A4 landscape; margin:10mm; }
+            body {font:10px Arial,sans-serif;color:#000;background:#fff;}
+            h1 {text-align:center;font-size:15px;} h2 {font-size:12px;}
+            .header {display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:14px 0;}
+            table {width:100%;border-collapse:collapse;table-layout:fixed;}
+            th,td {border:1px solid #000;padding:5px;overflow-wrap:anywhere;vertical-align:top;}
+            thead {display:table-header-group;} tr {break-inside:avoid;}
+            th {font-weight:normal;} .sign {display:flex;justify-content:space-around;margin:35px 0 18px;}
+            .tools {margin:10px;} @media print {.tools{display:none;}}
+            </style><body>
+            <div class="tools"><button onclick="window.print()">Drukuj / zapisz PDF</button>
+            Sprawdź A4 poziomo i wyłącz nagłówki oraz stopki przeglądarki.</div>
+            <h1>KSIĄŻKA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT,<br>
+            Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h1>
+            """);
+        html.Append($"<div class='header'><div>I. Zakład leczniczy:<br>{Field("Lecznica i adres")}</div><div>Posiadacz zwierzęcia:<br>{Field("Właściciel i adres")}</div><div>Nr dokumentu: {Field("Nr karty")}<br>Dokument źródłowy: {Field("Dokument źródłowy")}</div></div>");
+        html.Append($"<p>Zgłoszenie: {Field("Zgłoszenie — data i godzina")}<br>Wykonanie czynności: {Field("Wykonanie — data i godzina")}</p>");
+        foreach (string section in new[] { "II", "III" })
+        {
+            html.Append(section == "II" ? "<h2>II. Leczenie zwierząt</h2>" : "<h2>III. Potwierdzenie nabycia produktu leczniczego weterynaryjnego / paszy leczniczej</h2>");
+            html.Append("<table><thead><tr><th style='width:3%'>Lp.</th><th>Zwierzęta / siedziba stada</th><th style='width:5%'>Liczba</th><th>Rozpoznanie</th><th>Produkt</th><th>Seria / ważność</th><th>Ilość, dawkowanie i okres stosowania</th><th>Karencja</th><th>Zalecenia / uwagi</th></tr></thead><tbody>");
+            int index = 0;
+            foreach (var row in selected.Where(r => r.GetValueOrDefault("Sekcja (II lub III)") == section))
+            {
+                string V(string k) => E(row.GetValueOrDefault(k));
+                html.Append($"<tr><td>{++index}</td><td>{V(columns[0])}</td><td>{V(columns[1])}</td><td>{V(columns[2])}</td><td>{V(columns[3])}</td><td>{V(columns[4])}<br>{V(columns[5])}</td><td>Ilość wydana: {V(columns[6])}<br>{V(columns[7])}</td><td>{V(columns[8])}</td><td>{V(columns[9])}</td></tr>");
+            }
+            if (index == 0) html.Append("<tr><td colspan='9' style='height:25px'></td></tr>");
+            html.Append("</tbody></table>");
+        }
+        html.Append("<p>Oświadczam, że nabyte produkty lecznicze weterynaryjne / pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</p>");
+        html.Append($"<div class='sign'><div>{Field("Lekarz i nr prawa wykonywania zawodu")}<br><br>................................................<br>podpis i pieczęć lekarza weterynarii</div><div>................................................<br>podpis posiadacza zwierzęcia</div></div><p>IV. Wyniki badań uzupełniających: {Field("Wyniki badań")}</p></body></html>");
+        using var dialog = new SaveFileDialog { Filter = "Podgląd HTML|*.html", FileName = "karta-" + Guid.NewGuid().ToString("N") + ".html" };
+        if (dialog.ShowDialog() != DialogResult.OK) return;
+        File.WriteAllText(dialog.FileName, html.ToString(), Encoding.UTF8);
+        Process.Start(new ProcessStartInfo(dialog.FileName) { UseShellExecute = true });
+    }
+}
