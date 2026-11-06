@@ -21,11 +21,13 @@ public sealed class CardPage : ContentPage
     TreatmentRow? selected;
     bool changing;
     string scope = "", payer = "", recipient = "";
+    CancellationTokenSource? automaticWork;
+    int documentGeneration;
 
     public CardPage(AppState appState)
     {
         state = appState; Title = "Karta leczenia";
-        withdrawal.Items.Add("Rejestr RPL (domyślnie)"); withdrawal.Items.Add("Opis leku");
+        withdrawal.Items.Add("Unijna baza UPD (domyślnie)"); withdrawal.Items.Add("Opis leku");
         for (int i = 1; i <= 8; i++) withdrawal.Items.Add("Pole własne " + i);
         withdrawal.SelectedIndex = 0; owner.Items.Add("Płatnik"); owner.Items.Add("Odbiorca"); owner.SelectedIndex = 0;
         owner.SelectedIndexChanged += (_, _) => { if (!changing && scope != "") header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient; };
@@ -56,7 +58,7 @@ public sealed class CardPage : ContentPage
         printed.CheckedChanged += (_, e) => { if (!changing && selected != null) selected.Printed = e.Value; };
         detail.Add(Ui.Heading("Edytuj pozycję"));
         detail.Add(new HorizontalStackLayout { Children = { printed, new Label { Text = "Uwzględnij na wydruku", VerticalOptions = LayoutOptions.Center } } });
-        detail.Add(Ui.Action("Pobierz karencję z RPL…", ApplyRegistry));
+        detail.Add(Ui.Action("Karencja z UPD / RPL…", ApplyRegistry));
         foreach (string field in CardSchema.RowFields.Concat(CardSchema.ContextFields))
         {
             var editor = new Editor { HeightRequest = field is "Karencja" or "Dawkowanie i okres stosowania" or "Zalecenia / uwagi" ? 82 : 48 };
@@ -68,6 +70,7 @@ public sealed class CardPage : ContentPage
         var split = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(0.36, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(0.64, GridUnitType.Star) } } };
         split.Add(list, 0, 0); split.Add(new ScrollView { Content = detail }, 1, 0);
         var rowActions = new HorizontalStackLayout { Spacing = 10, Children = {
+            Ui.Action("Uzupełnij brakujące karencje", () => FillWithdrawals(documentGeneration)),
             Ui.Action("Dodaj pozycję ręcznie", () => { var row = new TreatmentRow(); row.Set("Produkt", "Nowa pozycja"); rows.Add(row); list.SelectedItem = row; return Task.CompletedTask; }),
             Ui.Action("Usuń wybraną pozycję", async () => { if (selected != null && await DisplayAlertAsync("Usuń pozycję", "Usunąć zaznaczoną pozycję z tej karty?", "Usuń", "Anuluj")) rows.Remove(selected); })
         } };
@@ -92,17 +95,60 @@ public sealed class CardPage : ContentPage
     {
         var options = state.ValidatedConnection ?? throw new InvalidOperationException("Najpierw przetestuj połączenie z Subiektem.");
         if (rows.Count > 0 && !await DisplayAlertAsync("Nowy dokument", "Pobranie zastąpi aktualnie edytowane pozycje. Kontynuować?", "Pobierz", "Anuluj")) return;
+        automaticWork?.Cancel();
+        int generation = ++documentGeneration;
         status.Text = "Pobieranie leków z dokumentu…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var data = await documents.ReadAsync(options, number.Text ?? "", withdrawal.SelectedIndex, timeout.Token);
+        if (generation != documentGeneration) return;
         if (state.ValidatedConnection != options) throw new InvalidOperationException("Zmieniono połączenie w trakcie pobierania. Ponów operację.");
         Select(null); rows.Clear(); foreach (var row in data.Rows) rows.Add(row);
         scope = data.Scope; payer = data.Payer; recipient = data.Recipient;
         header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient;
         header["Dokument źródłowy"].Text = data.Number;
         if (rows.Count > 0) list.SelectedItem = rows[0];
-        status.Text = $"Pobrano {rows.Count} pozycji dostaw z grupy {options.DrugGroup}. Sprawdź leczenie, ilości, karencję i brakujące dane.";
+        status.Text = $"Pobrano {rows.Count} pozycji dostaw z grupy {options.DrugGroup}.";
+        if (withdrawal.SelectedIndex == 0) await FillWithdrawals(generation);
     }
+    async Task FillWithdrawals(int generation)
+    {
+        automaticWork?.Cancel();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90)); automaticWork = timeout;
+        var targets = rows.ToList(); string sourceScope = scope;
+        int filled = 0, missing = 0;
+        try
+        {
+            if (generation != documentGeneration || timeout.IsCancellationRequested) return;
+            status.Text = "Automatyczne pobieranie karencji z UPD…";
+            using var gate = new SemaphoreSlim(3);
+            var tasks = targets.GroupBy(r => AutomaticWithdrawalService.MappingKey(sourceScope, r)).Select(async group =>
+            {
+                string originalProduct = group.First().Product;
+                AutomaticWithdrawal? resolved = null;
+                string? error = null;
+                await gate.WaitAsync(timeout.Token);
+                try { resolved = await AutomaticWithdrawalService.ResolveAsync(sourceScope, group.First(), timeout.Token); }
+                catch (Exception ex) { error = ex is OperationCanceledException ? "Przekroczono czas pobierania UPD." : ex.Message; }
+                finally { gate.Release(); }
+                if (generation != documentGeneration || timeout.IsCancellationRequested) return;
+                foreach (var row in group)
+                {
+                    if (!rows.Contains(row) || row.Product != originalProduct || row.Get("Karencja") != "") continue;
+                    if (resolved != null) { AutomaticWithdrawalService.Apply(row, resolved); filled++; }
+                    else { row.Set("Status karencji", error == null ? "Brak zapamiętanego dopasowania UPD — wybierz lek" : "UPD: " + error, false); missing++; }
+                }
+            }).ToArray();
+            await Task.WhenAll(tasks);
+            if (generation == documentGeneration)
+            {
+                Select(selected);
+                status.Text = $"Karencję uzupełniono automatycznie w {filled} pozycjach. Do dopasowania lub ponowienia: {missing}. Sprawdź źródło, produkt i leczenie przed wydrukiem.";
+            }
+        }
+        catch (OperationCanceledException) { if (generation == documentGeneration) status.Text = "Przekroczono czas UPD. Już pobrane dane pozostają w karcie; brakujące pozycje ponów przez przycisk karencji."; }
+        finally { if (ReferenceEquals(automaticWork, timeout)) automaticWork = null; }
+    }
+
     async Task SaveCard()
     {
         var snapshot = Capture();
@@ -117,6 +163,7 @@ public sealed class CardPage : ContentPage
         var card = JsonSerializer.Deserialize<Card>(await File.ReadAllTextAsync(path));
         if (card?.Fields is null || card.Rows is null || card.Rows.Any(r => r is null)) throw new InvalidDataException("Nieprawidłowy plik karty.");
         if (!await DisplayAlertAsync("Otwórz kartę", "Zastąpić aktualnie edytowaną kartę?", "Otwórz", "Anuluj")) return;
+        automaticWork?.Cancel(); documentGeneration++;
         changing = true;
         foreach (var pair in header) pair.Value.Text = card.Fields.GetValueOrDefault(pair.Key, "");
         Select(null); rows.Clear(); foreach (var row in card.Rows) rows.Add(new(row));
@@ -127,19 +174,21 @@ public sealed class CardPage : ContentPage
     async Task ApplyRegistry()
     {
         var row = selected ?? throw new InvalidOperationException("Wybierz lek.");
-        string key = scope + "|" + row.Get("ID towaru") + "|" + row.Product;
-        var page = new RegistryPage(row.Product, RegistryService.ReadMapping(key));
+        string key = AutomaticWithdrawalService.MappingKey(scope, row);
+        var page = new UpdRegistryPage(row.Product, UpdService.ReadMapping(key), RegistryService.ReadMapping(key));
         await Navigation.PushModalAsync(page);
         var result = await page.Completion;
         if (result == null || !rows.Contains(row)) return;
-        RegistryService.SaveMapping(key, result.Document.Id); row.ApplyRegistry(result);
+        if (result.Document.UpdId != null) UpdService.SaveMapping(key, result.Document.UpdId);
+        else RegistryService.SaveMapping(key, result.Document.Id);
+        row.ApplyRegistry(result);
         if (selected == row) Select(row); status.Text = "Zatwierdzono karencję dla wybranej pozycji.";
     }
     async Task Preview()
     {
         var snapshot = Capture();
         if (snapshot.Rows.Where(r => string.Equals(r.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)).Any(CardSchema.NeedsReview) &&
-            !await DisplayAlertAsync("Weryfikacja karencji", "Część pozycji ma brak karencji, dane spoza RPL lub ręczne zmiany. Czy potwierdzasz sprawdzenie danych przed podglądem?", "Potwierdzam", "Wróć")) return;
+            !await DisplayAlertAsync("Weryfikacja karencji", "Nie wszystkie karencje i dopasowania leków zostały zatwierdzone. Sprawdź uzupełnione dane i ewentualne braki. Czy potwierdzasz ich sprawdzenie przed podglądem?", "Potwierdzam", "Wróć")) return;
         string html = CardHtmlRenderer.Render(snapshot);
         var path = await WindowsFiles.SaveAsync(".html", "karta-" + Guid.NewGuid().ToString("N")); if (path == null) return;
         await File.WriteAllTextAsync(path, html, Encoding.UTF8);

@@ -76,7 +76,7 @@ public sealed class DocumentService
                 ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II", ["Produkt"] = product,
                 ["Seria"] = V("Seria"), ["Ważność"] = expiry, ["Ilość wydana"] = quantity.ToString("0.####") + " " + V("ob_Jm"),
                 ["Karencja"] = V("Karencja"), ["Zalecenia / uwagi"] = note,
-                ["Status karencji"] = withdrawalSource == 0 ? "Brak karencji — wybierz produkt w RPL" : "Dane Subiekta — do weryfikacji",
+                ["Status karencji"] = withdrawalSource == 0 ? "Brak karencji — wybierz produkt w UPD" : "Dane Subiekta — do weryfikacji",
                 ["Źródło karencji"] = withdrawalSource == 0 ? "" : "Subiekt: " + withdrawal,
                 ["ID towaru"] = V("ob_TowId")
             }));

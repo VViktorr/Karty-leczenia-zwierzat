@@ -50,5 +50,51 @@ catch (InvalidOperationException) { checks++; }
 restored.Rows[0]["Drukuj"] = "False";
 try { CardHtmlRenderer.Render(restored); throw new Exception("Empty print selection accepted."); }
 catch (InvalidOperationException) { checks++; }
+// BRAVOXIN: an explicit zero is valid data, not missing information.
+string zero = RegistryService.ExtractSection("3.12 Okresy karencji\nZero dni.\n4. DANE IMMUNOLOGICZNE\nNie kopiuj dalej.");
+Check(zero == "Zero dni.", "Explicit zero withdrawal rejected or changed.");
+Check(RegistryService.ExtractSection("4.11 Okres karencji\n0 dni.\n5. WŁAŚCIWOŚCI FARMAKOLOGICZNE") == "0 dni.", "Numeric zero withdrawal rejected.");
+Check(RegistryService.ExtractSection("3.12 Okresy karencji\nNie dotyczy.\n4. DANE IMMUNOLOGICZNE") == "Nie dotyczy.", "Non-applicable text must not become zero.");
+Check(RegistryService.ParseProductId("https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/45232/characteristic") == 45232, "Official PDF link not parsed.");
+try { RegistryService.ParseProductId("https://example.invalid/api/rpl/medicinal-products/45232/characteristic"); throw new Exception("Foreign URL accepted."); }
+catch (InvalidOperationException) { checks++; }
+Check(RegistryCatalog.ExactCandidates("BRAVOXIN A'100 ML").Single().Id == 45232, "Known Bravoxin identity not suggested.");
+Check(RegistryCatalog.ExactCandidates("FLORDOFEN 100MG/ML A'100 ML").All(p => p.Id != 32709), "Wrong strength matched automatically.");
+Check(RegistryCatalog.ExactCandidates("BRAVOXIN10").Count == 0, "Different product name guessed.");
+using (var xml = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("<produktyLecznicze xmlns='urn:test'><produktLeczniczy id='12' nazwaProduktu='Lek A' rodzajPreparatu='weterynaryjny' moc='20 mg/ml' postac='Roztwór'/><produktLeczniczy id='13' nazwaProduktu='Lek ludzki' rodzajPreparatu='ludzki'/></produktyLecznicze>")))
+{
+    var catalog = RegistryCatalog.Parse(xml);
+    Check(catalog.Count == 1 && catalog[0].Id == 12, "Catalog must exclude human medicines and use product IDs.");
+}
+var automatic = new TreatmentRow();
+automatic.Set("Produkt", "Bravoxin");
+var sourceDocument = new RegistryDocument(45232, RegistryService.Url(45232), "test-hash", DateTimeOffset.UtcNow, zero, "Bravoxin zawiesina do wstrzykiwań");
+AutomaticWithdrawalService.Apply(automatic, new(sourceDocument, false));
+Check(automatic.Get("Karencja") == "Zero dni.", "Automatic fill did not copy source withdrawal.");
+Check(CardSchema.NeedsReview(automatic.Values), "Automatic proposal must still require confirmation.");
+Check(automatic.Get("Pełna sekcja karencji źródła") == zero && automatic.Get("Źródło karencji").Contains("45232"), "Automatic fill lost its source.");
+var allRoutes = sourceDocument with { WithdrawalSection = current };
+AutomaticWithdrawalService.Apply(automatic, new(allRoutes, true));
+Check(automatic.Get("Karencja").Contains("30 dni") && automatic.Get("Karencja").Contains("44 dni"), "Automatic fill silently selected one route.");
+
+string Field(string cls, string value) => $"<div class='{cls}'><div class='field__item'>{value}</div></div>";
+string Period(string tissue, string value, string unit, string note = "") => "<div class='paragraph--type--upd-withdrawal-period'>" + Field("upd-tissue__field-upd-term-name", tissue) + Field("upd-withdrawal-period__field-upd-withdrawal-value", value) + Field("upd-units__field-upd-term-name", unit) + note + "</div>";
+string Fixture(string country = "Poland", string status = "Valid") => Field("products__extra-field-upd-products-authorised-countries", country) + Field("upd-auth-status__field-upd-term-name", status) + Field("products__extra-field-upd-products-medicine-name", "Example 50 mg/ml") + "<div class='products__extra-field-upd-products-species-by-route'><ul><li><div class='upd-items-list-title'>Subcutaneous use</div><ul><li class='list-item__upd_species'>" + Field("upd-species__field-upd-term-name", "Cattle") + Period("Meat and offal", "0", "day") + Period("Milk", "36", "hour", "Not for use in pregnancy") + "</li></ul></li></ul></div>";
+var upd = UpdService.Parse("600000000001", Fixture());
+Check(upd.WithdrawalSection.Contains("Tkanki jadalne: 0 dni") && upd.WithdrawalSection.Contains("Mleko: 36 godz."), "UPD lost explicit zero or changed units.");
+Check(upd.WithdrawalSection.Contains("Bydło; Podanie podskórne") && upd.WithdrawalSection.Contains("Not for use in pregnancy"), "UPD lost context or restriction.");
+Check(upd.UpdId == "600000000001" && upd.Source == "UPD" && upd.Sha256.Length == 64, "UPD provenance missing.");
+foreach (var invalid in new[] { Fixture("Norway") + "Poland", Fixture(status: "Suspended"), Fixture().Replace("paragraph--type--upd-withdrawal-period", "changed-layout") })
+{
+    try { UpdService.Parse("600000000001", invalid); throw new Exception("UPD accepted foreign, suspended or unknown data."); }
+    catch (InvalidDataException) { checks++; }
+}
+Check(UpdService.Translate("Unknown restriction") == "Unknown restriction", "UPD guessed a translation.");
+Check(UpdService.ParseId("https://medicines.health.europa.eu/veterinary/pl/600000000001") == "600000000001", "UPD link parsing failed.");
+try { UpdService.ParseId("https://evil.example/veterinary/pl/600000000001"); throw new Exception("Foreign UPD link accepted."); } catch (InvalidDataException) { checks++; }
+var matches = UpdService.ParseSearch("<a href='/veterinary/en/600000000001'>Example</a><a href='https://evil.example/600000000002'>Other</a>");
+Check(matches.Count == 1 && matches[0].Id == "600000000001", "UPD search accepted an external product.");
+automatic.ApplyRegistry(new(upd, "", "", "", upd.WithdrawalSection, upd.ProductIdentity));
+Check(!CardSchema.NeedsReview(automatic.Values) && automatic.RegistryStatus.StartsWith("UPD"), "UPD confirmation not retained.");
 Console.WriteLine($"Passed {checks} core checks.");
 

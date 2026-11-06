@@ -7,7 +7,11 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace KartyLeczenia;
 
-public sealed record RegistryDocument(int Id, string Url, string Sha256, DateTimeOffset DownloadedUtc, string WithdrawalSection, string ProductIdentity);
+public sealed record RegistryDocument(int Id, string Url, string Sha256, DateTimeOffset DownloadedUtc, string WithdrawalSection, string ProductIdentity)
+{
+    public string? UpdId { get; init; }
+    public string Source => UpdId == null ? "RPL" : "UPD";
+}
 public sealed record RegistrySelection(RegistryDocument Document, string Species, string Route, string Food, string Text, string Medicine);
 
 public static class RegistryService
@@ -24,19 +28,20 @@ public static class RegistryService
         var end = Regex.Match(remainder, @"(?im)^\s*(?:4\s*\.\s*(?:DANE|WŁAŚCIWOŚCI)|5\s*\.\s*(?:DANE|WŁAŚCIWOŚCI))\b");
         if (!end.Success) throw new InvalidDataException("Nie rozpoznano końca sekcji karencji. Wymagana ręczna kontrola PDF.");
         string section = remainder[..end.Index].Trim();
-        if (section.Length < 15 || section.Length > 12000) throw new InvalidDataException("Nietypowa sekcja karencji — sprawdź PDF ręcznie.");
+        if (!Regex.IsMatch(section, @"\p{L}{2}") || section.Length > 12000) throw new InvalidDataException("Nietypowa sekcja karencji — sprawdź PDF ręcznie.");
         return section;
     }
-    public static async Task<RegistryDocument> Fetch(int id)
+    public static async Task<RegistryDocument> Fetch(int id, CancellationToken token = default)
     {
         if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));
-        using var response = await Client.GetAsync(Url(id), HttpCompletionOption.ResponseHeadersRead);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(TimeSpan.FromSeconds(30)); token = timeout.Token;
+        using var response = await Client.GetAsync(Url(id), HttpCompletionOption.ResponseHeadersRead, token);
         response.EnsureSuccessStatusCode();
         if (response.Content.Headers.ContentLength > 12 * 1024 * 1024) throw new InvalidDataException("Zbyt duży dokument.");
-        await using var stream = await response.Content.ReadAsStreamAsync();
+        await using var stream = await response.Content.ReadAsStreamAsync(token);
         using var buffer = new MemoryStream();
         byte[] chunk = new byte[8192]; int count;
-        while ((count = await stream.ReadAsync(chunk)) > 0)
+        while ((count = await stream.ReadAsync(chunk, token)) > 0)
         {
             if (buffer.Length + count > 12 * 1024 * 1024) throw new InvalidDataException("Zbyt duży dokument.");
             buffer.Write(chunk, 0, count);
@@ -51,7 +56,7 @@ public static class RegistryService
         // Temporary file + replacement: an interrupted refresh cannot truncate the last good copy.
         string target = Path.Combine(Folder, id + ".json");
         string temp = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try { await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(result)); File.Move(temp, target, true); }
+        try { await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(result), token); File.Move(temp, target, true); }
         finally { if (File.Exists(temp)) File.Delete(temp); }
         return result;
     }
@@ -62,6 +67,17 @@ public static class RegistryService
         var data = JsonSerializer.Deserialize<RegistryDocument>(File.ReadAllText(file));
         if (data is null || data.Id != id || data.Url != Url(id) || string.IsNullOrWhiteSpace(data.WithdrawalSection)) return null;
         return data;
+    }
+    public static int ParseProductId(string input)
+    {
+        if (int.TryParse(input.Trim(), out int id) && id > 0) return id;
+        if (Uri.TryCreate(input.Trim(), UriKind.Absolute, out var uri) && uri.Scheme == "https" &&
+            uri.Host is "rejestrymedyczne.ezdrowie.gov.pl" or "rejestry.ezdrowie.gov.pl")
+        {
+            var match = Regex.Match(uri.AbsolutePath, @"^/api/rpl/medicinal-products/(?<id>\d+)/(?:characteristic|leaflet)/?$");
+            if (match.Success && int.TryParse(match.Groups["id"].Value, out id) && id > 0) return id;
+        }
+        throw new InvalidOperationException("Wpisz ID RPL albo wklej oficjalny link do charakterystyki leku.");
     }
     public static string MappingPath(string key) => Path.Combine(Folder, "map-" + Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key))) + ".txt");
     public static int? ReadMapping(string key)

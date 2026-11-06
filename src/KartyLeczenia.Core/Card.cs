@@ -10,7 +10,7 @@ public static class CardSchema
     public static readonly string[] RowFields = ["Opis zwierząt / numer siedziby stada", "Liczba zwierząt", "Rozpoznanie", "Produkt", "Seria", "Ważność", "Ilość wydana", "Dawkowanie i okres stosowania", "Karencja", "Zalecenia / uwagi", "Sekcja (II lub III)"];
     public static readonly string[] ContextFields = ["Gatunek", "Droga podania", "Produkt spożywczy", "Produkt rejestru"];
     public const string RegistryVerified = "RPL — sprawdzono i zatwierdzono";
-    public static bool NeedsReview(Dictionary<string, string> row) => string.IsNullOrWhiteSpace(row.GetValueOrDefault("Karencja")) || row.GetValueOrDefault("Status karencji") != RegistryVerified;
+    public static bool NeedsReview(Dictionary<string, string> row) => string.IsNullOrWhiteSpace(row.GetValueOrDefault("Karencja")) || row.GetValueOrDefault("Status karencji") is not (RegistryVerified or "UPD — sprawdzono i zatwierdzono");
 }
 
 public sealed class TreatmentRow : INotifyPropertyChanged
@@ -41,7 +41,7 @@ public sealed class TreatmentRow : INotifyPropertyChanged
         Set("Produkt rejestru", selection.Medicine, false);
         Set("Źródło karencji", selection.Document.Url + " | pobrano " + selection.Document.DownloadedUtc.ToString("O") + " | zatwierdzono " + DateTimeOffset.UtcNow.ToString("O"), false);
         Set("SHA256 źródła", selection.Document.Sha256, false); Set("Pełna sekcja karencji źródła", selection.Document.WithdrawalSection, false);
-        Set("Status karencji", CardSchema.RegistryVerified, false);
+        Set("Status karencji", selection.Document.UpdId == null ? CardSchema.RegistryVerified : "UPD — sprawdzono i zatwierdzono", false);
     }
     public event PropertyChangedEventHandler? PropertyChanged;
 }
