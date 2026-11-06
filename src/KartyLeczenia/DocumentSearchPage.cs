@@ -35,7 +35,13 @@ public sealed class DocumentSearchPage : ContentPage
             var number = new Label { FontAttributes = FontAttributes.Bold, FontSize = 15 };
             number.SetBinding(Label.TextProperty, nameof(DocumentSuggestion.Number));
             var detail = Ui.Note(""); detail.SetBinding(Label.TextProperty, nameof(DocumentSuggestion.Details));
-            return new VerticalStackLayout { Padding = new Thickness(14, 10), Spacing = 4, Children = { number, detail } };
+            var amount = new Label { FontAttributes = FontAttributes.Bold, FontSize = 14, HorizontalTextAlignment = TextAlignment.End, VerticalOptions = LayoutOptions.Center };
+            amount.SetBinding(Label.TextProperty, nameof(DocumentSuggestion.AmountText));
+            var heading = new Grid { ColumnSpacing = 16, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
+            heading.Add(number, 0, 0); heading.Add(amount, 1, 0);
+            var related = Ui.Note(""); related.SetBinding(Label.TextProperty, nameof(DocumentSuggestion.RelatedText));
+            related.SetBinding(VisualElement.IsVisibleProperty, nameof(DocumentSuggestion.HasRelatedText));
+            return new VerticalStackLayout { Padding = new Thickness(14, 9), Spacing = 4, Children = { heading, detail, related } };
         });
         results.SelectionChanged += async (_, e) =>
         {
