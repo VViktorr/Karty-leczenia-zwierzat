@@ -20,7 +20,7 @@ public sealed class TreatmentRow : INotifyPropertyChanged
         ? new() { ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II" } : new(values);
     public string Get(string key) => Values.GetValueOrDefault(key, "");
     public string Product => Get("Produkt");
-    public string Summary => Get("Ilość wydana") + "  •  seria: " + (Get("Seria") == "" ? "brak" : Get("Seria"));
+    public string Summary => Get("Ilość wydana") + (string.IsNullOrWhiteSpace(Get("Seria")) ? "" : "  •  serie: " + Get("Seria"));
     public string RegistryStatus => Get("Status karencji");
     public bool Printed { get => bool.TryParse(Get("Drukuj"), out bool value) && value; set => Set("Drukuj", value.ToString()); }
     public void Set(string key, string value, bool manual = true)
