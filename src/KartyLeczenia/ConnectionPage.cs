@@ -68,8 +68,11 @@ public sealed class ConnectionPage : ContentPage
         discover.Clicked += async (_, _) => await Discover(); test.Clicked += async (_, _) => await Test();
         save.Clicked += async (_, _) => await Save(false); next.Clicked += async (_, _) => await Save(true);
         cancel.Clicked += (_, _) => work?.Cancel();
-        Loaded += async (_, _) =>
-        {
+        Loaded += async (_, _) => await InitializeAsync();
+        Authentication(); UpdateButtons();
+    }
+    public async Task InitializeAsync()
+    {
             if (initialized) return; initialized = true;
             changing = true;
             var loaded = store.Load();
@@ -82,8 +85,7 @@ public sealed class ConnectionPage : ContentPage
             changing = false; Authentication();
             if (loaded.Warning != null) status.Text = loaded.Warning;
             if (loaded.Options != null && (windows.IsToggled || !string.IsNullOrEmpty(password.Text))) await Test();
-        };
-        Authentication(); UpdateButtons();
+        
     }
     static HorizontalStackLayout Toggle(string title, Switch toggle) => new() { Spacing = 12, Children = { toggle, new Label { Text = title, VerticalOptions = LayoutOptions.Center } } };
     void Authentication() { login.IsEnabled = password.IsEnabled = remember.IsEnabled = show.IsEnabled = !windows.IsToggled; if (windows.IsToggled) show.IsToggled = false; }
