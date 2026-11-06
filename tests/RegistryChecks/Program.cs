@@ -168,5 +168,11 @@ automaticContext.Set("Dawkowanie i okres stosowania", "Indywidualny wpis lekarza
 automaticContext.Set("Droga podania", "Podskórnie");
 Check(automaticContext.Get("Dawkowanie i okres stosowania") == "Indywidualny wpis lekarza", "Manual dosing was overwritten.");
 Check(TreatmentContextService.ExtractDosing("3.9 Droga podania i dawkowanie\nPodanie podskórne.\n3.10 Objawy przedawkowania\nNie kopiuj dalej.").Trim() == "Podanie podskórne.", "Dosing section boundaries failed.");
+var missingAmount = new DocumentSuggestion(1, "FS 1");
+Check(missingAmount.AmountText == "Brutto: —", "Missing amount reported as zero.");
+Check(new DocumentSuggestion(1, "FS 1", Gross: 0m, Currency: "PLN").AmountText == "Brutto: " + 0m.ToString("N2") + " PLN", "Real zero amount was discarded.");
+var collectiveInvoice = new DocumentSuggestion(1, "FS 1") { Related = new[] { new DocumentLink(2, "WZ 10"), new DocumentLink(3, "WZ 11"), new DocumentLink(4, "WZ 12") } };
+Check(collectiveInvoice.RelatedText.Contains("(3)") && collectiveInvoice.Related.All(d => collectiveInvoice.RelatedText.Contains(d.Number)), "Collective invoice lost linked WZ.");
+Check(new DocumentSuggestion(2, "WZ 10") { Related = new[] { new DocumentLink(1, "FS 1") } }.RelatedText.Contains("FS 1"), "Reverse invoice link missing.");
 Console.WriteLine($"Passed {checks} core checks.");
 
