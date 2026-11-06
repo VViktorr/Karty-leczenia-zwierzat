@@ -18,7 +18,9 @@ public static class RegistryService
 {
     static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(30) };
     internal static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KartyLeczenia", "registry");
-    public static string Url(int id) => $"https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/{id}/characteristic";
+    // Verified correction; never infer a generic conversion by removing digits.
+    public static int DocumentId(int id) => id == 100421477 ? 42147 : id;
+    public static string Url(int id) => $"https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/{DocumentId(id)}/characteristic";
     public static string ExtractSection(string text)
     {
         text = text.Replace('\u00a0', ' ');
@@ -33,6 +35,7 @@ public static class RegistryService
     }
     public static async Task<RegistryDocument> Fetch(int id, CancellationToken token = default)
     {
+        id = DocumentId(id);
         if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(TimeSpan.FromSeconds(30)); token = timeout.Token;
         using var response = await Client.GetAsync(Url(id), HttpCompletionOption.ResponseHeadersRead, token);
@@ -70,12 +73,12 @@ public static class RegistryService
     }
     public static int ParseProductId(string input)
     {
-        if (int.TryParse(input.Trim(), out int id) && id > 0) return id;
+        if (int.TryParse(input.Trim(), out int id) && id > 0) return DocumentId(id);
         if (Uri.TryCreate(input.Trim(), UriKind.Absolute, out var uri) && uri.Scheme == "https" &&
             uri.Host is "rejestrymedyczne.ezdrowie.gov.pl" or "rejestry.ezdrowie.gov.pl")
         {
             var match = Regex.Match(uri.AbsolutePath, @"^/api/rpl/medicinal-products/(?<id>\d+)/(?:characteristic|leaflet)/?$");
-            if (match.Success && int.TryParse(match.Groups["id"].Value, out id) && id > 0) return id;
+            if (match.Success && int.TryParse(match.Groups["id"].Value, out id) && id > 0) return DocumentId(id);
         }
         throw new InvalidOperationException("Wpisz ID RPL albo wklej oficjalny link do charakterystyki leku.");
     }
@@ -83,7 +86,7 @@ public static class RegistryService
     public static int? ReadMapping(string key)
     {
         string path = MappingPath(key);
-        return File.Exists(path) && int.TryParse(File.ReadAllText(path), out int id) && id > 0 ? id : null;
+        return File.Exists(path) && int.TryParse(File.ReadAllText(path), out int id) && id > 0 ? DocumentId(id) : null;
     }
     public static void SaveMapping(string key, int id)
     {
