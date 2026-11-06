@@ -1,88 +1,83 @@
-name: First Windows release
+name: Release MAUI Windows application
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/release.yml']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag nowego wydania'
+        required: true
+        default: v0.2.0-alpha.1
 permissions:
   contents: write
   statuses: write
-concurrency:
-  group: first-windows-release
-  cancel-in-progress: false
 jobs:
-  release:
+  build:
     runs-on: windows-latest
-    timeout-minutes: 20
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: v0.1.0-alpha.1
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Report pending release
+      - name: Report build start
         shell: pwsh
-        run: |
-          gh api "repos/$env:GH_REPO/statuses/$env:GITHUB_SHA" -f state=pending -f context="release/windows" -f description="Building first Windows release" -f target_url="https://github.com/$env:GH_REPO/actions/runs/$env:GITHUB_RUN_ID"
-          if ($LASTEXITCODE -ne 0) { throw "Cannot report release status" }
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh api "repos/$env:GH_REPO/statuses/$env:GITHUB_SHA" -f state=pending -f context="ci/maui-windows" -f target_url="https://github.com/$env:GH_REPO/actions/runs/$env:GITHUB_RUN_ID"
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
-      - name: Verify registry parser
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows --skip-manifest-update
+      - name: Check core and old card compatibility
         run: dotnet run --project tests/RegistryChecks -c Release
-      - name: Publish standalone Windows application
-        run: dotnet publish src/KartyLeczenia -c Release -r win-x64 --self-contained true -p:Version=0.1.0-alpha.1 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
-      - name: Check application startup
+      - name: Check connection settings and password protection
+        run: dotnet run --project tests/ConnectionChecks -c Release
+      - name: Publish MAUI Windows executable
+        run: dotnet publish src/KartyLeczenia -f net10.0-windows10.0.19041.0 -c Release -p:RuntimeIdentifierOverride=win-x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true --self-contained true -o publish
+      - name: Check native MAUI window startup
         shell: pwsh
-        run: |
-          $app = Start-Process -FilePath "$pwd/publish/KartyLeczenia.exe" -PassThru
-          Start-Sleep -Seconds 5
-          $app.Refresh()
-          if ($app.HasExited) { throw "Application exited during startup: $($app.ExitCode)" }
-          Stop-Process -Id $app.Id
-      - name: Prepare package and checksums
+        run: ./scripts/Smoke-Windows.ps1
+      - name: Include instructions and package
         shell: pwsh
         run: |
           Copy-Item README.md publish/INSTRUKCJA.md
-          $zip = "KartyLeczenia-$env:RELEASE_TAG-win-x64.zip"
-          Compress-Archive -Path publish/* -DestinationPath $zip
-          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
-          "$hash  $zip" | Set-Content -Encoding ascii SHA256SUMS.txt
-          @'
-          Pierwsza testowa wersja aplikacji dla Windows 11 x64.
-
-          Pobierz ZIP, rozpakuj cały folder i uruchom KartyLeczenia.exe. Instalacja .NET nie jest wymagana.
-
-          Funkcje:
-          - interfejs okienkowy, odczyt dokumentów i dostaw z Subiekta GT;
-          - ręczna edycja karty, zapis i otwieranie JSON;
-          - podgląd A4 poziomo i druk/PDF przez przeglądarkę;
-          - karencja z charakterystyki RPL, wybór kontekstu i zatwierdzenie przez użytkownika.
-
-          Baza Subiekta wymaga konta mającego wyłącznie prawo SELECT. Program nie zapisuje nic do tej bazy.
-
-          Ograniczenia: brak wspólnej bazy kart, automatycznej numeracji i trwałych profili lekarzy. Pobieranie RPL oraz rzeczywiste połączenie SQL wymagają sprawdzenia na stanowisku użytkownika. Program jest wersją alpha; dane przed wydrukiem wymagają sprawdzenia. Plik wykonywalny nie jest podpisany cyfrowo.
-
-          Walidacja wydania: kontrole parsera, kompilacja Windows x64 oraz próba uruchomienia aplikacji w środowisku GitHub Actions.
-          '@ | Set-Content -Encoding utf8 RELEASE_NOTES.md
+          Compress-Archive -Path publish/* -DestinationPath KartyLeczenia-MAUI-win-x64.zip
+          $hash = (Get-FileHash -Algorithm SHA256 KartyLeczenia-MAUI-win-x64.zip).Hash.ToLowerInvariant()
+          "$hash  KartyLeczenia-MAUI-win-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: KartyLeczenia-v0.1.0-alpha.1-win-x64
+          name: KartyLeczenia-MAUI-win-x64
           path: |
-            KartyLeczenia-*-win-x64.zip
+            KartyLeczenia-MAUI-win-x64.zip
             SHA256SUMS.txt
           if-no-files-found: error
-      - name: Publish private repository release
+      - name: Publish prerelease
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          gh release create "$env:RELEASE_TAG" "KartyLeczenia-$env:RELEASE_TAG-win-x64.zip" SHA256SUMS.txt --target "$env:GITHUB_SHA" --title "Karty leczenia zwierząt 0.1.0 Alpha 1" --prerelease --notes-file RELEASE_NOTES.md
-          if ($LASTEXITCODE -ne 0) { throw "Release publication failed" }
-      - name: Report release result
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?
         if: always()
         shell: pwsh
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           JOB_RESULT: ${{ job.status }}
         run: |
           $state = if ($env:JOB_RESULT -eq 'success') { 'success' } else { 'failure' }
-          $url = if ($state -eq 'success') { "https://github.com/$env:GH_REPO/releases/tag/$env:RELEASE_TAG" } else { "https://github.com/$env:GH_REPO/actions/runs/$env:GITHUB_RUN_ID" }
-          gh api "repos/$env:GH_REPO/statuses/$env:GITHUB_SHA" -f state="$state" -f context="release/windows" -f description="Windows release: $env:JOB_RESULT" -f target_url="$url"
+          gh api "repos/$env:GH_REPO/statuses/$env:GITHUB_SHA" -f state="$state" -f context="ci/maui-windows" -f target_url="https://github.com/$env:GH_REPO/actions/runs/$env:GITHUB_RUN_ID"
+) { throw "Invalid release tag" }
+          gh release create "$env:RELEASE_TAG" KartyLeczenia-MAUI-win-x64.zip SHA256SUMS.txt --target "$env:GITHUB_SHA" --title "Karty leczenia zwierząt $env:RELEASE_TAG — MAUI Windows" --prerelease --notes-file README.md
+          if ($LASTEXITCODE -ne 0) { throw "Release publication failed" }
+      - name: Report build result
+        if: always()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          JOB_RESULT: ${{ job.status }}
+        run: |
+          $state = if ($env:JOB_RESULT -eq 'success') { 'success' } else { 'failure' }
+          gh api "repos/$env:GH_REPO/statuses/$env:GITHUB_SHA" -f state="$state" -f context="ci/maui-windows" -f target_url="https://github.com/$env:GH_REPO/actions/runs/$env:GITHUB_RUN_ID"

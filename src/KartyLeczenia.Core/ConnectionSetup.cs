@@ -140,6 +140,7 @@ public sealed class DrugGroupNotFoundException(IReadOnlyList<string> groups)
 public sealed record SavedConnection(string Server, string Database, bool WindowsAuthentication, string UserName,
     bool TrustCertificate, string DrugGroup, string? ProtectedPassword);
 
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public sealed class ConnectionSettingsStore(string? filePath = null)
 {
     readonly string path = filePath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KartyLeczenia", "connection.json");

@@ -1,233 +1,139 @@
-namespace KartyLeczenia;
+namespace KartyLeczenia.Views;
 
-sealed partial class MainForm
+public sealed class ConnectionPage : ContentPage
 {
-    readonly ComboBox database = new() { DropDownStyle = ComboBoxStyle.DropDown, Width = 560 };
-    readonly ComboBox drugGroup = new() { DropDownStyle = ComboBoxStyle.DropDown, Width = 350, Text = "Leki" };
-    readonly CheckBox rememberPassword = new() { Text = "Zapamiętaj hasło dla mojego konta Windows", AutoSize = true };
-    readonly CheckBox showPassword = new() { Text = "Pokaż hasło", AutoSize = true };
-    readonly Label connectionStatus = new() { AutoSize = true, MaximumSize = new Size(760, 0), Text = "Krok 1 z 3: wpisz serwer SQL. Adres znajdziesz w oknie logowania Subiekta." };
-    readonly Button discoverCompanies = new() { Text = "Odśwież podmioty", AutoSize = true };
-    readonly Button testConnection = new() { Text = "Test połączenia", AutoSize = true };
-    readonly Button saveConnection = new() { Text = "Zapisz ustawienia", AutoSize = true, Enabled = false };
-    readonly Button saveAndContinue = new() { Text = "Zapisz i przejdź do kart", AutoSize = true, Enabled = false };
-    readonly Button cancelConnection = new() { Text = "Anuluj sprawdzanie", AutoSize = true, Enabled = false };
-    readonly System.Windows.Forms.Timer discoveryTimer = new() { Interval = 1200 };
-    readonly SubiektConnectionService connectionService = new();
-    readonly ConnectionSettingsStore connectionStore = new();
-    CancellationTokenSource? connectionWork;
-    ConnectionOptions? validatedConnection;
-    bool restoringConnection;
-    bool connectionBusy;
+    readonly AppState state;
+    readonly Entry server = new() { Placeholder = @"KOMPUTER\INSERTGT lub 192.168.1.10,1433" };
+    readonly Entry database = new() { Placeholder = "Wybierz podmiot poniżej lub wpisz nazwę bazy" };
+    readonly Entry login = new() { Placeholder = "Login SQL, nie operator Subiekta" };
+    readonly Entry password = new() { IsPassword = true };
+    readonly Entry group = new() { Text = "Leki" };
+    readonly Switch windows = new() { IsToggled = true }, trust = new(), remember = new(), show = new();
+    readonly Picker companies = new() { Title = "Podmioty na serwerze" }, groups = new() { Title = "Grupy leków" };
+    readonly Label status = Ui.Note("Krok 1 z 3: wpisz serwer SQL. Znajdziesz go w oknie logowania Subiekta.");
+    readonly ActivityIndicator progress = new();
+    readonly Button discover = new() { Text = "Odśwież podmioty" }, test = new() { Text = "Test połączenia" }, save = new() { Text = "Zapisz ustawienia", IsEnabled = false }, next = new() { Text = "Zapisz i przejdź do kart", IsEnabled = false }, cancel = new() { Text = "Anuluj", IsEnabled = false };
+    readonly SubiektConnectionService service = new();
+    readonly ConnectionSettingsStore store = new();
+    CancellationTokenSource? work, debounce;
+    bool changing, initialized;
+    ConnectionOptions Options => new(server.Text?.Trim() ?? "", database.Text?.Trim() ?? "", windows.IsToggled, login.Text?.Trim() ?? "", password.Text ?? "", trust.IsToggled, group.Text?.Trim() ?? "Leki");
 
-    string DatabaseName => database.SelectedItem is CompanyDatabase company && database.Text == company.ToString()
-        ? company.Database : database.Text.Trim();
-    ConnectionOptions CurrentConnection() => new(server.Text.Trim(), DatabaseName, windows.Checked, login.Text.Trim(), password.Text, trust.Checked, drugGroup.Text.Trim());
-
-    void BuildConnectionPage(TabPage page, TabControl tabs, TabPage card)
+    public ConnectionPage(AppState appState)
     {
-        page.Padding = new Padding(24);
-        var layout = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
-        page.Controls.Add(layout);
-        layout.Controls.Add(new Label { Text = "Połącz z Subiektem GT", AutoSize = true, Font = new Font(Font.FontFamily, 20, FontStyle.Bold), Margin = new Padding(0, 0, 0, 8) });
-        layout.Controls.Add(new Label { Text = "1. Wpisz serwer   →   2. Wybierz podmiot   →   3. Przetestuj i zapisz", AutoSize = true, Margin = new Padding(0, 0, 0, 18) });
-        AddInput(layout, "Serwer SQL", server);
-        server.Width = 560; server.PlaceholderText = @"np. KOMPUTER\INSERTGT lub 192.168.1.10,1433";
-        layout.Controls.Add(new Label { Text = @"Na tym komputerze może to być .\INSERTGT. W sieci wpisz nazwę/adres serwera i jego instancję lub port.", AutoSize = true, MaximumSize = new Size(760, 0) });
-        layout.Controls.Add(windows);
-        AddInput(layout, "Login SQL — nie login operatora Subiekta", login);
-        AddInput(layout, "Hasło SQL", password);
-        var passwordButtons = new FlowLayoutPanel { AutoSize = true };
-        passwordButtons.Controls.AddRange([showPassword, rememberPassword]); layout.Controls.Add(passwordButtons);
-        layout.Controls.Add(trust);
-        layout.Controls.Add(new Label { Text = "Zaufanie certyfikatowi włączaj tylko dla znanego serwera w swojej sieci.", AutoSize = true });
-        var dbButtons = new FlowLayoutPanel { AutoSize = true };
-        dbButtons.Controls.Add(discoverCompanies); dbButtons.Controls.Add(cancelConnection); layout.Controls.Add(dbButtons);
-        layout.Controls.Add(new Label { Text = "Podmiot Subiekta (baza firmy)", AutoSize = true });
-        layout.Controls.Add(database);
-        layout.Controls.Add(new Label { Text = "Lista pokazuje dostępne podmioty. Jeśli konto nie widzi listy baz, wpisz nazwę bazy ręcznie i użyj testu połączenia.", AutoSize = true, MaximumSize = new Size(760, 0) });
-        layout.Controls.Add(new Label { Text = "Grupa towarów zawierająca leki", AutoSize = true });
-        layout.Controls.Add(drugGroup);
-        layout.Controls.Add(new Label { Text = "Domyślnie: Leki. Lista grup pojawi się po teście. Z dokumentów pobierane będą tylko towary z wybranej grupy.", AutoSize = true, MaximumSize = new Size(760, 0) });
-        var actions = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 14, 0, 12) };
-        actions.Controls.AddRange([testConnection, saveConnection, saveAndContinue]); layout.Controls.Add(actions);
-        layout.Controls.Add(connectionStatus);
-        layout.Controls.Add(new Label { Text = "Potrzebne jest osobne konto tylko do odczytu. Test nie zmienia bazy. Ustawienia są zapisywane lokalnie; zapamiętane hasło jest szyfrowane dla bieżącego użytkownika Windows.", AutoSize = true, MaximumSize = new Size(760, 0), Margin = new Padding(0, 16, 0, 0) });
-
-        void Changed(object? sender, EventArgs e)
+        state = appState; Title = "Połączenie";
+        var panel = new VerticalStackLayout { Spacing = 12, MaximumWidthRequest = 850, HorizontalOptions = LayoutOptions.Fill, Padding = 28 };
+        panel.Add(Ui.Heading("Połącz z Subiektem GT"));
+        panel.Add(Ui.Note("1. Serwer i logowanie   →   2. Podmiot i grupa leków   →   3. Test i zapis"));
+        panel.Add(Ui.Field("Serwer SQL", server));
+        panel.Add(Ui.Note(@"Na tym komputerze np. .\INSERTGT. W sieci: nazwa lub adres komputera oraz instancja albo port."));
+        panel.Add(Toggle("Uwierzytelnianie Windows", windows));
+        panel.Add(Ui.Field("Login SQL", login)); panel.Add(Ui.Field("Hasło SQL", password));
+        panel.Add(Toggle("Pokaż hasło", show)); panel.Add(Toggle("Zapamiętaj hasło dla mojego konta Windows", remember));
+        panel.Add(Toggle("Zaufaj certyfikatowi znanego serwera w mojej sieci", trust));
+        panel.Add(new HorizontalStackLayout { Spacing = 10, Children = { discover, cancel, progress } });
+        panel.Add(Ui.Field("Wybierz podmiot", companies)); panel.Add(Ui.Field("Nazwa bazy podmiotu (można wpisać ręcznie)", database));
+        panel.Add(Ui.Note("Niektóre konta nie mogą wyświetlać listy baz. Wtedy wpisz nazwę bazy i użyj testu."));
+        panel.Add(Ui.Field("Grupa towarów — tylko leki", group)); panel.Add(groups);
+        panel.Add(new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = { test, save, next } });
+        panel.Add(status);
+        panel.Add(Ui.Note("Połączenie wymaga konta tylko do odczytu. Test niczego nie zmienia w Subiekcie. Opcjonalnie zapamiętane hasło jest szyfrowane dla bieżącego konta Windows."));
+        Content = new ScrollView { Content = panel };
+        foreach (var entry in new[] { server, database, login, password, group }) entry.TextChanged += (_, _) => Changed();
+        server.TextChanged += (_, _) => { if (!changing) { ResetCompanies(); ScheduleDiscovery(); } };
+        login.TextChanged += (_, _) => { if (!changing) ResetCompanies(); };
+        password.Unfocused += (_, _) => ScheduleDiscovery(); server.Unfocused += (_, _) => ScheduleDiscovery();
+        windows.Toggled += (_, _) => { Authentication(); Changed(); if (!changing) { ResetCompanies(); ScheduleDiscovery(); } };
+        trust.Toggled += (_, _) => { Changed(); if (!changing) ScheduleDiscovery(); };
+        show.Toggled += (_, _) => password.IsPassword = !show.IsToggled;
+        companies.SelectedIndexChanged += (_, _) => { if (companies.SelectedItem is CompanyDatabase company) database.Text = company.Database; };
+        groups.SelectedIndexChanged += (_, _) => { if (groups.SelectedItem is string value) group.Text = value; };
+        discover.Clicked += async (_, _) => await Discover(); test.Clicked += async (_, _) => await Test();
+        save.Clicked += async (_, _) => await Save(false); next.Clicked += async (_, _) => await Save(true);
+        cancel.Clicked += (_, _) => work?.Cancel();
+        Loaded += async (_, _) =>
         {
-            if (restoringConnection) return;
-            validatedConnection = null; connectionWork?.Cancel(); discoveryTimer.Stop();
-            connectionStatus.ForeColor = SystemColors.ControlText;
-            connectionStatus.Text = "Ustawienia zmienione — wykonaj test przed zapisaniem i pobieraniem dokumentów.";
-            UpdateConnectionActions();
-        }
-        foreach (Control control in new Control[] { server, login, password, database, drugGroup }) control.TextChanged += Changed;
-        foreach (var control in new[] { windows, trust }) control.CheckedChanged += Changed;
-        void InvalidateCompanies(object? sender, EventArgs e)
-        {
-            if (restoringConnection) return;
-            restoringConnection = true;
-            try { database.Items.Clear(); database.Text = ""; drugGroup.Items.Clear(); }
-            finally { restoringConnection = false; }
-            ScheduleDiscovery();
-        }
-        server.TextChanged += InvalidateCompanies;
-        windows.CheckedChanged += (_, _) => { UpdateAuthenticationFields(); InvalidateCompanies(null, EventArgs.Empty); };
-        trust.CheckedChanged += InvalidateCompanies;
-        login.TextChanged += InvalidateCompanies;
-        password.TextChanged += (_, _) =>
-        {
-            if (!restoringConnection)
+            if (initialized) return; initialized = true;
+            changing = true;
+            var loaded = store.Load();
+            if (loaded.Options is { } value)
             {
-                restoringConnection = true;
-                try { database.Items.Clear(); database.Text = ""; }
-                finally { restoringConnection = false; }
+                server.Text = value.Server; database.Text = value.Database; login.Text = value.UserName;
+                password.Text = value.Password; windows.IsToggled = value.WindowsAuthentication; trust.IsToggled = value.TrustCertificate;
+                remember.IsToggled = loaded.Remembered; group.Text = value.DrugGroup;
             }
+            changing = false; Authentication();
+            if (loaded.Warning != null) status.Text = loaded.Warning;
+            if (loaded.Options != null && (windows.IsToggled || !string.IsNullOrEmpty(password.Text))) await Test();
         };
-        password.Leave += (_, _) => ScheduleDiscovery();
-        server.Leave += (_, _) => ScheduleDiscovery();
-        showPassword.CheckedChanged += (_, _) => password.UseSystemPasswordChar = !showPassword.Checked;
-        discoveryTimer.Tick += async (_, _) => { discoveryTimer.Stop(); await DiscoverCompaniesAsync(); };
-        discoverCompanies.Click += async (_, _) => { discoveryTimer.Stop(); await DiscoverCompaniesAsync(); };
-        testConnection.Click += async (_, _) => { discoveryTimer.Stop(); await TestConnectionAsync(); };
-        cancelConnection.Click += (_, _) => connectionWork?.Cancel();
-        saveConnection.Click += (_, _) => SaveConnectionSettings();
-        saveAndContinue.Click += (_, _) => { if (SaveConnectionSettings()) tabs.SelectedTab = card; };
-        rememberPassword.CheckedChanged += (_, _) => UpdateConnectionActions();
-
-        restoringConnection = true;
-        var saved = connectionStore.Load();
-        if (saved.Options is { } options)
-        {
-            server.Text = options.Server; database.Text = options.Database; windows.Checked = options.WindowsAuthentication;
-            login.Text = options.UserName; password.Text = options.Password; trust.Checked = options.TrustCertificate;
-            drugGroup.Text = options.DrugGroup; rememberPassword.Checked = saved.Remembered;
-            connectionStatus.Text = saved.Warning ?? "Wczytano ustawienia. Sprawdź połączenie, aby rozpocząć pracę.";
-        }
-        else if (saved.Warning != null) connectionStatus.Text = saved.Warning;
-        restoringConnection = false;
-        UpdateAuthenticationFields(); UpdateConnectionActions();
-        Shown += async (_, _) =>
-        {
-            if (saved.Options != null && (windows.Checked || password.Text.Length > 0)) await TestConnectionAsync();
-            else server.Focus();
-        };
-        FormClosed += (_, _) => { discoveryTimer.Stop(); discoveryTimer.Dispose(); connectionWork?.Cancel(); };
+        Authentication(); UpdateButtons();
     }
-
-    void ScheduleDiscovery()
+    static HorizontalStackLayout Toggle(string title, Switch toggle) => new() { Spacing = 12, Children = { toggle, new Label { Text = title, VerticalOptions = LayoutOptions.Center } } };
+    void Authentication() { login.IsEnabled = password.IsEnabled = remember.IsEnabled = show.IsEnabled = !windows.IsToggled; if (windows.IsToggled) show.IsToggled = false; }
+    void Changed()
     {
-        discoveryTimer.Stop();
-        if (!restoringConnection && server.Text.Trim().Length > 0 && (windows.Checked || login.Text.Trim().Length > 0 && password.Text.Length > 0)) discoveryTimer.Start();
+        if (changing) return;
+        work?.Cancel(); debounce?.Cancel(); state.ValidatedConnection = null;
+        status.Text = "Ustawienia zmienione — wykonaj test aktualnego połączenia."; UpdateButtons();
     }
-    void UpdateAuthenticationFields()
+    void ResetCompanies() { changing = true; companies.ItemsSource = null; database.Text = ""; changing = false; }
+    void UpdateButtons() { bool busy = work != null; progress.IsRunning = busy; discover.IsEnabled = test.IsEnabled = !busy; cancel.IsEnabled = busy; save.IsEnabled = next.IsEnabled = !busy && state.ValidatedConnection == Options; }
+    async void ScheduleDiscovery()
     {
-        login.Enabled = password.Enabled = showPassword.Enabled = rememberPassword.Enabled = !windows.Checked;
-        if (windows.Checked) showPassword.Checked = false;
+        debounce?.Cancel();
+        if (changing || string.IsNullOrWhiteSpace(server.Text) || !windows.IsToggled && (string.IsNullOrWhiteSpace(login.Text) || string.IsNullOrEmpty(password.Text))) return;
+        using var delay = new CancellationTokenSource(); debounce = delay;
+        try { await Task.Delay(1200, delay.Token); await Discover(); }
+        catch (OperationCanceledException) { }
+        finally { if (ReferenceEquals(debounce, delay)) debounce = null; }
     }
-    void UpdateConnectionActions()
+    async Task Run(string message, Func<ConnectionOptions, CancellationToken, Task> action)
     {
-        bool valid = validatedConnection != null && validatedConnection == CurrentConnection() && !connectionBusy;
-        saveConnection.Enabled = saveAndContinue.Enabled = valid;
-        testConnection.Enabled = discoverCompanies.Enabled = !connectionBusy;
-        cancelConnection.Enabled = connectionBusy;
-        UseWaitCursor = connectionBusy;
+        debounce?.Cancel(); work?.Cancel();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)); work = cts;
+        var options = Options; status.Text = message; UpdateButtons();
+        try { await action(options, cts.Token); }
+        catch (OperationCanceledException) { if (options == Options) status.Text = "Operacja anulowana lub przekroczono czas oczekiwania."; }
+        catch (Exception ex) { if (options == Options) status.Text = SubiektConnectionService.FriendlyError(ex); }
+        finally { if (ReferenceEquals(work, cts)) work = null; UpdateButtons(); }
     }
-    CancellationTokenSource BeginConnectionWork(string message)
+    Task Discover() => Run("Wyszukiwanie dostępnych podmiotów…", async (options, token) =>
     {
-        connectionWork?.Cancel();
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        connectionWork = cts; connectionBusy = true;
-        connectionStatus.ForeColor = SystemColors.ControlText; connectionStatus.Text = message;
-        UpdateConnectionActions(); return cts;
-    }
-    void EndConnectionWork(CancellationTokenSource cts)
+        var result = await service.DiscoverAsync(options, token);
+        if (token.IsCancellationRequested || options != Options) return;
+        changing = true;
+        companies.ItemsSource = result.Companies.ToList();
+        var selected = result.Companies.FirstOrDefault(x => x.Database == options.Database);
+        if (selected != null) companies.SelectedItem = selected;
+        else if (result.Companies.Count == 1 && options.Database == "") companies.SelectedIndex = 0;
+        changing = false; state.ValidatedConnection = null;
+        status.Text = result.Companies.Count == 0 ? "Nie znaleziono widocznych podmiotów. Wpisz nazwę bazy ręcznie i użyj testu." : $"Krok 2 z 3: znaleziono {result.Companies.Count} podmiotów. Wybierz firmę i wykonaj test.";
+    });
+    Task Test() => Run("Sprawdzanie odczytu, uprawnień i grupy leków…", async (options, token) =>
     {
-        if (ReferenceEquals(connectionWork, cts))
-        { connectionWork = null; connectionBusy = false; if (!IsDisposed) UpdateConnectionActions(); }
-        cts.Dispose();
-    }
-    bool IsCurrent(ConnectionOptions options, CancellationTokenSource cts) => !IsDisposed && !cts.IsCancellationRequested && options == CurrentConnection();
-
-    async Task DiscoverCompaniesAsync()
-    {
-        var options = CurrentConnection();
-        if (string.IsNullOrWhiteSpace(options.Server)) { connectionStatus.Text = "Wpisz adres serwera SQL."; return; }
-        using var cts = BeginConnectionWork("Łączenie z serwerem i wyszukiwanie dostępnych podmiotów…");
+        state.ValidatedConnection = null;
         try
         {
-            var result = await connectionService.DiscoverAsync(options, cts.Token);
-            if (!IsCurrent(options, cts)) return;
-            restoringConnection = true;
-            try
-            {
-                database.Items.Clear();
-                foreach (var company in result.Companies) database.Items.Add(company);
-                var previous = result.Companies.FirstOrDefault(c => c.Database.Equals(options.Database, StringComparison.OrdinalIgnoreCase));
-                if (previous != null) database.SelectedItem = previous;
-                else if (result.Companies.Count == 1 && string.IsNullOrWhiteSpace(options.Database)) database.SelectedIndex = 0;
-                else database.Text = options.Database;
-            }
-            finally { restoringConnection = false; }
-            validatedConnection = null;
-            connectionStatus.Text = result.Companies.Count == 0
-                ? "Serwer odpowiada, ale nie znaleziono widocznych podmiotów Subiekta. Wpisz nazwę bazy ręcznie i wykonaj test."
-                : $"Krok 2 z 3: znaleziono podmioty: {result.Companies.Count}. Wybierz właściwy i kliknij Test połączenia.";
-            if (result.Skipped > 0) connectionStatus.Text += $" Pominięto inne lub niedostępne bazy: {result.Skipped}.";
-        }
-        catch (Exception ex)
-        {
-            if (!IsDisposed && options == CurrentConnection())
-            { connectionStatus.ForeColor = Color.Firebrick; connectionStatus.Text = SubiektConnectionService.FriendlyError(ex) + " Możesz wpisać nazwę bazy ręcznie i wykonać test."; }
-        }
-        finally { EndConnectionWork(cts); }
-    }
-    async Task TestConnectionAsync()
-    {
-        var options = CurrentConnection(); validatedConnection = null;
-        using var cts = BeginConnectionWork("Sprawdzanie dostępu do podmiotu, odczytu danych i uprawnień konta…");
-        try
-        {
-            var result = await connectionService.TestAsync(options, cts.Token);
-            if (!IsCurrent(options, cts)) return;
-            SetDrugGroups(result.DrugGroups, options.DrugGroup);
-            validatedConnection = CurrentConnection();
-            connectionStatus.ForeColor = Color.DarkGreen;
-            connectionStatus.Text = $"Krok 3 z 3: połączenie poprawne — {result.Company} [{options.Database}]. Odczyt wymaganych tabel działa; nie wykryto uprawnień do zapisu tabel ani wskazanych zmian struktury. Kliknij Zapisz i przejdź do kart.";
+            var result = await service.TestAsync(options, token);
+            if (token.IsCancellationRequested || options != Options) return;
+            changing = true; groups.ItemsSource = result.DrugGroups.ToList(); changing = false;
+            state.ValidatedConnection = options;
+            status.Text = $"Krok 3 z 3: połączenie poprawne — {result.Company} [{options.Database}]. Odczyt działa; nie wykryto badanych uprawnień zapisu. Zapisz ustawienia.";
         }
         catch (DrugGroupNotFoundException ex)
         {
-            if (IsCurrent(options, cts)) { SetDrugGroups(ex.Groups, options.DrugGroup); connectionStatus.ForeColor = Color.Firebrick; connectionStatus.Text = ex.Message; }
+            if (options != Options) return;
+            changing = true; groups.ItemsSource = ex.Groups.ToList(); changing = false; status.Text = ex.Message;
         }
-        catch (Exception ex)
-        {
-            if (!IsDisposed && options == CurrentConnection()) { connectionStatus.ForeColor = Color.Firebrick; connectionStatus.Text = SubiektConnectionService.FriendlyError(ex); }
-        }
-        finally { EndConnectionWork(cts); }
-    }
-    void SetDrugGroups(IReadOnlyList<string> groups, string current)
+    });
+    async Task Save(bool proceed)
     {
-        restoringConnection = true;
         try
         {
-            drugGroup.Items.Clear(); foreach (string group in groups) drugGroup.Items.Add(group);
-            drugGroup.Text = groups.FirstOrDefault(g => g.Equals(current, StringComparison.OrdinalIgnoreCase)) ?? current;
+            if (state.ValidatedConnection != Options) throw new InvalidOperationException("Najpierw wykonaj test aktualnego połączenia.");
+            store.Save(Options, remember.IsToggled); status.Text = "Zapisano ustawienia połączenia.";
+            if (proceed) await Shell.Current.GoToAsync("//cards");
         }
-        finally { restoringConnection = false; }
-    }
-    bool SaveConnectionSettings()
-    {
-        if (validatedConnection is null || validatedConnection != CurrentConnection())
-        { connectionStatus.Text = "Najpierw wykonaj test aktualnych ustawień."; return false; }
-        try
-        {
-            connectionStore.Save(CurrentConnection(), rememberPassword.Checked);
-            connectionStatus.ForeColor = Color.DarkGreen;
-            connectionStatus.Text = "Zapisano ustawienia. Przy kolejnym uruchomieniu program je wczyta.";
-            status.Text = "Połączenie gotowe. Wpisz numer faktury, paragonu lub WZ.";
-            return true;
-        }
-        catch (Exception ex) { connectionStatus.ForeColor = Color.Firebrick; connectionStatus.Text = "Nie udało się zapisać ustawień: " + ex.Message; return false; }
+        catch (Exception ex) { status.Text = "Nie zapisano ustawień: " + ex.Message; }
     }
 }

@@ -1,40 +1,40 @@
-# Karty leczenia zwierząt
-Aplikacja dla Windows 11 współpracująca z Subiektem GT przez SQL Server.
+# Karty leczenia zwierząt — MAUI Windows
+Aplikacja dla Windows 11 x64 w C# i .NET MAUI 10. Interfejs Windows korzysta z WinUI 3. Na tym etapie projekt zawiera wyłącznie platformę Windows; nie buduje Androida.
 
-## Pierwsza wersja
-- Wyszukanie dokumentu po pełnym numerze, bez łączenia ilości FS i WZ.
-- Adresy historyczne płatnika i odbiorcy; wybór osoby do karty.
-- Wybór pozycji, podział według ruchów magazynowych i dostaw.
-- Karencja z opisu albo tw_Pole1–tw_Pole8.
-- Edycja wszystkich pól przed wydrukiem.
-- Zapis karty do JSON i otwieranie zapisanej karty.
-- Eksport HTML A4 poziomo: wydruk lub PDF przez przeglądarkę.
+## Uruchomienie gotowej paczki
+Pobierz artefakt KartyLeczenia-MAUI-win-x64 z udanego zadania GitHub Actions. Rozpakuj również wewnętrzny ZIP i uruchom KartyLeczenia.exe z całego rozpakowanego folderu. Nie kopiuj samego EXE: obok są wymagane biblioteki .NET i Windows App SDK.
 
-## Uruchomienie
-Zainstaluj .NET 8 SDK na Windows i uruchom w PowerShell:
+## Budowanie
+Wymagany Windows, .NET 10 SDK i workload MAUI Windows:
 ```powershell
-dotnet run --project src/KartyLeczenia
+dotnet workload install maui-windows
+dotnet publish src/KartyLeczenia -f net10.0-windows10.0.19041.0 -c Release -p:RuntimeIdentifierOverride=win-x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true --self-contained true -o publish
 ```
-Wydanie samodzielne:
-```powershell
-dotnet publish src/KartyLeczenia -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
-```
+Do uruchomienia kontroli biblioteki net8.0 potrzebny jest również runtime .NET 8 (CI instaluje oba SDK).
 
-## Połączenie
-Podaj serwer (np. SERWER\\INSERTGT), bazę firmy i konto SQL mające wyłącznie SELECT do potrzebnych tabel. Można użyć uwierzytelniania Windows. Program wykonuje jedynie SELECT, ale uprawnienia serwera są właściwym zabezpieczeniem przed zapisem. ApplicationIntent=ReadOnly nie zastępuje uprawnień.
-Domyślnie hasło pozostaje wyłącznie w pamięci procesu. Opcja zapamiętania zapisuje je zaszyfrowane przez Windows DPAPI dla bieżącego konta użytkownika. Ustawienia lecznicy zapisuj wraz z kartą lub wprowadzaj przy kolejnej sesji; trwałe profile ustawień są jeszcze do dodania.
-Domyślnie wymagany jest zaufany certyfikat SQL. Opcję zaufania certyfikatowi włączaj tylko dla znanego serwera w swojej sieci.
+## Architektura
+- src/KartyLeczenia: natywne strony MAUI: połączenie, karta i modalny ekran RPL; platforma WinUI Windows.
+- src/KartyLeczenia.Core: SQL tylko do odczytu, konfiguracja, rejestr RPL, model karty i wydruk HTML, bez zależności od MAUI / Windows Forms.
+- Ochrona zapamiętanego hasła używa DPAPI na Windows. Przed dodaniem Androida potrzebny będzie osobny mechanizm poświadczeń i serwer pośredniczący; nie udostępniaj SQL przez internet.
 
-## Wydruk
-Wybierz produkty, uzupełnij dane i użyj „Podgląd / druk”. Przeglądarka otworzy lokalny HTML; Ctrl+P pozwala drukować lub zapisać PDF. Wybierz A4 poziomo i wyłącz nagłówki/stopki przeglądarki.
-Układ odwzorowuje sekcje przesłanego wzoru; wymaga jeszcze porównania wydruku na rzeczywistej drukarce.
+## Zachowane funkcje i dane
+- automatyczne wyszukiwanie podmiotów i ręczne wskazanie bazy;
+- test odczytu i badanych uprawnień zapisu, zapis konfiguracji, opcjonalne szyfrowanie hasła;
+- pobieranie tylko towarów ze wskazanej grupy Leki, rozbicie na faktyczne dostawy;
+- wybór płatnika/odbiorcy i historycznych adresów;
+- ręczna edycja każdego pola karty, zaznaczanie wydruku, dodawanie i usuwanie pozycji;
+- pobieranie charakterystyki RPL, zatwierdzanie kontekstu karencji i zapisywanie źródła;
+- zapis/otwieranie JSON zgodnego ze starszą wersją;
+- A4 poziomo w przeglądarce, Ctrl+P do wydruku lub PDF.
 
-## Zakres weryfikacji
-Powiązania SQL sprawdzono na eksportach użytkownika z Subiekta GT 1.89 SP1 HF1. Kompilacja Release przechodzi bez błędów i ostrzeżeń; 9 kontroli parsera przechodzi. Wydanie Alpha 1 przeszło próbę uruchomienia na Windows; pełna kontrola wyglądu nadal jest potrzebna. Nie sprawdzono jeszcze połączenia aplikacji z rzeczywistym serwerem SQL. Pobieranie dokumentów RPL w środowisku deweloperskim było blokowane przez serwer; wymaga sprawdzenia na stanowisku użytkownika.
-Ruchy bez dostawy źródłowej oraz dokumenty z korektami lub innym sposobem realizacji wymagają osobnej weryfikacji. Brak danych nie jest uzupełniany przez zgadywanie.
-Ilość sprzedaży nie jest dawką. Pole dawkowania pozostaje do ręcznego uzupełnienia.
-Numer karty wpisuje użytkownik. Automatyczna wspólna numeracja, centralna baza kart, instalator i profile lekarzy pozostają do wdrożenia. Plik JSON można zapisać do wybranego folderu sieciowego, ale nie zastępuje on centralnej bazy wielostanowiskowej.
-Nie dołączaj do repozytorium danych klientów, eksportów ani haseł.
+Poprzednie ustawienia są wczytywane z tego samego LocalAppData/KartyLeczenia/connection.json. Powiązania RPL i kopie źródeł pozostają w tym samym katalogu registry. Nie zmienia się tożsamość użytkownika DPAPI ani format kart.
+
+## Edycja karty
+Po lewej wybierz lek/dostawę; po prawej popraw jego pełne dane. Pole wyboru na liście określa udział w wydruku. Dane właściciela, lekarza, lecznicy i nagłówka są nad listą. Informacje o źródle RPL są w edytorze i zapisanej karcie, bez technicznych identyfikatorów na wydruku.
+
+## Weryfikacja i ograniczenia
+CI sprawdza bibliotekę danych, zgodność JSON/HTML, zapis i ochronę hasła, publikuje pakiet Windows i wymaga utworzenia natywnego okna MAUI. To nie zastępuje pełnego przeglądu wyglądu ani sprawdzenia z rzeczywistym SQL / RPL na stanowisku użytkownika.
+Wspólna baza kart, automatyczna numeracja i profile lekarzy pozostają do wdrożenia. Wydanie Alpha 1 pozostaje historycznym wydaniem Windows Forms. Ten projekt nie korzysta już z Windows Forms.
 
 ## Karencja z rejestru RPL
 Domyślne źródło karencji to teraz RPL. Pobranie dokumentu z Subiekta pozostawia karencję pustą do czasu wskazania produktu i zatwierdzenia danych rejestru. Nie ma automatycznego powrotu do opisu Subiekta.
@@ -52,33 +52,10 @@ Kopia odczytanej sekcji i mapowania są zapisywane w LocalAppData/KartyLeczenia/
 
 Ograniczenia: nie jest to pełny lokalny katalog wszystkich leków ani oficjalna integracja UPD API. Wyszukiwanie odbywa się w publicznym RPL, a pobieranie przez udostępniony adres charakterystyki. Nie wymaga kopiowania bazy Kliniki XP. Sekcja jest odczytywana z PDF i zatwierdzana przez użytkownika, bez automatycznej interpretacji klinicznej. Przy stosowaniu poza warunkami ChPL okres ustala lekarz.
 
-## Kontrole parsera
+
+## Kontrole
 ```powershell
-dotnet run --project tests/RegistryChecks
-```
-Sprawdzane są stare i nowe nagłówki, łamanie linii w PDF, zachowanie wszystkich dróg podania i ograniczeń, odrzucenie brakującej lub niepełnej sekcji oraz rozdzielenie mapowań baz.
-
-## Łatwiejsze pierwsze uruchomienie
-1. W zakładce połączenia wpisz serwer SQL (np. KOMPUTER\\INSERTGT lub 192.168.1.10,1433).
-2. Wybierz uwierzytelnianie Windows albo wpisz login i hasło SQL. To konto SQL, nie operator Subiekta.
-3. Po zakończeniu wpisywania serwera program próbuje odczytać listę dostępnych podmiotów. Możesz też użyć **Odśwież podmioty**.
-4. Wybierz firmę z listy. Przy ograniczonej widoczności baz wpisz jej nazwę ręcznie — nie jest potrzebne konto administratora do samej pracy.
-5. Kliknij **Test połączenia**. Sprawdzane są odczyty wymaganych tabel, uprawnienia zapisu do tabel / wybrane uprawnienia zmiany struktury i grupa leków.
-6. Wybierz grupę **Leki**, jeśli występuje pod inną nazwą. Po zmianie ponów test.
-7. Kliknij **Zapisz ustawienia** albo **Zapisz i przejdź do kart**.
-
-Ustawienia trafiają do LocalAppData/KartyLeczenia/connection.json. Nie ma automatycznego zapisu hasła: zaznacz to osobno. Wyłączenie zapamiętania i ponowny zapis usuwa zaszyfrowaną wartość. Hasło zapamiętane przez DPAPI nie jest przenośne między kontami Windows. Uszkodzony plik ustawień wyświetla komunikat i pozwala skonfigurować połączenie ponownie.
-
-Po restarcie wczytywany jest zapisany podmiot. Jeśli dostępne jest uwierzytelnianie Windows albo zapamiętane hasło, program automatycznie testuje połączenie. Zmiana konfiguracji unieważnia test; nie można zapisać nieprzetestowanego połączenia ani użyć go do pobrania dokumentu.
-
-Lista firm jest budowana wyłącznie z widocznych, dostępnych baz o strukturze GT; nie są nadawane żadne uprawnienia. Nie wszystkie konta mają prawo wyświetlać listę baz. Brak nazwy firmy w danych licencyjnych nie blokuje wybrania bazy po jej nazwie.
-
-Z faktur, paragonów i WZ pobierane są wyłącznie towary należące do skonfigurowanej grupy leków. Brak grupy nie powoduje pobrania wszystkich towarów. Dostęp do Subiekta nadal ogranicza się do SELECT. Test nie nadaje ani nie odbiera uprawnień.
-
-Ekran w bieżącym wydaniu pozostaje Windows Forms. Logika konfiguracji została oddzielona od interfejsu w ConnectionSetup.cs, aby można było wykorzystać ją przy uzgodnionej migracji do MAUI dla Windows.
-
-Kontrole konfiguracji (na Windows):
-```powershell
+dotnet run --project tests/RegistryChecks -c Release
 dotnet run --project tests/ConnectionChecks -c Release
 ```
-Nie zastępują sprawdzenia połączenia z rzeczywistym serwerem użytkownika.
+Drugi zestaw wymaga Windows do sprawdzenia DPAPI.

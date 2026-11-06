@@ -10,7 +10,7 @@ namespace KartyLeczenia;
 public sealed record RegistryDocument(int Id, string Url, string Sha256, DateTimeOffset DownloadedUtc, string WithdrawalSection, string ProductIdentity);
 public sealed record RegistrySelection(RegistryDocument Document, string Species, string Route, string Food, string Text, string Medicine);
 
-static class RegistryService
+public static class RegistryService
 {
     static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(30) };
     internal static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KartyLeczenia", "registry");
