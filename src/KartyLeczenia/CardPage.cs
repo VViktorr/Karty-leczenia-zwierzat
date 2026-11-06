@@ -113,8 +113,13 @@ public sealed class CardPage : ContentPage
             name.SetBinding(Label.TextProperty, nameof(TreatmentRow.Product));
             var summary = Ui.Note(""); summary.SetBinding(Label.TextProperty, nameof(TreatmentRow.Summary));
             var text = new VerticalStackLayout { Spacing = 3, Children = { name, summary } };
-            var row = new Grid { Padding = 8, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition { Width = GridLength.Star } } };
-            row.Add(check, 0, 0); row.Add(text, 1, 0); return row;
+            var remove = new Button { Text = "×", FontSize = 20, WidthRequest = 30, HeightRequest = 30,
+                MinimumWidthRequest = 30, MinimumHeightRequest = 30, Padding = 0, VerticalOptions = LayoutOptions.Center };
+            SemanticProperties.SetDescription(remove, "Usuń ten lek z karty");
+            ToolTipProperties.SetText(remove, "Usuń pozycję");
+            remove.Clicked += async (_, _) => { if (remove.BindingContext is TreatmentRow item) await RemoveRow(item); };
+            var row = new Grid { Padding = 8, ColumnSpacing = 8, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
+            row.Add(check, 0, 0); row.Add(text, 1, 0); row.Add(remove, 2, 0); return row;
         });
         list.SelectionChanged += (_, e) => Select(e.CurrentSelection.FirstOrDefault() as TreatmentRow);
         printed.CheckedChanged += (_, e) => { if (!changing && selected != null) selected.Printed = e.Value; };
@@ -147,7 +152,7 @@ public sealed class CardPage : ContentPage
         var rowActions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = {
             Ui.Action("Uzupełnij brakujące karencje", () => FillWithdrawals(documentGeneration)),
             Ui.Action("Dodaj pozycję ręcznie", () => { var row = new TreatmentRow(); row.Set("Produkt", "Nowa pozycja"); rows.Add(row); list.SelectedItem = row; return Task.CompletedTask; }),
-            Ui.Action("Usuń wybraną pozycję", async () => { if (selected != null && await DisplayAlertAsync("Usuń pozycję", "Usunąć zaznaczoną pozycję z tej karty?", "Usuń", "Anuluj")) rows.Remove(selected); })
+            Ui.Action("Usuń wybraną pozycję", async () => { if (selected is TreatmentRow item) await RemoveRow(item); })
         } };
         var root = new Grid { Padding = 18, RowSpacing = 8, RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = new GridLength(0) }, new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }, new RowDefinition { Height = GridLength.Auto } } };
         var cardDetails = Ui.Card(new ScrollView { Content = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("2. Dane karty"), headerPanel } } });
@@ -162,6 +167,16 @@ public sealed class CardPage : ContentPage
             searchHint.Text = "Wybrano: " + suggestion + " | " + suggestion.AmountText;
             choosingDocument = true; number.Text = suggestion.Number; choosingDocument = false; chosenDocument = suggestion;
         };
+    }
+    async Task RemoveRow(TreatmentRow item)
+    {
+        if (!rows.Contains(item)) return;
+        int generation = documentGeneration;
+        if (!await DisplayAlertAsync("Usuń pozycję", $"Usunąć „{item.Product}” z tej karty?", "Usuń", "Anuluj")) return;
+        if (generation != documentGeneration || !rows.Contains(item)) return;
+        bool wasSelected = ReferenceEquals(selected, item);
+        rows.Remove(item);
+        if (wasSelected) { list.SelectedItem = null; Select(null); }
     }
     Task RefreshDocumentSuggestions()
     {
