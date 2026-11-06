@@ -32,7 +32,7 @@ Poprzednie ustawienia są wczytywane z tego samego LocalAppData/KartyLeczenia/co
 ## Ustawienia i dokumenty
 W zakładce **Ustawienia** są połączenie SQL oraz nazwa, adres lecznicy/podmiotu i dane lekarza do nowych kart. Dane lecznicy zapisuje się niezależnie od testu SQL; ustawienia połączenia nadal wymagają testu i korzystają z dotychczasowego magazynu hasła. Dane lecznicy są w LocalAppData/KartyLeczenia/clinic.json.
 
-W polu dokumentu wystarczy fragment numeru. Po 4 znakach, z krótkim opóźnieniem, pojawiają się podpowiedzi faktur FS, paragonów PA i WZ. Wybierz dokument z listy. Gdy przy pobraniu pasuje jeden dokument, może zostać wskazany automatycznie; kilka wyników wymaga wyboru. Wyszukiwanie wykonuje wyłącznie parametryzowane SELECT, ogranicza wyniki i anuluje stare żądania. Wyszukiwanie na rzeczywistej bazie Subiekta wymaga sprawdzenia na stanowisku użytkownika.
+W polu dokumentu wystarczy fragment numeru lub nazwisko/nazwa klienta. Enter pobiera wybrany lub jedyny pasujący dokument; przy kilku wynikach wymaga wyboru. Zaznaczenia Faktury, WZ i Paragony ograniczają wyszukiwanie do wybranych rodzajów (domyślnie wszystkie). Po 4 znakach, z krótkim opóźnieniem, pojawiają się podpowiedzi faktur FS, paragonów PA i WZ. Wybierz dokument z listy. Gdy przy pobraniu pasuje jeden dokument, może zostać wskazany automatycznie; kilka wyników wymaga wyboru. Wyszukiwanie wykonuje wyłącznie parametryzowane SELECT, ogranicza wyniki i anuluje stare żądania. Wyszukiwanie na rzeczywistej bazie Subiekta wymaga sprawdzenia na stanowisku użytkownika.
 
 Jednoznaczny gatunek i droga podania są proponowane z danych UPD lub rozpoznanych sekcji polskiej ChPL RPL. Przy wielu możliwościach lub nieznanym układzie pola pozostają do uzupełnienia. Gatunek uzupełnia także pusty opis zwierzęcia; program nie zgaduje liczby zwierząt, identyfikatora, płci ani numeru stada. Automatyczne propozycje nie zastępują ręcznych wpisów i wymagają kontroli lekarza.
 
@@ -48,22 +48,14 @@ Po lewej wybierz lek/dostawę; po prawej popraw jego pełne dane. Pole wyboru na
 CI sprawdza bibliotekę danych, zgodność JSON/HTML, zapis i ochronę hasła, publikuje pakiet Windows i wymaga utworzenia natywnego okna MAUI. To nie zastępuje pełnego przeglądu wyglądu ani sprawdzenia z rzeczywistym SQL / RPL na stanowisku użytkownika.
 Wspólna baza kart, automatyczna numeracja i profile lekarzy pozostają do wdrożenia. Wydanie Alpha 1 pozostaje historycznym wydaniem Windows Forms. Ten projekt nie korzysta już z Windows Forms.
 
-## Karencja: UPD jako główne źródło
-Domyślne źródło to unijna baza UPD. Program odczytuje publiczne strony produktów; nie korzysta z uwierzytelnionego API EMA i nie wymaga jego konta. Adapter strony może wymagać aktualizacji po zmianie układu portalu. Nie jest to oficjalny klient API.
+## Karencja: RPL jako źródło domyślne
+Program najpierw wykorzystuje potwierdzone powiązania towar–ID RPL, zapisane osobno dla serwera i podmiotu. Dla nowych produktów próbuje jednoznacznie dopasować nazwę i moc z dostępnego katalogu, pobiera aktualną oficjalną ChPL i sprawdza identyfikację produktu w PDF. Propozycje nadal wymagają weryfikacji leczenia przed wydrukiem. Nie nadpisuje ręcznie wpisanej karencji.
 
-1. Po pobraniu pozycji z Subiekta program próbuje automatycznie pobrać aktualną karencję dla wcześniej zatwierdzonych powiązań UPD.
-2. Przy pierwszym użyciu produktu wybierz **Karencja z UPD / RPL…**, wyszukaj lek lub wklej link UPD / 12-cyfrowe ID.
-3. Wybierz i sprawdź nazwę, moc oraz postać. Program wymaga Polski w polu kraju pozwolenia i statusu Valid; sama wzmianka o Polsce w procedurze nie wystarcza.
-4. Po pobraniu karencja jest uzupełniana automatycznie z zachowaniem gatunku, drogi podania, tkanki/żywności i jednostki. Znane terminy są tłumaczone słownikiem. Pełny oryginał każdego odczytanego wpisu pozostaje obok tłumaczenia; nieznane terminy i zastrzeżenia pozostają w języku źródła.
-5. Sprawdź leczenie, ewentualnie popraw tekst i zatwierdź. Powiązanie towar–UPD zostaje zapisane osobno dla serwera i podmiotu. Program nie zgaduje tożsamości leku na podstawie podobnej nazwy.
-6. Przy kolejnych kartach dla tego towaru pobierana jest aktualna karencja UPD; automatyczna propozycja nadal wymaga sprawdzenia przed wydrukiem. Ręcznie wpisany tekst nie jest nadpisywany.
+Wyszukiwanie RPL pokazuje podpowiedzi po krótkiej przerwie w pisaniu, obsługuje fragment nazwy oraz zapis Subiekta ze sklejoną mocą (np. FLUNIVIS50MG/ML). Rozmiar opakowania nie musi być zgodny z nazwą rejestrową. Po Enterze lub przycisku wyszukiwania jednoznaczna propozycja jest pobierana; kilka wariantów lub niezgodna moc wymagają wyboru. Podobieństwo pisowni nie zastępuje identyfikacji leku.
 
-RPL jest źródłem zapasowym wybieranym jawnie przyciskiem **Użyj zapasowego źródła RPL…**. Dotychczasowe powiązania RPL i kopie dokumentów pozostają zachowane, lecz nie są automatycznie zamieniane w powiązania UPD. Brak danych, awaria lub nieznana struktura źródła nie oznaczają zera dni i nie powodują cichego użycia opisu Subiekta. Zapis karty zawiera źródłowy URL, datę pobrania, SHA256 i pełny odczytany tekst; data pobrania nie oznacza daty aktualizacji źródła.
+Gatunek nowych pozycji to domyślnie **Bydło**, wpisywane również w pusty opis zwierzęcia. Jest to ustawienie programu, nie informacja o wskazaniach leku. Jednoznaczny gatunek odczytany z charakterystyki zastępuje niezmienioną wartość domyślną. Ręcznie wybrany gatunek pozostaje zachowany. Liczba zwierząt, masa i numery identyfikacyjne wymagają uzupełnienia. Przy kilku drogach podania program nie wybiera jednej za lekarza.
 
-Wyszukiwanie korzysta z publicznego formularza UPD, może podlegać ograniczeniom serwisu. W razie braku wyników wklej oficjalny link lub użyj RPL. Test żywego wyszukiwania nie zwrócił poprawnych wyników (a dodatkowa próba serwisu zwróciła 429); wklejanie linku stanowi niezależną ścieżkę. Odczyt stron i parser sprawdzono na strukturze publicznej strony oraz testach lokalnych; zgodność pełnego katalogu wymaga dalszej weryfikacji. Przy stosowaniu poza warunkami ChPL okres ustala lekarz.
-
-### Źródło zapasowe RPL
-RPL pobiera oficjalny PDF i odczytuje pełną sekcję karencji, również krótki zapis „Zero dni.”. Ekran dopuszcza ID RPL lub oficjalny link charakterystyki. Przed zastosowaniem sprawdź produkt i zatwierdź kontekst. Kopię dokumentu można wykorzystać wyłącznie po jawnym potwierdzeniu jej daty. Katalog XML RPL może być niedostępny; wtedy pozostaje link lub zapamiętane powiązanie. Nie ma automatycznego powrotu do danych z Subiekta.
+Katalog i dokumenty RPL mogą być niedostępne. W takim przypadku użyj zapamiętanego powiązania lub oficjalnego linku / ID. UPD pozostaje jawnie wybieranym źródłem zapasowym. Brak danych nie oznacza zera dni i nie powoduje automatycznego użycia opisu Subiekta. Kopia RPL wymaga jawnego potwierdzenia daty. Przy stosowaniu poza ChPL karencję ustala lekarz.
 
 ## Kontrole
 ```powershell
