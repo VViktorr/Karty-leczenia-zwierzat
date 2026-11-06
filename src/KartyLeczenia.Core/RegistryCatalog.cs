@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml;
+using System.Xml.Linq;
 
 namespace KartyLeczenia;
 
@@ -17,7 +18,7 @@ public static class RegistryCatalog
     public const string ExportUrl = "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/public-pl-report/6.0.0/overall.xml";
     static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(25) };
     // Only product identities are supplied; withdrawal text is always fetched from the actual RPL PDF.
-    static readonly RegistryProduct[] Known = [new(32709, "Flordofen", "300 mg/ml", "Roztwór do wstrzykiwań"), new(50492, "Flunivis", "50 mg/ml", "Roztwór do wstrzykiwań"), new(45232, "Bravoxin", "", "Zawiesina do wstrzykiwań")];
+    static readonly RegistryProduct[] Known = [new(32709, "Flordofen", "300 mg/ml", "Roztwór do wstrzykiwań"), new(50492, "Flunivis", "50 mg/ml", "Roztwór do wstrzykiwań"), new(45232, "Bravoxin", "", "Zawiesina do wstrzykiwań"), new(42147, "Tilkomay", "300 mg/ml + 90 mg/ml", "Roztwór do wstrzykiwań")];
     static string CachePath => Path.Combine(RegistryService.Folder, "catalog.json");
     static RegistryCatalogData? cached;
     static bool attempted;
@@ -45,13 +46,23 @@ public static class RegistryCatalog
             try { cached = JsonSerializer.Deserialize<RegistryCatalogData>(File.ReadAllText(CachePath)); }
             catch (Exception ex) when (ex is IOException or JsonException) { }
         }
-        var products = Known.Concat(cached?.Products ?? []).GroupBy(p => p.Id).Select(g => g.Last());
+        var products = (cached?.Products ?? []).Select(p => p with { Id = RegistryService.DocumentId(p.Id) })
+            .Where(p => p.Id < 100_000_000).Concat(Known).GroupBy(p => p.Id).Select(g => g.Last());
         string text = Words(name);
         if (text.Length < 2) return [];
         return products.Where(p => Matches(p, name, false) || Words(p.Name).StartsWith(text, StringComparison.Ordinal)).OrderBy(p => p.Name).ThenBy(p => p.Strength).ToList();
     }
     public static List<RegistryProduct> ExactCandidates(string name) => Search(name).Where(p => Matches(p, name)).ToList();
 
+    public static int? DocumentIdFromXml(int exportId, string xml)
+    {
+        var link = Regex.Match(xml, @"https://(?:rejestrymedyczne|rejestry)\.ezdrowie\.gov\.pl/api/rpl/medicinal-products/(?<id>\d+)/characteristic\b");
+        if (link.Success && int.TryParse(link.Groups["id"].Value, out int linkedId) && linkedId > 0)
+            return RegistryService.DocumentId(linkedId);
+        int corrected = RegistryService.DocumentId(exportId);
+        // Unresolved extended export IDs are not used to construct PDF URLs.
+        return corrected > 0 && corrected < 100_000_000 ? corrected : null;
+    }
     public static List<RegistryProduct> Parse(Stream stream)
     {
         using var reader = XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 100_000_000 });
@@ -63,7 +74,10 @@ public static class RegistryCatalog
             if (!kind.Contains("weteryn", StringComparison.OrdinalIgnoreCase)) continue;
             string name = reader.GetAttribute("nazwaProduktu") ?? "";
             if (!int.TryParse(reader.GetAttribute("id"), out int id) || id <= 0 || string.IsNullOrWhiteSpace(name)) continue;
-            products.Add(new(id, name, reader.GetAttribute("moc") ?? "", reader.GetAttribute("postac") ?? ""));
+            string strength = reader.GetAttribute("moc") ?? "", form = reader.GetAttribute("postac") ?? "";
+            using var subtree = reader.ReadSubtree();
+            int? documentId = DocumentIdFromXml(id, XElement.Load(subtree).ToString());
+            if (documentId.HasValue) products.Add(new(documentId.Value, name, strength, form));
         }
         if (products.Count == 0) throw new InvalidDataException("Eksport nie zawiera rozpoznawalnego katalogu leków weterynaryjnych.");
         return products;
