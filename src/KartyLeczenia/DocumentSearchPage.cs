@@ -40,12 +40,12 @@ public sealed class DocumentSearchPage : ContentPage
         results.SelectionChanged += async (_, e) =>
         {
             if (closing || e.CurrentSelection.FirstOrDefault() is not DocumentSuggestion chosen) return;
-            closing = true; work?.Cancel(); completion.TrySetResult(chosen); await Navigation.PopModalAsync();
+            await CloseSearch(chosen);
         };
         var root = new Grid { Padding = 20, RowSpacing = 12, RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }, new RowDefinition { Height = GridLength.Auto } } };
         root.Add(Ui.Card(top), 0, 0); root.Add(Ui.Card(results), 0, 1);
-        root.Add(Ui.Action("Anuluj", async () => { closing = true; work?.Cancel(); completion.TrySetResult(null); await Navigation.PopModalAsync(); }), 0, 2);
-        Content = root;
+        root.Add(Ui.Action("Anuluj", () => CloseSearch(null)), 0, 2);
+        Content = Ui.WithClose(this, root, () => CloseSearch(null));
         query.TextChanged += (_, _) => { work?.Cancel(); results.ItemsSource = null; };
         query.Completed += async (_, _) => await Search();
         year.SelectedIndexChanged += async (_, _) => { dates.IsVisible = year.SelectedItem as string == "Zakres dat"; if (initialized) await Search(); };
@@ -77,12 +77,33 @@ public sealed class DocumentSearchPage : ContentPage
                 found.Count == 0 ? "Brak dokumentów w wybranym okresie. Spróbuj opcji „Wszystkie lata”." : $"Dokumenty: {found.Count}. Kliknij właściwy dokument — dane zostaną pobrane automatycznie.";
         }
         catch (OperationCanceledException) { if (!closing && ReferenceEquals(work, cts)) status.Text = "Wyszukiwanie anulowane lub przekroczono czas oczekiwania."; }
-        catch (Exception ex) { if (!closing && ReferenceEquals(work, cts)) status.Text = SubiektConnectionService.FriendlyError(ex); }
+        catch (Exception ex) { CrashLog.Write("DocumentSearch.Query.Failed", ex); if (!closing && ReferenceEquals(work, cts)) status.Text = SubiektConnectionService.FriendlyError(ex); }
         finally { if (ReferenceEquals(work, cts)) work = null; }
     }
+    async Task CloseSearch(DocumentSuggestion? chosen)
+    {
+        if (closing) return;
+        closing = true;
+        try
+        {
+            work?.Cancel();
+            CrashLog.Write(chosen == null ? "DocumentSearch.Cancel" : "DocumentSearch.Select");
+            // Let the native selection callback finish and fully dismiss the modal before updating the parent CollectionView.
+            await Task.Yield();
+            await Navigation.PopModalAsync();
+            await Task.Yield();
+            completion.TrySetResult(chosen);
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("DocumentSearch.Close.Failed", ex);
+            closing = false; status.Text = "Nie zamknięto okna wyboru: " + ex.Message;
+        }
+    }
+    protected override bool OnBackButtonPressed() { _ = CloseSearch(null); return true; }
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
-        if (!Navigation.ModalStack.Contains(this)) { closing = true; work?.Cancel(); completion.TrySetResult(null); }
+        if (!closing && !Navigation.ModalStack.Contains(this)) { closing = true; work?.Cancel(); completion.TrySetResult(null); }
     }
 }

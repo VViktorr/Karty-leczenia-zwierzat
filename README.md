@@ -72,3 +72,14 @@ RPL zapisuje pełne sekcje docelowych gatunków, dawkowania/sposobu podania oraz
 Dawkowanie jest kopiowane jako tekst ChPL z częstością, okresem stosowania, jednostkami i ograniczeniami. Program nie oblicza dawki dla konkretnego zwierzęcia bez podanej masy i nie ustala rozpoznania. Zmiana gatunku lub drogi odświeża automatyczne fragmenty; ręcznie zmienione dawkowanie i karencja pozostają zachowane i wymagają ponownej weryfikacji. Zapis JSON zawiera pełne sekcje i kontekst źródła; stare karty pozostają czytelne. Starsza kopia ChPL bez tych sekcji wymaga ponownego pobrania dla automatyzacji dawkowania.
 
 Kompilację i testy nowych zmian pozostawiono użytkownikowi. Dodano regresje dla podziału karencji, zachowania zakazów dotyczących mleka i ręcznych dawek.
+
+## Motyw, zamykanie okien i crashlog
+Ustawienia zawierają zapamiętywany wybór motywu: zgodnie z systemem (domyślnie), jasny lub ciemny. Zmiana jest stosowana od razu i zapisywana w LocalAppData/KartyLeczenia/appearance.json, niezależnie od ustawień SQL.
+
+Przy numerze dokumentu są małe pary FS, WZ i PA z zaznaczeniem po prawej. Okna pomocnicze mają przycisk zamknięcia × w prawym górnym rogu; główne okno zachowuje standardowe zamknięcie Windows.
+
+Zmieniono zakończenie wyboru dokumentu: wynik jest przekazywany dopiero po zamknięciu okna wyboru i zwolnieniu callbacku zaznaczenia. Błąd samego zamknięcia jest przechwytywany i pokazywany w oknie. Jest to poprawka potencjalnego wyścigu nawigacji/aktualizacji listy, bez potwierdzenia przyczyny awarii użytkownika na jego stanowisku.
+
+Crashlog zapisuje obsługiwane zdarzenia wyjątków .NET/WinUI, błędy akcji i etapy wczytywania dokumentu. Pliki są lokalne w LocalAppData/KartyLeczenia/logs; przycisk w Ustawieniach otwiera ten folder. Log nie jest automatycznie wysyłany. Dane połączeń są maskowane, a znane hasło SQL jest rejestrowane wyłącznie w pamięci jako wartość do usuwania z komunikatów. Dziennik nie zapisuje świadomie dokumentów, parametrów SQL ani treści ChPL. Zachowywane jest do 10 plików, z rotacją około 512 KiB. Nie jest to pełny zrzut procesu i nie gwarantuje przechwycenia awarii natywnych lub wymuszonego zamknięcia systemowego.
+
+Nie uruchamiano kompilacji, testów ani odtwarzania awarii w aplikacji Windows przy tej zmianie.

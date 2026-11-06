@@ -64,7 +64,7 @@ public sealed class RegistryPage : ContentPage
         panel.Add(Ui.Field("Karencja uzupełniona automatycznie — sprawdź i ewentualnie popraw", result));
         panel.Add(new HorizontalStackLayout { Children = { confirmed, new Label { Text = "Potwierdzam dopasowanie produktu i zgodność karencji z charakterystyką oraz leczeniem.", VerticalOptions = LayoutOptions.Center } } });
         panel.Add(apply); panel.Add(Ui.Action("Anuluj", Close));
-        Content = new ScrollView { Content = panel };
+        Content = Ui.WithClose(this, new ScrollView { Content = panel }, Close);
         foreach (var entry in new[] { medicine, species, route, food }) entry.TextChanged += (_, _) => InvalidateChoice();
         result.TextChanged += (_, _) => InvalidateChoice();
         dosing.TextChanged += (_, _) => InvalidateChoice();

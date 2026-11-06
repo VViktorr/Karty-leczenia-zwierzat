@@ -38,6 +38,11 @@ public sealed class App : Application
                 </Style>
             </ResourceDictionary>
             """);
+        ApplyTheme(UiPreferencesStore.Load().Theme);
+    }
+    public static void ApplyTheme(ThemeMode mode)
+    {
+        if (Application.Current != null) Application.Current.UserAppTheme = mode switch { ThemeMode.Light => AppTheme.Light, ThemeMode.Dark => AppTheme.Dark, _ => AppTheme.Unspecified };
     }
     protected override Window CreateWindow(IActivationState? activationState) =>
         new(new AppShell()) { Title = "Karty leczenia zwierząt", Width = 1400, Height = 920, MinimumWidth = 1050, MinimumHeight = 700 };

@@ -40,6 +40,30 @@ public sealed class ConnectionPage : ContentPage
             return Task.CompletedTask;
         }));
         panel.Add(Ui.Card(clinic));
+        var appearance = new VerticalStackLayout { Spacing = 10 };
+        appearance.Add(Ui.Heading("Wygląd i diagnostyka"));
+        var theme = new Picker { ItemsSource = new[] { "Zgodnie z systemem", "Jasny", "Ciemny" } };
+        theme.SelectedIndex = (int)UiPreferencesStore.Load().Theme;
+        appearance.Add(Ui.Field("Motyw aplikacji", theme));
+        theme.SelectedIndexChanged += (_, _) =>
+        {
+            if (theme.SelectedIndex < 0) return;
+            try
+            {
+                var mode = (ThemeMode)theme.SelectedIndex;
+                UiPreferencesStore.Save(new(mode)); App.ApplyTheme(mode);
+                status.Text = "Zapisano motyw aplikacji.";
+            }
+            catch (Exception ex) { CrashLog.Write("Appearance.Save", ex); status.Text = "Nie zapisano motywu: " + ex.Message; }
+        };
+        appearance.Add(Ui.Note("Lokalny dziennik błędów zapisuje wyjątki i przebieg pobierania dokumentu. Nie jest wysyłany automatycznie."));
+        appearance.Add(Ui.Action("Otwórz folder crashlogów", () =>
+        {
+            Directory.CreateDirectory(CrashLog.Folder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = CrashLog.Folder, UseShellExecute = true });
+            return Task.CompletedTask;
+        }));
+        panel.Add(Ui.Card(appearance));
         panel.Add(Ui.Heading("Połączenie SQL — Subiekt GT"));
         panel.Add(Ui.Note("1. Serwer i logowanie   →   2. Podmiot i grupa leków   →   3. Test i zapis"));
         panel.Add(Ui.Field("Serwer SQL", server));
@@ -79,7 +103,7 @@ public sealed class ConnectionPage : ContentPage
             if (loaded.Options is { } value)
             {
                 server.Text = value.Server; database.Text = value.Database; login.Text = value.UserName;
-                password.Text = value.Password; windows.IsToggled = value.WindowsAuthentication; trust.IsToggled = value.TrustCertificate;
+                password.Text = value.Password; CrashLog.RegisterSecret(value.Password); windows.IsToggled = value.WindowsAuthentication; trust.IsToggled = value.TrustCertificate;
                 remember.IsToggled = loaded.Remembered; group.Text = value.DrugGroup;
             }
             changing = false; Authentication();
@@ -110,7 +134,7 @@ public sealed class ConnectionPage : ContentPage
     {
         debounce?.Cancel(); work?.Cancel();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)); work = cts;
-        var options = Options; status.Text = message; UpdateButtons();
+        var options = Options; CrashLog.RegisterSecret(options.Password); status.Text = message; UpdateButtons();
         try { await action(options, cts.Token); }
         catch (OperationCanceledException) { if (options == Options) status.Text = "Operacja anulowana lub przekroczono czas oczekiwania."; }
         catch (Exception ex) { if (options == Options) status.Text = SubiektConnectionService.FriendlyError(ex); }

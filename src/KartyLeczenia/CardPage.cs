@@ -42,11 +42,22 @@ public sealed class CardPage : ContentPage
         for (int i = 1; i <= 8; i++) withdrawal.Items.Add("Pole własne " + i);
         withdrawal.SelectedIndex = 0; owner.Items.Add("Płatnik"); owner.Items.Add("Odbiorca"); owner.SelectedIndex = 0;
         owner.SelectedIndexChanged += (_, _) => { if (!changing && scope != "") header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient; };
+        var searchTypes = new HorizontalStackLayout { Spacing = 10, HorizontalOptions = LayoutOptions.Start };
+        foreach (var item in new[] { (Toggle: searchInvoices, Title: "FS"), (Toggle: searchWarehouse, Title: "WZ"), (Toggle: searchReceipts, Title: "PA") })
+        {
+            searchTypes.Add(new HorizontalStackLayout { Spacing = 2, Children = { new Label { Text = item.Title, FontSize = 12, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center }, item.Toggle } });
+            item.Toggle.CheckedChanged += async (_, _) => await RefreshDocumentSuggestions();
+        }
         var actions = new Grid { ColumnSpacing = 16, RowSpacing = 10,
             ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
         var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło karencji", withdrawal), Ui.Field("Dane właściciela", owner) };
-        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 20; actions.Add(searchFields[i], i, 0); }
+        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 24; actions.Add(searchFields[i], i, 0); }
+        var searchLabel = (Label)searchFields[0].Children[0];
+        searchFields[0].Children.RemoveAt(0);
+        var searchHeader = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
+        searchHeader.Add(searchLabel, 0, 0); searchHeader.Add(searchTypes, 1, 0);
+        searchFields[0].Children.Insert(0, searchHeader);
         actions.SizeChanged += (_, _) =>
         {
             bool narrow = actions.Width > 0 && actions.Width < 1000;
@@ -63,18 +74,12 @@ public sealed class CardPage : ContentPage
         documentActions.Add(Ui.Action("Podgląd", () => Preview("preview")));
         documentActions.Add(Ui.Action("Drukuj", () => Preview("print")));
         documentActions.Add(Ui.PrimaryAction("Eksport do PDF", () => Preview("pdf")));
-        var searchTypes = new HorizontalStackLayout { Spacing = 10, HorizontalOptions = LayoutOptions.Start };
-        foreach (var item in new[] { (Toggle: searchInvoices, Title: "Faktury"), (Toggle: searchWarehouse, Title: "WZ"), (Toggle: searchReceipts, Title: "Paragony") })
-        {
-            searchTypes.Add(new HorizontalStackLayout { Spacing = 2, Children = { item.Toggle, new Label { Text = item.Title, FontSize = 12, VerticalOptions = LayoutOptions.Center } } });
-            item.Toggle.CheckedChanged += async (_, _) => await RefreshDocumentSuggestions();
-        }
         number.Completed += async (_, _) =>
         {
             try { await OpenDocumentSearch(); }
-            catch (Exception ex) { await DisplayAlertAsync("Nie pobrano dokumentu", SubiektConnectionService.FriendlyError(ex), "OK"); }
+            catch (Exception ex) { CrashLog.Write("DocumentSearch.Enter.Failed", ex); await DisplayAlertAsync("Nie pobrano dokumentu", SubiektConnectionService.FriendlyError(ex), "OK"); }
         };
-        var documentPanel = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("1. Dokument źródłowy"), searchTypes, actions, searchHint, documentActions } };
+        var documentPanel = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("1. Dokument źródłowy"), actions, searchHint, documentActions } };
         var headerPanel = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         foreach (string field in CardSchema.Fields)
         {
@@ -194,7 +199,8 @@ public sealed class CardPage : ContentPage
     {
         if (loadingDocument) return;
         loadingDocument = true;
-        try { await LoadDocumentCore(); }
+        try { CrashLog.Write("Document.Load.Start"); await LoadDocumentCore(); CrashLog.Write("Document.Load.Finished"); }
+        catch (Exception ex) { CrashLog.Write("Document.Load.Failed", ex); throw; }
         finally { loadingDocument = false; }
     }
     async Task LoadDocumentCore()
@@ -222,16 +228,19 @@ public sealed class CardPage : ContentPage
         status.Text = "Pobieranie leków z dokumentu…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         string requestedNumber = number.Text ?? "";
+        CrashLog.Write("Document.SQL.Read");
         var data = await documents.ReadAsync(options, requestedNumber, withdrawal.SelectedIndex, timeout.Token, chosenDocument?.Id);
         if (generation != documentGeneration || SearchKinds != requestedKinds || number.Text != requestedNumber) return;
         if (state.ValidatedConnection != options) throw new InvalidOperationException("Zmieniono połączenie w trakcie pobierania. Ponów operację.");
-        Select(null); rows.Clear(); foreach (var row in data.Rows) rows.Add(row);
+        CrashLog.Write("Document.UI.Apply rows=" + data.Rows.Count);
+        Select(null); list.SelectedItem = null; rows.Clear(); foreach (var row in data.Rows) rows.Add(row);
         scope = data.Scope; payer = data.Payer; recipient = data.Recipient;
         header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient;
         header["Dokument źródłowy"].Text = data.Number;
         if (rows.Count > 0) list.SelectedItem = rows[0];
         status.Text = $"Pobrano {rows.Count} pozycji dostaw z grupy {options.DrugGroup}.";
-        if (withdrawal.SelectedIndex == 0) await FillWithdrawals(generation);
+        CrashLog.Write("Document.UI.Applied");
+        if (withdrawal.SelectedIndex == 0) { CrashLog.Write("Document.RPL.Start"); await FillWithdrawals(generation); CrashLog.Write("Document.RPL.Finished"); }
     }
     async Task FillWithdrawals(int generation)
     {

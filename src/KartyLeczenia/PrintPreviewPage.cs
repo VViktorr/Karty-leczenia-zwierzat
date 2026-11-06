@@ -15,7 +15,7 @@ public sealed class PrintPreviewPage : ContentPage
         var toolbar = new FlexLayout { Padding = 12, Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = { print, pdf,
             Ui.Action("Zamknij podgląd", async () => { closed = true; await Navigation.PopModalAsync(); }) } };
         var root = new Grid { RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } } };
-        root.Add(toolbar, 0, 0); root.Add(status, 0, 1); root.Add(browser, 0, 2); Content = root;
+        root.Add(toolbar, 0, 0); root.Add(status, 0, 1); root.Add(browser, 0, 2); Content = Ui.WithClose(this, root, async () => { closed = true; await Navigation.PopModalAsync(); });
         browser.Navigated += async (_, e) =>
         {
             if (closed) return;

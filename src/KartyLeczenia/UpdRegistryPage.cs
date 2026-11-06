@@ -39,7 +39,7 @@ public sealed class UpdRegistryPage : ContentPage
             if (result != null) { completion.TrySetResult(result); await Navigation.PopModalAsync(); }
         }));
         panel.Add(Ui.Action("Anuluj", async () => { completion.TrySetResult(null); await Navigation.PopModalAsync(); }));
-        Content = new ScrollView { Content = panel };
+        Content = Ui.WithClose(this, new ScrollView { Content = panel }, async () => { lifetime.Cancel(); completion.TrySetResult(null); await Navigation.PopModalAsync(); });
         link.TextChanged += (_, _) => { generation++; document = null; identity.Text = ""; text.Text = ""; species.Text = ""; route.Text = ""; Invalidate(); };
         species.TextChanged += (_, _) => Invalidate(); route.TextChanged += (_, _) => Invalidate();
         query.TextChanged += (_, _) => Invalidate(); text.TextChanged += (_, _) => Invalidate();
