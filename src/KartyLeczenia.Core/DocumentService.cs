@@ -3,6 +3,9 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia;
 
+[Flags]
+public enum DocumentSearchKinds { None = 0, Invoices = 1, WarehouseReleases = 2, Receipts = 4, All = Invoices | WarehouseReleases | Receipts }
+
 public sealed record DocumentSuggestion(int Id, string Number, string Payer = "", string Recipient = "")
 {
     public override string ToString()
@@ -18,10 +21,10 @@ public sealed record DocumentData(string Number, string Payer, string Recipient,
 
 public sealed class DocumentService
 {
-    public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token)
+    public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token, DocumentSearchKinds kinds = DocumentSearchKinds.All)
     {
         string fragment = input.Trim();
-        if (fragment.Length < 4) return [];
+        if (fragment.Length < 4 || kinds == DocumentSearchKinds.None) return [];
         string escaped = fragment.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace("[", "~[");
         await using var con = new SqlConnection(options.BuildConnectionString());
         await con.OpenAsync(token);
@@ -32,7 +35,7 @@ public sealed class DocumentService
             FROM dbo.dok__Dokument d
             LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
-            WHERE (d.dok_NrPelny LIKE N'FS %' OR d.dok_NrPelny LIKE N'PA %' OR d.dok_NrPelny LIKE N'WZ %')
+            WHERE ((@invoices=1 AND d.dok_NrPelny LIKE N'FS %') OR (@receipts=1 AND d.dok_NrPelny LIKE N'PA %') OR (@warehouse=1 AND d.dok_NrPelny LIKE N'WZ %'))
               AND (d.dok_NrPelny LIKE @fragment ESCAPE N'~'
                 OR pl.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
                 OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
@@ -40,6 +43,9 @@ public sealed class DocumentService
                 OR od.adrh_Nazwa LIKE @fragment ESCAPE N'~')
             ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, d.dok_Id DESC
             """, con) { CommandTimeout = 10 };
+        cmd.Parameters.Add("@invoices", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Invoices);
+        cmd.Parameters.Add("@receipts", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Receipts);
+        cmd.Parameters.Add("@warehouse", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.WarehouseReleases);
         cmd.Parameters.Add("@fragment", SqlDbType.NVarChar, 250).Value = "%" + escaped + "%";
         cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
         var found = new List<DocumentSuggestion>();
@@ -115,9 +121,10 @@ public sealed class DocumentService
             deliveries.Add(new(new TreatmentRow(new()
             {
                 ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II", ["Produkt"] = product,
+                ["Gatunek"] = "Bydło", ["Opis zwierząt / numer siedziby stada"] = "Bydło", ["Domyślny gatunek"] = "True",
                 ["Seria"] = V("Seria"), ["Ważność"] = expiry, ["Ilość wydana"] = quantity.ToString("0.####") + " " + V("ob_Jm"),
                 ["Karencja"] = V("Karencja"), ["Zalecenia / uwagi"] = note,
-                ["Status karencji"] = withdrawalSource == 0 ? "Brak karencji — wybierz produkt w UPD" : "Dane Subiekta — do weryfikacji",
+                ["Status karencji"] = withdrawalSource == 0 ? "Brak karencji — wybierz produkt w RPL" : "Dane Subiekta — do weryfikacji",
                 ["Źródło karencji"] = withdrawalSource == 0 ? "" : "Subiekt: " + withdrawal,
                 ["ID towaru"] = V("ob_TowId")
             }), quantity, V("ob_Jm")));
