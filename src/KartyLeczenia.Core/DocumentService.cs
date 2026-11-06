@@ -6,8 +6,15 @@ namespace KartyLeczenia;
 [Flags]
 public enum DocumentSearchKinds { None = 0, Invoices = 1, WarehouseReleases = 2, Receipts = 4, All = Invoices | WarehouseReleases | Receipts }
 
-public sealed record DocumentSuggestion(int Id, string Number, string Payer = "", string Recipient = "", DateTime? Date = null)
+public sealed record DocumentLink(int Id, string Number);
+
+public sealed record DocumentSuggestion(int Id, string Number, string Payer = "", string Recipient = "", DateTime? Date = null, decimal? Gross = null, string Currency = "")
 {
+    public IReadOnlyList<DocumentLink> Related { get; init; } = Array.Empty<DocumentLink>();
+    public string RelationNotice { get; init; } = "";
+    public string AmountText => Gross.HasValue ? "Brutto: " + Gross.Value.ToString("N2") + (string.IsNullOrWhiteSpace(Currency) ? " (waluta nieodczytana)" : " " + Currency.Trim()) : "Brutto: —";
+    public string RelatedText => Related.Count > 0 ? (Related.All(d => d.Number.StartsWith("WZ ", StringComparison.OrdinalIgnoreCase)) ? "Powiązane WZ (" + Related.Count + "): " : "Powiązane dokumenty: ") + string.Join(", ", Related.Select(d => d.Number)) : RelationNotice;
+    public bool HasRelatedText => !string.IsNullOrWhiteSpace(RelatedText);
     public string Details => (Date.HasValue ? Date.Value.ToString("dd.MM.yyyy") + " | " : "") + string.Join(" | ", new[] { Payer, Recipient }.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
     public override string ToString()
     {
@@ -22,6 +29,65 @@ public sealed record DocumentData(string Number, string Payer, string Recipient,
 
 public sealed class DocumentService
 {
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (bool Gross, bool Currency)> AmountColumns = new();
+    static async Task<(bool Gross, bool Currency)> DetectAmounts(SqlConnection con, CancellationToken token)
+    {
+        string key = con.DataSource + "|" + con.Database;
+        if (AmountColumns.TryGetValue(key, out var known)) return known;
+        using var cmd = new SqlCommand("""
+            SELECT name, TYPE_NAME(system_type_id) FROM sys.columns
+            WHERE object_id=OBJECT_ID(N'dbo.dok__Dokument') AND name IN (N'dok_WartBrutto', N'dok_Waluta')
+            """, con) { CommandTimeout = 5 };
+        bool gross = false, currency = false;
+        await using (var reader = await cmd.ExecuteReaderAsync(token))
+        while (await reader.ReadAsync(token))
+        {
+            string name = reader.GetString(0), type = reader.GetString(1);
+            if (name == "dok_WartBrutto" && (type is "money" or "smallmoney" or "decimal" or "numeric" or "float" or "real" or "int" or "bigint")) gross = true;
+            if (name == "dok_Waluta" && (type is "char" or "varchar" or "nchar" or "nvarchar")) currency = true;
+        }
+        var result = (Gross: gross, Currency: currency); AmountColumns[key] = result; return result;
+    }
+    static async Task<List<DocumentSuggestion>> AttachRelations(SqlConnection con, List<DocumentSuggestion> documents, CancellationToken token)
+    {
+        if (documents.Count == 0) return documents;
+        using var cmd = con.CreateCommand(); cmd.CommandTimeout = 10;
+        var ids = documents.Select(d => d.Id).Distinct().ToList();
+        string parameters = string.Join(",", ids.Select((id, i) => "@doc" + i));
+        for (int i = 0; i < ids.Count; i++) cmd.Parameters.Add("@doc" + i, SqlDbType.Int).Value = ids[i];
+        // These are actual trade/warehouse references on document positions, never date/customer guesses.
+        cmd.CommandText = $"""
+            SELECT DISTINCT h.dok_Id, h.dok_NrPelny, m.dok_Id, m.dok_NrPelny
+            FROM dbo.dok_Pozycja p
+            INNER JOIN dbo.dok__Dokument h ON h.dok_Id=p.ob_DokHanId
+            INNER JOIN dbo.dok__Dokument m ON m.dok_Id=p.ob_DokMagId
+            WHERE (p.ob_DokHanId IN ({parameters}) OR p.ob_DokMagId IN ({parameters}))
+              AND (h.dok_NrPelny LIKE N'FS %' OR h.dok_NrPelny LIKE N'PA %')
+              AND m.dok_NrPelny LIKE N'WZ %'
+            """;
+        var links = new Dictionary<int, Dictionary<int, DocumentLink>>();
+        void Add(int id, DocumentLink target)
+        {
+            if (!links.TryGetValue(id, out var bucket)) links[id] = bucket = new();
+            bucket[target.Id] = target;
+        }
+        try
+        {
+            await using var reader = await cmd.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                int trade = reader.GetInt32(0), warehouse = reader.GetInt32(2);
+                Add(trade, new(warehouse, reader.GetString(3)));
+                Add(warehouse, new(trade, reader.GetString(1)));
+            }
+            return documents.Select(d => d with { Related = links.TryGetValue(d.Id, out var bucket) ? bucket.Values.OrderBy(v => v.Number).ToList() : Array.Empty<DocumentLink>() }).ToList();
+        }
+        catch (SqlException ex)
+        {
+            CrashLog.Write("DocumentSearch.Relations.Failed", ex);
+            return documents.Select(d => d with { RelationNotice = "Powiązania niedostępne" }).ToList();
+        }
+    }
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> DateColumns = new();
     static async Task<string> DateColumn(SqlConnection con, CancellationToken token)
     {
@@ -46,6 +112,9 @@ public sealed class DocumentService
         await using var con = new SqlConnection(options.BuildConnectionString());
         await con.OpenAsync(token);
         string dateColumn = await DateColumn(con, token);
+        var amounts = await DetectAmounts(con, token);
+        string grossValue = amounts.Gross ? "d.dok_WartBrutto" : "CAST(NULL AS decimal(19,4))";
+        string currencyValue = amounts.Currency ? "d.dok_Waluta" : "CAST(NULL AS nvarchar(3))";
         if (dateColumn.Length == 0 && (dateFrom.HasValue || dateUntil.HasValue))
             throw new InvalidOperationException("Nie rozpoznano kolumny daty dokumentu. Wybierz wszystkie lata.");
         string dateValue = dateColumn.Length > 0 ? "d." + dateColumn : "CAST(NULL AS datetime)";
@@ -55,7 +124,7 @@ public sealed class DocumentService
         using var cmd = new SqlCommand($"""
             SELECT TOP (@limit) d.dok_Id, d.dok_NrPelny,
               COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_NazwaPelna)), N''), pl.adrh_Nazwa, N'') AS Payer,
-              COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient, {dateValue} AS DocumentDate
+              COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient, {dateValue} AS DocumentDate, {grossValue} AS Gross, {currencyValue} AS Currency
             FROM dbo.dok__Dokument d
             LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
@@ -77,9 +146,10 @@ public sealed class DocumentService
         cmd.Parameters.Add("@fragment", SqlDbType.NVarChar, 250).Value = "%" + escaped + "%";
         cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
         var found = new List<DocumentSuggestion>();
-        await using var reader = await cmd.ExecuteReaderAsync(token);
-        while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetDateTime(4)));
-        return found;
+        await using (var reader = await cmd.ExecuteReaderAsync(token))
+        while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetDateTime(4), reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5)), reader.IsDBNull(6) ? "" : reader.GetString(6).Trim()));
+        return await AttachRelations(con, found, token);
     }
     public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null)
     {
