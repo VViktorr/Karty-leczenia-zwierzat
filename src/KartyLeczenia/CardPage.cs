@@ -10,14 +10,15 @@ public sealed class CardPage : ContentPage
     readonly ObservableCollection<TreatmentRow> rows = new();
     readonly CollectionView list = new() { SelectionMode = SelectionMode.Single };
     readonly Dictionary<string, Editor> header = new(), editors = new();
-    readonly Entry number = new() { Placeholder = "Numer lub fragment — podpowiedzi od 4 znaków", WidthRequest = 320, MaxLength = 100 };
-    readonly Picker documentSuggestions = new() { Title = "Podpowiedzi dokumentów", WidthRequest = 320 };
+    readonly Entry number = new() { Placeholder = "Numer, nazwisko lub nazwa — od 4 znaków", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill, MaxLength = 100 };
+    readonly Picker documentSuggestions = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
     CancellationTokenSource? documentSearch;
     DocumentSuggestion? chosenDocument;
     ConnectionOptions? documentLookupConnection;
     bool choosingDocument;
-    readonly Picker withdrawal = new() { Title = "Źródło karencji", WidthRequest = 260 };
-    readonly Picker owner = new() { Title = "Dane właściciela", WidthRequest = 150 };
+    readonly Picker withdrawal = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
+    readonly Picker owner = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
+    readonly Label searchHint = Ui.Note("Podpowiedzi po wpisaniu 4 znaków numeru dokumentu, nazwiska lub nazwy klienta.");
     readonly Label status = Ui.Note("Wybierz dokument lub otwórz zapisaną kartę.");
     readonly Label provenance = Ui.Note("Wybierz lek z listy, aby poprawić jego dane.");
     readonly CheckBox printed = new();
@@ -37,17 +38,29 @@ public sealed class CardPage : ContentPage
         for (int i = 1; i <= 8; i++) withdrawal.Items.Add("Pole własne " + i);
         withdrawal.SelectedIndex = 0; owner.Items.Add("Płatnik"); owner.Items.Add("Odbiorca"); owner.SelectedIndex = 0;
         owner.SelectedIndexChanged += (_, _) => { if (!changing && scope != "") header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient; };
-        var actions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.Center };
-        actions.Add(Ui.Field("Faktura, paragon lub WZ", number));
-        actions.Add(Ui.Field("Wybierz dokument", documentSuggestions));
-        actions.Add(Ui.Field("Źródło karencji", withdrawal)); actions.Add(Ui.Field("Dane właściciela", owner));
+        var actions = new Grid { ColumnSpacing = 16, RowSpacing = 10,
+            ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(4, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2.5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(1.5, GridUnitType.Star) } },
+            RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
+        var fields = new[] { Ui.Field("Numer dokumentu lub klient", number), Ui.Field("Wybierz dokument", documentSuggestions), Ui.Field("Źródło karencji", withdrawal), Ui.Field("Dane właściciela", owner) };
+        void ArrangeSearch(double width)
+        {
+            bool narrow = width > 0 && width < 1150;
+            for (int i = 0; i < fields.Length; i++) { Grid.SetColumn(fields[i], narrow ? (i % 2) * 2 : i); Grid.SetRow(fields[i], narrow ? i / 2 : 0); Grid.SetColumnSpan(fields[i], narrow ? 2 : 1); }
+        }
+        for (int i = 0; i < fields.Length; i++)
+        {
+            fields[i].HorizontalOptions = LayoutOptions.Fill; fields[i].VerticalOptions = LayoutOptions.Start;
+            ((Label)fields[i].Children[0]).HeightRequest = 20;
+            actions.Add(fields[i], i, 0);
+        }
+        actions.SizeChanged += (_, _) => ArrangeSearch(actions.Width);
         var documentActions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         documentActions.Add(Ui.PrimaryAction("Pobierz dokument", LoadDocument));
         documentActions.Add(Ui.Action("Otwórz kartę", OpenCard)); documentActions.Add(Ui.Action("Zapisz kartę", SaveCard));
         documentActions.Add(Ui.Action("Podgląd", () => Preview("preview")));
         documentActions.Add(Ui.Action("Drukuj", () => Preview("print")));
         documentActions.Add(Ui.PrimaryAction("Eksport do PDF", () => Preview("pdf")));
-        var documentPanel = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("1. Dokument źródłowy"), actions, documentActions } };
+        var documentPanel = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("1. Dokument źródłowy"), actions, searchHint, documentActions } };
         var headerPanel = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         foreach (string field in CardSchema.Fields)
         {
@@ -101,6 +114,7 @@ public sealed class CardPage : ContentPage
         {
             if (choosingDocument) return;
             chosenDocument = null; documentSuggestions.ItemsSource = null;
+            searchHint.Text = "Wpisz co najmniej 4 znaki numeru, nazwiska lub nazwy klienta.";
             documentSearch?.Cancel();
             if ((number.Text?.Trim().Length ?? 0) < 4 || state.ValidatedConnection == null) return;
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15)); documentSearch = cts;
@@ -111,7 +125,7 @@ public sealed class CardPage : ContentPage
                 var found = await documents.SearchAsync(options, input, cts.Token);
                 if (cts.IsCancellationRequested || number.Text?.Trim() != input || state.ValidatedConnection != options) return;
                 documentLookupConnection = options; documentSuggestions.ItemsSource = found;
-                documentSuggestions.Title = found.Count >= 21 ? "Ponad 20 wyników — dopisz numer" : $"Dokumenty: {found.Count} — wybierz";
+                searchHint.Text = found.Count >= 21 ? "Ponad 20 wyników — dopisz numer lub nazwisko, aby zawęzić listę." : $"Znaleziono dokumentów: {found.Count}. Wybierz właściwy dokument z listy.";
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { if (!cts.IsCancellationRequested && state.ValidatedConnection == options) status.Text = "Nie pobrano podpowiedzi: " + ex.Message; }
@@ -120,6 +134,7 @@ public sealed class CardPage : ContentPage
         documentSuggestions.SelectedIndexChanged += (_, _) =>
         {
             if (documentSuggestions.SelectedItem is not DocumentSuggestion suggestion) return;
+            searchHint.Text = "Wybrano: " + suggestion;
             documentSearch?.Cancel(); choosingDocument = true; number.Text = suggestion.Number; choosingDocument = false; chosenDocument = suggestion;
         };
     }
@@ -160,7 +175,7 @@ public sealed class CardPage : ContentPage
             var exact = found.Where(d => d.Number.Equals(input, StringComparison.OrdinalIgnoreCase)).ToList();
             if (exact.Count == 1) chosenDocument = exact[0];
             else if (found.Count == 1) chosenDocument = found[0];
-            else { documentSuggestions.ItemsSource = found; status.Text = found.Count == 0 ? "Nie znaleziono dokumentu." : "Wybierz dokument z podpowiedzi; możesz dopisać dalszą część numeru."; return; }
+            else { documentSuggestions.ItemsSource = found; status.Text = found.Count == 0 ? "Nie znaleziono dokumentu." : "Wybierz dokument z podpowiedzi; możesz dopisać numer lub nazwisko."; return; }
             choosingDocument = true; number.Text = chosenDocument.Number; choosingDocument = false;
         }
         if (rows.Count > 0 && !await DisplayAlertAsync("Nowy dokument", "Pobranie zastąpi aktualnie edytowane pozycje. Kontynuować?", "Pobierz", "Anuluj")) return;
