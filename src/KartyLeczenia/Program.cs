@@ -19,9 +19,9 @@ static class Program
 
 public sealed record Card(Dictionary<string, string> Fields, List<Dictionary<string, string>> Rows);
 
-sealed class MainForm : Form
+sealed partial class MainForm : Form
 {
-    readonly TextBox server = new(), database = new(), login = new(), password = new() { UseSystemPasswordChar = true };
+    readonly TextBox server = new(), login = new(), password = new() { UseSystemPasswordChar = true };
     readonly CheckBox windows = new() { Text = "Logowanie Windows", Checked = true, AutoSize = true };
     readonly CheckBox trust = new() { Text = "Zaufaj certyfikatowi serwera", AutoSize = true };
     readonly TextBox document = new();
@@ -42,22 +42,14 @@ sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "Karty leczenia zwierząt — pierwsza wersja";
+        Text = "Karty leczenia zwierząt";
         Width = 1400; Height = 900;
         var tabs = new TabControl { Dock = DockStyle.Fill };
         var connection = new TabPage("Połączenie z Subiektem");
         var card = new TabPage("Karta leczenia");
         tabs.TabPages.AddRange([connection, card]);
         Controls.Add(tabs);
-        var settings = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
-        connection.Controls.Add(settings);
-        AddInput(settings, "Serwer SQL (komputer lub komputer\\instancja)", server);
-        AddInput(settings, "Baza firmy", database);
-        settings.Controls.Add(windows);
-        AddInput(settings, "Login SQL", login);
-        AddInput(settings, "Hasło SQL — tylko na czas sesji", password);
-        settings.Controls.Add(trust);
-        settings.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(700, 0), Text = "Wymagane konto z uprawnieniami wyłącznie SELECT. Program nie zapisuje nic do bazy Subiekta. Ustawienia połączenia nie są zapisywane na dysku." });
+        BuildConnectionPage(connection, tabs, card);
 
         var top = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true };
         document.Width = 180; document.PlaceholderText = "Pełny numer FS / PA / WZ";
@@ -122,17 +114,9 @@ sealed class MainForm : Form
     }
     string ConnectionString()
     {
-        if (string.IsNullOrWhiteSpace(server.Text) || string.IsNullOrWhiteSpace(database.Text))
-            throw new InvalidOperationException("Podaj serwer SQL i bazę firmy w zakładce połączenia.");
-        var b = new SqlConnectionStringBuilder
-        {
-            DataSource = server.Text.Trim(), InitialCatalog = database.Text.Trim(),
-            IntegratedSecurity = windows.Checked, TrustServerCertificate = trust.Checked,
-            ApplicationIntent = ApplicationIntent.ReadOnly, ConnectTimeout = 10,
-            ApplicationName = "KartyLeczenia"
-        };
-        if (!windows.Checked) { b.UserID = login.Text; b.Password = password.Text; }
-        return b.ConnectionString;
+        if (validatedConnection is null || validatedConnection != CurrentConnection())
+            throw new InvalidOperationException("Przejdź do połączenia z Subiektem i wykonaj test aktualnych ustawień.");
+        return CurrentConnection().BuildConnectionString();
     }
 
     async Task LoadDocument()
@@ -140,7 +124,9 @@ sealed class MainForm : Form
         if (string.IsNullOrWhiteSpace(document.Text)) throw new InvalidOperationException("Podaj pełny numer dokumentu.");
         if (grid.Rows.Cast<DataGridViewRow>().Any(r => !r.IsNewRow) &&
             MessageBox.Show("Pobranie zastąpi aktualnie edytowane pozycje. Kontynuować?", "Nowy dokument", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
-        await using var con = new SqlConnection(ConnectionString());
+        string connectionString = ConnectionString();
+        var documentConnection = CurrentConnection();
+        await using var con = new SqlConnection(connectionString);
         await con.OpenAsync();
         using var head = new SqlCommand("""
             SELECT d.dok_Id, d.dok_NrPelny,
@@ -178,10 +164,12 @@ sealed class MainForm : Form
             LEFT JOIN dbo.dok_MagRuch r ON r.mr_PozId=p.ob_Id
             LEFT JOIN dbo.dok_MagRuch z ON z.mr_Id=r.mr_DoId AND z.mr_TowId=r.mr_TowId
             LEFT JOIN dbo.dok_Pozycja zp ON zp.ob_Id=z.mr_PozId
-            WHERE p.ob_DokHanId=@id OR p.ob_DokMagId=@id
+            WHERE (p.ob_DokHanId=@id OR p.ob_DokMagId=@id)
+              AND t.tw_IdGrupa IN (SELECT grt_Id FROM dbo.sl_GrupaTw WHERE grt_Nazwa=@drugGroup)
             ORDER BY p.ob_Id, r.mr_Id
             """, con);
         cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
+        cmd.Parameters.Add("@drugGroup", SqlDbType.NVarChar, 50).Value = documentConnection.DrugGroup;
         var rows = new List<object[]>();
         await using (var reader = await cmd.ExecuteReaderAsync())
         {
@@ -200,10 +188,12 @@ sealed class MainForm : Form
                     selectedSource == 0 ? "" : "Subiekt: " + withdrawal, "", "", "", V("ob_TowId")]);
             }
         }
+        if (documentConnection != CurrentConnection())
+            throw new InvalidOperationException("W trakcie pobierania zmieniono połączenie. Ponów pobieranie po teście nowych ustawień.");
         changingRegistry = true;
         try { grid.Rows.Clear(); foreach (var row in rows) grid.Rows.Add(row); }
         finally { changingRegistry = false; }
-        documentScope = server.Text.Trim().ToUpperInvariant() + "|" + database.Text.Trim().ToUpperInvariant();
+        documentScope = documentConnection.Server.ToUpperInvariant() + "|" + documentConnection.Database.ToUpperInvariant();
         addresses = newAddresses;
         fields["Właściciel i adres"].Text = addresses[owner.SelectedIndex];
         fields["Dokument źródłowy"].Text = number;

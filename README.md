@@ -22,7 +22,7 @@ dotnet publish src/KartyLeczenia -c Release -r win-x64 --self-contained true -p:
 
 ## Połączenie
 Podaj serwer (np. SERWER\\INSERTGT), bazę firmy i konto SQL mające wyłącznie SELECT do potrzebnych tabel. Można użyć uwierzytelniania Windows. Program wykonuje jedynie SELECT, ale uprawnienia serwera są właściwym zabezpieczeniem przed zapisem. ApplicationIntent=ReadOnly nie zastępuje uprawnień.
-Hasło pozostaje wyłącznie w pamięci procesu. Ustawienia lecznicy zapisuj wraz z kartą lub wprowadzaj przy kolejnej sesji; trwałe profile ustawień są jeszcze do dodania.
+Domyślnie hasło pozostaje wyłącznie w pamięci procesu. Opcja zapamiętania zapisuje je zaszyfrowane przez Windows DPAPI dla bieżącego konta użytkownika. Ustawienia lecznicy zapisuj wraz z kartą lub wprowadzaj przy kolejnej sesji; trwałe profile ustawień są jeszcze do dodania.
 Domyślnie wymagany jest zaufany certyfikat SQL. Opcję zaufania certyfikatowi włączaj tylko dla znanego serwera w swojej sieci.
 
 ## Wydruk
@@ -30,7 +30,7 @@ Wybierz produkty, uzupełnij dane i użyj „Podgląd / druk”. Przeglądarka o
 Układ odwzorowuje sekcje przesłanego wzoru; wymaga jeszcze porównania wydruku na rzeczywistej drukarce.
 
 ## Zakres weryfikacji
-Powiązania SQL sprawdzono na eksportach użytkownika z Subiekta GT 1.89 SP1 HF1. Kompilacja Release przechodzi bez błędów i ostrzeżeń; 9 kontroli parsera przechodzi. Nie wykonano próby GUI na Windows ani połączenia aplikacji z rzeczywistym serwerem SQL. Pobieranie dokumentów RPL w środowisku deweloperskim było blokowane przez serwer; wymaga sprawdzenia na stanowisku użytkownika.
+Powiązania SQL sprawdzono na eksportach użytkownika z Subiekta GT 1.89 SP1 HF1. Kompilacja Release przechodzi bez błędów i ostrzeżeń; 9 kontroli parsera przechodzi. Wydanie Alpha 1 przeszło próbę uruchomienia na Windows; pełna kontrola wyglądu nadal jest potrzebna. Nie sprawdzono jeszcze połączenia aplikacji z rzeczywistym serwerem SQL. Pobieranie dokumentów RPL w środowisku deweloperskim było blokowane przez serwer; wymaga sprawdzenia na stanowisku użytkownika.
 Ruchy bez dostawy źródłowej oraz dokumenty z korektami lub innym sposobem realizacji wymagają osobnej weryfikacji. Brak danych nie jest uzupełniany przez zgadywanie.
 Ilość sprzedaży nie jest dawką. Pole dawkowania pozostaje do ręcznego uzupełnienia.
 Numer karty wpisuje użytkownik. Automatyczna wspólna numeracja, centralna baza kart, instalator i profile lekarzy pozostają do wdrożenia. Plik JSON można zapisać do wybranego folderu sieciowego, ale nie zastępuje on centralnej bazy wielostanowiskowej.
@@ -57,3 +57,28 @@ Ograniczenia: nie jest to pełny lokalny katalog wszystkich leków ani oficjalna
 dotnet run --project tests/RegistryChecks
 ```
 Sprawdzane są stare i nowe nagłówki, łamanie linii w PDF, zachowanie wszystkich dróg podania i ograniczeń, odrzucenie brakującej lub niepełnej sekcji oraz rozdzielenie mapowań baz.
+
+## Łatwiejsze pierwsze uruchomienie
+1. W zakładce połączenia wpisz serwer SQL (np. KOMPUTER\\INSERTGT lub 192.168.1.10,1433).
+2. Wybierz uwierzytelnianie Windows albo wpisz login i hasło SQL. To konto SQL, nie operator Subiekta.
+3. Po zakończeniu wpisywania serwera program próbuje odczytać listę dostępnych podmiotów. Możesz też użyć **Odśwież podmioty**.
+4. Wybierz firmę z listy. Przy ograniczonej widoczności baz wpisz jej nazwę ręcznie — nie jest potrzebne konto administratora do samej pracy.
+5. Kliknij **Test połączenia**. Sprawdzane są odczyty wymaganych tabel, uprawnienia zapisu do tabel / wybrane uprawnienia zmiany struktury i grupa leków.
+6. Wybierz grupę **Leki**, jeśli występuje pod inną nazwą. Po zmianie ponów test.
+7. Kliknij **Zapisz ustawienia** albo **Zapisz i przejdź do kart**.
+
+Ustawienia trafiają do LocalAppData/KartyLeczenia/connection.json. Nie ma automatycznego zapisu hasła: zaznacz to osobno. Wyłączenie zapamiętania i ponowny zapis usuwa zaszyfrowaną wartość. Hasło zapamiętane przez DPAPI nie jest przenośne między kontami Windows. Uszkodzony plik ustawień wyświetla komunikat i pozwala skonfigurować połączenie ponownie.
+
+Po restarcie wczytywany jest zapisany podmiot. Jeśli dostępne jest uwierzytelnianie Windows albo zapamiętane hasło, program automatycznie testuje połączenie. Zmiana konfiguracji unieważnia test; nie można zapisać nieprzetestowanego połączenia ani użyć go do pobrania dokumentu.
+
+Lista firm jest budowana wyłącznie z widocznych, dostępnych baz o strukturze GT; nie są nadawane żadne uprawnienia. Nie wszystkie konta mają prawo wyświetlać listę baz. Brak nazwy firmy w danych licencyjnych nie blokuje wybrania bazy po jej nazwie.
+
+Z faktur, paragonów i WZ pobierane są wyłącznie towary należące do skonfigurowanej grupy leków. Brak grupy nie powoduje pobrania wszystkich towarów. Dostęp do Subiekta nadal ogranicza się do SELECT. Test nie nadaje ani nie odbiera uprawnień.
+
+Ekran w bieżącym wydaniu pozostaje Windows Forms. Logika konfiguracji została oddzielona od interfejsu w ConnectionSetup.cs, aby można było wykorzystać ją przy uzgodnionej migracji do MAUI dla Windows.
+
+Kontrole konfiguracji (na Windows):
+```powershell
+dotnet run --project tests/ConnectionChecks -c Release
+```
+Nie zastępują sprawdzenia połączenia z rzeczywistym serwerem użytkownika.
