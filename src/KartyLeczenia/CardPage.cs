@@ -12,7 +12,6 @@ public sealed class CardPage : ContentPage
     readonly Dictionary<string, Editor> header = new(), editors = new();
     readonly Entry number = new() { Placeholder = "Numer lub nazwisko — Enter otwiera wybór dokumentu", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill, MaxLength = 100 };
     readonly Picker documentSuggestions = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
-    CancellationTokenSource? documentSearch;
     DocumentSuggestion? chosenDocument;
     ConnectionOptions? documentLookupConnection;
     bool choosingDocument, loadingDocument;
@@ -142,13 +141,13 @@ public sealed class CardPage : ContentPage
         {
             if (documentSuggestions.SelectedItem is not DocumentSuggestion suggestion) return;
             searchHint.Text = "Wybrano: " + suggestion;
-            documentSearch?.Cancel(); choosingDocument = true; number.Text = suggestion.Number; choosingDocument = false; chosenDocument = suggestion;
+            choosingDocument = true; number.Text = suggestion.Number; choosingDocument = false; chosenDocument = suggestion;
         };
     }
     Task RefreshDocumentSuggestions()
     {
         if (choosingDocument) return Task.CompletedTask;
-        documentSearch?.Cancel(); chosenDocument = null; documentSuggestions.ItemsSource = null;
+        chosenDocument = null; documentSuggestions.ItemsSource = null;
         searchHint.Text = "Naciśnij Enter lub „Wyszukaj dokument”, aby wybrać dokument i okres.";
         return Task.CompletedTask;
     }
