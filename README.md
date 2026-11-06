@@ -83,3 +83,11 @@ Zmieniono zakończenie wyboru dokumentu: wynik jest przekazywany dopiero po zamk
 Crashlog zapisuje obsługiwane zdarzenia wyjątków .NET/WinUI, błędy akcji i etapy wczytywania dokumentu. Pliki są lokalne w LocalAppData/KartyLeczenia/logs; przycisk w Ustawieniach otwiera ten folder. Log nie jest automatycznie wysyłany. Dane połączeń są maskowane, a znane hasło SQL jest rejestrowane wyłącznie w pamięci jako wartość do usuwania z komunikatów. Dziennik nie zapisuje świadomie dokumentów, parametrów SQL ani treści ChPL. Zachowywane jest do 10 plików, z rotacją około 512 KiB. Nie jest to pełny zrzut procesu i nie gwarantuje przechwycenia awarii natywnych lub wymuszonego zamknięcia systemowego.
 
 Nie uruchamiano kompilacji, testów ani odtwarzania awarii w aplikacji Windows przy tej zmianie.
+
+### Kwoty i powiązania dokumentów
+
+Wyniki wyszukiwania pokazują kwotę brutto całego dokumentu i walutę, jeżeli odpowiednie kolumny są dostępne w bazie. Brak kwoty jest oznaczany kreską, nie zerem. Filtry FS/WZ/PA zajmują mniej miejsca.
+
+Powiązania FS/PA ↔ WZ są odczytywane z referencji pozycji `dok_Pozycja.ob_DokHanId` i `ob_DokMagId`. Faktura zbiorowa pokazuje wszystkie znalezione WZ, bez ograniczenia do jednego; powtarzające się referencje są usuwane. Program nie ustala powiązań na podstawie klienta ani daty. Przy wyborze faktury nie importuje ponownie leków z powiązanych WZ. Numery powiązań trafiają również do danych dokumentu źródłowego karty.
+
+Obsługa dotyczy relacji zapisanych przez te referencje pozycji. Wymaga potwierdzenia na rzeczywistej bazie Subiekta; niedostępność odczytu relacji jest sygnalizowana w wynikach i logowana. Wszystkie zapytania pozostają tylko do odczytu.
