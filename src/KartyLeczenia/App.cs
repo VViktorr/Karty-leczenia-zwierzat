@@ -58,9 +58,14 @@ public sealed class AppShell : Shell
         var state = new AppState();
         var tabs = new TabBar();
         var connection = new Tab { Title = "Ustawienia", Route = "connection" };
-        connection.Items.Add(new ShellContent { Content = new Views.ConnectionPage(state) }); tabs.Items.Add(connection);
+        var connectionPage = new Views.ConnectionPage(state);
+        connection.Items.Add(new ShellContent { Content = connectionPage });
         var cards = new Tab { Title = "Karta leczenia", Route = "cards" };
         cards.Items.Add(new ShellContent { Content = new Views.CardPage(state) }); tabs.Items.Add(cards);
+        tabs.Items.Add(connection);
+        tabs.CurrentItem = cards;
         Items.Add(tabs);
+        CurrentItem = tabs;
+        Loaded += async (_, _) => await connectionPage.InitializeAsync();
     }
 }
