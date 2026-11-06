@@ -3,9 +3,15 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia;
 
-public sealed record DocumentSuggestion(int Id, string Number)
+public sealed record DocumentSuggestion(int Id, string Number, string Payer = "", string Recipient = "")
 {
-    public override string ToString() => Number;
+    public override string ToString()
+    {
+        if (string.IsNullOrWhiteSpace(Payer)) return string.IsNullOrWhiteSpace(Recipient) ? Number : Number + " | " + Recipient;
+        return string.IsNullOrWhiteSpace(Recipient) || string.Equals(Payer, Recipient, StringComparison.OrdinalIgnoreCase)
+            ? Number + " | " + Payer
+            : Number + " | płatnik: " + Payer + " | odbiorca: " + Recipient;
+    }
 }
 
 public sealed record DocumentData(string Number, string Payer, string Recipient, List<TreatmentRow> Rows, string Scope);
@@ -20,17 +26,25 @@ public sealed class DocumentService
         await using var con = new SqlConnection(options.BuildConnectionString());
         await con.OpenAsync(token);
         using var cmd = new SqlCommand("""
-            SELECT TOP (21) d.dok_Id, d.dok_NrPelny
+            SELECT TOP (21) d.dok_Id, d.dok_NrPelny,
+              COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_NazwaPelna)), N''), pl.adrh_Nazwa, N'') AS Payer,
+              COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient
             FROM dbo.dok__Dokument d
+            LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
+            LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
             WHERE (d.dok_NrPelny LIKE N'FS %' OR d.dok_NrPelny LIKE N'PA %' OR d.dok_NrPelny LIKE N'WZ %')
-              AND d.dok_NrPelny LIKE @fragment ESCAPE N'~'
+              AND (d.dok_NrPelny LIKE @fragment ESCAPE N'~'
+                OR pl.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
+                OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
+                OR od.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
+                OR od.adrh_Nazwa LIKE @fragment ESCAPE N'~')
             ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, d.dok_Id DESC
             """, con) { CommandTimeout = 10 };
         cmd.Parameters.Add("@fragment", SqlDbType.NVarChar, 250).Value = "%" + escaped + "%";
         cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
         var found = new List<DocumentSuggestion>();
         await using var reader = await cmd.ExecuteReaderAsync(token);
-        while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1)));
+        while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
         return found;
     }
     public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null)
