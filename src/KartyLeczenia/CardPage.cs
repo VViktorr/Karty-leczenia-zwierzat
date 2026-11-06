@@ -41,19 +41,19 @@ public sealed class CardPage : ContentPage
         for (int i = 1; i <= 8; i++) withdrawal.Items.Add("Pole własne " + i);
         withdrawal.SelectedIndex = 0; owner.Items.Add("Płatnik"); owner.Items.Add("Odbiorca"); owner.SelectedIndex = 0;
         owner.SelectedIndexChanged += (_, _) => { if (!changing && scope != "") header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient; };
-        var searchTypes = new HorizontalStackLayout { Spacing = 8, HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Center };
+        var searchTypes = new HorizontalStackLayout { Spacing = 6, HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Center };
         foreach (var item in new[] { (Toggle: searchInvoices, Title: "FS"), (Toggle: searchWarehouse, Title: "WZ"), (Toggle: searchReceipts, Title: "PA") })
         {
-            item.Toggle.WidthRequest = item.Toggle.MinimumWidthRequest = 32;
-            item.Toggle.HeightRequest = item.Toggle.MinimumHeightRequest = 32;
+            item.Toggle.WidthRequest = item.Toggle.MinimumWidthRequest = 28;
+            item.Toggle.HeightRequest = item.Toggle.MinimumHeightRequest = 28;
             item.Toggle.Margin = 0; item.Toggle.HorizontalOptions = LayoutOptions.End; item.Toggle.VerticalOptions = LayoutOptions.Center;
             item.Toggle.Color = Color.FromArgb("#14B8A6");
             SemanticProperties.SetDescription(item.Toggle, "Uwzględnij dokumenty " + item.Title);
-            var label = new Label { Text = item.Title, FontSize = 13, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center, VerticalTextAlignment = TextAlignment.Center };
-            var pair = new Grid { ColumnSpacing = 4, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = new GridLength(32) } } };
+            var label = new Label { Text = item.Title, FontSize = 12, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center, VerticalTextAlignment = TextAlignment.Center };
+            var pair = new Grid { ColumnSpacing = 2, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = new GridLength(28) } } };
             pair.Add(label, 0, 0); pair.Add(item.Toggle, 1, 0);
-            var frame = new Border { Content = pair, WidthRequest = 80, HeightRequest = 38, Padding = new Thickness(8, 2, 4, 2), StrokeThickness = 1,
-                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(7) } };
+            var frame = new Border { Content = pair, WidthRequest = 58, HeightRequest = 30, Padding = new Thickness(5, 0, 1, 0), StrokeThickness = 1,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(5) } };
             void UpdateFilterAppearance()
             {
                 frame.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb(item.Toggle.IsChecked ? "#CCFBF1" : "#F8FAFC"), Color.FromArgb(item.Toggle.IsChecked ? "#173C40" : "#1E293B"));
@@ -70,7 +70,7 @@ public sealed class CardPage : ContentPage
             ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
         var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło karencji", withdrawal), Ui.Field("Dane właściciela", owner) };
-        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 40; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
+        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 32; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
         var searchLabel = (Label)searchFields[0].Children[0];
         searchFields[0].Children.RemoveAt(0);
         var searchHeader = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
@@ -159,7 +159,7 @@ public sealed class CardPage : ContentPage
         documentSuggestions.SelectedIndexChanged += (_, _) =>
         {
             if (documentSuggestions.SelectedItem is not DocumentSuggestion suggestion) return;
-            searchHint.Text = "Wybrano: " + suggestion;
+            searchHint.Text = "Wybrano: " + suggestion + " | " + suggestion.AmountText;
             choosingDocument = true; number.Text = suggestion.Number; choosingDocument = false; chosenDocument = suggestion;
         };
     }
@@ -185,7 +185,7 @@ public sealed class CardPage : ContentPage
             if (picked == null || state.ValidatedConnection != options) return;
             choosingDocument = true; number.Text = picked.Number; choosingDocument = false;
             chosenDocument = picked; documentLookupConnection = options;
-            searchHint.Text = "Wybrano: " + picked;
+            searchHint.Text = "Wybrano: " + picked + " | " + picked.AmountText;
             await LoadDocument();
         }
         finally { searchOpen = false; }
@@ -254,7 +254,7 @@ public sealed class CardPage : ContentPage
         Select(null); list.SelectedItem = null; rows.Clear(); foreach (var row in data.Rows) rows.Add(row);
         scope = data.Scope; payer = data.Payer; recipient = data.Recipient;
         header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient;
-        header["Dokument źródłowy"].Text = data.Number;
+        header["Dokument źródłowy"].Text = data.Number + (chosenDocument?.HasRelatedText == true && chosenDocument.Related.Count > 0 ? "\n" + chosenDocument.RelatedText : "");
         if (rows.Count > 0) list.SelectedItem = rows[0];
         status.Text = $"Pobrano {rows.Count} pozycji dostaw z grupy {options.DrugGroup}.";
         CrashLog.Write("Document.UI.Applied");
