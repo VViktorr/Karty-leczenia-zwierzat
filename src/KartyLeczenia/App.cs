@@ -1,26 +1,43 @@
+using Microsoft.Maui.Controls.Xaml;
+
 namespace KartyLeczenia;
 public sealed class App : Application
 {
     public App()
     {
-        static AppThemeBinding Theme(string light, string dark) => new() { Light = Color.FromArgb(light), Dark = Color.FromArgb(dark) };
-        Resources.Add(new Style(typeof(ContentPage)) { ApplyToDerivedTypes = true, Setters = { new Setter { Property = ContentPage.BackgroundColorProperty, Value = Theme("#F1F5F9", "#0F172A") } } });
-        Resources.Add(new Style(typeof(Label)) { Setters = { new Setter { Property = Label.TextColorProperty, Value = Theme("#0F172A", "#F1F5F9") } } });
-        Resources.Add(new Style(typeof(Button)) { Setters = {
-            new Setter { Property = Button.CornerRadiusProperty, Value = 8 },
-            new Setter { Property = Button.PaddingProperty, Value = new Thickness(16, 10) },
-            new Setter { Property = Button.MinimumHeightRequestProperty, Value = 42d },
-            new Setter { Property = Button.BackgroundColorProperty, Value = Theme("#E2E8F0", "#2B3A50") },
-            new Setter { Property = Button.TextColorProperty, Value = Theme("#0F172A", "#F1F5F9") } } });
-        foreach (var type in new[] { typeof(Entry), typeof(Editor), typeof(Picker) })
-        {
-            var style = new Style(type);
-            style.Setters.Add(new Setter { Property = VisualElement.BackgroundColorProperty, Value = Theme("#F8FAFC", "#1E293B") });
-            if (type == typeof(Entry)) { style.Setters.Add(new Setter { Property = Entry.TextColorProperty, Value = Theme("#0F172A", "#F1F5F9") }); style.Setters.Add(new Setter { Property = Entry.PlaceholderColorProperty, Value = Theme("#64748B", "#94A3B8") }); style.Setters.Add(new Setter { Property = Entry.MinimumHeightRequestProperty, Value = 44d }); }
-            if (type == typeof(Editor)) style.Setters.Add(new Setter { Property = Editor.TextColorProperty, Value = Theme("#0F172A", "#F1F5F9") });
-            if (type == typeof(Picker)) { style.Setters.Add(new Setter { Property = Picker.TextColorProperty, Value = Theme("#0F172A", "#F1F5F9") }); style.Setters.Add(new Setter { Property = Picker.TitleColorProperty, Value = Theme("#64748B", "#94A3B8") }); }
-            Resources.Add(style);
-        }
+        Resources = new ResourceDictionary().LoadFromXaml("""
+            <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+                <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
+                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F1F5F9, Dark=#0F172A}" />
+                </Style>
+                <Style TargetType="Label">
+                    <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
+                </Style>
+                <Style TargetType="Button">
+                    <Setter Property="CornerRadius" Value="8" />
+                    <Setter Property="Padding" Value="16,10" />
+                    <Setter Property="MinimumHeightRequest" Value="42" />
+                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E2E8F0, Dark=#2B3A50}" />
+                    <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
+                </Style>
+                <Style TargetType="Entry">
+                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8FAFC, Dark=#1E293B}" />
+                    <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
+                    <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light=#64748B, Dark=#94A3B8}" />
+                    <Setter Property="MinimumHeightRequest" Value="44" />
+                </Style>
+                <Style TargetType="Editor">
+                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8FAFC, Dark=#1E293B}" />
+                    <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
+                </Style>
+                <Style TargetType="Picker">
+                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8FAFC, Dark=#1E293B}" />
+                    <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
+                    <Setter Property="TitleColor" Value="{AppThemeBinding Light=#64748B, Dark=#94A3B8}" />
+                </Style>
+            </ResourceDictionary>
+            """);
     }
     protected override Window CreateWindow(IActivationState? activationState) =>
         new(new AppShell()) { Title = "Karty leczenia zwierząt", Width = 1400, Height = 920, MinimumWidth = 1050, MinimumHeight = 700 };
