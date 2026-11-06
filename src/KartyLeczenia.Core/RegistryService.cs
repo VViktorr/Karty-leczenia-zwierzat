@@ -9,6 +9,7 @@ namespace KartyLeczenia;
 
 public sealed record RegistryDocument(int Id, string Url, string Sha256, DateTimeOffset DownloadedUtc, string WithdrawalSection, string ProductIdentity)
 {
+    public int ExtractionVersion { get; init; }
     public string? UpdId { get; init; }
     public string SuggestedSpecies { get; init; } = "";
     public string DosingSection { get; init; } = "";
@@ -37,29 +38,33 @@ public static class RegistryService
         var end = Regex.Match(remainder, @"(?im)^\s*(?:4\s*\.\s*(?:DANE|WŁAŚCIWOŚCI)|5\s*\.\s*(?:DANE|WŁAŚCIWOŚCI))\b");
         if (!end.Success) throw new InvalidDataException("Nie rozpoznano końca sekcji karencji. Wymagana ręczna kontrola PDF.");
         string section = remainder[..end.Index].Trim();
+        // A page number may precede the first paragraph after a page break.
+        section = Regex.Replace(section, @"\A(?:\d+[ \t]*\r?\n)+", "").Trim();
         if (!Regex.IsMatch(section, @"\p{L}{2}") || section.Length > 12000) throw new InvalidDataException("Nietypowa sekcja karencji — sprawdź PDF ręcznie.");
         return section;
     }
-    static string ContextSection(string text, string number, string heading, string next)
-    {
-        var match = Regex.Match(text, @"(?ims)^\s*" + number + @"\s*\.?\s*" + heading + @"[^\r\n]*[\r\n]+(?<body>.*?)^\s*" + next + @"\s*\.?");
-        return match.Success ? Regex.Replace(match.Groups["body"].Value, @"\s+", " ").Trim() : "";
-    }
     public static string SingleSpecies(string text)
     {
-        string body = ContextSection(text, @"(?:4|3)\s*\.\s*1", "Docelowe gatunki", @"(?:4|3)\s*\.\s*2");
+        string body = Regex.Replace(TreatmentContextService.ExtractSpecies(text), @"\s+", " ").Trim();
         return Regex.IsMatch(body, @"^(?:Bydło|Świnie|Owce|Kozy|Konie|Kury|Indyki|Króliki)(?:\s*\([^()]*\))?\.?$", RegexOptions.IgnoreCase) ? body.TrimEnd('.') : "";
     }
     public static string SingleRoute(string text)
     {
         string body = TreatmentContextService.ExtractDosing(text);
         if (body.Length == 0) return "";
-        var explicitRoute = Regex.Matches(body, @"(?:^|(?<=[.!?])\s+)(?:Wyłącznie\s+)?(?:podanie|podawać)\s+(podskórne|podskórnie|domięśniowe|domięśniowo|dożylne|dożylnie|doustne|doustnie|dowymieniowe|dowymieniowo)\b", RegexOptions.IgnoreCase)
+        var explicitRoute = Regex.Matches(body, @"(?:^|(?<=[.!?])\s+|(?<=:)\s+)(?:Wyłącznie\s+)?(?:podanie|podawać)\s+(podskórne|podskórnie|domięśniowe|domięśniowo|dożylne|dożylnie|doustne|doustnie|dowymieniowe|dowymieniowo|donosowe|donosowo|wewnątrznosowe|wewnątrznosowo)\b", RegexOptions.IgnoreCase)
             .Where(m => !Regex.IsMatch(body[..m.Index], @"\bnie\s*$", RegexOptions.IgnoreCase))
-            .Select(m => m.Groups[1].Value.ToLowerInvariant()).Select(x => x switch { "podskórne" or "podskórnie" => "Podanie podskórne", "domięśniowe" or "domięśniowo" => "Podanie domięśniowe", "dożylne" or "dożylnie" => "Podanie dożylne", "doustne" or "doustnie" => "Podanie doustne", _ => "Podanie dowymieniowe" }).Distinct().ToArray();
-        int mentionedRoutes = Regex.Matches(body, @"\b(podskórn|domięśniow|dożyln|doustn|dowymieniow)\p{L}*", RegexOptions.IgnoreCase)
+            .Select(m => m.Groups[1].Value.ToLowerInvariant()).Select(x => x switch { "podskórne" or "podskórnie" => "Podanie podskórne", "domięśniowe" or "domięśniowo" => "Podanie domięśniowe", "dożylne" or "dożylnie" => "Podanie dożylne", "doustne" or "doustnie" => "Podanie doustne", "donosowe" or "donosowo" or "wewnątrznosowe" or "wewnątrznosowo" => "Podanie donosowe", _ => "Podanie dowymieniowe" }).Distinct().ToArray();
+        int mentionedRoutes = Regex.Matches(body, @"\b(podskórn|domięśniow|dożyln|doustn|dowymieniow|donosow|wewnątrznosow)\p{L}*", RegexOptions.IgnoreCase)
             .Select(m => m.Groups[1].Value.ToLowerInvariant()).Distinct().Count();
         return explicitRoute.Length == 1 && mentionedRoutes == 1 ? explicitRoute[0] : "";
+    }
+    public static string CleanPdfPage(string text)
+    {
+        // Strip only standalone page numbers at page edges; keep numeric dosing/table rows inside.
+        text = text.Replace('\u00a0', ' ').Replace("\r\n", "\n").Trim();
+        text = Regex.Replace(text, @"\A\d+[ \t]*\n", "");
+        return Regex.Replace(text, @"\n[ \t]*\d+\z", "").Trim();
     }
     public static async Task<RegistryDocument> Fetch(int id, CancellationToken token = default)
     {
@@ -81,9 +86,9 @@ public static class RegistryService
         if (bytes.Length < 5 || System.Text.Encoding.ASCII.GetString(bytes, 0, 5) != "%PDF-")
             throw new InvalidDataException("Rejestr nie zwrócił PDF — możliwa przerwa w działaniu. Nie użyto danych z Subiekta.");
         using var pdf = PdfDocument.Open(bytes);
-        string text = string.Join("\n", pdf.GetPages().Select(p => ContentOrderTextExtractor.GetText(p)));
+        string text = string.Join("\n", pdf.GetPages().Select(p => CleanPdfPage(ContentOrderTextExtractor.GetText(p))));
         var result = new RegistryDocument(id, Url(id), Convert.ToHexString(SHA256.HashData(bytes)), DateTimeOffset.UtcNow, ExtractSection(text), text[..Math.Min(text.Length, 750)])
-        { SuggestedSpecies = SingleSpecies(text), SuggestedRoute = SingleRoute(text), DosingSection = TreatmentContextService.ExtractDosing(text), TargetSpeciesSection = TreatmentContextService.ExtractSpecies(text) };
+        { ExtractionVersion = 2, SuggestedSpecies = SingleSpecies(text), SuggestedRoute = SingleRoute(text), DosingSection = TreatmentContextService.ExtractDosing(text), TargetSpeciesSection = TreatmentContextService.ExtractSpecies(text) };
         Directory.CreateDirectory(Folder);
         // Temporary file + replacement: an interrupted refresh cannot truncate the last good copy.
         string target = Path.Combine(Folder, id + ".json");
@@ -97,7 +102,7 @@ public static class RegistryService
         string file = Path.Combine(Folder, id + ".json");
         if (!File.Exists(file)) return null;
         var data = JsonSerializer.Deserialize<RegistryDocument>(File.ReadAllText(file));
-        if (data is null || data.Id != id || data.Url != Url(id) || string.IsNullOrWhiteSpace(data.WithdrawalSection)) return null;
+        if (data is null || data.ExtractionVersion < 2 || data.Id != id || data.Url != Url(id) || string.IsNullOrWhiteSpace(data.WithdrawalSection)) return null;
         return data;
     }
     public static int ParseProductId(string input)
