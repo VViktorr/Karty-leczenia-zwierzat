@@ -174,5 +174,20 @@ Check(new DocumentSuggestion(1, "FS 1", Gross: 0m, Currency: "PLN").AmountText =
 var collectiveInvoice = new DocumentSuggestion(1, "FS 1") { Related = new[] { new DocumentLink(2, "WZ 10"), new DocumentLink(3, "WZ 11"), new DocumentLink(4, "WZ 12") } };
 Check(collectiveInvoice.RelatedText.Contains("(3)") && collectiveInvoice.Related.All(d => collectiveInvoice.RelatedText.Contains(d.Number)), "Collective invoice lost linked WZ.");
 Check(new DocumentSuggestion(2, "WZ 10") { Related = new[] { new DocumentLink(1, "FS 1") } }.RelatedText.Contains("FS 1"), "Reverse invoice link missing.");
+// Rispoval-style QRD sections, split numbering and page breaks.
+string nasalPdf = "3.1\nDocelowe gatunki zwierząt\nBydło.\n3.2Wskazania lecznicze\nInformacje.\n3.9\nDroga podania i dawkowanie\nDawka: 2 ml.\nDroga: Podanie donosowe.\nJedna dawka dla cieląt od 9 dnia życia.\n3.10Objawy przedawkowania\nNie kopiuj.\n3.12 Okresy karencji\n5\nZero dni.\n4. DANE IMMUNOLOGICZNE";
+var nasalDoc = new RegistryDocument(18875, RegistryService.Url(18875), "", DateTimeOffset.UtcNow, RegistryService.ExtractSection(nasalPdf), "")
+{
+    DosingSection = TreatmentContextService.ExtractDosing(nasalPdf),
+    TargetSpeciesSection = TreatmentContextService.ExtractSpecies(nasalPdf),
+    SuggestedRoute = RegistryService.SingleRoute(nasalPdf)
+};
+var nasalContext = TreatmentContextService.Select(nasalDoc, "Bydło", "");
+Check(RegistryService.SingleSpecies(nasalPdf) == "Bydło", "Split target-species heading was lost.");
+Check(nasalContext.Route == "Podanie donosowe" && nasalContext.Dosing.Contains("2 ml"), "Nasal route/dosing not selected.");
+Check(!nasalContext.Dosing.Contains("Nie kopiuj"), "Dosing crossed the next heading.");
+Check(nasalContext.Withdrawal == "Zero dni.", "Page number leaked into withdrawal.");
+Check(RegistryService.CleanPdfPage("Dawka: 2 ml.\n5") == "Dawka: 2 ml.", "Page footer retained.");
+Check(RegistryService.CleanPdfPage("Dawka:\n2\nml.\n5").Contains("\n2\n"), "Numeric dosing row removed.");
 Console.WriteLine($"Passed {checks} core checks.");
 
