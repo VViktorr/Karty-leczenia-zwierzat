@@ -26,19 +26,29 @@ public static class RegistryCatalog
 
     public static string Compact(string text) => new(text.Normalize(NormalizationForm.FormD).Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark && char.IsLetterOrDigit(c)).Select(char.ToUpperInvariant).ToArray());
     static string Words(string text) => Regex.Replace(text.ToUpperInvariant(), @"[^\p{L}\p{N}]+", " ").Trim();
-    public static bool Matches(RegistryProduct product, string text, bool requireStrength = true)
+    static string Brand(RegistryProduct product)
     {
-        string name = Words(product.Name); string value = Words(text);
-        bool identity = value == name || value.StartsWith(name + " ", StringComparison.Ordinal);
-        return identity && (!requireStrength || string.IsNullOrWhiteSpace(product.Strength) || Compact(text).Contains(Compact(product.Strength), StringComparison.Ordinal));
+        var strength = Regex.Match(product.Name, @"\d+(?:[.,]\d+)?\s*(?:mg|g|µg|mcg|IU|j\.?m\.?)\b", RegexOptions.IgnoreCase);
+        string name = strength.Success ? product.Name[..strength.Index] : product.Name;
+        return Regex.Split(name, @"\s+(?:roztwór|zawiesina|proszek|tabletki|emulsja)\b", RegexOptions.IgnoreCase)[0].Trim();
     }
-    public static bool MatchesDocument(RegistryProduct product, RegistryDocument document)
+    public static bool NameMatches(RegistryProduct product, string text)
     {
-        string identity = Words(document.ProductIdentity);
-        string name = Words(product.Name);
-        return (" " + identity + " ").Contains(" " + name + " ", StringComparison.Ordinal)
-            && (string.IsNullOrWhiteSpace(product.Strength) || Compact(document.ProductIdentity).Contains(Compact(product.Strength), StringComparison.Ordinal));
+        string brand = Words(Brand(product)), value = Words(text);
+        if (string.IsNullOrWhiteSpace(brand)) return false;
+        if (value == brand || value.StartsWith(brand + " ", StringComparison.Ordinal)) return true;
+        // Subiekt often joins the brand and concentration: FLUNIVIS50MG/ML.
+        // Do not treat a digit suffix on a strength-free brand (e.g. BRAVOXIN10) as the same name.
+        if (string.IsNullOrWhiteSpace(product.Strength)) return false;
+        value = Regex.Replace(value, @"(?<=\p{L})(?=\d)", " ");
+        return value == brand || value.StartsWith(brand + " ", StringComparison.Ordinal);
     }
+    public static bool Matches(RegistryProduct product, string text, bool requireStrength = true) =>
+        NameMatches(product, text) && (!requireStrength || string.IsNullOrWhiteSpace(product.Strength) ||
+            Compact(text).Contains(Compact(product.Strength), StringComparison.Ordinal));
+    public static bool MatchesDocument(RegistryProduct product, RegistryDocument document) =>
+        (" " + Words(document.ProductIdentity) + " ").Contains(" " + Words(Brand(product)) + " ", StringComparison.Ordinal) &&
+        (string.IsNullOrWhiteSpace(product.Strength) || Compact(document.ProductIdentity).Contains(Compact(product.Strength), StringComparison.Ordinal));
     public static List<RegistryProduct> Search(string name)
     {
         if (cached == null && File.Exists(CachePath))
@@ -50,8 +60,9 @@ public static class RegistryCatalog
             .Where(p => p.Id < 100_000_000).Concat(Known).GroupBy(p => p.Id).Select(g => g.Last());
         string text = Words(name);
         if (text.Length < 2) return [];
-        return products.Where(p => Matches(p, name, false) || Words(p.Name).StartsWith(text, StringComparison.Ordinal)).OrderBy(p => p.Name).ThenBy(p => p.Strength).ToList();
+        return products.Where(p => Matches(p, name, false) || Words(Brand(p)).StartsWith(text, StringComparison.Ordinal)).OrderBy(p => p.Name).ThenBy(p => p.Strength).ToList();
     }
+    public static List<RegistryProduct> NameCandidates(string name) => Search(name).Where(p => NameMatches(p, name)).ToList();
     public static List<RegistryProduct> ExactCandidates(string name) => Search(name).Where(p => Matches(p, name)).ToList();
 
     public static int? DocumentIdFromXml(int exportId, string xml)
@@ -118,11 +129,19 @@ public static class AutomaticWithdrawalService
     public static string MappingKey(string scope, TreatmentRow row) => scope + "|" + row.Get("ID towaru") + "|" + row.Product;
     public static async Task<AutomaticWithdrawal?> ResolveAsync(string scope, TreatmentRow row, CancellationToken token)
     {
-        string? id = UpdService.ReadMapping(MappingKey(scope, row));
-        // Only an explicitly confirmed UPD mapping is reused automatically. A name alone is insufficient.
-        if (id == null) return null;
-        var document = await UpdService.Fetch(id, token);
-        return new(document, true);
+        int? id = RegistryService.ReadMapping(MappingKey(scope, row));
+        bool mapped = id.HasValue;
+        RegistryProduct? product = null;
+        if (!mapped)
+        {
+            var matches = RegistryCatalog.ExactCandidates(row.Product);
+            if (matches.Count != 1) return null;
+            product = matches[0]; id = product.Id;
+        }
+        var document = await RegistryService.Fetch(id!.Value, token);
+        if (product != null && !RegistryCatalog.MatchesDocument(product, document))
+            throw new InvalidDataException("Charakterystyka nie potwierdza proponowanej nazwy i mocy. Wybierz produkt ręcznie.");
+        return new(document, mapped);
     }
     public static void Apply(TreatmentRow row, AutomaticWithdrawal resolved)
     {
