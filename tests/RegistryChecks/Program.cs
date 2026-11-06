@@ -132,5 +132,17 @@ Check(multipleBatches[0].Get("Seria") == "A, B" && decimal.Parse(multipleBatches
 Check(multipleBatches[0].Get("Ważność") == "A: 01.01.2027, B: 02.02.2028", "Batch expiry pairs changed or duplicated.");
 Check(DocumentRowMerger.Merge([Delivery(1m, "", unit: "FL."), Delivery(1m, "", unit: "szt.")]).Count == 2, "Incompatible units were added.");
 Check(DocumentRowMerger.Merge([Delivery(1m, "", productId: "123"), Delivery(1m, "", productId: "456")]).Count == 2, "Different product identities were merged.");
+
+Check(RegistryCatalog.ExactCandidates("FLUNIVIS50MG/ML A'100ML").Single().Id == 50492, "Joined Subiekt brand and strength not matched.");
+Check(RegistryCatalog.ExactCandidates("FLUNIVIS100MG/ML A'100ML").All(p => p.Id != 50492), "Joined wrong concentration was matched.");
+Check(RegistryCatalog.NameCandidates("TILKOMAY A'100 ML").Any(p => p.Id == 42147), "Package suffix prevented brand search.");
+Check(RegistryCatalog.Search("fluni").Any(p => p.Id == 50492), "Partial brand search failed.");
+var cattleDefault = new TreatmentRow();
+Check(cattleDefault.Get("Gatunek") == "Bydło" && cattleDefault.Get("Opis zwierząt / numer siedziby stada") == "Bydło", "Default cattle missing.");
+cattleDefault.FillMissingContext("Owce", "Podanie podskórne");
+Check(cattleDefault.Get("Gatunek") == "Owce" && cattleDefault.Get("Opis zwierząt / numer siedziby stada") == "Owce", "Source species did not replace an untouched default.");
+var manualSpecies = new TreatmentRow(); manualSpecies.Set("Gatunek", "Konie");
+manualSpecies.FillMissingContext("Owce", "");
+Check(manualSpecies.Get("Gatunek") == "Konie", "Source species overwrote a manual choice.");
 Console.WriteLine($"Passed {checks} core checks.");
 
