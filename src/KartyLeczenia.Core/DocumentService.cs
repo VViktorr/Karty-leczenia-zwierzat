@@ -95,7 +95,7 @@ public sealed class DocumentService
             """, con);
         cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
         cmd.Parameters.Add("@drugGroup", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
-        var rows = new List<TreatmentRow>();
+        var deliveries = new List<DocumentDelivery>();
         await using (var reader = await cmd.ExecuteReaderAsync(token))
         while (await reader.ReadAsync(token))
         {
@@ -112,7 +112,7 @@ public sealed class DocumentService
                 else note += " Nie można przeliczyć ilości dostawy — sprawdź ilość ręcznie.";
             }
             if (reader["mr_DoId"] is DBNull) note += " Brak powiązania z dostawą źródłową — sprawdź ręcznie.";
-            rows.Add(new(new()
+            deliveries.Add(new(new TreatmentRow(new()
             {
                 ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II", ["Produkt"] = product,
                 ["Seria"] = V("Seria"), ["Ważność"] = expiry, ["Ilość wydana"] = quantity.ToString("0.####") + " " + V("ob_Jm"),
@@ -120,8 +120,40 @@ public sealed class DocumentService
                 ["Status karencji"] = withdrawalSource == 0 ? "Brak karencji — wybierz produkt w UPD" : "Dane Subiekta — do weryfikacji",
                 ["Źródło karencji"] = withdrawalSource == 0 ? "" : "Subiekt: " + withdrawal,
                 ["ID towaru"] = V("ob_TowId")
-            }));
+            }), quantity, V("ob_Jm")));
         }
-        return new(number, payer, recipient, rows, options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant());
+        return new(number, payer, recipient, DocumentRowMerger.Merge(deliveries), options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant());
+    }
+}
+
+public sealed record DocumentDelivery(TreatmentRow Row, decimal Quantity, string Unit);
+
+public static class DocumentRowMerger
+{
+    // Merge fresh document data only; archived cards and manually edited rows are not regrouped.
+    public static List<TreatmentRow> Merge(IEnumerable<DocumentDelivery> deliveries)
+    {
+        static string Key(string value) => System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ").ToUpperInvariant();
+        var result = new List<TreatmentRow>();
+        foreach (var group in deliveries.GroupBy(d => (
+            Product: Key(d.Row.Product), Id: d.Row.Get("ID towaru"),
+            Unit: Key(d.Unit), Withdrawal: d.Row.Get("Karencja"),
+            Source: d.Row.Get("Źródło karencji"), Section: d.Row.Get("Sekcja (II lub III)"))))
+        {
+            var items = group.ToList();
+            var merged = new TreatmentRow(items[0].Row.Values);
+            string unit = items[0].Unit.Trim();
+            merged.Set("Ilość wydana", items.Sum(d => d.Quantity).ToString("0.####") + (unit.Length > 0 ? " " + unit : ""), false);
+            var series = items.Select(d => d.Row.Get("Seria").Trim()).Where(v => v.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            merged.Set("Seria", string.Join(", ", series), false);
+            var expiries = items.Select(d => new { Series = d.Row.Get("Seria").Trim(), Date = d.Row.Get("Ważność").Trim() })
+                .Where(d => d.Date.Length > 0)
+                .Select(d => items.Count > 1 && d.Series.Length > 0 ? d.Series + ": " + d.Date : d.Date)
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+            merged.Set("Ważność", string.Join(", ", expiries), false);
+            merged.Set("Zalecenia / uwagi", string.Join("\n", items.Select(d => d.Row.Get("Zalecenia / uwagi").Trim()).Where(v => v.Length > 0).Distinct()), false);
+            result.Add(merged);
+        }
+        return result;
     }
 }
