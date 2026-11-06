@@ -41,17 +41,36 @@ public sealed class CardPage : ContentPage
         for (int i = 1; i <= 8; i++) withdrawal.Items.Add("Pole własne " + i);
         withdrawal.SelectedIndex = 0; owner.Items.Add("Płatnik"); owner.Items.Add("Odbiorca"); owner.SelectedIndex = 0;
         owner.SelectedIndexChanged += (_, _) => { if (!changing && scope != "") header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient; };
-        var searchTypes = new HorizontalStackLayout { Spacing = 10, HorizontalOptions = LayoutOptions.Start };
+        var searchTypes = new HorizontalStackLayout { Spacing = 8, HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Center };
         foreach (var item in new[] { (Toggle: searchInvoices, Title: "FS"), (Toggle: searchWarehouse, Title: "WZ"), (Toggle: searchReceipts, Title: "PA") })
         {
-            searchTypes.Add(new HorizontalStackLayout { Spacing = 2, Children = { new Label { Text = item.Title, FontSize = 12, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center }, item.Toggle } });
-            item.Toggle.CheckedChanged += async (_, _) => await RefreshDocumentSuggestions();
+            item.Toggle.WidthRequest = item.Toggle.MinimumWidthRequest = 32;
+            item.Toggle.HeightRequest = item.Toggle.MinimumHeightRequest = 32;
+            item.Toggle.Margin = 0; item.Toggle.HorizontalOptions = LayoutOptions.End; item.Toggle.VerticalOptions = LayoutOptions.Center;
+            item.Toggle.Color = Color.FromArgb("#14B8A6");
+            SemanticProperties.SetDescription(item.Toggle, "Uwzględnij dokumenty " + item.Title);
+            var label = new Label { Text = item.Title, FontSize = 13, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center, VerticalTextAlignment = TextAlignment.Center };
+            var pair = new Grid { ColumnSpacing = 4, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = new GridLength(32) } } };
+            pair.Add(label, 0, 0); pair.Add(item.Toggle, 1, 0);
+            var frame = new Border { Content = pair, WidthRequest = 80, HeightRequest = 38, Padding = new Thickness(8, 2, 4, 2), StrokeThickness = 1,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(7) } };
+            void UpdateFilterAppearance()
+            {
+                frame.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb(item.Toggle.IsChecked ? "#CCFBF1" : "#F8FAFC"), Color.FromArgb(item.Toggle.IsChecked ? "#173C40" : "#1E293B"));
+                frame.Stroke = new SolidColorBrush(Color.FromArgb(item.Toggle.IsChecked ? "#14B8A6" : "#64748B"));
+                label.SetAppThemeColor(Label.TextColorProperty, Color.FromArgb(item.Toggle.IsChecked ? "#115E59" : "#475569"), Color.FromArgb(item.Toggle.IsChecked ? "#CCFBF1" : "#CBD5E1"));
+            }
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += (_, _) => item.Toggle.IsChecked = !item.Toggle.IsChecked;
+            label.GestureRecognizers.Add(tap);
+            item.Toggle.CheckedChanged += async (_, _) => { UpdateFilterAppearance(); await RefreshDocumentSuggestions(); };
+            UpdateFilterAppearance(); searchTypes.Add(frame);
         }
         var actions = new Grid { ColumnSpacing = 16, RowSpacing = 10,
             ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
         var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło karencji", withdrawal), Ui.Field("Dane właściciela", owner) };
-        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 24; actions.Add(searchFields[i], i, 0); }
+        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 40; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
         var searchLabel = (Label)searchFields[0].Children[0];
         searchFields[0].Children.RemoveAt(0);
         var searchHeader = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
