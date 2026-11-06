@@ -61,7 +61,7 @@ public sealed class CardPage : ContentPage
         {
             var editor = new Editor { HeightRequest = field is "Karencja" or "Dawkowanie i okres stosowania" or "Zalecenia / uwagi" ? 82 : 48 };
             string key = field;
-            editor.TextChanged += (_, e) => { if (!changing && selected != null) selected.Set(key, e.NewTextValue ?? ""); };
+            editor.TextChanged += (_, e) => { if (!changing && selected != null) { selected.Set(key, e.NewTextValue ?? ""); provenance.Text = selected.RegistryStatus + "\n" + selected.Get("Źródło karencji"); } };
             editors.Add(field, editor); detail.Add(Ui.Field(field, editor));
         }
         detail.Add(provenance); detail.IsEnabled = false;
@@ -138,7 +138,7 @@ public sealed class CardPage : ContentPage
     async Task Preview()
     {
         var snapshot = Capture();
-        if (snapshot.Rows.Where(r => r.GetValueOrDefault("Drukuj") == "True").Any(CardSchema.NeedsReview) &&
+        if (snapshot.Rows.Where(r => string.Equals(r.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)).Any(CardSchema.NeedsReview) &&
             !await DisplayAlertAsync("Weryfikacja karencji", "Część pozycji ma brak karencji, dane spoza RPL lub ręczne zmiany. Czy potwierdzasz sprawdzenie danych przed podglądem?", "Potwierdzam", "Wróć")) return;
         string html = CardHtmlRenderer.Render(snapshot);
         var path = await WindowsFiles.SaveAsync(".html", "karta-" + Guid.NewGuid().ToString("N")); if (path == null) return;
