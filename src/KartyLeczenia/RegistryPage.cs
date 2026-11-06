@@ -51,7 +51,7 @@ public sealed class RegistryPage : ContentPage
         Content = new ScrollView { Content = panel };
         foreach (var entry in new[] { medicine, species, route, food }) entry.TextChanged += (_, _) => InvalidateChoice();
         result.TextChanged += (_, _) => InvalidateChoice();
-        id.TextChanged += (_, _) => { fetchGeneration++; document = null; excerpt.Text = ""; result.Text = ""; InvalidateChoice(); };
+        id.TextChanged += (_, _) => { fetchGeneration++; document = null; excerpt.Text = ""; result.Text = ""; species.Text = ""; route.Text = ""; InvalidateChoice(); };
         confirmed.CheckedChanged += (_, e) => apply.IsEnabled = e.Value && document != null && new[] { medicine.Text, result.Text }.All(s => !string.IsNullOrWhiteSpace(s));
         candidates.SelectedIndexChanged += async (_, _) =>
         {
@@ -117,6 +117,7 @@ public sealed class RegistryPage : ContentPage
             }
             if (lifetime.IsCancellationRequested || generation != fetchGeneration) return;
             document = loaded;
+            species.Text = loaded.SuggestedSpecies; route.Text = loaded.SuggestedRoute;
             result.Text = loaded.WithdrawalSection;
             excerpt.Text = "IDENTYFIKACJA Z PDF:\n" + loaded.ProductIdentity + "\n\nOKRESY KARENCJI:\n" + loaded.WithdrawalSection;
             info.Text = $"RPL ID {loaded.Id} | pobrano {loaded.DownloadedUtc.ToLocalTime():g}\n{loaded.Url}\nKarencję wpisano automatycznie. Data pobrania nie jest datą aktualizacji ChPL. Sprawdź produkt i leczenie.";

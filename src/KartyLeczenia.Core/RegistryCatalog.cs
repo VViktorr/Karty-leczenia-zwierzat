@@ -126,6 +126,7 @@ public static class AutomaticWithdrawalService
     }
     public static void Apply(TreatmentRow row, AutomaticWithdrawal resolved)
     {
+        row.FillMissingContext(resolved.Document.SuggestedSpecies, resolved.Document.SuggestedRoute);
         row.Set("Karencja", resolved.Document.WithdrawalSection, false);
         row.Set("Źródło karencji", resolved.Document.Url + " | pobrano " + resolved.Document.DownloadedUtc.ToString("O"), false);
         row.Set("SHA256 źródła", resolved.Document.Sha256, false);

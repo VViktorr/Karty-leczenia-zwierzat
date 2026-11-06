@@ -3,11 +3,37 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia;
 
+public sealed record DocumentSuggestion(int Id, string Number)
+{
+    public override string ToString() => Number;
+}
+
 public sealed record DocumentData(string Number, string Payer, string Recipient, List<TreatmentRow> Rows, string Scope);
 
 public sealed class DocumentService
 {
-    public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token)
+    public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token)
+    {
+        string fragment = input.Trim();
+        if (fragment.Length < 4) return [];
+        string escaped = fragment.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace("[", "~[");
+        await using var con = new SqlConnection(options.BuildConnectionString());
+        await con.OpenAsync(token);
+        using var cmd = new SqlCommand("""
+            SELECT TOP (21) d.dok_Id, d.dok_NrPelny
+            FROM dbo.dok__Dokument d
+            WHERE (d.dok_NrPelny LIKE N'FS %' OR d.dok_NrPelny LIKE N'PA %' OR d.dok_NrPelny LIKE N'WZ %')
+              AND d.dok_NrPelny LIKE @fragment ESCAPE N'~'
+            ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, d.dok_Id DESC
+            """, con) { CommandTimeout = 10 };
+        cmd.Parameters.Add("@fragment", SqlDbType.NVarChar, 250).Value = "%" + escaped + "%";
+        cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
+        var found = new List<DocumentSuggestion>();
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1)));
+        return found;
+    }
+    public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null)
     {
         if (string.IsNullOrWhiteSpace(documentNumber)) throw new InvalidOperationException("Wpisz pełny numer dokumentu.");
         if (withdrawalSource is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(withdrawalSource));
@@ -22,9 +48,10 @@ public sealed class DocumentService
             FROM dbo.dok__Dokument d
             LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
-            WHERE d.dok_NrPelny=@number
+            WHERE (@documentId IS NULL AND d.dok_NrPelny=@number) OR d.dok_Id=@documentId
             """, con);
         head.Parameters.Add("@number", SqlDbType.NVarChar, 100).Value = documentNumber.Trim();
+        head.Parameters.Add("@documentId", SqlDbType.Int).Value = (object?)documentId ?? DBNull.Value;
         int id; string number; string payer; string recipient;
         await using (var reader = await head.ExecuteReaderAsync(token))
         {

@@ -96,5 +96,22 @@ var matches = UpdService.ParseSearch("<a href='/veterinary/en/600000000001'>Exam
 Check(matches.Count == 1 && matches[0].Id == "600000000001", "UPD search accepted an external product.");
 automatic.ApplyRegistry(new(upd, "", "", "", upd.WithdrawalSection, upd.ProductIdentity));
 Check(!CardSchema.NeedsReview(automatic.Values) && automatic.RegistryStatus.StartsWith("UPD"), "UPD confirmation not retained.");
+
+const string oneAnimal = "4.1 Docelowe gatunki zwierząt\nBydło (cielęta ≤ 330 kg)\n4.2 Wskazania\nOpis";
+Check(RegistryService.SingleSpecies(oneAnimal) == "Bydło (cielęta ≤ 330 kg)", "Single species must retain its calf/weight restriction.");
+Check(RegistryService.SingleSpecies(oneAnimal.Replace("Bydło (cielęta ≤ 330 kg)", "Bydło i owce")) == "", "Multiple species must not be selected automatically.");
+const string oneRoute = "4.9 Dawkowanie i droga(i) podawania\nWyłącznie podanie podskórne.\nPodawać dawkę według masy ciała.\n4.10 Przedawkowanie";
+Check(RegistryService.SingleRoute(oneRoute) == "Podanie podskórne", "Explicit single route not proposed.");
+Check(RegistryService.SingleRoute(oneRoute.Replace("Wyłącznie podanie podskórne.", "Podanie podskórne lub domięśniowo.")) == "", "Multiple routes must remain unselected.");
+var contextRow = new TreatmentRow();
+contextRow.FillMissingContext("Bydło", "Podanie podskórne");
+Check(contextRow.Get("Gatunek") == "Bydło" && contextRow.Get("Opis zwierząt / numer siedziby stada") == "Bydło", "Single animal context not copied to the card.");
+contextRow.Set("Gatunek", "Wpis lekarza"); contextRow.Set("Opis zwierząt / numer siedziby stada", "Stado 123"); contextRow.Set("Droga podania", "Wpisana ręcznie");
+contextRow.FillMissingContext("Owce", "Doustnie");
+Check(contextRow.Get("Gatunek") == "Wpis lekarza" && contextRow.Get("Opis zwierząt / numer siedziby stada") == "Stado 123" && contextRow.Get("Droga podania") == "Wpisana ręcznie", "Automatic context overwrote manual values.");
+Check(upd.SuggestedSpecies == "Bydło" && upd.SuggestedRoute == "Podanie podskórne", "UPD single structured context lost.");
+string multiSpecies = Fixture().Replace("</li></ul></li></ul></div>", "</li><li class='list-item__upd_species'>" + Field("upd-species__field-upd-term-name", "Sheep") + Period("Meat and offal", "7", "day") + "</li></ul></li></ul></div>");
+Check(UpdService.Parse("600000000001", multiSpecies).SuggestedSpecies == "", "UPD multiple species were selected automatically.");
+Check(html.Contains("rowspan=\"2\"") && html.Contains("colspan=\"4\""), "Scanned form grouped headers missing.");
 Console.WriteLine($"Passed {checks} core checks.");
 

@@ -2,7 +2,7 @@ namespace KartyLeczenia.Views;
 
 public sealed class UpdRegistryPage : ContentPage
 {
-    readonly Entry query = new(), link = new();
+    readonly Entry query = new(), link = new(), species = new(), route = new();
     readonly Picker products = new() { Title = "Wybierz właściwy produkt, moc i postać" };
     readonly Editor identity = new() { IsReadOnly = true, HeightRequest = 100 };
     readonly Editor text = new() { HeightRequest = 260 };
@@ -27,7 +27,9 @@ public sealed class UpdRegistryPage : ContentPage
         panel.Add(Ui.Field("Link do produktu UPD lub 12-cyfrowe ID", link));
         panel.Add(Ui.Action("Pobierz karencję", Fetch));
         panel.Add(Ui.Action("Otwórz produkt w UPD", () => Launcher.Default.OpenAsync(UpdService.Url(link.Text ?? ""))));
-        panel.Add(info); panel.Add(identity); panel.Add(Ui.Field("Karencja — sprawdź i ewentualnie popraw", text));
+        panel.Add(info); panel.Add(identity);
+        panel.Add(Ui.Field("Gatunek — automatycznie przy jednej możliwości", species));
+        panel.Add(Ui.Field("Droga podania — automatycznie przy jednej możliwości", route)); panel.Add(Ui.Field("Karencja — sprawdź i ewentualnie popraw", text));
         panel.Add(new HorizontalStackLayout { Children = { confirm, new Label { Text = "Potwierdzam produkt, moc, postać i zgodność karencji z leczeniem.", VerticalOptions = LayoutOptions.Center } } });
         panel.Add(apply);
         panel.Add(Ui.Action("Użyj zapasowego źródła RPL…", async () =>
@@ -38,14 +40,15 @@ public sealed class UpdRegistryPage : ContentPage
         }));
         panel.Add(Ui.Action("Anuluj", async () => { completion.TrySetResult(null); await Navigation.PopModalAsync(); }));
         Content = new ScrollView { Content = panel };
-        link.TextChanged += (_, _) => { generation++; document = null; identity.Text = ""; text.Text = ""; Invalidate(); };
+        link.TextChanged += (_, _) => { generation++; document = null; identity.Text = ""; text.Text = ""; species.Text = ""; route.Text = ""; Invalidate(); };
+        species.TextChanged += (_, _) => Invalidate(); route.TextChanged += (_, _) => Invalidate();
         query.TextChanged += (_, _) => Invalidate(); text.TextChanged += (_, _) => Invalidate();
         confirm.CheckedChanged += (_, e) => apply.IsEnabled = e.Value && document != null && !string.IsNullOrWhiteSpace(text.Text);
         products.SelectedIndexChanged += async (_, _) => { if (products.SelectedItem is UpdProduct item) { link.Text = item.Id; await Fetch(); } };
         apply.Clicked += async (_, _) =>
         {
             if (document == null || !apply.IsEnabled) return;
-            completion.TrySetResult(new(document, "", "", "", text.Text.Trim(), document.ProductIdentity));
+            completion.TrySetResult(new(document, species.Text?.Trim() ?? "", route.Text?.Trim() ?? "", "", text.Text.Trim(), document.ProductIdentity));
             await Navigation.PopModalAsync();
         };
         bool loaded = false;
@@ -72,7 +75,7 @@ public sealed class UpdRegistryPage : ContentPage
         {
             var result = await UpdService.Fetch(link.Text ?? "", lifetime.Token);
             if (lifetime.IsCancellationRequested || requested != generation) return;
-            document = result; identity.Text = result.ProductIdentity; text.Text = result.WithdrawalSection;
+            document = result; species.Text = result.SuggestedSpecies; route.Text = result.SuggestedRoute; identity.Text = result.ProductIdentity; text.Text = result.WithdrawalSection;
             info.Text = $"{result.Url}\nPobrano {result.DownloadedUtc.ToLocalTime():g}. Sprawdź dopasowanie i leczenie. Data pobrania nie jest datą aktualizacji źródła.";
         }
         catch (Exception ex) { if (!lifetime.IsCancellationRequested && requested == generation) info.Text = "Nie pobrano karencji: " + ex.Message; }

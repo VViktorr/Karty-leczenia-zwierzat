@@ -10,6 +10,8 @@ namespace KartyLeczenia;
 public sealed record RegistryDocument(int Id, string Url, string Sha256, DateTimeOffset DownloadedUtc, string WithdrawalSection, string ProductIdentity)
 {
     public string? UpdId { get; init; }
+    public string SuggestedSpecies { get; init; } = "";
+    public string SuggestedRoute { get; init; } = "";
     public string Source => UpdId == null ? "RPL" : "UPD";
 }
 public sealed record RegistrySelection(RegistryDocument Document, string Species, string Route, string Food, string Text, string Medicine);
@@ -33,6 +35,27 @@ public static class RegistryService
         if (!Regex.IsMatch(section, @"\p{L}{2}") || section.Length > 12000) throw new InvalidDataException("Nietypowa sekcja karencji — sprawdź PDF ręcznie.");
         return section;
     }
+    static string ContextSection(string text, string number, string heading, string next)
+    {
+        var match = Regex.Match(text, @"(?ims)^\s*" + number + @"\s*\.?\s*" + heading + @"[^\r\n]*[\r\n]+(?<body>.*?)^\s*" + next + @"\s*\.?");
+        return match.Success ? Regex.Replace(match.Groups["body"].Value, @"\s+", " ").Trim() : "";
+    }
+    public static string SingleSpecies(string text)
+    {
+        string body = ContextSection(text, @"(?:4|3)\s*\.\s*1", "Docelowe gatunki", @"(?:4|3)\s*\.\s*2");
+        return Regex.IsMatch(body, @"^(?:Bydło|Świnie|Owce|Kozy|Konie|Kury|Indyki|Króliki)(?:\s*\([^()]*\))?\.?$", RegexOptions.IgnoreCase) ? body.TrimEnd('.') : "";
+    }
+    public static string SingleRoute(string text)
+    {
+        string body = ContextSection(text, @"(?:4|3)\s*\.\s*9", "Dawkowanie", @"(?:4|3)\s*\.\s*10");
+        if (body.Length == 0) return "";
+        var explicitRoute = Regex.Matches(body, @"(?:^|(?<=[.!?])\s+)(?:Wyłącznie\s+)?(?:podanie|podawać)\s+(podskórne|podskórnie|domięśniowe|domięśniowo|dożylne|dożylnie|doustne|doustnie|dowymieniowe|dowymieniowo)\b", RegexOptions.IgnoreCase)
+            .Where(m => !Regex.IsMatch(body[..m.Index], @"\bnie\s*$", RegexOptions.IgnoreCase))
+            .Select(m => m.Groups[1].Value.ToLowerInvariant()).Select(x => x switch { "podskórne" or "podskórnie" => "Podanie podskórne", "domięśniowe" or "domięśniowo" => "Podanie domięśniowe", "dożylne" or "dożylnie" => "Podanie dożylne", "doustne" or "doustnie" => "Podanie doustne", _ => "Podanie dowymieniowe" }).Distinct().ToArray();
+        int mentionedRoutes = Regex.Matches(body, @"\b(podskórn|domięśniow|dożyln|doustn|dowymieniow)\p{L}*", RegexOptions.IgnoreCase)
+            .Select(m => m.Groups[1].Value.ToLowerInvariant()).Distinct().Count();
+        return explicitRoute.Length == 1 && mentionedRoutes == 1 ? explicitRoute[0] : "";
+    }
     public static async Task<RegistryDocument> Fetch(int id, CancellationToken token = default)
     {
         id = DocumentId(id);
@@ -54,7 +77,8 @@ public static class RegistryService
             throw new InvalidDataException("Rejestr nie zwrócił PDF — możliwa przerwa w działaniu. Nie użyto danych z Subiekta.");
         using var pdf = PdfDocument.Open(bytes);
         string text = string.Join("\n", pdf.GetPages().Select(p => ContentOrderTextExtractor.GetText(p)));
-        var result = new RegistryDocument(id, Url(id), Convert.ToHexString(SHA256.HashData(bytes)), DateTimeOffset.UtcNow, ExtractSection(text), text[..Math.Min(text.Length, 750)]);
+        var result = new RegistryDocument(id, Url(id), Convert.ToHexString(SHA256.HashData(bytes)), DateTimeOffset.UtcNow, ExtractSection(text), text[..Math.Min(text.Length, 750)])
+        { SuggestedSpecies = SingleSpecies(text), SuggestedRoute = SingleRoute(text) };
         Directory.CreateDirectory(Folder);
         // Temporary file + replacement: an interrupted refresh cannot truncate the last good copy.
         string target = Path.Combine(Folder, id + ".json");

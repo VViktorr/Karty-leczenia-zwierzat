@@ -34,10 +34,18 @@ public sealed class TreatmentRow : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new(nameof(RegistryStatus)));
         PropertyChanged?.Invoke(this, new(nameof(Printed)));
     }
+    public void FillMissingContext(string species, string route)
+    {
+        if (string.IsNullOrWhiteSpace(Get("Gatunek")) && species.Length > 0) Set("Gatunek", species, false);
+        if (string.IsNullOrWhiteSpace(Get("Opis zwierząt / numer siedziby stada")) && species.Length > 0) Set("Opis zwierząt / numer siedziby stada", species, false);
+        if (string.IsNullOrWhiteSpace(Get("Droga podania")) && route.Length > 0) Set("Droga podania", route, false);
+    }
     public void ApplyRegistry(RegistrySelection selection)
     {
-        Set("Karencja", selection.Text, false); Set("Gatunek", selection.Species, false);
-        Set("Droga podania", selection.Route, false); Set("Produkt spożywczy", selection.Food, false);
+        FillMissingContext(selection.Species, selection.Route);
+        Set("Karencja", selection.Text, false); if (!string.IsNullOrWhiteSpace(selection.Species)) Set("Gatunek", selection.Species, false);
+        if (!string.IsNullOrWhiteSpace(selection.Route)) Set("Droga podania", selection.Route, false);
+        if (!string.IsNullOrWhiteSpace(selection.Food)) Set("Produkt spożywczy", selection.Food, false);
         Set("Produkt rejestru", selection.Medicine, false);
         Set("Źródło karencji", selection.Document.Url + " | pobrano " + selection.Document.DownloadedUtc.ToString("O") + " | zatwierdzono " + DateTimeOffset.UtcNow.ToString("O"), false);
         Set("SHA256 źródła", selection.Document.Sha256, false); Set("Pełna sekcja karencji źródła", selection.Document.WithdrawalSection, false);

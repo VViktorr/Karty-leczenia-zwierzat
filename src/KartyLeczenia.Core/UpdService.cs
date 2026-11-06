@@ -65,12 +65,15 @@ public static class UpdService
         var periods = section.Descendants().Where(n => Has(n, "paragraph--type--upd-withdrawal-period")).ToList();
         if (periods.Count == 0) throw new InvalidDataException("Nie rozpoznano karencji UPD — sprawdź dokument źródłowy.");
         var lines = new List<string>();
+        var animals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var routes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var period in periods)
         {
             var species = period.Ancestors("li").FirstOrDefault(n => Has(n, "list-item__upd_species")) ?? throw new InvalidDataException("Brak gatunku w karencji UPD.");
             string animal = Value(Field(species, "upd-species__field-upd-term-name"));
             var routeItem = species.Ancestors("li").FirstOrDefault() ?? throw new InvalidDataException("Brak drogi podania UPD.");
             string route = Text(routeItem.ChildNodes.FirstOrDefault(n => Has(n, "upd-items-list-title")));
+            animals.Add(Translate(animal)); routes.Add(Translate(route));
             string tissue = Value(Field(period, "upd-tissue__field-upd-term-name"));
             string number = Value(Field(period, "upd-withdrawal-period__field-upd-withdrawal-value"));
             string unit = Value(Field(period, "upd-units__field-upd-term-name"));
@@ -82,8 +85,12 @@ public static class UpdService
                 : $"{Translate(animal)}; {Translate(route)}; {Translate(tissue)}: {original}";
             lines.Add(rendered + $" [Oryginał UPD: {animal}; {route}; {original}]");
         }
+        foreach (var n in Field(root, "products__extra-field-upd-products-species")?.Descendants().Where(n => Has(n, "upd-species__field-upd-term-name")) ?? Enumerable.Empty<HtmlNode>())
+            if (Value(n).Length > 0) animals.Add(Translate(Value(n)));
+        foreach (var n in Field(root, "products__extra-field-upd-products-route-administration")?.Descendants().Where(n => Has(n, "upd-route-of-administration__field-upd-term-name")) ?? Enumerable.Empty<HtmlNode>())
+            if (Value(n).Length > 0) routes.Add(Translate(Value(n)));
         string form = Text(Field(root, "products__extra-field-upd-products-pharmaceutical-form"));
-        return new RegistryDocument(0, Url(id), Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(html))), DateTimeOffset.UtcNow, string.Join("\n", lines), name + " | " + form + " | Polska; status: Valid") { UpdId = id };
+        return new RegistryDocument(0, Url(id), Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(html))), DateTimeOffset.UtcNow, string.Join("\n", lines), name + " | " + form + " | Polska; status: Valid") { UpdId = id, SuggestedSpecies = animals.Count == 1 ? animals.Single() : "", SuggestedRoute = routes.Count == 1 ? routes.Single() : "" };
     }
     static async Task<string> Download(string url, CancellationToken token)
     {

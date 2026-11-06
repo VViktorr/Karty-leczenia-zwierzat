@@ -3,6 +3,9 @@ namespace KartyLeczenia.Views;
 public sealed class ConnectionPage : ContentPage
 {
     readonly AppState state;
+    readonly Entry clinicName = new();
+    readonly Editor clinicAddress = new() { HeightRequest = 90 };
+    readonly Entry clinicDoctor = new();
     readonly Entry server = new() { Placeholder = @"KOMPUTER\INSERTGT lub 192.168.1.10,1433" };
     readonly Entry database = new() { Placeholder = "Wybierz podmiot poniżej lub wpisz nazwę bazy" };
     readonly Entry login = new() { Placeholder = "Login SQL, nie operator Subiekta" };
@@ -21,9 +24,23 @@ public sealed class ConnectionPage : ContentPage
 
     public ConnectionPage(AppState appState)
     {
-        state = appState; Title = "Połączenie";
+        state = appState; Title = "Ustawienia";
         var panel = new VerticalStackLayout { Spacing = 12, MaximumWidthRequest = 850, HorizontalOptions = LayoutOptions.Fill, Padding = 28 };
-        panel.Add(Ui.Heading("Połącz z Subiektem GT"));
+        clinicName.Text = state.Clinic.Name; clinicAddress.Text = state.Clinic.Address; clinicDoctor.Text = state.Clinic.Doctor;
+        var clinic = new VerticalStackLayout { Spacing = 12 };
+        clinic.Add(Ui.Heading("Dane lecznicy / podmiotu"));
+        clinic.Add(Ui.Note("Stałe dane do nowych kart. Dane właściciela zwierząt nadal pochodzą z wybranego dokumentu."));
+        clinic.Add(Ui.Field("Nazwa lecznicy / podmiotu", clinicName));
+        clinic.Add(Ui.Field("Adres", clinicAddress));
+        clinic.Add(Ui.Field("Lekarz i numer prawa wykonywania zawodu", clinicDoctor));
+        clinic.Add(Ui.Action("Zapisz dane do kart", () =>
+        {
+            var value = new ClinicSettings(clinicName.Text?.Trim() ?? "", clinicAddress.Text?.Trim() ?? "", clinicDoctor.Text?.Trim() ?? "");
+            ClinicSettingsStore.Save(value); state.Clinic = value; status.Text = "Zapisano dane lecznicy i lekarza do nowych kart.";
+            return Task.CompletedTask;
+        }));
+        panel.Add(Ui.Card(clinic));
+        panel.Add(Ui.Heading("Połączenie SQL — Subiekt GT"));
         panel.Add(Ui.Note("1. Serwer i logowanie   →   2. Podmiot i grupa leków   →   3. Test i zapis"));
         panel.Add(Ui.Field("Serwer SQL", server));
         panel.Add(Ui.Note(@"Na tym komputerze np. .\INSERTGT. W sieci: nazwa lub adres komputera oraz instancja albo port."));
@@ -131,6 +148,8 @@ public sealed class ConnectionPage : ContentPage
         try
         {
             if (state.ValidatedConnection != Options) throw new InvalidOperationException("Najpierw wykonaj test aktualnego połączenia.");
+            var clinic = new ClinicSettings(clinicName.Text?.Trim() ?? "", clinicAddress.Text?.Trim() ?? "", clinicDoctor.Text?.Trim() ?? "");
+            ClinicSettingsStore.Save(clinic); state.Clinic = clinic;
             store.Save(Options, remember.IsToggled); status.Text = "Zapisano ustawienia połączenia.";
             if (proceed) await Shell.Current.GoToAsync("//cards");
         }

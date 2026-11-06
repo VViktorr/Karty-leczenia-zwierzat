@@ -25,9 +25,21 @@ Do uruchomienia kontroli biblioteki net8.0 potrzebny jest również runtime .NET
 - ręczna edycja każdego pola karty, zaznaczanie wydruku, dodawanie i usuwanie pozycji;
 - pobieranie karencji UPD i charakterystyki RPL, zatwierdzanie kontekstu karencji i zapisywanie źródła;
 - zapis/otwieranie JSON zgodnego ze starszą wersją;
-- A4 poziomo w przeglądarce, Ctrl+P do wydruku lub PDF.
+- A4 poziomo: podgląd w aplikacji, oddzielne drukowanie i bezpośredni eksport PDF przez Windows WebView2.
 
 Poprzednie ustawienia są wczytywane z tego samego LocalAppData/KartyLeczenia/connection.json. Powiązania RPL i kopie źródeł pozostają w tym samym katalogu registry. Nie zmienia się tożsamość użytkownika DPAPI ani format kart.
+
+## Ustawienia i dokumenty
+W zakładce **Ustawienia** są połączenie SQL oraz nazwa, adres lecznicy/podmiotu i dane lekarza do nowych kart. Dane lecznicy zapisuje się niezależnie od testu SQL; ustawienia połączenia nadal wymagają testu i korzystają z dotychczasowego magazynu hasła. Dane lecznicy są w LocalAppData/KartyLeczenia/clinic.json.
+
+W polu dokumentu wystarczy fragment numeru. Po 4 znakach, z krótkim opóźnieniem, pojawiają się podpowiedzi faktur FS, paragonów PA i WZ. Wybierz dokument z listy. Gdy przy pobraniu pasuje jeden dokument, może zostać wskazany automatycznie; kilka wyników wymaga wyboru. Wyszukiwanie wykonuje wyłącznie parametryzowane SELECT, ogranicza wyniki i anuluje stare żądania. Wyszukiwanie na rzeczywistej bazie Subiekta wymaga sprawdzenia na stanowisku użytkownika.
+
+Jednoznaczny gatunek i droga podania są proponowane z danych UPD lub rozpoznanych sekcji polskiej ChPL RPL. Przy wielu możliwościach lub nieznanym układzie pola pozostają do uzupełnienia. Gatunek uzupełnia także pusty opis zwierzęcia; program nie zgaduje liczby zwierząt, identyfikatora, płci ani numeru stada. Automatyczne propozycje nie zastępują ręcznych wpisów i wymagają kontroli lekarza.
+
+## Podgląd, druk i PDF
+Trzy osobne przyciski: **Podgląd**, **Drukuj**, **Eksport do PDF**. Podgląd działa w aplikacji bez okna zapisu HTML. Drukowanie otwiera okno drukowania WebView2. Eksport pyta o plik PDF i zapisuje bezpośrednio przez PrintToPdfAsync; wymaga dostępnego środowiska WebView2 na Windows. Te funkcje korzystają z tego samego formularza A4 poziomo, odtworzonego według przesłanego skanu: sekcje I-IV, dziewięć kolumn, dwupoziomowy nagłówek, oświadczenie i podpisy. Puste wiersze zachowują strukturę formularza; dłuższe dane mogą wymagać kolejnych stron i nie są celowo obcinane. Przy wydruku wybierz A4 poziomo i wyłącz nagłówki/stopki przeglądarki.
+
+Sprawdzono render próby układu formularza poza aplikacją. Natywny interfejs, nowe wywołania WebView2 i nowe kontrole regresji wymagają budowania/weryfikacji na Windows; nie uruchamiano ich przy tej zmianie na życzenie użytkownika.
 
 ## Edycja karty
 Po lewej wybierz lek/dostawę; po prawej popraw jego pełne dane. Pole wyboru na liście określa udział w wydruku. Dane właściciela, lekarza, lecznicy i nagłówka są nad listą. Informacje o źródle karencji są w edytorze i zapisanej karcie, bez technicznych identyfikatorów na wydruku.
