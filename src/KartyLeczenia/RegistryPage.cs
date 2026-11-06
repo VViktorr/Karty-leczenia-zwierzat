@@ -14,13 +14,18 @@ public sealed class RegistryPage : ContentPage
     readonly TaskCompletionSource<RegistrySelection?> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     readonly CancellationTokenSource lifetime = new();
     RegistryDocument? document;
+    readonly string initialSpecies, initialRoute;
     int fetchGeneration;
+    CancellationTokenSource? lookupDelay;
     public Task<RegistrySelection?> Completion => completion.Task;
 
-    public RegistryPage(string product, int? mapped)
+    public RegistryPage(string product, int? mapped, string currentSpecies = "", string currentRoute = "")
     {
         Title = "Karencja z rejestru RPL";
+        initialSpecies = currentSpecies; initialRoute = currentRoute;
         medicine.Text = product;
+        species.Text = string.IsNullOrWhiteSpace(currentSpecies) ? "Bydło" : currentSpecies;
+        route.Text = currentRoute;
         var matches = RegistryCatalog.ExactCandidates(product);
         id.Text = (mapped ?? (matches.Count == 1 ? matches[0].Id : 0)).ToString();
         var panel = new VerticalStackLayout { Padding = 24, Spacing = 10, MaximumWidthRequest = 1050 };
@@ -30,7 +35,7 @@ public sealed class RegistryPage : ContentPage
         panel.Add(Ui.Field("ID RPL lub oficjalny link do charakterystyki", id));
         var buttons = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         buttons.Add(Ui.Action("Znajdź lek w katalogu", Search));
-        buttons.Add(Ui.Action("Aktualizuj katalog RPL", async () => { await RegistryCatalog.UpdateAsync(true, lifetime.Token); ShowCandidates(); }));
+        buttons.Add(Ui.Action("Aktualizuj katalog RPL", async () => { await RegistryCatalog.UpdateAsync(true, lifetime.Token); await Search(); }));
         buttons.Add(Ui.Action("Otwórz źródło PDF", () => Launcher.Default.OpenAsync(RegistryService.Url(ProductId()))));
         buttons.Add(Ui.Action("Pobierz aktualną ChPL", Fetch)); panel.Add(buttons);
         panel.Add(info); panel.Add(excerpt);
@@ -51,13 +56,23 @@ public sealed class RegistryPage : ContentPage
         Content = new ScrollView { Content = panel };
         foreach (var entry in new[] { medicine, species, route, food }) entry.TextChanged += (_, _) => InvalidateChoice();
         result.TextChanged += (_, _) => InvalidateChoice();
-        id.TextChanged += (_, _) => { fetchGeneration++; document = null; excerpt.Text = ""; result.Text = ""; species.Text = ""; route.Text = ""; InvalidateChoice(); };
+        id.TextChanged += (_, _) => { fetchGeneration++; document = null; excerpt.Text = ""; result.Text = ""; species.Text = string.IsNullOrWhiteSpace(currentSpecies) ? "Bydło" : currentSpecies; route.Text = currentRoute; InvalidateChoice(); };
         confirmed.CheckedChanged += (_, e) => apply.IsEnabled = e.Value && document != null && new[] { medicine.Text, result.Text }.All(s => !string.IsNullOrWhiteSpace(s));
         candidates.SelectedIndexChanged += async (_, _) =>
         {
             if (candidates.SelectedItem is RegistryProduct candidate)
             { id.Text = candidate.Id.ToString(); await Fetch(); }
         };
+        medicine.TextChanged += async (_, _) =>
+        {
+            lookupDelay?.Cancel(); fetchGeneration++; document = null; excerpt.Text = ""; result.Text = ""; id.IsEnabled = true; id.Text = "0"; InvalidateChoice();
+            using var delay = new CancellationTokenSource(); lookupDelay = delay;
+            try { await Task.Delay(400, delay.Token); if (!lifetime.IsCancellationRequested) ShowCandidates(); }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { if (!lifetime.IsCancellationRequested) info.Text = "Nie odczytano katalogu: " + ex.Message; }
+            finally { if (ReferenceEquals(lookupDelay, delay)) lookupDelay = null; }
+        };
+        medicine.Completed += async (_, _) => await Search();
         bool firstLoad = true;
         Loaded += async (_, _) => { if (!firstLoad) return; firstLoad = false; if (id.Text != "0") await Fetch(); else await Search(); };
         apply.Clicked += async (_, _) =>
@@ -88,6 +103,11 @@ public sealed class RegistryPage : ContentPage
             ShowCandidates();
             if (catalogFailure != null) info.Text += "\n" + catalogFailure;
             var exact = RegistryCatalog.ExactCandidates(medicine.Text ?? "");
+            if (exact.Count == 0 && !System.Text.RegularExpressions.Regex.IsMatch(medicine.Text ?? "", @"\d+(?:[.,]\d+)?\s*(?:mg|g|µg|mcg|IU)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                var named = RegistryCatalog.NameCandidates(medicine.Text ?? "");
+                if (named.Count == 1) exact = named;
+            }
             if (exact.Count == 1 && candidates.ItemsSource is List<RegistryProduct> items)
                 candidates.SelectedItem = items.FirstOrDefault(p => p.Id == exact[0].Id);
         }
@@ -117,7 +137,8 @@ public sealed class RegistryPage : ContentPage
             }
             if (lifetime.IsCancellationRequested || generation != fetchGeneration) return;
             document = loaded;
-            species.Text = loaded.SuggestedSpecies; route.Text = loaded.SuggestedRoute;
+            species.Text = !string.IsNullOrWhiteSpace(initialSpecies) ? initialSpecies : !string.IsNullOrWhiteSpace(loaded.SuggestedSpecies) ? loaded.SuggestedSpecies : "Bydło";
+            route.Text = !string.IsNullOrWhiteSpace(initialRoute) ? initialRoute : loaded.SuggestedRoute;
             result.Text = loaded.WithdrawalSection;
             excerpt.Text = "IDENTYFIKACJA Z PDF:\n" + loaded.ProductIdentity + "\n\nOKRESY KARENCJI:\n" + loaded.WithdrawalSection;
             info.Text = $"RPL ID {loaded.Id} | pobrano {loaded.DownloadedUtc.ToLocalTime():g}\n{loaded.Url}\nKarencję wpisano automatycznie. Data pobrania nie jest datą aktualizacji ChPL. Sprawdź produkt i leczenie.";
@@ -126,5 +147,5 @@ public sealed class RegistryPage : ContentPage
         finally { if (generation == fetchGeneration) id.IsEnabled = true; }
     }
     async Task Close() { completion.TrySetResult(null); await Navigation.PopModalAsync(); }
-    protected override void OnDisappearing() { lifetime.Cancel(); completion.TrySetResult(null); base.OnDisappearing(); }
+    protected override void OnDisappearing() { lookupDelay?.Cancel(); lifetime.Cancel(); completion.TrySetResult(null); base.OnDisappearing(); }
 }
