@@ -9,16 +9,21 @@ public static class TreatmentContextService
 {
     const string Animals = @"Bydło|Świnie|Owce|Kozy|Konie|Kury|Indyki|Króliki";
     static string Clean(string text) => text.Replace('\u00a0', ' ').Replace("\r\n", "\n").Trim();
-    public static string Section(string text, string number, string next)
+    public static string Section(string text, string number, string next, string heading = @"\p{L}[^\r\n]*")
     {
-        var start = Regex.Match(text, @"(?im)^\s*" + number + @"(?!\d)\s*\.?\s*(?<title>[^\r\n]*)[\r\n]+");
+        text = Clean(text);
+        // PDF text may put the section number and heading on separate lines,
+        // or concatenate a heading with the preceding paragraph.
+        var start = Regex.Match(text, @"(?im)(?<![\d.])" + number + @"(?!\d)\s*\.?\s*" + heading + @"(?:[ \t]*\r?\n|[ \t]+|$)");
         if (!start.Success) return "";
         string body = text[(start.Index + start.Length)..];
-        var end = Regex.Match(body, @"(?im)^\s*" + next + @"(?!\d)\s*\.?\s+\p{L}");
+        var end = Regex.Match(body, @"(?im)(?<![\d.])" + next + @"(?!\d)\s*\.?\s*\p{L}");
         return end.Success ? Clean(body[..end.Index]) : "";
     }
-    public static string ExtractDosing(string text) => Section(text, @"(?:3|4)\s*\.\s*9", @"(?:3|4)\s*\.\s*10");
-    public static string ExtractSpecies(string text) => Section(text, @"(?:3|4)\s*\.\s*1", @"(?:3|4)\s*\.\s*2");
+    public static string ExtractDosing(string text) => Section(text, @"(?:3|4)\s*\.\s*9", @"(?:3|4)\s*\.\s*10",
+        @"(?:Droga\s+podania\s+i\s+dawkowanie|Dawkowanie\s+i\s+drog(?:a|i)(?:\s*\([^\r\n)]*\))?\s+pod(?:ania|awania))");
+    public static string ExtractSpecies(string text) => Section(text, @"(?:3|4)\s*\.\s*1", @"(?:3|4)\s*\.\s*2",
+        @"Docelowe\s+gatunki\s+zwierząt");
     public static string SpeciesKey(string text)
     {
         var m = Regex.Match(text.Trim(), @"^(?:" + Animals + @")\b", RegexOptions.IgnoreCase);
@@ -30,17 +35,18 @@ public static class TreatmentContextService
         if (Regex.IsMatch(t, @"podskórn|\bs\.?\s*c\.?\b")) return "sc";
         if (Regex.IsMatch(t, @"domięśniow|\bi\.?\s*m\.?\b")) return "im";
         if (Regex.IsMatch(t, @"dożyln|\bi\.?\s*v\.?\b")) return "iv";
+        if (Regex.IsMatch(t, @"donosow|wewnątrznosow")) return "nasal";
         if (Regex.IsMatch(t, @"dowymieniow")) return "udder";
         if (Regex.IsMatch(t, @"doustn|\bp\.?\s*o\.?\b")) return "oral";
         return "";
     }
-    static string RouteName(string key) => key switch { "sc" => "Podanie podskórne", "im" => "Podanie domięśniowe", "iv" => "Podanie dożylne", "udder" => "Podanie dowymieniowe", "oral" => "Podanie doustne", _ => "" };
+    static string RouteName(string key) => key switch { "sc" => "Podanie podskórne", "im" => "Podanie domięśniowe", "iv" => "Podanie dożylne", "udder" => "Podanie dowymieniowe", "oral" => "Podanie doustne", "nasal" => "Podanie donosowe", _ => "" };
     static string[] RouteKeys(string text)
     {
         var common = Regex.Match(text, @"(?im)^\s*(?:W jedno miejsce|Aby zapewnić|Sposób podawania\s*:|Informacje (?:ogólne|dla wszystkich))\b");
         if (common.Success) text = text[..common.Index];
-        return Regex.Matches(text, @"(?im)^(?!\s*(?:nie|zakaz)\b)[^\r\n]*(?:podanie|podawać|podskórn|domięśniow|dożyln|doustn|dowymieniow)[^\r\n]*")
-        .SelectMany(m => Regex.Matches(m.Value, @"podskórn\p{L}*|domięśniow\p{L}*|dożyln\p{L}*|doustn\p{L}*|dowymieniow\p{L}*", RegexOptions.IgnoreCase).Select(r => RouteKey(r.Value)))
+        return Regex.Matches(text, @"(?im)^(?!\s*(?:nie|zakaz)\b)[^\r\n]*(?:podanie|podawać|podskórn|domięśniow|dożyln|doustn|dowymieniow|donosow|wewnątrznosow)[^\r\n]*")
+        .SelectMany(m => Regex.Matches(m.Value, @"podskórn\p{L}*|domięśniow\p{L}*|dożyln\p{L}*|doustn\p{L}*|dowymieniow\p{L}*|donosow\p{L}*|wewnątrznosow\p{L}*", RegexOptions.IgnoreCase).Select(r => RouteKey(r.Value)))
         .Where(k => k.Length > 0).Distinct().ToArray();
     }
 
@@ -94,7 +100,7 @@ public static class TreatmentContextService
             if (tissue.Success) { food = tissue.Groups[1].Value; current = ""; }
             // Only explicit route-leading rows/paragraphs may be excluded.
             string routePart = tissue.Success ? line[(tissue.Index + tissue.Length)..].Trim() : line;
-            var routeStart = Regex.Match(routePart, @"^(?:(?:Wyłącznie\s+)?podanie\s+)?(?:podskórn\p{L}*|domięśniow\p{L}*|dożyln\p{L}*|doustn\p{L}*|dowymieniow\p{L}*)\s*(?:\([^)]*\))?\s*:", RegexOptions.IgnoreCase);
+            var routeStart = Regex.Match(routePart, @"^(?:(?:Wyłącznie\s+)?podanie\s+)?(?:podskórn\p{L}*|domięśniow\p{L}*|dożyln\p{L}*|doustn\p{L}*|dowymieniow\p{L}*|donosow\p{L}*|wewnątrznosow\p{L}*)\s*(?:\([^)]*\))?\s*:", RegexOptions.IgnoreCase);
             if (routeStart.Success)
             {
                 current = RouteKey(routeStart.Value);
