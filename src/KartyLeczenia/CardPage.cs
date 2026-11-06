@@ -15,7 +15,11 @@ public sealed class CardPage : ContentPage
     CancellationTokenSource? documentSearch;
     DocumentSuggestion? chosenDocument;
     ConnectionOptions? documentLookupConnection;
-    bool choosingDocument;
+    bool choosingDocument, loadingDocument;
+    readonly CheckBox searchInvoices = new() { IsChecked = true }, searchWarehouse = new() { IsChecked = true }, searchReceipts = new() { IsChecked = true };
+    DocumentSearchKinds SearchKinds => (searchInvoices.IsChecked ? DocumentSearchKinds.Invoices : DocumentSearchKinds.None)
+        | (searchWarehouse.IsChecked ? DocumentSearchKinds.WarehouseReleases : DocumentSearchKinds.None)
+        | (searchReceipts.IsChecked ? DocumentSearchKinds.Receipts : DocumentSearchKinds.None);
     readonly Picker withdrawal = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
     readonly Picker owner = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
     readonly Label searchHint = Ui.Note("Podpowiedzi po wpisaniu 4 znaków numeru dokumentu, nazwiska lub nazwy klienta.");
@@ -34,7 +38,7 @@ public sealed class CardPage : ContentPage
     public CardPage(AppState appState)
     {
         state = appState; Title = "Karta leczenia";
-        withdrawal.Items.Add("Unijna baza UPD (domyślnie)"); withdrawal.Items.Add("Opis leku");
+        withdrawal.Items.Add("Rejestr RPL (domyślnie)"); withdrawal.Items.Add("Opis leku");
         for (int i = 1; i <= 8; i++) withdrawal.Items.Add("Pole własne " + i);
         withdrawal.SelectedIndex = 0; owner.Items.Add("Płatnik"); owner.Items.Add("Odbiorca"); owner.SelectedIndex = 0;
         owner.SelectedIndexChanged += (_, _) => { if (!changing && scope != "") header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient; };
@@ -60,7 +64,18 @@ public sealed class CardPage : ContentPage
         documentActions.Add(Ui.Action("Podgląd", () => Preview("preview")));
         documentActions.Add(Ui.Action("Drukuj", () => Preview("print")));
         documentActions.Add(Ui.PrimaryAction("Eksport do PDF", () => Preview("pdf")));
-        var documentPanel = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("1. Dokument źródłowy"), actions, searchHint, documentActions } };
+        var searchTypes = new HorizontalStackLayout { Spacing = 14 };
+        foreach (var item in new[] { (Toggle: searchInvoices, Title: "Faktury"), (Toggle: searchWarehouse, Title: "WZ"), (Toggle: searchReceipts, Title: "Paragony") })
+        {
+            searchTypes.Add(new HorizontalStackLayout { Spacing = 2, Children = { item.Toggle, new Label { Text = item.Title, VerticalOptions = LayoutOptions.Center } } });
+            item.Toggle.CheckedChanged += async (_, _) => await RefreshDocumentSuggestions();
+        }
+        number.Completed += async (_, _) =>
+        {
+            try { await LoadDocument(); }
+            catch (Exception ex) { await DisplayAlertAsync("Nie pobrano dokumentu", SubiektConnectionService.FriendlyError(ex), "OK"); }
+        };
+        var documentPanel = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("1. Dokument źródłowy"), actions, searchHint, searchTypes, documentActions } };
         var headerPanel = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         foreach (string field in CardSchema.Fields)
         {
@@ -84,7 +99,8 @@ public sealed class CardPage : ContentPage
         detail.Add(Ui.Heading("4. Dane wybranego leku"));
         detail.Add(Ui.Note("Wybierz lek z listy po lewej. Każde pole możesz poprawić przed wydrukiem."));
         detail.Add(new HorizontalStackLayout { Children = { printed, new Label { Text = "Uwzględnij na wydruku", VerticalOptions = LayoutOptions.Center } } });
-        detail.Add(Ui.Action("Karencja z UPD / RPL…", ApplyRegistry));
+        detail.Add(Ui.Action("Karencja z RPL…", ApplyRegistry));
+        detail.Add(Ui.Action("UPD — źródło zapasowe…", () => ApplyRegistrySource(true)));
         foreach (string field in CardSchema.RowFields.Concat(CardSchema.ContextFields))
         {
             var editor = new Editor { HeightRequest = field is "Karencja" or "Dawkowanie i okres stosowania" or "Zalecenia / uwagi" ? 82 : 48 };
@@ -110,33 +126,35 @@ public sealed class CardPage : ContentPage
         documentActions.Add(Ui.Action("Pokaż / ukryj dane karty", () => { cardDetails.IsVisible = !cardDetails.IsVisible; root.RowDefinitions[1].Height = new GridLength(cardDetails.IsVisible ? 225 : 0); return Task.CompletedTask; }));
         root.Add(Ui.Card(documentPanel), 0, 0); root.Add(cardDetails, 0, 1); root.Add(rowActions, 0, 2); root.Add(split, 0, 3); root.Add(status, 0, 4);
         Content = root;
-        number.TextChanged += async (_, _) =>
-        {
-            if (choosingDocument) return;
-            chosenDocument = null; documentSuggestions.ItemsSource = null;
-            searchHint.Text = "Wpisz co najmniej 4 znaki numeru, nazwiska lub nazwy klienta.";
-            documentSearch?.Cancel();
-            if ((number.Text?.Trim().Length ?? 0) < 4 || state.ValidatedConnection == null) return;
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15)); documentSearch = cts;
-            var options = state.ValidatedConnection; string input = number.Text!.Trim();
-            try
-            {
-                await Task.Delay(400, cts.Token);
-                var found = await documents.SearchAsync(options, input, cts.Token);
-                if (cts.IsCancellationRequested || number.Text?.Trim() != input || state.ValidatedConnection != options) return;
-                documentLookupConnection = options; documentSuggestions.ItemsSource = found;
-                searchHint.Text = found.Count >= 21 ? "Ponad 20 wyników — dopisz numer lub nazwisko, aby zawęzić listę." : $"Znaleziono dokumentów: {found.Count}. Wybierz właściwy dokument z listy.";
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex) { if (!cts.IsCancellationRequested && state.ValidatedConnection == options) status.Text = "Nie pobrano podpowiedzi: " + ex.Message; }
-            finally { if (ReferenceEquals(documentSearch, cts)) documentSearch = null; }
-        };
+        number.TextChanged += async (_, _) => await RefreshDocumentSuggestions();
         documentSuggestions.SelectedIndexChanged += (_, _) =>
         {
             if (documentSuggestions.SelectedItem is not DocumentSuggestion suggestion) return;
             searchHint.Text = "Wybrano: " + suggestion;
             documentSearch?.Cancel(); choosingDocument = true; number.Text = suggestion.Number; choosingDocument = false; chosenDocument = suggestion;
         };
+    }
+    async Task RefreshDocumentSuggestions()
+    {
+            if (choosingDocument) return;
+            chosenDocument = null; documentSuggestions.ItemsSource = null;
+            searchHint.Text = "Wpisz co najmniej 4 znaki numeru, nazwiska lub nazwy klienta.";
+            documentSearch?.Cancel();
+            if ((number.Text?.Trim().Length ?? 0) < 4 || state.ValidatedConnection == null) return;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15)); documentSearch = cts;
+            var options = state.ValidatedConnection; string input = number.Text!.Trim(); var kinds = SearchKinds;
+            try
+            {
+                await Task.Delay(400, cts.Token);
+                var found = await documents.SearchAsync(options, input, cts.Token, kinds);
+                if (cts.IsCancellationRequested || number.Text?.Trim() != input || state.ValidatedConnection != options || SearchKinds != kinds) return;
+                documentLookupConnection = options; documentSuggestions.ItemsSource = found;
+                searchHint.Text = found.Count >= 21 ? "Ponad 20 wyników — dopisz numer lub nazwisko, aby zawęzić listę." : $"Znaleziono dokumentów: {found.Count}. Wybierz właściwy dokument z listy.";
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { if (!cts.IsCancellationRequested && state.ValidatedConnection == options) status.Text = "Nie pobrano podpowiedzi: " + ex.Message; }
+            finally { if (ReferenceEquals(documentSearch, cts)) documentSearch = null; }
+        
     }
     protected override void OnAppearing()
     {
@@ -163,14 +181,23 @@ public sealed class CardPage : ContentPage
     }
     async Task LoadDocument()
     {
+        if (loadingDocument) return;
+        loadingDocument = true;
+        try { await LoadDocumentCore(); }
+        finally { loadingDocument = false; }
+    }
+    async Task LoadDocumentCore()
+    {
+        var requestedKinds = SearchKinds;
         var options = state.ValidatedConnection ?? throw new InvalidOperationException("Najpierw przetestuj połączenie z Subiektem.");
+        if (SearchKinds == DocumentSearchKinds.None) throw new InvalidOperationException("Zaznacz co najmniej jeden rodzaj dokumentu: faktury, WZ lub paragony.");
         if (documentLookupConnection != options) chosenDocument = null;
         if (chosenDocument == null && !string.IsNullOrWhiteSpace(number.Text) && number.Text.Trim().Length >= 4)
         {
             using var searchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            string input = number.Text.Trim();
-            var found = await documents.SearchAsync(options, input, searchTimeout.Token);
-            if (state.ValidatedConnection != options || number.Text?.Trim() != input) return;
+            string input = number.Text.Trim(); var kinds = SearchKinds;
+            var found = await documents.SearchAsync(options, input, searchTimeout.Token, kinds);
+            if (state.ValidatedConnection != options || number.Text?.Trim() != input || SearchKinds != kinds) return;
             documentLookupConnection = options;
             var exact = found.Where(d => d.Number.Equals(input, StringComparison.OrdinalIgnoreCase)).ToList();
             if (exact.Count == 1) chosenDocument = exact[0];
@@ -183,8 +210,9 @@ public sealed class CardPage : ContentPage
         int generation = ++documentGeneration;
         status.Text = "Pobieranie leków z dokumentu…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        var data = await documents.ReadAsync(options, number.Text ?? "", withdrawal.SelectedIndex, timeout.Token, chosenDocument?.Id);
-        if (generation != documentGeneration) return;
+        string requestedNumber = number.Text ?? "";
+        var data = await documents.ReadAsync(options, requestedNumber, withdrawal.SelectedIndex, timeout.Token, chosenDocument?.Id);
+        if (generation != documentGeneration || SearchKinds != requestedKinds || number.Text != requestedNumber) return;
         if (state.ValidatedConnection != options) throw new InvalidOperationException("Zmieniono połączenie w trakcie pobierania. Ponów operację.");
         Select(null); rows.Clear(); foreach (var row in data.Rows) rows.Add(row);
         scope = data.Scope; payer = data.Payer; recipient = data.Recipient;
@@ -203,7 +231,14 @@ public sealed class CardPage : ContentPage
         try
         {
             if (generation != documentGeneration || timeout.IsCancellationRequested) return;
-            status.Text = "Automatyczne pobieranie karencji z UPD…";
+            if (targets.Any(r => RegistryService.ReadMapping(AutomaticWithdrawalService.MappingKey(sourceScope, r)) == null && RegistryCatalog.ExactCandidates(r.Product).Count != 1))
+            {
+                status.Text = "Aktualizowanie katalogu RPL…";
+                try { await RegistryCatalog.UpdateAsync(token: timeout.Token); }
+                catch (Exception) when (!timeout.IsCancellationRequested) { }
+            }
+            if (generation != documentGeneration || timeout.IsCancellationRequested) return;
+            status.Text = "Automatyczne pobieranie karencji z RPL…";
             using var gate = new SemaphoreSlim(3);
             var tasks = targets.GroupBy(r => AutomaticWithdrawalService.MappingKey(sourceScope, r)).Select(async group =>
             {
@@ -212,14 +247,14 @@ public sealed class CardPage : ContentPage
                 string? error = null;
                 await gate.WaitAsync(timeout.Token);
                 try { resolved = await AutomaticWithdrawalService.ResolveAsync(sourceScope, group.First(), timeout.Token); }
-                catch (Exception ex) { error = ex is OperationCanceledException ? "Przekroczono czas pobierania UPD." : ex.Message; }
+                catch (Exception ex) { error = ex is OperationCanceledException ? "Przekroczono czas pobierania RPL." : ex.Message; }
                 finally { gate.Release(); }
                 if (generation != documentGeneration || timeout.IsCancellationRequested) return;
                 foreach (var row in group)
                 {
                     if (!rows.Contains(row) || row.Product != originalProduct || row.Get("Karencja") != "") continue;
                     if (resolved != null) { AutomaticWithdrawalService.Apply(row, resolved); filled++; }
-                    else { row.Set("Status karencji", error == null ? "Brak zapamiętanego dopasowania UPD — wybierz lek" : "UPD: " + error, false); missing++; }
+                    else { row.Set("Status karencji", error == null ? "Brak jednoznacznego dopasowania RPL — wybierz lek" : "RPL: " + error, false); missing++; }
                 }
             }).ToArray();
             await Task.WhenAll(tasks);
@@ -229,7 +264,7 @@ public sealed class CardPage : ContentPage
                 status.Text = $"Karencję uzupełniono automatycznie w {filled} pozycjach. Do dopasowania lub ponowienia: {missing}. Sprawdź źródło, produkt i leczenie przed wydrukiem.";
             }
         }
-        catch (OperationCanceledException) { if (generation == documentGeneration) status.Text = "Przekroczono czas UPD. Już pobrane dane pozostają w karcie; brakujące pozycje ponów przez przycisk karencji."; }
+        catch (OperationCanceledException) { if (generation == documentGeneration) status.Text = "Przekroczono czas RPL. Już pobrane dane pozostają w karcie; brakujące pozycje ponów przez przycisk karencji."; }
         finally { if (ReferenceEquals(automaticWork, timeout)) automaticWork = null; }
     }
 
@@ -255,13 +290,22 @@ public sealed class CardPage : ContentPage
         payer = recipient = header["Właściciel i adres"].Text ?? ""; changing = false;
         if (rows.Count > 0) list.SelectedItem = rows[0]; status.Text = "Otworzono kartę. Zapisane dane źródłowe pozostają zachowane.";
     }
-    async Task ApplyRegistry()
+    Task ApplyRegistry() => ApplyRegistrySource(false);
+    async Task ApplyRegistrySource(bool useUpd)
     {
         var row = selected ?? throw new InvalidOperationException("Wybierz lek.");
         string key = AutomaticWithdrawalService.MappingKey(scope, row);
-        var page = new UpdRegistryPage(row.Product, UpdService.ReadMapping(key), RegistryService.ReadMapping(key));
-        await Navigation.PushModalAsync(page);
-        var result = await page.Completion;
+        RegistrySelection? result;
+        if (useUpd)
+        {
+            var page = new UpdRegistryPage(row.Product, UpdService.ReadMapping(key), RegistryService.ReadMapping(key));
+            await Navigation.PushModalAsync(page); result = await page.Completion;
+        }
+        else
+        {
+            var page = new RegistryPage(row.Product, RegistryService.ReadMapping(key), row.Get("Domyślny gatunek") == "True" ? "" : row.Get("Gatunek"), row.Get("Droga podania"));
+            await Navigation.PushModalAsync(page); result = await page.Completion;
+        }
         if (result == null || !rows.Contains(row)) return;
         if (result.Document.UpdId != null) UpdService.SaveMapping(key, result.Document.UpdId);
         else RegistryService.SaveMapping(key, result.Document.Id);
