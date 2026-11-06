@@ -17,7 +17,7 @@ public sealed class TreatmentRow : INotifyPropertyChanged
 {
     public Dictionary<string, string> Values { get; }
     public TreatmentRow(Dictionary<string, string>? values = null) => Values = values is null
-        ? new() { ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II" } : new(values);
+        ? new() { ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II", ["Gatunek"] = "Bydło", ["Opis zwierząt / numer siedziby stada"] = "Bydło", ["Domyślny gatunek"] = "True" } : new(values);
     public string Get(string key) => Values.GetValueOrDefault(key, "");
     public string Product => Get("Produkt");
     public string Summary => Get("Ilość wydana") + (string.IsNullOrWhiteSpace(Get("Seria")) ? "" : "  •  serie: " + Get("Seria"));
@@ -27,6 +27,7 @@ public sealed class TreatmentRow : INotifyPropertyChanged
     {
         if (Get(key) == value) return;
         Values[key] = value;
+        if (manual && (key is "Gatunek" or "Opis zwierząt / numer siedziby stada")) Values["Domyślny gatunek"] = "False";
         if (manual && (key is "Karencja" or "Produkt" or "Gatunek" or "Droga podania" or "Produkt spożywczy" or "Produkt rejestru" or "Dawkowanie i okres stosowania" or "Opis zwierząt / numer siedziby stada"))
             Values["Status karencji"] = "Zmieniono ręcznie — sprawdź przed wydrukiem";
         PropertyChanged?.Invoke(this, new(nameof(Product)));
@@ -36,6 +37,14 @@ public sealed class TreatmentRow : INotifyPropertyChanged
     }
     public void FillMissingContext(string species, string route)
     {
+        if (Get("Domyślny gatunek") == "True" && !string.IsNullOrWhiteSpace(species))
+        {
+            string previous = Get("Gatunek");
+            Set("Gatunek", species, false);
+            if (string.IsNullOrWhiteSpace(Get("Opis zwierząt / numer siedziby stada")) || Get("Opis zwierząt / numer siedziby stada") == previous)
+                Set("Opis zwierząt / numer siedziby stada", species, false);
+            Set("Domyślny gatunek", "False", false);
+        }
         if (string.IsNullOrWhiteSpace(Get("Gatunek")) && species.Length > 0) Set("Gatunek", species, false);
         if (string.IsNullOrWhiteSpace(Get("Opis zwierząt / numer siedziby stada")) && species.Length > 0) Set("Opis zwierząt / numer siedziby stada", species, false);
         if (string.IsNullOrWhiteSpace(Get("Droga podania")) && route.Length > 0) Set("Droga podania", route, false);
