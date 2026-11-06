@@ -113,5 +113,24 @@ Check(upd.SuggestedSpecies == "Bydło" && upd.SuggestedRoute == "Podanie podskó
 string multiSpecies = Fixture().Replace("</li></ul></li></ul></div>", "</li><li class='list-item__upd_species'>" + Field("upd-species__field-upd-term-name", "Sheep") + Period("Meat and offal", "7", "day") + "</li></ul></li></ul></div>");
 Check(UpdService.Parse("600000000001", multiSpecies).SuggestedSpecies == "", "UPD multiple species were selected automatically.");
 Check(html.Contains("rowspan=\"2\"") && html.Contains("colspan=\"4\""), "Scanned form grouped headers missing.");
+
+DocumentDelivery Delivery(decimal quantity, string series, string expiry = "", string unit = "FL.", string productId = "123")
+{
+    var deliveryRow = new TreatmentRow(new() {
+        ["Produkt"] = "FLUNIVIS 50MG/ML A'100ML", ["ID towaru"] = productId,
+        ["Sekcja (II lub III)"] = "II", ["Drukuj"] = "True", ["Seria"] = series, ["Ważność"] = expiry });
+    return new(deliveryRow, quantity, unit);
+}
+var mergedDeliveries = DocumentRowMerger.Merge([
+    Delivery(0.29m, ""), Delivery(0.31m, "V-003A", "31.12.2027")]);
+Check(mergedDeliveries.Count == 1 && decimal.Parse(mergedDeliveries[0].Get("Ilość wydana").Split(' ')[0]) == 0.60m, "Delivery quantities were not summed.");
+Check(mergedDeliveries[0].Get("Seria") == "V-003A" && !mergedDeliveries[0].Summary.Contains("brak"), "Blank series was not omitted.");
+Check(mergedDeliveries[0].Get("Ważność").Contains("V-003A: 31.12.2027"), "Expiry lost its batch association.");
+var multipleBatches = DocumentRowMerger.Merge([
+    Delivery(1m, "A", "01.01.2027"), Delivery(2m, "B", "02.02.2028"), Delivery(3m, "A", "01.01.2027")]);
+Check(multipleBatches[0].Get("Seria") == "A, B" && decimal.Parse(multipleBatches[0].Get("Ilość wydana").Split(' ')[0]) == 6m, "Distinct series or total quantity incorrect.");
+Check(multipleBatches[0].Get("Ważność") == "A: 01.01.2027, B: 02.02.2028", "Batch expiry pairs changed or duplicated.");
+Check(DocumentRowMerger.Merge([Delivery(1m, "", unit: "FL."), Delivery(1m, "", unit: "szt.")]).Count == 2, "Incompatible units were added.");
+Check(DocumentRowMerger.Merge([Delivery(1m, "", productId: "123"), Delivery(1m, "", productId: "456")]).Count == 2, "Different product identities were merged.");
 Console.WriteLine($"Passed {checks} core checks.");
 
