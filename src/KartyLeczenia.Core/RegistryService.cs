@@ -11,10 +11,15 @@ public sealed record RegistryDocument(int Id, string Url, string Sha256, DateTim
 {
     public string? UpdId { get; init; }
     public string SuggestedSpecies { get; init; } = "";
+    public string DosingSection { get; init; } = "";
+    public string TargetSpeciesSection { get; init; } = "";
     public string SuggestedRoute { get; init; } = "";
     public string Source => UpdId == null ? "RPL" : "UPD";
 }
-public sealed record RegistrySelection(RegistryDocument Document, string Species, string Route, string Food, string Text, string Medicine);
+public sealed record RegistrySelection(RegistryDocument Document, string Species, string Route, string Food, string Text, string Medicine)
+{
+    public string Dosing { get; init; } = "";
+}
 
 public static class RegistryService
 {
@@ -47,7 +52,7 @@ public static class RegistryService
     }
     public static string SingleRoute(string text)
     {
-        string body = ContextSection(text, @"(?:4|3)\s*\.\s*9", "Dawkowanie", @"(?:4|3)\s*\.\s*10");
+        string body = TreatmentContextService.ExtractDosing(text);
         if (body.Length == 0) return "";
         var explicitRoute = Regex.Matches(body, @"(?:^|(?<=[.!?])\s+)(?:Wyłącznie\s+)?(?:podanie|podawać)\s+(podskórne|podskórnie|domięśniowe|domięśniowo|dożylne|dożylnie|doustne|doustnie|dowymieniowe|dowymieniowo)\b", RegexOptions.IgnoreCase)
             .Where(m => !Regex.IsMatch(body[..m.Index], @"\bnie\s*$", RegexOptions.IgnoreCase))
@@ -78,7 +83,7 @@ public static class RegistryService
         using var pdf = PdfDocument.Open(bytes);
         string text = string.Join("\n", pdf.GetPages().Select(p => ContentOrderTextExtractor.GetText(p)));
         var result = new RegistryDocument(id, Url(id), Convert.ToHexString(SHA256.HashData(bytes)), DateTimeOffset.UtcNow, ExtractSection(text), text[..Math.Min(text.Length, 750)])
-        { SuggestedSpecies = SingleSpecies(text), SuggestedRoute = SingleRoute(text) };
+        { SuggestedSpecies = SingleSpecies(text), SuggestedRoute = SingleRoute(text), DosingSection = TreatmentContextService.ExtractDosing(text), TargetSpeciesSection = TreatmentContextService.ExtractSpecies(text) };
         Directory.CreateDirectory(Folder);
         // Temporary file + replacement: an interrupted refresh cannot truncate the last good copy.
         string target = Path.Combine(Folder, id + ".json");

@@ -144,5 +144,29 @@ Check(cattleDefault.Get("Gatunek") == "Owce" && cattleDefault.Get("Opis zwierzą
 var manualSpecies = new TreatmentRow(); manualSpecies.Set("Gatunek", "Konie");
 manualSpecies.FillMissingContext("Owce", "");
 Check(manualSpecies.Get("Gatunek") == "Konie", "Source species overwrote a manual choice.");
+
+var contextualSource = new RegistryDocument(1, "https://example.invalid/fixture", "fixture", DateTimeOffset.UtcNow,
+    "Bydło:\nTkanki jadalne: podanie domięśniowe: 10 dni\npodanie podskórne: 20 dni\nMleko: Produkt niedopuszczony do stosowania.\nŚwinie:\nTkanki jadalne: 7 dni",
+    "Syntetyczny dokument testowy")
+{
+    TargetSpeciesSection = "Bydło i świnie",
+    DosingSection = "Bydło:\nLeczenie\nPodanie domięśniowe: 1 ml/10 kg, dwukrotnie.\nPodanie podskórne: 2 ml/10 kg, jednokrotnie.\nŚwinie:\nPodanie domięśniowe: 3 ml/10 kg.\nW jedno miejsce nie podawać więcej niż 5 ml."
+};
+var subcutaneous = TreatmentContextService.Select(contextualSource, "Bydło", "Podskórnie");
+Check(subcutaneous.Withdrawal.Contains("20 dni") && !subcutaneous.Withdrawal.Contains("10 dni") && !subcutaneous.Withdrawal.Contains("7 dni"), "Route/species withdrawal filtering failed.");
+Check(subcutaneous.Withdrawal.Contains("Mleko") && subcutaneous.Withdrawal.Contains("niedopuszczony"), "Milk prohibition was discarded.");
+Check(subcutaneous.Dosing.Contains("2 ml/10 kg") && !subcutaneous.Dosing.Contains("1 ml/10 kg") && !subcutaneous.Dosing.Contains("3 ml/10 kg") && subcutaneous.Dosing.Contains("5 ml"), "Selected dosing or shared safety limit lost.");
+Check(TreatmentContextService.Select(contextualSource, "Bydło", "").Withdrawal == "", "Multiple routes were chosen without selection.");
+Check(TreatmentContextService.Select(contextualSource, "Konie", "Podskórnie").Withdrawal == "", "Unlisted species accepted.");
+var automaticContext = new TreatmentRow();
+automaticContext.StoreTreatmentSource(contextualSource);
+automaticContext.Set("Droga podania", "Podskórnie");
+Check(automaticContext.Get("Karencja").Contains("20 dni"), "Selected route not applied automatically.");
+automaticContext.Set("Droga podania", "Domięśniowo");
+Check(automaticContext.Get("Karencja").Contains("10 dni") && !automaticContext.Get("Karencja").Contains("20 dni"), "Route change did not refresh automatic withdrawal.");
+automaticContext.Set("Dawkowanie i okres stosowania", "Indywidualny wpis lekarza");
+automaticContext.Set("Droga podania", "Podskórnie");
+Check(automaticContext.Get("Dawkowanie i okres stosowania") == "Indywidualny wpis lekarza", "Manual dosing was overwritten.");
+Check(TreatmentContextService.ExtractDosing("3.9 Droga podania i dawkowanie\nPodanie podskórne.\n3.10 Objawy przedawkowania\nNie kopiuj dalej.").Trim() == "Podanie podskórne.", "Dosing section boundaries failed.");
 Console.WriteLine($"Passed {checks} core checks.");
 

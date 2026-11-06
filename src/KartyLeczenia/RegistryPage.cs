@@ -6,6 +6,11 @@ public sealed class RegistryPage : ContentPage
     readonly Entry medicine = new();
     readonly Editor excerpt = new() { IsReadOnly = true, HeightRequest = 270 };
     readonly Editor result = new() { HeightRequest = 110 };
+    readonly Editor dosing = new() { HeightRequest = 170 };
+    readonly Picker sourceRoutes = new() { Title = "Drogi podania rozpoznane w charakterystyce" };
+    readonly Label contextNotice = Ui.Note("");
+    bool updatingContext;
+    string lastAutoWithdrawal = "", lastAutoDosing = "";
     readonly Entry species = new(), route = new(), food = new();
     readonly Label info = Ui.Note("Pobierz charakterystykę i sprawdź tożsamość leku.");
     readonly Picker candidates = new() { Title = "Wyniki wyszukiwania leków" };
@@ -38,9 +43,15 @@ public sealed class RegistryPage : ContentPage
         buttons.Add(Ui.Action("Aktualizuj katalog RPL", async () => { await RegistryCatalog.UpdateAsync(true, lifetime.Token); await Search(); }));
         buttons.Add(Ui.Action("Otwórz źródło PDF", () => Launcher.Default.OpenAsync(RegistryService.Url(ProductId()))));
         buttons.Add(Ui.Action("Pobierz aktualną ChPL", Fetch)); panel.Add(buttons);
-        panel.Add(info); panel.Add(excerpt);
+        panel.Add(info);
+        excerpt.IsVisible = false;
+        panel.Add(Ui.Action("Pokaż / ukryj pełne sekcje ChPL", () => { excerpt.IsVisible = !excerpt.IsVisible; return Task.CompletedTask; }));
+        panel.Add(excerpt);
         panel.Add(Context("Gatunek", species, ["Bydło", "Świnie", "Konie", "Owce", "Kozy", "Drób"]));
-        panel.Add(Context("Droga podania", route, ["Domięśniowo", "Podskórnie", "Dożylnie", "Doustnie", "Dowymieniowo"]));
+        panel.Add(sourceRoutes);
+        panel.Add(Ui.Field("Wybrana droga podania", route));
+        panel.Add(contextNotice);
+        panel.Add(Ui.Field("Dawkowanie, częstość i sposób podania z ChPL — sprawdź i ewentualnie popraw", dosing));
         panel.Add(Context("Produkt spożywczy", food, ["Tkanki jadalne", "Mleko", "Jaja", "Miód", "Tkanki jadalne i mleko"]));
         panel.Add(Ui.Action("Opcjonalnie zawęź karencję do zaznaczonego fragmentu", () =>
         {
@@ -56,7 +67,11 @@ public sealed class RegistryPage : ContentPage
         Content = new ScrollView { Content = panel };
         foreach (var entry in new[] { medicine, species, route, food }) entry.TextChanged += (_, _) => InvalidateChoice();
         result.TextChanged += (_, _) => InvalidateChoice();
-        id.TextChanged += (_, _) => { fetchGeneration++; document = null; excerpt.Text = ""; result.Text = ""; species.Text = string.IsNullOrWhiteSpace(currentSpecies) ? "Bydło" : currentSpecies; route.Text = currentRoute; InvalidateChoice(); };
+        dosing.TextChanged += (_, _) => InvalidateChoice();
+        species.TextChanged += (_, _) => RecomputeContext();
+        route.TextChanged += (_, _) => RecomputeContext();
+        sourceRoutes.SelectedIndexChanged += (_, _) => { if (sourceRoutes.SelectedItem is string value) route.Text = value; };
+        id.TextChanged += (_, _) => { fetchGeneration++; document = null; excerpt.Text = ""; result.Text = ""; dosing.Text = ""; species.Text = string.IsNullOrWhiteSpace(currentSpecies) ? "Bydło" : currentSpecies; route.Text = currentRoute; InvalidateChoice(); };
         confirmed.CheckedChanged += (_, e) => apply.IsEnabled = e.Value && document != null && new[] { medicine.Text, result.Text }.All(s => !string.IsNullOrWhiteSpace(s));
         candidates.SelectedIndexChanged += async (_, _) =>
         {
@@ -78,7 +93,7 @@ public sealed class RegistryPage : ContentPage
         apply.Clicked += async (_, _) =>
         {
             if (document == null || !apply.IsEnabled) return;
-            completion.TrySetResult(new(document, species.Text?.Trim() ?? "", route.Text?.Trim() ?? "", food.Text?.Trim() ?? "", result.Text.Trim(), medicine.Text.Trim()));
+            completion.TrySetResult(new(document, species.Text?.Trim() ?? "", route.Text?.Trim() ?? "", food.Text?.Trim() ?? "", result.Text.Trim(), medicine.Text.Trim()) { Dosing = dosing.Text?.Trim() ?? "" });
             await Navigation.PopModalAsync();
         };
     }
@@ -136,15 +151,36 @@ public sealed class RegistryPage : ContentPage
                 loaded = cached;
             }
             if (lifetime.IsCancellationRequested || generation != fetchGeneration) return;
+            updatingContext = true;
             document = loaded;
             species.Text = !string.IsNullOrWhiteSpace(initialSpecies) ? initialSpecies : !string.IsNullOrWhiteSpace(loaded.SuggestedSpecies) ? loaded.SuggestedSpecies : "Bydło";
             route.Text = !string.IsNullOrWhiteSpace(initialRoute) ? initialRoute : loaded.SuggestedRoute;
-            result.Text = loaded.WithdrawalSection;
-            excerpt.Text = "IDENTYFIKACJA Z PDF:\n" + loaded.ProductIdentity + "\n\nOKRESY KARENCJI:\n" + loaded.WithdrawalSection;
-            info.Text = $"RPL ID {loaded.Id} | pobrano {loaded.DownloadedUtc.ToLocalTime():g}\n{loaded.Url}\nKarencję wpisano automatycznie. Data pobrania nie jest datą aktualizacji ChPL. Sprawdź produkt i leczenie.";
+            result.Text = ""; dosing.Text = ""; lastAutoWithdrawal = lastAutoDosing = "";
+            updatingContext = false;
+            RecomputeContext();
+            excerpt.Text = "IDENTYFIKACJA Z PDF:\n" + loaded.ProductIdentity + "\n\nOKRESY KARENCJI:\n" + loaded.WithdrawalSection + "\n\nPEŁNE DAWKOWANIE I SPOSÓB PODANIA:\n" + loaded.DosingSection + "\n\nGATUNKI I OGRANICZENIA ŹRÓDŁA:\n" + loaded.TargetSpeciesSection;
+            info.Text = $"RPL ID {loaded.Id} | pobrano {loaded.DownloadedUtc.ToLocalTime():g}\n{loaded.Url}\nDane są dobierane do gatunku i drogi podania. Data pobrania nie jest datą aktualizacji ChPL. Sprawdź produkt i leczenie.";
         }
         catch (Exception ex) { if (!lifetime.IsCancellationRequested) info.Text = "Nie pobrano danych: " + ex.Message; }
         finally { if (generation == fetchGeneration) id.IsEnabled = true; }
+    }
+    void RecomputeContext()
+    {
+        if (updatingContext || document == null) return;
+        updatingContext = true;
+        try
+        {
+            var context = TreatmentContextService.Select(document, species.Text ?? "", route.Text ?? "");
+            sourceRoutes.ItemsSource = context.Routes;
+            if (string.IsNullOrWhiteSpace(route.Text) && context.Route.Length > 0) route.Text = context.Route;
+            bool manualWithdrawal = !string.IsNullOrWhiteSpace(result.Text) && result.Text != lastAutoWithdrawal;
+            bool manualDosing = !string.IsNullOrWhiteSpace(dosing.Text) && dosing.Text != lastAutoDosing;
+            if (!manualWithdrawal) { result.Text = context.Withdrawal; lastAutoWithdrawal = context.Withdrawal; }
+            if (!manualDosing) { dosing.Text = context.Dosing; lastAutoDosing = context.Dosing; }
+            contextNotice.Text = context.Notice + (manualWithdrawal || manualDosing ? " Zachowano ręcznie zmienione pola — sprawdź ich zgodność z nowym kontekstem." : "");
+            InvalidateChoice();
+        }
+        finally { updatingContext = false; }
     }
     async Task Close() { completion.TrySetResult(null); await Navigation.PopModalAsync(); }
     protected override void OnDisappearing() { lookupDelay?.Cancel(); lifetime.Cancel(); completion.TrySetResult(null); base.OnDisappearing(); }

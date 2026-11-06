@@ -146,10 +146,11 @@ public static class AutomaticWithdrawalService
     public static void Apply(TreatmentRow row, AutomaticWithdrawal resolved)
     {
         row.FillMissingContext(resolved.Document.SuggestedSpecies, resolved.Document.SuggestedRoute);
-        row.Set("Karencja", resolved.Document.WithdrawalSection, false);
+        row.StoreTreatmentSource(resolved.Document);
+        row.RecalculateTreatmentContext();
         row.Set("Źródło karencji", resolved.Document.Url + " | pobrano " + resolved.Document.DownloadedUtc.ToString("O"), false);
         row.Set("SHA256 źródła", resolved.Document.Sha256, false);
         row.Set("Pełna sekcja karencji źródła", resolved.Document.WithdrawalSection, false);
-        row.Set("Status karencji", resolved.Document.Source + (resolved.ConfirmedMapping ? " — uzupełniono automatycznie; sprawdź leczenie" : " — uzupełniono automatycznie; potwierdź dopasowanie leku"), false);
+        row.Set("Status karencji", row.Get("Status karencji") + (resolved.ConfirmedMapping ? "" : " Potwierdź dopasowanie produktu."), false);
     }
 }

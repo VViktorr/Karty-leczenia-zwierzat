@@ -6,8 +6,9 @@ namespace KartyLeczenia;
 [Flags]
 public enum DocumentSearchKinds { None = 0, Invoices = 1, WarehouseReleases = 2, Receipts = 4, All = Invoices | WarehouseReleases | Receipts }
 
-public sealed record DocumentSuggestion(int Id, string Number, string Payer = "", string Recipient = "")
+public sealed record DocumentSuggestion(int Id, string Number, string Payer = "", string Recipient = "", DateTime? Date = null)
 {
+    public string Details => (Date.HasValue ? Date.Value.ToString("dd.MM.yyyy") + " | " : "") + string.Join(" | ", new[] { Payer, Recipient }.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
     public override string ToString()
     {
         if (string.IsNullOrWhiteSpace(Payer)) return string.IsNullOrWhiteSpace(Recipient) ? Number : Number + " | " + Recipient;
@@ -21,17 +22,40 @@ public sealed record DocumentData(string Number, string Payer, string Recipient,
 
 public sealed class DocumentService
 {
-    public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token, DocumentSearchKinds kinds = DocumentSearchKinds.All)
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> DateColumns = new();
+    static async Task<string> DateColumn(SqlConnection con, CancellationToken token)
+    {
+        string key = con.DataSource + "|" + con.Database;
+        if (DateColumns.TryGetValue(key, out var known)) return known;
+        using var cmd = new SqlCommand("""
+            SELECT TOP (1) name FROM sys.columns
+            WHERE object_id=OBJECT_ID(N'dbo.dok__Dokument') AND name IN (N'dok_DataWyst', N'dok_DataDok')
+            ORDER BY CASE name WHEN N'dok_DataWyst' THEN 0 ELSE 1 END
+            """, con) { CommandTimeout = 5 };
+        string value = (await cmd.ExecuteScalarAsync(token))?.ToString() ?? "";
+        // Only these fixed identifiers may be inserted into a query.
+        if (value is not ("dok_DataWyst" or "dok_DataDok")) value = "";
+        DateColumns[key] = value;
+        return value;
+    }
+    public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token, DocumentSearchKinds kinds = DocumentSearchKinds.All, DateTime? dateFrom = null, DateTime? dateUntil = null, int limit = 21)
     {
         string fragment = input.Trim();
-        if (fragment.Length < 4 || kinds == DocumentSearchKinds.None) return [];
+        if (fragment.Length < 1 || kinds == DocumentSearchKinds.None) return [];
         string escaped = fragment.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace("[", "~[");
         await using var con = new SqlConnection(options.BuildConnectionString());
         await con.OpenAsync(token);
-        using var cmd = new SqlCommand("""
-            SELECT TOP (21) d.dok_Id, d.dok_NrPelny,
+        string dateColumn = await DateColumn(con, token);
+        if (dateColumn.Length == 0 && (dateFrom.HasValue || dateUntil.HasValue))
+            throw new InvalidOperationException("Nie rozpoznano kolumny daty dokumentu. Wybierz wszystkie lata.");
+        string dateValue = dateColumn.Length > 0 ? "d." + dateColumn : "CAST(NULL AS datetime)";
+        string dateFilter = "";
+        if (dateColumn.Length > 0 && dateFrom.HasValue) dateFilter += $" AND d.{dateColumn}>=@from";
+        if (dateColumn.Length > 0 && dateUntil.HasValue) dateFilter += $" AND d.{dateColumn}<@until";
+        using var cmd = new SqlCommand($"""
+            SELECT TOP (@limit) d.dok_Id, d.dok_NrPelny,
               COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_NazwaPelna)), N''), pl.adrh_Nazwa, N'') AS Payer,
-              COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient
+              COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient, {dateValue} AS DocumentDate
             FROM dbo.dok__Dokument d
             LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
@@ -41,8 +65,12 @@ public sealed class DocumentService
                 OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
                 OR od.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
                 OR od.adrh_Nazwa LIKE @fragment ESCAPE N'~')
+              {dateFilter}
             ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, d.dok_Id DESC
             """, con) { CommandTimeout = 10 };
+        cmd.Parameters.Add("@limit", SqlDbType.Int).Value = Math.Clamp(limit, 1, 101);
+        cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = (object?)dateFrom ?? DBNull.Value;
+        cmd.Parameters.Add("@until", SqlDbType.DateTime).Value = (object?)dateUntil ?? DBNull.Value;
         cmd.Parameters.Add("@invoices", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Invoices);
         cmd.Parameters.Add("@receipts", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Receipts);
         cmd.Parameters.Add("@warehouse", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.WarehouseReleases);
@@ -50,7 +78,7 @@ public sealed class DocumentService
         cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
         var found = new List<DocumentSuggestion>();
         await using var reader = await cmd.ExecuteReaderAsync(token);
-        while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+        while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetDateTime(4)));
         return found;
     }
     public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null)

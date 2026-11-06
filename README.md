@@ -63,3 +63,12 @@ dotnet run --project tests/RegistryChecks -c Release
 dotnet run --project tests/ConnectionChecks -c Release
 ```
 Drugi zestaw wymaga Windows do sprawdzenia DPAPI.
+
+## Wybór dokumentu i kontekst leczenia
+Zaznaczenia Faktury/WZ/Paragony znajdują się nad wyszukiwaniem. Enter i przycisk wyszukiwania otwierają osobne okno wyboru dokumentu. Domyślnie jest wybrany bieżący rok (lub rok wpisany na końcu pełnego numeru), można wskazać inny rok, wszystkie lata lub zakres dat. Lista pokazuje do 100 wyników z numerem, datą i danymi klienta. Kliknięcie pobiera dokument. Wpisywanie na głównym ekranie nie uruchamia zapytań SQL. Rozpoznanie kolumny daty wykonuje SELECT metadanych i jest zapamiętywane w procesie; daty, tekst, limity i rodzaje dokumentów są parametrami SELECT. Szybkość zależy od bazy i sieci; nie mierzono jej na bazie użytkownika.
+
+RPL zapisuje pełne sekcje docelowych gatunków, dawkowania/sposobu podania oraz karencji. Rozpoznane nagłówki gatunków i dróg podania pozwalają zaproponować odpowiedni fragment, zachowując zakazy dotyczące mleka i rozpoznane instrukcje wspólne. Przy kilku drogach podania trzeba wybrać jedną. Gdy struktura jest niejednoznaczna, docelowe pola mogą pozostać puste i wymagają sprawdzenia pełnego źródła. Nie jest to uniwersalny interpreter tabel lub wszystkich układów PDF.
+
+Dawkowanie jest kopiowane jako tekst ChPL z częstością, okresem stosowania, jednostkami i ograniczeniami. Program nie oblicza dawki dla konkretnego zwierzęcia bez podanej masy i nie ustala rozpoznania. Zmiana gatunku lub drogi odświeża automatyczne fragmenty; ręcznie zmienione dawkowanie i karencja pozostają zachowane i wymagają ponownej weryfikacji. Zapis JSON zawiera pełne sekcje i kontekst źródła; stare karty pozostają czytelne. Starsza kopia ChPL bez tych sekcji wymaga ponownego pobrania dla automatyzacji dawkowania.
+
+Kompilację i testy nowych zmian pozostawiono użytkownikowi. Dodano regresje dla podziału karencji, zachowania zakazów dotyczących mleka i ręcznych dawek.
