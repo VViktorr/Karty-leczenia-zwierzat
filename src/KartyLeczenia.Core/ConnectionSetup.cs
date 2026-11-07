@@ -7,7 +7,7 @@ using Microsoft.Data.SqlClient;
 namespace KartyLeczenia;
 
 public sealed record ConnectionOptions(string Server, string Database, bool WindowsAuthentication,
-    string UserName, string Password, bool TrustCertificate, string DrugGroup = "Leki")
+    string UserName, string Password, bool TrustCertificate, string DrugGroup = "Leki", int? WarehouseId = null)
 {
     public string BuildConnectionString(string? database = null)
     {
@@ -33,7 +33,7 @@ public sealed record CompanyDatabase(string Database, string Company)
     public override string ToString() => string.IsNullOrWhiteSpace(Company) ? Database : $"{Company} — [{Database}]";
 }
 public sealed record DiscoveryResult(IReadOnlyList<CompanyDatabase> Companies, int Skipped);
-public sealed record ConnectionTestResult(string Company, IReadOnlyList<string> DrugGroups);
+public sealed record ConnectionTestResult(string Company, IReadOnlyList<string> DrugGroups, IReadOnlyList<MedicineWarehouse> Warehouses);
 
 public sealed class SubiektConnectionService
 {
@@ -114,7 +114,7 @@ public sealed class SubiektConnectionService
             company = (await title.ExecuteScalarAsync(token))?.ToString() ?? options.Database;
         }
         catch (SqlException ex) when (ex.Number is 229 or 207 or 208) { }
-        return new(company, groups);
+        return new(company, groups, await MedicineStockService.Warehouses(options, token));
     }
 
     public static string FriendlyError(Exception ex) => ex switch
@@ -138,7 +138,7 @@ public sealed class DrugGroupNotFoundException(IReadOnlyList<string> groups)
 }
 
 public sealed record SavedConnection(string Server, string Database, bool WindowsAuthentication, string UserName,
-    bool TrustCertificate, string DrugGroup, string? ProtectedPassword);
+    bool TrustCertificate, string DrugGroup, string? ProtectedPassword, int? WarehouseId = null);
 
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public sealed class ConnectionSettingsStore(string? filePath = null)
@@ -156,7 +156,7 @@ public sealed class ConnectionSettingsStore(string? filePath = null)
                 try { password = Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(saved.ProtectedPassword), null, DataProtectionScope.CurrentUser)); }
                 catch (Exception ex) when (ex is CryptographicException or FormatException) { warning = "Nie można odczytać zapamiętanego hasła. Wpisz je ponownie i zapisz ustawienia."; }
             }
-            return (new(saved.Server, saved.Database, saved.WindowsAuthentication, saved.UserName, password, saved.TrustCertificate, saved.DrugGroup ?? "Leki"), !string.IsNullOrWhiteSpace(saved.ProtectedPassword), warning);
+            return (new(saved.Server, saved.Database, saved.WindowsAuthentication, saved.UserName, password, saved.TrustCertificate, saved.DrugGroup ?? "Leki", saved.WarehouseId), !string.IsNullOrWhiteSpace(saved.ProtectedPassword), warning);
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or InvalidDataException)
         { return (null, false, "Nie udało się odczytać ustawień. Skonfiguruj połączenie ponownie i zapisz je."); }
@@ -165,7 +165,7 @@ public sealed class ConnectionSettingsStore(string? filePath = null)
     {
         string? secret = rememberPassword && !options.WindowsAuthentication && options.Password.Length > 0
             ? Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(options.Password), null, DataProtectionScope.CurrentUser)) : null;
-        var saved = new SavedConnection(options.Server.Trim(), options.Database.Trim(), options.WindowsAuthentication, options.UserName.Trim(), options.TrustCertificate, options.DrugGroup.Trim(), secret);
+        var saved = new SavedConnection(options.Server.Trim(), options.Database.Trim(), options.WindowsAuthentication, options.UserName.Trim(), options.TrustCertificate, options.DrugGroup.Trim(), secret, options.WarehouseId);
         string? directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
         string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
