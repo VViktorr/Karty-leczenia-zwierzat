@@ -4,7 +4,7 @@ using Microsoft.Data.SqlClient;
 namespace KartyLeczenia;
 
 public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawal = "");
-public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName);
+public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName, DateTime? Received);
 public sealed record MedicineWarehouse(int Id, string Name)
 {
     public override string ToString() => Name;
@@ -82,8 +82,10 @@ public static class MedicineStockService
     {
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
-        using var command = new SqlCommand("""
-            SELECT t.tw_Nazwa, p.ob_NumerSeryjny, COALESCE(p.ob_Termin, r.mr_Termin), r.mr_Pozostalo, d.dok_MagId, m.mag_Nazwa
+        string dateColumn = await DocumentService.DateColumn(connection, token);
+        string received = dateColumn.Length == 0 ? "CAST(NULL AS datetime)" : "d." + dateColumn;
+        using var command = new SqlCommand($"""
+            SELECT t.tw_Nazwa, p.ob_NumerSeryjny, COALESCE(p.ob_Termin, r.mr_Termin), r.mr_Pozostalo, d.dok_MagId, m.mag_Nazwa, {received}
             FROM dbo.dok_MagRuch r
             JOIN dbo.tw__Towar t ON t.tw_Id = r.mr_TowId
             JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
@@ -104,7 +106,8 @@ public static class MedicineStockService
         while (await reader.ReadAsync(token))
             result.Add(new(reader.GetString(0), reader.IsDBNull(1) ? "" : reader.GetString(1).Trim(),
                 reader.IsDBNull(2) ? null : reader.GetDateTime(2), Convert.ToDecimal(reader.GetValue(3)),
-                reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetValue(4)), reader.IsDBNull(5) ? "nieustalony" : reader.GetString(5)));
+                reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetValue(4)), reader.IsDBNull(5) ? "nieustalony" : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetDateTime(6)));
         return result;
     }
 }
