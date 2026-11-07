@@ -191,7 +191,7 @@ public sealed class MedicineStockPage : ContentPage
             {
                 string gross = row.Gross?.ToString("N2") ?? "—";
                 string withdrawal = string.IsNullOrWhiteSpace(row.Withdrawal) ? "Brak danych" : row.Withdrawal;
-                return $"<tr><td>{Encode(row.Name)}</td><td class='price'>{Encode(gross)}</td><td>{Encode(withdrawal)}</td></tr>";
+                return $"<tr><td>{Encode(row.Name)}</td><td>{Encode(BatchText(row))}</td><td class='price'>{Encode(gross)}</td><td>{Encode(withdrawal)}</td></tr>";
             }));
             string html = $$"""
                 <!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Cennik leków</title>
@@ -208,7 +208,7 @@ public sealed class MedicineStockPage : ContentPage
                 </style></head><body><main class="sheet">
                 <h1>Cennik leków</h1>
                 <p>{{DateTime.Today:dd.MM.yyyy}} · Poziom cenowy {{level}} · Karencja z Subiekta ({{Encode(sourceName)}})</p>
-                <table><thead><tr><th>Lek</th><th>Cena brutto</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
+                <table><thead><tr><th>Lek</th><th>Najnowsza seria</th><th>Cena brutto</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
                 </main></body></html>
                 """;
             await Navigation.PushModalAsync(new PrintPreviewPage(html, "preview", "Podgląd cennika leków", "cennik-lekow"));
@@ -283,6 +283,8 @@ public sealed class MedicineStockPage : ContentPage
 
     sealed record ExpiryRow(string Name, string Batch, string Received, string Expires, string Remaining);
 
+    static string BatchText(MedicinePrice row) => string.IsNullOrWhiteSpace(row.LatestBatch) ? "Brak danych" : row.LatestBatch;
+
     void ShowRows()
     {
         if (!loaded) return;
@@ -291,7 +293,8 @@ public sealed class MedicineStockPage : ContentPage
         if (prices)
         {
             var priceList = priceRows.Where(row => Matches(row.Name)).Select(row =>
-                new Row(row.Name, row.Gross is decimal gross ? $"Brutto: {gross:N2}" : "Brak ceny brutto")).ToList();
+                new Row(row.Name, (row.Gross is decimal gross ? $"Brutto: {gross:N2}" : "Brak ceny brutto")
+                    + $" | Najnowsza seria: {BatchText(row)}")).ToList();
             list.ItemsSource = priceList;
             status.Text = priceList.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {priceList.Count}";
             return;
