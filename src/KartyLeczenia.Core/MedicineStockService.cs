@@ -3,8 +3,8 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia;
 
-public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawal = "");
-public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName, DateTime? Received, bool DeliveriesConfirmed);
+public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawal = "", string LatestBatch = "");
+public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName, DateTime? Received, bool DeliveriesConfirmed, int ProductId = 0, int MovementId = 0);
 public sealed record MedicineWarehouse(int Id, string Name)
 {
     public override string ToString() => Name;
@@ -46,7 +46,7 @@ public static class MedicineStockService
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
         using var command = new SqlCommand($"""
-            SELECT t.tw_Nazwa, c.tc_CenaBrutto{level}, {withdrawal}
+            SELECT t.tw_Nazwa, c.tc_CenaBrutto{level}, {withdrawal}, t.tw_Id
             FROM dbo.tw__Towar t
             JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
             LEFT JOIN dbo.tw_Cena c ON c.tc_IdTowar = t.tw_Id
@@ -58,12 +58,23 @@ public static class MedicineStockService
             """, connection);
         command.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         command.Parameters.Add("@group", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
-        var result = new List<MedicinePrice>();
-        await using var reader = await command.ExecuteReaderAsync(token);
-        while (await reader.ReadAsync(token))
-            result.Add(new(reader.GetString(0), reader.IsDBNull(1) ? null : Convert.ToDecimal(reader.GetValue(1)),
-                reader.IsDBNull(2) ? "" : reader.GetString(2).Trim()));
-        return result;
+        var prices = new List<(int ProductId, MedicinePrice Price)>();
+        await using (var reader = await command.ExecuteReaderAsync(token))
+        {
+            while (await reader.ReadAsync(token))
+                prices.Add((reader.GetInt32(3), new(reader.GetString(0),
+                    reader.IsDBNull(1) ? null : Convert.ToDecimal(reader.GetValue(1)),
+                    reader.IsDBNull(2) ? "" : reader.GetString(2).Trim())));
+        }
+        if (prices.Count == 0) return [];
+
+        var deliveries = await Expiries(options, token);
+        var latestBatches = deliveries.Where(row => row.DeliveriesConfirmed)
+            .GroupBy(row => row.ProductId)
+            .Where(group => group.Count() == 1 || group.All(row => row.Received.HasValue))
+            .ToDictionary(group => group.Key, group => group.OrderByDescending(row => row.Received)
+                .ThenByDescending(row => row.MovementId).First().Batch);
+        return prices.Select(row => row.Price with { LatestBatch = latestBatches.GetValueOrDefault(row.ProductId, "") }).ToList();
     }
 
     public static async Task<List<MedicineWarehouse>> Warehouses(ConnectionOptions options, CancellationToken token)
@@ -95,7 +106,7 @@ public static class MedicineStockService
                 HAVING SUM(stan.st_Stan) > 0
             ),
             Deliveries AS (
-                SELECT r.mr_TowId, p.ob_NumerSeryjny AS Batch, COALESCE(p.ob_Termin, r.mr_Termin) AS Expires,
+                SELECT r.mr_TowId, r.mr_Id, p.ob_NumerSeryjny AS Batch, COALESCE(p.ob_Termin, r.mr_Termin) AS Expires,
                        r.mr_Pozostalo AS Remaining, {received} AS Received,
                        SUM(r.mr_Pozostalo) OVER (PARTITION BY r.mr_TowId) AS DeliveryTotal
                 FROM CurrentStock stock
@@ -107,7 +118,7 @@ public static class MedicineStockService
                   AND r.mr_Ilosc > 0 AND r.mr_Pozostalo > 0
             )
             SELECT stock.tw_Nazwa, lot.Batch, lot.Expires, COALESCE(lot.Remaining, stock.Quantity),
-                   @warehouseId, m.mag_Nazwa, lot.Received, CAST(CASE WHEN lot.mr_TowId IS NULL THEN 0 ELSE 1 END AS bit)
+                   @warehouseId, m.mag_Nazwa, lot.Received, CAST(CASE WHEN lot.mr_TowId IS NULL THEN 0 ELSE 1 END AS bit), stock.st_TowId, lot.mr_Id
             FROM CurrentStock stock
             LEFT JOIN Deliveries lot ON lot.mr_TowId = stock.st_TowId AND lot.DeliveryTotal = stock.Quantity
             LEFT JOIN dbo.sl_Magazyn m ON m.mag_Id = @warehouseId
@@ -121,7 +132,7 @@ public static class MedicineStockService
             result.Add(new(reader.GetString(0), reader.IsDBNull(1) ? "" : reader.GetString(1).Trim(),
                 reader.IsDBNull(2) ? null : reader.GetDateTime(2), Convert.ToDecimal(reader.GetValue(3)),
                 reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetValue(4)), reader.IsDBNull(5) ? "nieustalony" : reader.GetString(5),
-                reader.IsDBNull(6) ? null : reader.GetDateTime(6), reader.GetBoolean(7)));
+                reader.IsDBNull(6) ? null : reader.GetDateTime(6), reader.GetBoolean(7), reader.GetInt32(8), reader.IsDBNull(9) ? 0 : reader.GetInt32(9)));
         return result;
     }
 }
