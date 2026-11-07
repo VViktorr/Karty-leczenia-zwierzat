@@ -331,7 +331,7 @@ public sealed class MedicineStockPage : ContentPage
         list.ItemsSource = rows;
         int unresolved = sortedRows.Count(row => !row.DeliveriesConfirmed);
         status.Text = rows.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {rows.Count}";
-        if (unresolved > 0) status.Text += $" | Nie ustalono dostaw dla {unresolved} leków. Pokazano ich łączny stan."
+        if (unresolved > 0) status.Text += $" | Nie ustalono dostaw dla {unresolved} leków. Pokazano ich łączny stan.";
     }
 
     bool MatchesExpiry(DateTime? expiry, DateTime today) => filter.SelectedIndex switch
