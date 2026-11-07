@@ -7,7 +7,7 @@ public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawa
 public sealed record MedicinePriceLevel(int Number, string Name)
 {
     public bool IsRetail => Name.Trim().ToUpperInvariant() is "DETALICZNA" or "CENA DETALICZNA" or "DETALICZNA BRUTTO" or "CENA DETALICZNA BRUTTO";
-    public override string ToString() => Name.EndsWith(" brutto", StringComparison.OrdinalIgnoreCase) ? Name : Name + " (brutto)";
+    public override string ToString() => Name;
 }
 
 public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName, DateTime? Received, bool DeliveriesConfirmed, int ProductId = 0, int MovementId = 0);
@@ -58,11 +58,21 @@ public static class MedicineStockService
             names[5] = "Detaliczna";
             names[6] = "Specjalna";
         }
-        return levels.OrderBy(level => level)
-            .Select(level => new MedicinePriceLevel(level, names.GetValueOrDefault(level, $"Poziom {level}"))).ToArray();
+        string[] allowed = ["Detaliczna", "Specjalna", "Hurtowa", "Kredytowa"];
+        var result = new List<MedicinePriceLevel>();
+        foreach (string name in allowed)
+        {
+            var matches = levels.Where(level => names.TryGetValue(level, out string? label)
+                && (string.Equals(label, name, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(label, name + " brutto", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(label, "Cena " + name, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(label, "Cena " + name + " brutto", StringComparison.OrdinalIgnoreCase))).Take(2).ToArray();
+            if (matches.Length == 1) result.Add(new(matches[0], name));
+        }
+        return result.ToArray();
     }
 
-    public static async Task<List<MedicinePrice>> Prices(ConnectionOptions options, int level, CancellationToken token, int withdrawalSource = 0)
+    public static async Task<List<MedicinePrice>> Prices(ConnectionOptions options, int level, CancellationToken token, int withdrawalSource = 0, bool net = false)
     {
         if (level is < 1 or > 10) throw new ArgumentOutOfRangeException(nameof(level));
         if (withdrawalSource is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(withdrawalSource));
@@ -74,8 +84,16 @@ public static class MedicineStockService
         };
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
+        string priceColumn = (net ? "tc_CenaNetto" : "tc_CenaBrutto") + level;
+        if (net)
+        {
+            using var check = new SqlCommand("SELECT COL_LENGTH(N'dbo.tw_Cena', @column)", connection);
+            check.Parameters.Add("@column", SqlDbType.NVarChar, 128).Value = priceColumn;
+            if (await check.ExecuteScalarAsync(token) is null or DBNull)
+                throw new InvalidOperationException("Brak kolumny ceny netto dla wybranego poziomu w Subiekcie.");
+        }
         using var command = new SqlCommand($"""
-            SELECT t.tw_Nazwa, c.tc_CenaBrutto{level}, {withdrawal}, t.tw_Id
+            SELECT t.tw_Nazwa, c.{priceColumn}, {withdrawal}, t.tw_Id
             FROM dbo.tw__Towar t
             JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
             LEFT JOIN dbo.tw_Cena c ON c.tc_IdTowar = t.tw_Id
