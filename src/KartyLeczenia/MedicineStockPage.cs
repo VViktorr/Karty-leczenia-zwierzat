@@ -20,6 +20,7 @@ public sealed class MedicineStockPage : ContentPage
     List<MedicinePrice> priceRows = [];
     List<MedicineExpiry> expiryRows = [];
     bool loading, loaded, openingPrint;
+    ConnectionOptions? priceSelectionConnection;
 
     public MedicineStockPage(AppState state, bool prices)
     {
@@ -134,17 +135,25 @@ public sealed class MedicineStockPage : ContentPage
         {
             if (prices)
             {
-                int? selected = filter.SelectedItem is int currentLevel ? currentLevel : null;
-                int[] levels = await MedicineStockService.PriceLevels(options, timeout.Token);
+                int? selected = priceSelectionConnection == options ? (filter.SelectedItem as MedicinePriceLevel)?.Number : null;
+                var levels = await MedicineStockService.PriceLevels(options, timeout.Token);
                 filter.ItemsSource = levels;
                 if (levels.Length == 0)
                 {
                     status.Text = "Nie znaleziono obsługiwanych poziomów ceny brutto w tej bazie.";
                     return;
                 }
-                int level = selected.HasValue && levels.Contains(selected.Value) ? selected.Value : levels[0];
+                var retail = levels.Where(item => item.IsRetail).Take(2).ToArray();
+                var level = levels.FirstOrDefault(item => item.Number == selected)
+                    ?? (retail.Length == 1 ? retail[0] : null);
+                priceSelectionConnection = options;
                 filter.SelectedItem = level;
-                priceRows = await MedicineStockService.Prices(options, level, timeout.Token);
+                if (level is null)
+                {
+                    status.Text = "Wybierz poziom ceny brutto. Nie rozpoznano jednoznacznie ceny detalicznej w Subiekcie.";
+                    return;
+                }
+                priceRows = await MedicineStockService.Prices(options, level.Number, timeout.Token);
             }
             else expiryRows = await MedicineStockService.Expiries(options, timeout.Token);
 
@@ -168,7 +177,7 @@ public sealed class MedicineStockPage : ContentPage
     async Task PreviewPrices()
     {
         if (openingPrint) return;
-        if (!loaded || loading || state.ValidatedConnection is not { } options || filter.SelectedItem is not int level)
+        if (!loaded || loading || state.ValidatedConnection is not { } options || filter.SelectedItem is not MedicinePriceLevel level)
             throw new InvalidOperationException("Najpierw wczytaj cennik.");
         if (withdrawalSource.SelectedIndex < 0)
             throw new InvalidOperationException("Wybierz opis lub pole własne zawierające karencję.");
@@ -180,8 +189,8 @@ public sealed class MedicineStockPage : ContentPage
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var data = await MedicineStockService.Prices(options, level, timeout.Token, source);
-            if (state.ValidatedConnection != options || !loaded || loading || filter.SelectedItem is not int current || current != level)
+            var data = await MedicineStockService.Prices(options, level.Number, timeout.Token, source);
+            if (state.ValidatedConnection != options || !loaded || loading || !Equals(filter.SelectedItem, level))
                 throw new InvalidOperationException("Cennik zmienił się w trakcie przygotowania wydruku. Ponów operację.");
 
             var rows = data.Where(row => row.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
@@ -207,7 +216,7 @@ public sealed class MedicineStockPage : ContentPage
                     .price { text-align: right; white-space: nowrap; }
                 </style></head><body><main class="sheet">
                 <h1>Cennik leków</h1>
-                <p>{{DateTime.Today:dd.MM.yyyy}} · Poziom cenowy {{level}} · Karencja z Subiekta ({{Encode(sourceName)}})</p>
+                <p>{{DateTime.Today:dd.MM.yyyy}} · {{Encode(level.ToString())}} · Karencja z Subiekta ({{Encode(sourceName)}})</p>
                 <table><thead><tr><th>Lek</th><th>Najnowsza seria</th><th>Cena brutto</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
                 </main></body></html>
                 """;
