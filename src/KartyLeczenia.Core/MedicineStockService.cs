@@ -4,6 +4,12 @@ using Microsoft.Data.SqlClient;
 namespace KartyLeczenia;
 
 public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawal = "", string LatestBatch = "");
+public sealed record MedicinePriceLevel(int Number, string Name)
+{
+    public bool IsRetail => Name.Trim().ToUpperInvariant() is "DETALICZNA" or "CENA DETALICZNA" or "DETALICZNA BRUTTO" or "CENA DETALICZNA BRUTTO";
+    public override string ToString() => Name.EndsWith(" brutto", StringComparison.OrdinalIgnoreCase) ? Name : Name + " (brutto)";
+}
+
 public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName, DateTime? Received, bool DeliveriesConfirmed, int ProductId = 0, int MovementId = 0);
 public sealed record MedicineWarehouse(int Id, string Name)
 {
@@ -12,7 +18,7 @@ public sealed record MedicineWarehouse(int Id, string Name)
 
 public static class MedicineStockService
 {
-    public static async Task<int[]> PriceLevels(ConnectionOptions options, CancellationToken token)
+    public static async Task<MedicinePriceLevel[]> PriceLevels(ConnectionOptions options, CancellationToken token)
     {
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
@@ -21,7 +27,7 @@ public static class MedicineStockService
             """, connection);
         const string prefix = "tc_CenaBrutto";
         var levels = new List<int>();
-        await using var reader = await command.ExecuteReaderAsync(token);
+        await using (var reader = await command.ExecuteReaderAsync(token))
         while (await reader.ReadAsync(token))
         {
             string name = reader.GetString(0);
@@ -30,7 +36,22 @@ public static class MedicineStockService
                 name.Equals(prefix + level, StringComparison.OrdinalIgnoreCase))
                 levels.Add(level);
         }
-        return levels.OrderBy(level => level).ToArray();
+        var names = new Dictionary<int, string>();
+        using var metadata = new SqlCommand("""
+            SELECT CASE WHEN COL_LENGTH(N'dbo.sl_Cena', N'cen_Id') IS NOT NULL
+                         AND COL_LENGTH(N'dbo.sl_Cena', N'cen_Nazwa') IS NOT NULL
+                        THEN 1 ELSE 0 END
+            """, connection);
+        if (Convert.ToInt32(await metadata.ExecuteScalarAsync(token)) == 1)
+        {
+            using var labels = new SqlCommand("SELECT cen_Id, cen_Nazwa FROM dbo.sl_Cena", connection);
+            await using var reader = await labels.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+                if (!reader.IsDBNull(0) && !reader.IsDBNull(1) && !string.IsNullOrWhiteSpace(reader.GetString(1)))
+                    names[Convert.ToInt32(reader.GetValue(0))] = reader.GetString(1).Trim();
+        }
+        return levels.OrderBy(level => level)
+            .Select(level => new MedicinePriceLevel(level, names.GetValueOrDefault(level, $"Poziom {level}"))).ToArray();
     }
 
     public static async Task<List<MedicinePrice>> Prices(ConnectionOptions options, int level, CancellationToken token, int withdrawalSource = 0)
