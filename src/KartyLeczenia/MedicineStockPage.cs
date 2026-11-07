@@ -320,15 +320,18 @@ public sealed class MedicineStockPage : ContentPage
             4 => Order(row => row.Remaining),
             _ => Order(row => row.Expires ?? (descending ? DateTime.MinValue : DateTime.MaxValue))
         };
-        var rows = sorted.ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase).Select(row =>
+        var sortedRows = sorted.ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        var rows = sortedRows.Select(row =>
         {
-            string expiry = row.Expires?.ToString("dd.MM.yyyy") ?? "—";
+            string expiry = row.DeliveriesConfirmed ? row.Expires?.ToString("dd.MM.yyyy") ?? "—" : "Nie ustalono dostaw";
             if (row.Expires?.Date < today) expiry += " (po terminie)";
             return new ExpiryRow(row.Name, string.IsNullOrWhiteSpace(row.Batch) ? "—" : row.Batch,
                 row.Received?.ToString("dd.MM.yyyy") ?? "—", expiry, row.Remaining.ToString("0.####"));
         }).ToList();
         list.ItemsSource = rows;
+        int unresolved = sortedRows.Count(row => !row.DeliveriesConfirmed);
         status.Text = rows.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {rows.Count}";
+        if (unresolved > 0) status.Text += $" | Nie ustalono dostaw dla {unresolved} leków. Pokazano ich łączny stan."
     }
 
     bool MatchesExpiry(DateTime? expiry, DateTime today) => filter.SelectedIndex switch
