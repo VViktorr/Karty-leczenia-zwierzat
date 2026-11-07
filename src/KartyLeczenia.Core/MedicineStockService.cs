@@ -51,10 +51,8 @@ public static class MedicineStockService
             JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
             LEFT JOIN dbo.tw_Cena c ON c.tc_IdTowar = t.tw_Id
             WHERE g.grt_Nazwa = @group AND EXISTS (
-                SELECT 1 FROM dbo.dok_MagRuch r
-                JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
-                JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
-                WHERE r.mr_TowId = t.tw_Id AND r.mr_Pozostalo > 0 AND d.dok_MagId = @warehouseId
+                SELECT 1 FROM dbo.tw_Stan stan
+                WHERE stan.st_TowId = t.tw_Id AND stan.st_MagId = @warehouseId AND stan.st_Stan > 0
             )
             ORDER BY t.tw_Nazwa
             """, connection);
@@ -93,6 +91,10 @@ public static class MedicineStockService
             LEFT JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
             LEFT JOIN dbo.sl_Magazyn m ON m.mag_Id = d.dok_MagId
             WHERE g.grt_Nazwa = @group AND r.mr_Pozostalo > 0 AND d.dok_MagId = @warehouseId
+              AND EXISTS (
+                SELECT 1 FROM dbo.tw_Stan stan
+                WHERE stan.st_TowId = t.tw_Id AND stan.st_MagId = @warehouseId AND stan.st_Stan > 0
+              )
             ORDER BY COALESCE(p.ob_Termin, r.mr_Termin), t.tw_Nazwa
             """, connection);
         command.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
