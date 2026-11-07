@@ -13,6 +13,8 @@ public sealed class ConnectionPage : ContentPage
     readonly Entry group = new() { Text = "Leki" };
     readonly Switch windows = new() { IsToggled = true }, trust = new(), remember = new(), show = new();
     readonly Picker companies = new() { Title = "Podmioty na serwerze" }, groups = new() { Title = "Grupy leków" };
+    readonly Picker warehouses = new() { Title = "Wybierz magazyn" };
+    int? warehouseId;
     readonly Label status = Ui.Note("Krok 1 z 3: wpisz serwer SQL. Znajdziesz go w oknie logowania Subiekta.");
     readonly ActivityIndicator progress = new();
     readonly Button discover = new() { Text = "Odśwież podmioty" }, test = new() { Text = "Test połączenia" }, save = new() { Text = "Zapisz ustawienia", IsEnabled = false }, next = new() { Text = "Zapisz i przejdź do kart", IsEnabled = false }, cancel = new() { Text = "Anuluj", IsEnabled = false };
@@ -20,7 +22,7 @@ public sealed class ConnectionPage : ContentPage
     readonly ConnectionSettingsStore store = new();
     CancellationTokenSource? work, debounce;
     bool changing, initialized;
-    ConnectionOptions Options => new(server.Text?.Trim() ?? "", database.Text?.Trim() ?? "", windows.IsToggled, login.Text?.Trim() ?? "", password.Text ?? "", trust.IsToggled, group.Text?.Trim() ?? "Leki");
+    ConnectionOptions Options => new(server.Text?.Trim() ?? "", database.Text?.Trim() ?? "", windows.IsToggled, login.Text?.Trim() ?? "", password.Text ?? "", trust.IsToggled, group.Text?.Trim() ?? "Leki", warehouseId);
 
     public ConnectionPage(AppState appState)
     {
@@ -65,7 +67,7 @@ public sealed class ConnectionPage : ContentPage
         }));
         panel.Add(Ui.Card(appearance));
         panel.Add(Ui.Heading("Połączenie SQL — Subiekt GT"));
-        panel.Add(Ui.Note("1. Serwer i logowanie   →   2. Podmiot i grupa leków   →   3. Test i zapis"));
+        panel.Add(Ui.Note("1. Serwer i logowanie   →   2. Podmiot, grupa leków i magazyn   →   3. Test i zapis"));
         panel.Add(Ui.Field("Serwer SQL", server));
         panel.Add(Ui.Note(@"Na tym komputerze np. .\INSERTGT. W sieci: nazwa lub adres komputera oraz instancja albo port."));
         panel.Add(Toggle("Uwierzytelnianie Windows", windows));
@@ -76,11 +78,20 @@ public sealed class ConnectionPage : ContentPage
         panel.Add(Ui.Field("Wybierz podmiot", companies)); panel.Add(Ui.Field("Nazwa bazy podmiotu (można wpisać ręcznie)", database));
         panel.Add(Ui.Note("Niektóre konta nie mogą wyświetlać listy baz. Wtedy wpisz nazwę bazy i użyj testu."));
         panel.Add(Ui.Field("Grupa towarów — tylko leki", group)); panel.Add(groups);
+        panel.Add(Ui.Field("Magazyn dla całej aplikacji", warehouses));
+        panel.Add(Ui.Note("Wykonaj test połączenia, aby wczytać magazyny wybranego podmiotu."));
         panel.Add(new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = { test, save, next } });
         panel.Add(status);
         panel.Add(Ui.Note("Połączenie wymaga konta tylko do odczytu. Test niczego nie zmienia w Subiekcie. Opcjonalnie zapamiętane hasło jest szyfrowane dla bieżącego konta Windows."));
         Content = new ScrollView { Content = panel };
         foreach (var entry in new[] { server, database, login, password, group }) entry.TextChanged += (_, _) => Changed();
+        database.TextChanged += (_, _) => { if (!changing) ResetWarehouses(); };
+        warehouses.SelectedIndexChanged += (_, _) =>
+        {
+            if (changing) return;
+            warehouseId = (warehouses.SelectedItem as MedicineWarehouse)?.Id;
+            Changed();
+        };
         server.TextChanged += (_, _) => { if (!changing) { ResetCompanies(); ScheduleDiscovery(); } };
         login.TextChanged += (_, _) => { if (!changing) ResetCompanies(); };
         password.Unfocused += (_, _) => ScheduleDiscovery(); server.Unfocused += (_, _) => ScheduleDiscovery();
@@ -104,7 +115,7 @@ public sealed class ConnectionPage : ContentPage
             {
                 server.Text = value.Server; database.Text = value.Database; login.Text = value.UserName;
                 password.Text = value.Password; CrashLog.RegisterSecret(value.Password); windows.IsToggled = value.WindowsAuthentication; trust.IsToggled = value.TrustCertificate;
-                remember.IsToggled = loaded.Remembered; group.Text = value.DrugGroup;
+                remember.IsToggled = loaded.Remembered; group.Text = value.DrugGroup; warehouseId = value.WarehouseId;
             }
             changing = false; Authentication();
             if (loaded.Warning != null) status.Text = loaded.Warning;
@@ -119,7 +130,15 @@ public sealed class ConnectionPage : ContentPage
         work?.Cancel(); debounce?.Cancel(); state.ValidatedConnection = null;
         status.Text = "Ustawienia zmienione — wykonaj test aktualnego połączenia."; UpdateButtons();
     }
-    void ResetCompanies() { changing = true; companies.ItemsSource = null; database.Text = ""; changing = false; }
+    void ResetCompanies() { changing = true; companies.ItemsSource = null; database.Text = ""; ResetWarehouses(); changing = false; }
+    void ResetWarehouses()
+    {
+        bool wasChanging = changing;
+        changing = true;
+        warehouseId = null;
+        warehouses.ItemsSource = null;
+        changing = wasChanging;
+    }
     void UpdateButtons() { bool busy = work != null; progress.IsRunning = busy; discover.IsEnabled = test.IsEnabled = !busy; cancel.IsEnabled = busy; save.IsEnabled = next.IsEnabled = !busy && state.ValidatedConnection == Options; }
     async void ScheduleDiscovery()
     {
@@ -148,7 +167,7 @@ public sealed class ConnectionPage : ContentPage
         companies.ItemsSource = result.Companies.ToList();
         var selected = result.Companies.FirstOrDefault(x => x.Database == options.Database);
         if (selected != null) companies.SelectedItem = selected;
-        else if (result.Companies.Count == 1 && options.Database == "") companies.SelectedIndex = 0;
+        else if (result.Companies.Count == 1 && options.Database == "") { ResetWarehouses(); companies.SelectedIndex = 0; }
         changing = false; state.ValidatedConnection = null;
         status.Text = result.Companies.Count == 0 ? "Nie znaleziono widocznych podmiotów. Wpisz nazwę bazy ręcznie i użyj testu." : $"Krok 2 z 3: znaleziono {result.Companies.Count} podmiotów. Wybierz firmę i wykonaj test.";
     });
@@ -159,9 +178,23 @@ public sealed class ConnectionPage : ContentPage
         {
             var result = await service.TestAsync(options, token);
             if (token.IsCancellationRequested || options != Options) return;
-            changing = true; groups.ItemsSource = result.DrugGroups.ToList(); changing = false;
-            state.ValidatedConnection = options;
-            status.Text = $"Krok 3 z 3: połączenie poprawne — {result.Company} [{options.Database}]. Odczyt działa; nie wykryto badanych uprawnień zapisu. Zapisz ustawienia.";
+            changing = true;
+            groups.ItemsSource = result.DrugGroups.ToList();
+            warehouses.ItemsSource = result.Warehouses.ToList();
+            var selected = result.Warehouses.FirstOrDefault(item => item.Id == options.WarehouseId);
+            selected ??= result.Warehouses.Count == 1 ? result.Warehouses[0] : null;
+            warehouses.SelectedItem = selected;
+            warehouseId = selected?.Id;
+            changing = false;
+            if (selected is null)
+            {
+                status.Text = result.Warehouses.Count == 0
+                    ? "W tej bazie nie znaleziono magazynów."
+                    : "Wybierz magazyn, ponów test i zapisz ustawienia.";
+                return;
+            }
+            state.ValidatedConnection = Options;
+            status.Text = $"Krok 3 z 3: połączenie poprawne — {result.Company} [{options.Database}], magazyn {selected.Name}. Odczyt działa; nie wykryto badanych uprawnień zapisu. Zapisz ustawienia.";
         }
         catch (DrugGroupNotFoundException ex)
         {
