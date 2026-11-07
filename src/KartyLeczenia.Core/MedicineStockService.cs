@@ -4,7 +4,7 @@ using Microsoft.Data.SqlClient;
 namespace KartyLeczenia;
 
 public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawal = "");
-public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName, DateTime? Received);
+public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName, DateTime? Received, bool DeliveriesConfirmed);
 public sealed record MedicineWarehouse(int Id, string Name)
 {
     public override string ToString() => Name;
@@ -85,19 +85,33 @@ public static class MedicineStockService
         string dateColumn = await DocumentService.DateColumn(connection, token);
         string received = dateColumn.Length == 0 ? "CAST(NULL AS datetime)" : "d." + dateColumn;
         using var command = new SqlCommand($"""
-            SELECT t.tw_Nazwa, p.ob_NumerSeryjny, COALESCE(p.ob_Termin, r.mr_Termin), r.mr_Pozostalo, d.dok_MagId, m.mag_Nazwa, {received}
-            FROM dbo.dok_MagRuch r
-            JOIN dbo.tw__Towar t ON t.tw_Id = r.mr_TowId
-            JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
-            LEFT JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
-            LEFT JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
-            LEFT JOIN dbo.sl_Magazyn m ON m.mag_Id = d.dok_MagId
-            WHERE g.grt_Nazwa = @group AND r.mr_Pozostalo > 0 AND d.dok_MagId = @warehouseId
-              AND EXISTS (
-                SELECT 1 FROM dbo.tw_Stan stan
-                WHERE stan.st_TowId = t.tw_Id AND stan.st_MagId = @warehouseId AND stan.st_Stan > 0
-              )
-            ORDER BY COALESCE(p.ob_Termin, r.mr_Termin), t.tw_Nazwa
+            WITH CurrentStock AS (
+                SELECT stan.st_TowId, t.tw_Nazwa, SUM(stan.st_Stan) AS Quantity
+                FROM dbo.tw_Stan stan
+                JOIN dbo.tw__Towar t ON t.tw_Id = stan.st_TowId
+                JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
+                WHERE stan.st_MagId = @warehouseId AND g.grt_Nazwa = @group
+                GROUP BY stan.st_TowId, t.tw_Nazwa
+                HAVING SUM(stan.st_Stan) > 0
+            ),
+            Deliveries AS (
+                SELECT r.mr_TowId, p.ob_NumerSeryjny AS Batch, COALESCE(p.ob_Termin, r.mr_Termin) AS Expires,
+                       r.mr_Pozostalo AS Remaining, {received} AS Received,
+                       SUM(r.mr_Pozostalo) OVER (PARTITION BY r.mr_TowId) AS DeliveryTotal
+                FROM CurrentStock stock
+                JOIN dbo.dok_MagRuch r ON r.mr_TowId = stock.st_TowId
+                JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
+                JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
+                WHERE d.dok_MagId = @warehouseId
+                  AND (r.mr_DoId IS NULL OR r.mr_DoId = 0)
+                  AND r.mr_Ilosc > 0 AND r.mr_Pozostalo > 0
+            )
+            SELECT stock.tw_Nazwa, lot.Batch, lot.Expires, COALESCE(lot.Remaining, stock.Quantity),
+                   @warehouseId, m.mag_Nazwa, lot.Received, CAST(CASE WHEN lot.mr_TowId IS NULL THEN 0 ELSE 1 END AS bit)
+            FROM CurrentStock stock
+            LEFT JOIN Deliveries lot ON lot.mr_TowId = stock.st_TowId AND lot.DeliveryTotal = stock.Quantity
+            LEFT JOIN dbo.sl_Magazyn m ON m.mag_Id = @warehouseId
+            ORDER BY stock.tw_Nazwa, lot.Expires
             """, connection);
         command.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         command.Parameters.Add("@group", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
@@ -107,7 +121,7 @@ public static class MedicineStockService
             result.Add(new(reader.GetString(0), reader.IsDBNull(1) ? "" : reader.GetString(1).Trim(),
                 reader.IsDBNull(2) ? null : reader.GetDateTime(2), Convert.ToDecimal(reader.GetValue(3)),
                 reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetValue(4)), reader.IsDBNull(5) ? "nieustalony" : reader.GetString(5),
-                reader.IsDBNull(6) ? null : reader.GetDateTime(6)));
+                reader.IsDBNull(6) ? null : reader.GetDateTime(6), reader.GetBoolean(7)));
         return result;
     }
 }
