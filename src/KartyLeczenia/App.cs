@@ -67,6 +67,12 @@ public sealed class AppShell : Shell
         connection.Items.Add(new ShellContent { Content = connectionPage });
         var cards = new Tab { Title = "Karta leczenia", Route = "cards" };
         cards.Items.Add(new ShellContent { Content = new Views.CardPage(state) }); tabs.Items.Add(cards);
+        var prices = new Tab { Title = "Cennik leków", Route = "medicine-prices" };
+        prices.Items.Add(new ShellContent { Content = new Views.MedicineStockPage(state, prices: true) });
+        tabs.Items.Add(prices);
+        var expiry = new Tab { Title = "Kontrola terminów ważności", Route = "medicine-expiry" };
+        expiry.Items.Add(new ShellContent { Content = new Views.MedicineStockPage(state, prices: false) });
+        tabs.Items.Add(expiry);
         tabs.Items.Add(connection);
         tabs.CurrentItem = cards;
         Items.Add(tabs);
