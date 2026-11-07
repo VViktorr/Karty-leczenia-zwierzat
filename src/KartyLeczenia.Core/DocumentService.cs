@@ -91,7 +91,7 @@ public sealed class DocumentService
         }
     }
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> DateColumns = new();
-    static async Task<string> DateColumn(SqlConnection con, CancellationToken token)
+    internal static async Task<string> DateColumn(SqlConnection con, CancellationToken token)
     {
         string key = con.DataSource + "|" + con.Database;
         if (DateColumns.TryGetValue(key, out var known)) return known;
