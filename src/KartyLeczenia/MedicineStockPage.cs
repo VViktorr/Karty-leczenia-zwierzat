@@ -7,6 +7,13 @@ public sealed class MedicineStockPage : ContentPage
     readonly bool prices;
     readonly Picker filter = new() { WidthRequest = 235 };
     readonly Picker withdrawalSource = new() { Title = "Wybierz źródło karencji" };
+    readonly DatePicker receivedFrom = new() { Format = "dd.MM.yyyy", Date = DateTime.Today.AddYears(-1) };
+    readonly DatePicker receivedTo = new() { Format = "dd.MM.yyyy", Date = DateTime.Today };
+    readonly Switch useReceivedRange = new();
+    readonly string[] expiryColumns = ["Lek", "Seria", "Data przyjęcia", "Termin ważności", "Pozostało"];
+    readonly List<Button> sortHeaders = [];
+    int sortColumn = 3;
+    bool descending;
     readonly Entry search = new();
     readonly CollectionView list = new();
     readonly Label status = Ui.Note("");
@@ -27,14 +34,14 @@ public sealed class MedicineStockPage : ContentPage
             filter.SelectedIndex = 0;
         }
         list.SelectionMode = SelectionMode.None;
-        list.ItemTemplate = new DataTemplate(() =>
+        list.ItemTemplate = prices ? new DataTemplate(() =>
         {
             var name = new Label { FontAttributes = FontAttributes.Bold };
             name.SetBinding(Label.TextProperty, nameof(Row.Name));
             var detail = Ui.Note("");
             detail.SetBinding(Label.TextProperty, nameof(Row.Detail));
             return new VerticalStackLayout { Padding = new Thickness(12, 8), Spacing = 3, Children = { name, detail } };
-        });
+        }) : new DataTemplate(() => CreateExpiryRow());
         var actions = new Grid
         {
             ColumnSpacing = 10,
@@ -59,6 +66,27 @@ public sealed class MedicineStockPage : ContentPage
                 Children = { Ui.Field("Źródło karencji na wydruku", withdrawalSource), Ui.Action("Wydrukuj cennik", PreviewPrices) }
             });
         }
+        if (!prices)
+        {
+            receivedFrom.IsEnabled = receivedTo.IsEnabled = false;
+            header.Children.Add(new HorizontalStackLayout
+            {
+                Spacing = 12,
+                Children =
+                {
+                    Ui.Field("Filtruj datę przyjęcia", useReceivedRange),
+                    Ui.Field("Od", receivedFrom),
+                    Ui.Field("Do", receivedTo)
+                }
+            });
+            useReceivedRange.Toggled += (_, e) =>
+            {
+                receivedFrom.IsEnabled = receivedTo.IsEnabled = e.Value;
+                ShowRows();
+            };
+            receivedFrom.DateSelected += (_, _) => ShowRows();
+            receivedTo.DateSelected += (_, _) => ShowRows();
+        }
         header.Children.Add(status);
         var root = new Grid
         {
@@ -70,7 +98,7 @@ public sealed class MedicineStockPage : ContentPage
             }
         };
         root.Add(Ui.Card(header), 0, 0);
-        root.Add(Ui.Card(list), 0, 1);
+        root.Add(Ui.Card(prices ? list : CreateExpiryTable()), 0, 1);
         Content = root;
         search.TextChanged += (_, _) => ShowRows();
         filter.SelectedIndexChanged += async (_, _) =>
@@ -188,25 +216,117 @@ public sealed class MedicineStockPage : ContentPage
         finally { openingPrint = false; }
     }
 
+    static Grid ExpiryGrid() => new()
+    {
+        Padding = new Thickness(8, 4),
+        ColumnSpacing = 8,
+        ColumnDefinitions =
+        {
+            new ColumnDefinition { Width = GridLength.Star },
+            new ColumnDefinition { Width = new GridLength(125) },
+            new ColumnDefinition { Width = new GridLength(130) },
+            new ColumnDefinition { Width = new GridLength(175) },
+            new ColumnDefinition { Width = new GridLength(110) }
+        }
+    };
+
+    View CreateExpiryTable()
+    {
+        var heading = ExpiryGrid();
+        for (int i = 0; i < expiryColumns.Length; i++)
+        {
+            int column = i;
+            var button = new Button { Padding = new Thickness(4) };
+            button.Clicked += (_, _) =>
+            {
+                descending = sortColumn == column && !descending;
+                sortColumn = column;
+                UpdateSortHeaders();
+                ShowRows();
+            };
+            sortHeaders.Add(button);
+            heading.Add(button, i, 0);
+        }
+        UpdateSortHeaders();
+        var table = new Grid
+        {
+            RowDefinitions =
+            {
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Star }
+            }
+        };
+        table.Add(heading, 0, 0);
+        table.Add(list, 0, 1);
+        return table;
+    }
+
+    void UpdateSortHeaders()
+    {
+        for (int i = 0; i < sortHeaders.Count; i++)
+            sortHeaders[i].Text = expiryColumns[i] + (i == sortColumn ? descending ? " ↓" : " ↑" : "");
+    }
+
+    static View CreateExpiryRow()
+    {
+        var grid = ExpiryGrid();
+        string[] properties = [nameof(ExpiryRow.Name), nameof(ExpiryRow.Batch), nameof(ExpiryRow.Received),
+            nameof(ExpiryRow.Expires), nameof(ExpiryRow.Remaining)];
+        for (int i = 0; i < properties.Length; i++)
+        {
+            var cell = new Label { VerticalOptions = LayoutOptions.Center };
+            cell.SetBinding(Label.TextProperty, properties[i]);
+            grid.Add(cell, i, 0);
+        }
+        return grid;
+    }
+
+    sealed record ExpiryRow(string Name, string Batch, string Received, string Expires, string Remaining);
+
     void ShowRows()
     {
         if (!loaded) return;
         string query = (search.Text ?? "").Trim();
         bool Matches(string text) => text.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+        if (prices)
+        {
+            var priceList = priceRows.Where(row => Matches(row.Name)).Select(row =>
+                new Row(row.Name, row.Gross is decimal gross ? $"Brutto: {gross:N2}" : "Brak ceny brutto")).ToList();
+            list.ItemsSource = priceList;
+            status.Text = priceList.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {priceList.Count}";
+            return;
+        }
+
         DateTime today = DateTime.Today;
-        var rows = prices
-            ? priceRows.Where(row => Matches(row.Name)).Select(row =>
-                new Row(row.Name, row.Gross is decimal gross ? $"Brutto: {gross:N2}" : "Brak ceny brutto")).ToList()
-            : expiryRows.Where(row => Matches(row.Name) || Matches(row.Batch))
-                .Where(row => MatchesExpiry(row.Expires?.Date, today))
-                .OrderBy(row => row.Expires ?? DateTime.MaxValue)
-                .Select(row =>
-                {
-                    string date = row.Expires?.ToString("dd.MM.yyyy") ?? "brak daty";
-                    string batch = string.IsNullOrWhiteSpace(row.Batch) ? "brak numeru" : row.Batch;
-                    string expired = row.Expires?.Date < today ? " | po terminie" : "";
-                    return new Row(row.Name, $"Seria: {batch} | Magazyn: {row.WarehouseName} | Ważność: {date}{expired} | Pozostało: {row.Remaining:0.####} (jedn. mag.)");
-                }).ToList();
+        var matching = expiryRows.Where(row => (Matches(row.Name) || Matches(row.Batch)) && MatchesExpiry(row.Expires?.Date, today));
+        if (useReceivedRange.IsToggled)
+        {
+            if (receivedFrom.Date is not DateTime from || receivedTo.Date is not DateTime to || from.Date > to.Date)
+            {
+                list.ItemsSource = null;
+                status.Text = "Wybierz poprawny zakres dat przyjęcia.";
+                return;
+            }
+            matching = matching.Where(row => row.Received is DateTime date && date.Date >= from.Date && date.Date <= to.Date);
+        }
+
+        IOrderedEnumerable<MedicineExpiry> Order<T>(Func<MedicineExpiry, T> key, IComparer<T>? comparer = null) =>
+            descending ? matching.OrderByDescending(key, comparer) : matching.OrderBy(key, comparer);
+        var sorted = sortColumn switch
+        {
+            0 => Order(row => row.Name, StringComparer.CurrentCultureIgnoreCase),
+            1 => Order(row => row.Batch, StringComparer.CurrentCultureIgnoreCase),
+            2 => Order(row => row.Received ?? (descending ? DateTime.MinValue : DateTime.MaxValue)),
+            4 => Order(row => row.Remaining),
+            _ => Order(row => row.Expires ?? (descending ? DateTime.MinValue : DateTime.MaxValue))
+        };
+        var rows = sorted.ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase).Select(row =>
+        {
+            string expiry = row.Expires?.ToString("dd.MM.yyyy") ?? "—";
+            if (row.Expires?.Date < today) expiry += " (po terminie)";
+            return new ExpiryRow(row.Name, string.IsNullOrWhiteSpace(row.Batch) ? "—" : row.Batch,
+                row.Received?.ToString("dd.MM.yyyy") ?? "—", expiry, row.Remaining.ToString("0.####"));
+        }).ToList();
         list.ItemsSource = rows;
         status.Text = rows.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {rows.Count}";
     }
