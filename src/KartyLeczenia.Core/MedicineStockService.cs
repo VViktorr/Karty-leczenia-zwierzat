@@ -5,7 +5,7 @@ namespace KartyLeczenia;
 
 public sealed record MedicinePrice(string Name, decimal? Gross);
 public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName);
-public sealed record MedicineWarehouse(int? Id, string Name)
+public sealed record MedicineWarehouse(int Id, string Name)
 {
     public override string ToString() => Name;
 }
@@ -43,9 +43,15 @@ public static class MedicineStockService
             FROM dbo.tw__Towar t
             JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
             LEFT JOIN dbo.tw_Cena c ON c.tc_IdTowar = t.tw_Id
-            WHERE g.grt_Nazwa = @group
+            WHERE g.grt_Nazwa = @group AND EXISTS (
+                SELECT 1 FROM dbo.dok_MagRuch r
+                JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
+                JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
+                WHERE r.mr_TowId = t.tw_Id AND r.mr_Pozostalo > 0 AND d.dok_MagId = @warehouseId
+            )
             ORDER BY t.tw_Nazwa
             """, connection);
+        command.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         command.Parameters.Add("@group", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
         var result = new List<MedicinePrice>();
         await using var reader = await command.ExecuteReaderAsync(token);
@@ -59,10 +65,10 @@ public static class MedicineStockService
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
         using var command = new SqlCommand("SELECT mag_Id, mag_Nazwa FROM dbo.sl_Magazyn ORDER BY mag_Nazwa, mag_Id", connection);
-        var result = new List<MedicineWarehouse> { new(null, "Wszystkie magazyny") };
+        var result = new List<MedicineWarehouse>();
         await using var reader = await command.ExecuteReaderAsync(token);
         while (await reader.ReadAsync(token))
-            result.Add(new(reader.GetInt32(0), reader.GetString(1)));
+            result.Add(new(Convert.ToInt32(reader.GetValue(0)), reader.GetString(1)));
         return result;
     }
 
@@ -78,16 +84,17 @@ public static class MedicineStockService
             LEFT JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
             LEFT JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
             LEFT JOIN dbo.sl_Magazyn m ON m.mag_Id = d.dok_MagId
-            WHERE g.grt_Nazwa = @group AND r.mr_Pozostalo > 0
+            WHERE g.grt_Nazwa = @group AND r.mr_Pozostalo > 0 AND d.dok_MagId = @warehouseId
             ORDER BY COALESCE(p.ob_Termin, r.mr_Termin), t.tw_Nazwa
             """, connection);
+        command.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         command.Parameters.Add("@group", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
         var result = new List<MedicineExpiry>();
         await using var reader = await command.ExecuteReaderAsync(token);
         while (await reader.ReadAsync(token))
             result.Add(new(reader.GetString(0), reader.IsDBNull(1) ? "" : reader.GetString(1).Trim(),
                 reader.IsDBNull(2) ? null : reader.GetDateTime(2), Convert.ToDecimal(reader.GetValue(3)),
-                reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.IsDBNull(5) ? "nieustalony" : reader.GetString(5)));
+                reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetValue(4)), reader.IsDBNull(5) ? "nieustalony" : reader.GetString(5)));
         return result;
     }
 }
