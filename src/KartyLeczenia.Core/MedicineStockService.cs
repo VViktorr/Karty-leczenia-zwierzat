@@ -3,7 +3,7 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia;
 
-public sealed record MedicinePrice(string Name, decimal? Gross);
+public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawal = "");
 public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName);
 public sealed record MedicineWarehouse(int Id, string Name)
 {
@@ -33,13 +33,20 @@ public static class MedicineStockService
         return levels.OrderBy(level => level).ToArray();
     }
 
-    public static async Task<List<MedicinePrice>> Prices(ConnectionOptions options, int level, CancellationToken token)
+    public static async Task<List<MedicinePrice>> Prices(ConnectionOptions options, int level, CancellationToken token, int withdrawalSource = 0)
     {
         if (level is < 1 or > 10) throw new ArgumentOutOfRangeException(nameof(level));
+        if (withdrawalSource is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(withdrawalSource));
+        string withdrawal = withdrawalSource switch
+        {
+            0 => "CAST(NULL AS nvarchar(4000))",
+            1 => "t.tw_Opis",
+            _ => "t.tw_Pole" + (withdrawalSource - 1)
+        };
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
         using var command = new SqlCommand($"""
-            SELECT t.tw_Nazwa, c.tc_CenaBrutto{level}
+            SELECT t.tw_Nazwa, c.tc_CenaBrutto{level}, {withdrawal}
             FROM dbo.tw__Towar t
             JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
             LEFT JOIN dbo.tw_Cena c ON c.tc_IdTowar = t.tw_Id
@@ -56,7 +63,8 @@ public static class MedicineStockService
         var result = new List<MedicinePrice>();
         await using var reader = await command.ExecuteReaderAsync(token);
         while (await reader.ReadAsync(token))
-            result.Add(new(reader.GetString(0), reader.IsDBNull(1) ? null : Convert.ToDecimal(reader.GetValue(1))));
+            result.Add(new(reader.GetString(0), reader.IsDBNull(1) ? null : Convert.ToDecimal(reader.GetValue(1)),
+                reader.IsDBNull(2) ? "" : reader.GetString(2).Trim()));
         return result;
     }
 
