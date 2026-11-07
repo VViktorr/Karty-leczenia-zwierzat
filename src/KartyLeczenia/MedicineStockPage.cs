@@ -6,6 +6,8 @@ public sealed class MedicineStockPage : ContentPage
     readonly AppState state;
     readonly bool prices;
     readonly Picker filter = new() { WidthRequest = 235 };
+    readonly Picker warehouse = new() { Title = "Magazyn", WidthRequest = 235 };
+    ConnectionOptions? warehouseConnection;
     readonly Entry search = new();
     readonly CollectionView list = new();
     readonly Label status = Ui.Note("");
@@ -47,7 +49,9 @@ public sealed class MedicineStockPage : ContentPage
         actions.Add(search, 0, 0);
         actions.Add(filter, 1, 0);
         actions.Add(Ui.Action("Odśwież", Refresh), 2, 0);
-        var header = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading(Title), actions, status } };
+        var header = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading(Title), actions } };
+        if (!prices) header.Children.Add(Ui.Field("Magazyn", warehouse));
+        header.Children.Add(status);
         var root = new Grid
         {
             Padding = 18, RowSpacing = 10,
@@ -60,6 +64,7 @@ public sealed class MedicineStockPage : ContentPage
         root.Add(Ui.Card(header), 0, 0);
         root.Add(Ui.Card(list), 0, 1);
         Content = root;
+        warehouse.SelectedIndexChanged += (_, _) => ShowRows();
         search.TextChanged += (_, _) => ShowRows();
         filter.SelectedIndexChanged += async (_, _) =>
         {
@@ -88,6 +93,7 @@ public sealed class MedicineStockPage : ContentPage
 
         loading = true;
         filter.IsEnabled = false;
+        warehouse.IsEnabled = false;
         status.Text = "Pobieranie danych z Subiekta…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
@@ -106,7 +112,15 @@ public sealed class MedicineStockPage : ContentPage
                 filter.SelectedItem = level;
                 priceRows = await MedicineStockService.Prices(options, level, timeout.Token);
             }
-            else expiryRows = await MedicineStockService.Expiries(options, timeout.Token);
+            else
+            {
+                int? selectedId = warehouseConnection == options ? (warehouse.SelectedItem as MedicineWarehouse)?.Id : null;
+                var warehouses = await MedicineStockService.Warehouses(options, timeout.Token);
+                expiryRows = await MedicineStockService.Expiries(options, timeout.Token);
+                warehouse.ItemsSource = warehouses;
+                warehouse.SelectedItem = warehouses.FirstOrDefault(item => item.Id == selectedId) ?? warehouses[0];
+                warehouseConnection = options;
+            }
 
             if (!ReferenceEquals(options, state.ValidatedConnection))
             {
@@ -122,7 +136,7 @@ public sealed class MedicineStockPage : ContentPage
             CrashLog.Write(prices ? "MedicinePrices.Read" : "MedicineExpiries.Read", ex);
             status.Text = "Nie udało się odczytać danych. " + SubiektConnectionService.FriendlyError(ex);
         }
-        finally { filter.IsEnabled = true; loading = false; }
+        finally { filter.IsEnabled = true; warehouse.IsEnabled = true; loading = false; }
     }
 
     void ShowRows()
@@ -130,11 +144,13 @@ public sealed class MedicineStockPage : ContentPage
         if (!loaded) return;
         string query = (search.Text ?? "").Trim();
         bool Matches(string text) => text.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+        int? warehouseId = (warehouse.SelectedItem as MedicineWarehouse)?.Id;
         DateTime today = DateTime.Today;
         var rows = prices
             ? priceRows.Where(row => Matches(row.Name)).Select(row =>
                 new Row(row.Name, row.Gross is decimal gross ? $"Brutto: {gross:N2}" : "Brak ceny brutto")).ToList()
             : expiryRows.Where(row => Matches(row.Name) || Matches(row.Batch))
+                .Where(row => warehouseId is null || row.WarehouseId == warehouseId)
                 .Where(row => MatchesExpiry(row.Expires?.Date, today))
                 .OrderBy(row => row.Expires ?? DateTime.MaxValue)
                 .Select(row =>
@@ -142,7 +158,7 @@ public sealed class MedicineStockPage : ContentPage
                     string date = row.Expires?.ToString("dd.MM.yyyy") ?? "brak daty";
                     string batch = string.IsNullOrWhiteSpace(row.Batch) ? "brak numeru" : row.Batch;
                     string expired = row.Expires?.Date < today ? " | po terminie" : "";
-                    return new Row(row.Name, $"Seria: {batch} | Ważność: {date}{expired} | Pozostało: {row.Remaining:0.####} (jedn. mag.)");
+                    return new Row(row.Name, $"Seria: {batch} | Magazyn: {row.WarehouseName} | Ważność: {date}{expired} | Pozostało: {row.Remaining:0.####} (jedn. mag.)");
                 }).ToList();
         list.ItemsSource = rows;
         status.Text = rows.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {rows.Count}";
