@@ -5,10 +5,12 @@ public sealed class PrintPreviewPage : ContentPage
     readonly WebView browser = new();
     readonly Label status = Ui.Note("Przygotowywanie formularza A4 poziomo…");
     readonly Button print, pdf;
+    readonly string pdfName;
     bool ready, firstAction, closed;
-    public PrintPreviewPage(string html, string firstMode)
+    public PrintPreviewPage(string html, string firstMode, string title = "Podgląd karty leczenia", string pdfName = "karta-leczenia")
     {
-        Title = "Podgląd karty leczenia";
+        Title = title;
+        this.pdfName = pdfName;
         print = Ui.Action("Drukuj", Print);
         pdf = Ui.PrimaryAction("Eksport do PDF", Export);
         print.IsEnabled = pdf.IsEnabled = false;
@@ -44,7 +46,7 @@ public sealed class PrintPreviewPage : ContentPage
     async Task Export()
     {
         if (!ready) throw new InvalidOperationException("Poczekaj na załadowanie podglądu.");
-        var path = await WindowsFiles.SaveAsync(".pdf", "karta-leczenia");
+        var path = await WindowsFiles.SaveAsync(".pdf", pdfName);
         if (path == null || closed) return;
         print.IsEnabled = pdf.IsEnabled = false;
         try { await WindowsFiles.ExportPdfAsync(browser, path); status.Text = "Zapisano PDF: " + path; }
