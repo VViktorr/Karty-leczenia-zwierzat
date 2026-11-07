@@ -6,12 +6,13 @@ public sealed class MedicineStockPage : ContentPage
     readonly AppState state;
     readonly bool prices;
     readonly Picker filter = new() { WidthRequest = 235 };
+    readonly Picker withdrawalSource = new() { Title = "Wybierz źródło karencji" };
     readonly Entry search = new();
     readonly CollectionView list = new();
     readonly Label status = Ui.Note("");
     List<MedicinePrice> priceRows = [];
     List<MedicineExpiry> expiryRows = [];
-    bool loading, loaded;
+    bool loading, loaded, openingPrint;
 
     public MedicineStockPage(AppState state, bool prices)
     {
@@ -48,6 +49,16 @@ public sealed class MedicineStockPage : ContentPage
         actions.Add(filter, 1, 0);
         actions.Add(Ui.Action("Odśwież", Refresh), 2, 0);
         var header = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading(Title), actions } };
+        if (prices)
+        {
+            withdrawalSource.ItemsSource = new[] { "Opis leku" }
+                .Concat(Enumerable.Range(1, 8).Select(index => $"Pole własne {index}")).ToList();
+            header.Children.Add(new HorizontalStackLayout
+            {
+                Spacing = 10,
+                Children = { Ui.Field("Źródło karencji na wydruku", withdrawalSource), Ui.Action("Wydrukuj cennik", PreviewPrices) }
+            });
+        }
         header.Children.Add(status);
         var root = new Grid
         {
@@ -124,6 +135,57 @@ public sealed class MedicineStockPage : ContentPage
             status.Text = "Nie udało się odczytać danych. " + SubiektConnectionService.FriendlyError(ex);
         }
         finally { filter.IsEnabled = true; loading = false; }
+    }
+
+    async Task PreviewPrices()
+    {
+        if (openingPrint) return;
+        if (!loaded || loading || state.ValidatedConnection is not { } options || filter.SelectedItem is not int level)
+            throw new InvalidOperationException("Najpierw wczytaj cennik.");
+        if (withdrawalSource.SelectedIndex < 0)
+            throw new InvalidOperationException("Wybierz opis lub pole własne zawierające karencję.");
+        int source = withdrawalSource.SelectedIndex + 1;
+        string sourceName = (string)withdrawalSource.SelectedItem;
+        string query = (search.Text ?? "").Trim();
+
+        openingPrint = true;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var data = await MedicineStockService.Prices(options, level, timeout.Token, source);
+            if (state.ValidatedConnection != options || !loaded || loading || filter.SelectedItem is not int current || current != level)
+                throw new InvalidOperationException("Cennik zmienił się w trakcie przygotowania wydruku. Ponów operację.");
+
+            var rows = data.Where(row => row.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
+            if (rows.Count == 0) throw new InvalidOperationException("Brak pozycji do wydruku.");
+            string Encode(string value) => System.Net.WebUtility.HtmlEncode(value);
+            string body = string.Concat(rows.Select(row =>
+            {
+                string gross = row.Gross?.ToString("N2") ?? "—";
+                string withdrawal = string.IsNullOrWhiteSpace(row.Withdrawal) ? "Brak danych" : row.Withdrawal;
+                return $"<tr><td>{Encode(row.Name)}</td><td class='price'>{Encode(gross)}</td><td>{Encode(withdrawal)}</td></tr>";
+            }));
+            string html = $$"""
+                <!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Cennik leków</title>
+                <style>
+                    @page { size: A4 landscape; margin: 12mm; }
+                    body { font: 11pt Arial, sans-serif; color: #171717; }
+                    h1 { font-size: 18pt; }
+                    table { width: 100%; border-collapse: collapse; }
+                    thead { display: table-header-group; }
+                    tr { break-inside: avoid; }
+                    th, td { border: 1px solid #999; padding: 6px; text-align: left; vertical-align: top; }
+                    td { white-space: pre-wrap; overflow-wrap: anywhere; }
+                    .price { text-align: right; white-space: nowrap; }
+                </style></head><body><main class="sheet">
+                <h1>Cennik leków</h1>
+                <p>{{DateTime.Today:dd.MM.yyyy}} · Poziom cenowy {{level}} · Karencja z Subiekta ({{Encode(sourceName)}})</p>
+                <table><thead><tr><th>Lek</th><th>Cena brutto</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
+                </main></body></html>
+                """;
+            await Navigation.PushModalAsync(new PrintPreviewPage(html, "preview", "Podgląd cennika leków", "cennik-lekow"));
+        }
+        finally { openingPrint = false; }
     }
 
     void ShowRows()
