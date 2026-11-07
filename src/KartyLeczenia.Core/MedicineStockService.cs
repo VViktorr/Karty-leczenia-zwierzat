@@ -50,6 +50,14 @@ public static class MedicineStockService
                 if (!reader.IsDBNull(0) && !reader.IsDBNull(1) && !string.IsNullOrWhiteSpace(reader.GetString(1)))
                     names[Convert.ToInt32(reader.GetValue(0))] = reader.GetString(1).Trim();
         }
+        // Verified against the exported tw_Cena columns and the ACEGON price card for this company.
+        if (string.Equals(options.Database.Trim(), "Przychodnia_Weterynaryjna", StringComparison.OrdinalIgnoreCase))
+        {
+            names[1] = "Kredytowa";
+            names[4] = "Hurtowa";
+            names[5] = "Detaliczna";
+            names[6] = "Specjalna";
+        }
         return levels.OrderBy(level => level)
             .Select(level => new MedicinePriceLevel(level, names.GetValueOrDefault(level, $"Poziom {level}"))).ToArray();
     }
