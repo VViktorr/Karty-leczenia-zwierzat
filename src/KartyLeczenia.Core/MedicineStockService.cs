@@ -4,7 +4,11 @@ using Microsoft.Data.SqlClient;
 namespace KartyLeczenia;
 
 public sealed record MedicinePrice(string Name, decimal? Gross);
-public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining);
+public sealed record MedicineExpiry(string Name, string Batch, DateTime? Expires, decimal Remaining, int? WarehouseId, string WarehouseName);
+public sealed record MedicineWarehouse(int? Id, string Name)
+{
+    public override string ToString() => Name;
+}
 
 public static class MedicineStockService
 {
@@ -50,16 +54,30 @@ public static class MedicineStockService
         return result;
     }
 
+    public static async Task<List<MedicineWarehouse>> Warehouses(ConnectionOptions options, CancellationToken token)
+    {
+        await using var connection = new SqlConnection(options.BuildConnectionString());
+        await connection.OpenAsync(token);
+        using var command = new SqlCommand("SELECT mag_Id, mag_Nazwa FROM dbo.sl_Magazyn ORDER BY mag_Nazwa, mag_Id", connection);
+        var result = new List<MedicineWarehouse> { new(null, "Wszystkie magazyny") };
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+            result.Add(new(reader.GetInt32(0), reader.GetString(1)));
+        return result;
+    }
+
     public static async Task<List<MedicineExpiry>> Expiries(ConnectionOptions options, CancellationToken token)
     {
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
         using var command = new SqlCommand("""
-            SELECT t.tw_Nazwa, p.ob_NumerSeryjny, COALESCE(p.ob_Termin, r.mr_Termin), r.mr_Pozostalo
+            SELECT t.tw_Nazwa, p.ob_NumerSeryjny, COALESCE(p.ob_Termin, r.mr_Termin), r.mr_Pozostalo, d.dok_MagId, m.mag_Nazwa
             FROM dbo.dok_MagRuch r
             JOIN dbo.tw__Towar t ON t.tw_Id = r.mr_TowId
             JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
             LEFT JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
+            LEFT JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
+            LEFT JOIN dbo.sl_Magazyn m ON m.mag_Id = d.dok_MagId
             WHERE g.grt_Nazwa = @group AND r.mr_Pozostalo > 0
             ORDER BY COALESCE(p.ob_Termin, r.mr_Termin), t.tw_Nazwa
             """, connection);
@@ -68,7 +86,8 @@ public static class MedicineStockService
         await using var reader = await command.ExecuteReaderAsync(token);
         while (await reader.ReadAsync(token))
             result.Add(new(reader.GetString(0), reader.IsDBNull(1) ? "" : reader.GetString(1).Trim(),
-                reader.IsDBNull(2) ? null : reader.GetDateTime(2), Convert.ToDecimal(reader.GetValue(3))));
+                reader.IsDBNull(2) ? null : reader.GetDateTime(2), Convert.ToDecimal(reader.GetValue(3)),
+                reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.IsDBNull(5) ? "nieustalony" : reader.GetString(5)));
         return result;
     }
 }
