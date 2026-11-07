@@ -53,6 +53,7 @@ public static class MedicineStockService
         // Verified against the exported tw_Cena columns and the ACEGON price card for this company.
         if (string.Equals(options.Database.Trim(), "Przychodnia_Weterynaryjna", StringComparison.OrdinalIgnoreCase))
         {
+            names.Clear();
             names[1] = "Kredytowa";
             names[4] = "Hurtowa";
             names[5] = "Detaliczna";
