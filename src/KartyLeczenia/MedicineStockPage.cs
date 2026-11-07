@@ -5,6 +5,8 @@ public sealed class MedicineStockPage : ContentPage
     sealed record Row(string Name, string Detail);
     readonly AppState state;
     readonly bool prices;
+    readonly Picker priceBasis = new() { ItemsSource = new[] { "Brutto", "Netto" }, SelectedIndex = 0, WidthRequest = 105 };
+    bool NetPrice => priceBasis.SelectedIndex == 1;
     readonly Picker filter = new() { WidthRequest = 235 };
     readonly Picker withdrawalSource = new() { Title = "Wybierz źródło karencji" };
     readonly DatePicker receivedFrom = new() { Format = "dd.MM.yyyy", Date = DateTime.Today.AddYears(-1) };
@@ -28,7 +30,7 @@ public sealed class MedicineStockPage : ContentPage
         this.prices = prices;
         Title = prices ? "Cennik leków" : "Kontrola terminów ważności";
         search.Placeholder = prices ? "Szukaj leku" : "Szukaj leku lub serii";
-        filter.Title = prices ? "Poziom ceny brutto" : "Termin ważności";
+        filter.Title = prices ? "Rodzaj ceny" : "Termin ważności";
         if (!prices)
         {
             filter.ItemsSource = new[] { "Wszystkie dostawy", "Po terminie", "Do 30 dni", "Do 90 dni", "Bez daty" };
@@ -54,7 +56,7 @@ public sealed class MedicineStockPage : ContentPage
             }
         };
         actions.Add(search, 0, 0);
-        actions.Add(filter, 1, 0);
+        actions.Add(prices ? new HorizontalStackLayout { Spacing = 8, Children = { filter, priceBasis } } : filter, 1, 0);
         actions.Add(Ui.Action("Odśwież", Refresh), 2, 0);
         var header = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading(Title), actions } };
         if (prices)
@@ -102,6 +104,7 @@ public sealed class MedicineStockPage : ContentPage
         root.Add(Ui.Card(prices ? list : CreateExpiryTable()), 0, 1);
         Content = root;
         search.TextChanged += (_, _) => ShowRows();
+        priceBasis.SelectedIndexChanged += async (_, _) => { if (prices && !loading) await Refresh(); };
         filter.SelectedIndexChanged += async (_, _) =>
         {
             if (loading) return;
@@ -128,7 +131,7 @@ public sealed class MedicineStockPage : ContentPage
         }
 
         loading = true;
-        filter.IsEnabled = false;
+        filter.IsEnabled = priceBasis.IsEnabled = false;
         status.Text = "Pobieranie danych z Subiekta…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
@@ -140,7 +143,7 @@ public sealed class MedicineStockPage : ContentPage
                 filter.ItemsSource = levels;
                 if (levels.Length == 0)
                 {
-                    status.Text = "Nie znaleziono obsługiwanych poziomów ceny brutto w tej bazie.";
+                    status.Text = "Nie znaleziono nazwanych poziomów cen w tej bazie.";
                     return;
                 }
                 var retail = levels.Where(item => item.IsRetail).Take(2).ToArray();
@@ -150,10 +153,10 @@ public sealed class MedicineStockPage : ContentPage
                 filter.SelectedItem = level;
                 if (level is null)
                 {
-                    status.Text = "Wybierz poziom ceny brutto. Nie rozpoznano jednoznacznie ceny detalicznej w Subiekcie.";
+                    status.Text = "Wybierz rodzaj ceny. Nie rozpoznano jednoznacznie ceny detalicznej w Subiekcie.";
                     return;
                 }
-                priceRows = await MedicineStockService.Prices(options, level.Number, timeout.Token);
+                priceRows = await MedicineStockService.Prices(options, level.Number, timeout.Token, net: NetPrice);
             }
             else expiryRows = await MedicineStockService.Expiries(options, timeout.Token);
 
@@ -171,7 +174,7 @@ public sealed class MedicineStockPage : ContentPage
             CrashLog.Write(prices ? "MedicinePrices.Read" : "MedicineExpiries.Read", ex);
             status.Text = "Nie udało się odczytać danych. " + SubiektConnectionService.FriendlyError(ex);
         }
-        finally { filter.IsEnabled = true; loading = false; }
+        finally { filter.IsEnabled = priceBasis.IsEnabled = true; loading = false; }
     }
 
     async Task PreviewPrices()
@@ -181,6 +184,8 @@ public sealed class MedicineStockPage : ContentPage
             throw new InvalidOperationException("Najpierw wczytaj cennik.");
         if (withdrawalSource.SelectedIndex < 0)
             throw new InvalidOperationException("Wybierz opis lub pole własne zawierające karencję.");
+        bool net = NetPrice;
+        string basis = net ? "netto" : "brutto";
         int source = withdrawalSource.SelectedIndex + 1;
         string sourceName = (string)withdrawalSource.SelectedItem;
         string query = (search.Text ?? "").Trim();
@@ -189,8 +194,8 @@ public sealed class MedicineStockPage : ContentPage
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var data = await MedicineStockService.Prices(options, level.Number, timeout.Token, source);
-            if (state.ValidatedConnection != options || !loaded || loading || !Equals(filter.SelectedItem, level))
+            var data = await MedicineStockService.Prices(options, level.Number, timeout.Token, source, net);
+            if (state.ValidatedConnection != options || !loaded || loading || !Equals(filter.SelectedItem, level) || NetPrice != net)
                 throw new InvalidOperationException("Cennik zmienił się w trakcie przygotowania wydruku. Ponów operację.");
 
             var rows = data.Where(row => row.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
@@ -217,7 +222,7 @@ public sealed class MedicineStockPage : ContentPage
                 </style></head><body><main class="sheet">
                 <h1>Cennik leków</h1>
                 <p>{{DateTime.Today:dd.MM.yyyy}} · {{Encode(level.ToString())}} · Karencja z Subiekta ({{Encode(sourceName)}})</p>
-                <table><thead><tr><th>Lek</th><th>Najnowsza seria</th><th>Cena brutto</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
+                <table><thead><tr><th>Lek</th><th>Najnowsza seria</th><th>Cena {{basis}}</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
                 </main></body></html>
                 """;
             await Navigation.PushModalAsync(new PrintPreviewPage(html, "preview", "Podgląd cennika leków", "cennik-lekow"));
@@ -302,7 +307,7 @@ public sealed class MedicineStockPage : ContentPage
         if (prices)
         {
             var priceList = priceRows.Where(row => Matches(row.Name)).Select(row =>
-                new Row(row.Name, (row.Gross is decimal gross ? $"Brutto: {gross:N2}" : "Brak ceny brutto")
+                new Row(row.Name, (row.Gross is decimal amount ? $"{(NetPrice ? "Netto" : "Brutto")}: {amount:N2}" : "Brak ceny")
                     + $" | Najnowsza seria: {BatchText(row)}")).ToList();
             list.ItemsSource = priceList;
             status.Text = priceList.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {priceList.Count}";
