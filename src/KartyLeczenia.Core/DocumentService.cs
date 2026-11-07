@@ -48,13 +48,14 @@ public sealed class DocumentService
         }
         var result = (Gross: gross, Currency: currency); AmountColumns[key] = result; return result;
     }
-    static async Task<List<DocumentSuggestion>> AttachRelations(SqlConnection con, List<DocumentSuggestion> documents, CancellationToken token)
+    static async Task<List<DocumentSuggestion>> AttachRelations(SqlConnection con, List<DocumentSuggestion> documents, int? warehouseId, CancellationToken token)
     {
         if (documents.Count == 0) return documents;
         using var cmd = con.CreateCommand(); cmd.CommandTimeout = 10;
         var ids = documents.Select(d => d.Id).Distinct().ToList();
         string parameters = string.Join(",", ids.Select((id, i) => "@doc" + i));
         for (int i = 0; i < ids.Count; i++) cmd.Parameters.Add("@doc" + i, SqlDbType.Int).Value = ids[i];
+        cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)warehouseId ?? DBNull.Value;
         // These are actual trade/warehouse references on document positions, never date/customer guesses.
         cmd.CommandText = $"""
             SELECT DISTINCT h.dok_Id, h.dok_NrPelny, m.dok_Id, m.dok_NrPelny
@@ -64,6 +65,7 @@ public sealed class DocumentService
             WHERE (p.ob_DokHanId IN ({parameters}) OR p.ob_DokMagId IN ({parameters}))
               AND (h.dok_NrPelny LIKE N'FS %' OR h.dok_NrPelny LIKE N'PA %')
               AND m.dok_NrPelny LIKE N'WZ %'
+              AND m.dok_MagId = @warehouseId AND h.dok_MagId = @warehouseId
             """;
         var links = new Dictionary<int, Dictionary<int, DocumentLink>>();
         void Add(int id, DocumentLink target)
@@ -129,6 +131,7 @@ public sealed class DocumentService
             LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
             WHERE ((@invoices=1 AND d.dok_NrPelny LIKE N'FS %') OR (@receipts=1 AND d.dok_NrPelny LIKE N'PA %') OR (@warehouse=1 AND d.dok_NrPelny LIKE N'WZ %'))
+              AND d.dok_MagId = @warehouseId
               AND (d.dok_NrPelny LIKE @fragment ESCAPE N'~'
                 OR pl.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
                 OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
@@ -137,6 +140,7 @@ public sealed class DocumentService
               {dateFilter}
             ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, d.dok_Id DESC
             """, con) { CommandTimeout = 10 };
+        cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         cmd.Parameters.Add("@limit", SqlDbType.Int).Value = Math.Clamp(limit, 1, 101);
         cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = (object?)dateFrom ?? DBNull.Value;
         cmd.Parameters.Add("@until", SqlDbType.DateTime).Value = (object?)dateUntil ?? DBNull.Value;
@@ -149,7 +153,7 @@ public sealed class DocumentService
         await using (var reader = await cmd.ExecuteReaderAsync(token))
         while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetDateTime(4), reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5)), reader.IsDBNull(6) ? "" : reader.GetString(6).Trim()));
-        return await AttachRelations(con, found, token);
+        return await AttachRelations(con, found, options.WarehouseId, token);
     }
     public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null)
     {
@@ -166,8 +170,9 @@ public sealed class DocumentService
             FROM dbo.dok__Dokument d
             LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
-            WHERE (@documentId IS NULL AND d.dok_NrPelny=@number) OR d.dok_Id=@documentId
+            WHERE d.dok_MagId = @warehouseId AND ((@documentId IS NULL AND d.dok_NrPelny=@number) OR d.dok_Id=@documentId)
             """, con);
+        head.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         head.Parameters.Add("@number", SqlDbType.NVarChar, 100).Value = documentNumber.Trim();
         head.Parameters.Add("@documentId", SqlDbType.Int).Value = (object?)documentId ?? DBNull.Value;
         int id; string number; string payer; string recipient;
@@ -193,10 +198,13 @@ public sealed class DocumentService
             LEFT JOIN dbo.dok_MagRuch r ON r.mr_PozId=p.ob_Id
             LEFT JOIN dbo.dok_MagRuch z ON z.mr_Id=r.mr_DoId AND z.mr_TowId=r.mr_TowId
             LEFT JOIN dbo.dok_Pozycja zp ON zp.ob_Id=z.mr_PozId
+            LEFT JOIN dbo.dok__Dokument mag ON mag.dok_Id=p.ob_DokMagId
             WHERE (p.ob_DokHanId=@id OR p.ob_DokMagId=@id)
+              AND (p.ob_DokMagId IS NULL OR p.ob_DokMagId = 0 OR mag.dok_MagId = @warehouseId)
               AND t.tw_IdGrupa IN (SELECT grt_Id FROM dbo.sl_GrupaTw WHERE grt_Nazwa=@drugGroup)
             ORDER BY p.ob_Id, r.mr_Id
             """, con);
+        cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
         cmd.Parameters.Add("@drugGroup", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
         var deliveries = new List<DocumentDelivery>();
