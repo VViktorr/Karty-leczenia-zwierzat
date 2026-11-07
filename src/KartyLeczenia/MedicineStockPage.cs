@@ -55,18 +55,46 @@ public sealed class MedicineStockPage : ContentPage
                 new ColumnDefinition { Width = GridLength.Auto }
             }
         };
-        actions.Add(search, 0, 0);
-        actions.Add(prices ? new HorizontalStackLayout { Spacing = 8, Children = { filter, priceBasis } } : filter, 1, 0);
-        actions.Add(Ui.Action("Odśwież", Refresh), 2, 0);
+        var refresh = Ui.Action("Odśwież", Refresh);
+        if (prices)
+        {
+            filter.WidthRequest = 165;
+            filter.Title = null;
+            withdrawalSource.WidthRequest = 235;
+            withdrawalSource.Title = null;
+            foreach (var control in new VisualElement[] { search, filter, priceBasis, withdrawalSource, refresh })
+            {
+                control.HeightRequest = 44;
+                control.VerticalOptions = LayoutOptions.End;
+            }
+            refresh.Padding = new Thickness(14, 0);
+            actions.Add(Ui.Field("Wyszukiwanie", search), 0, 0);
+            actions.Add(new HorizontalStackLayout
+            {
+                Spacing = 8,
+                VerticalOptions = LayoutOptions.End,
+                Children = { Ui.Field("Rodzaj ceny", filter), Ui.Field("Netto / brutto", priceBasis) }
+            }, 1, 0);
+        }
+        else
+        {
+            actions.Add(search, 0, 0);
+            actions.Add(filter, 1, 0);
+        }
+        actions.Add(refresh, 2, 0);
         var header = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading(Title), actions } };
         if (prices)
         {
             withdrawalSource.ItemsSource = new[] { "Opis leku" }
                 .Concat(Enumerable.Range(1, 8).Select(index => $"Pole własne {index}")).ToList();
+            var print = Ui.Action("Wydrukuj cennik", PreviewPrices);
+            print.HeightRequest = 44;
+            print.Padding = new Thickness(14, 0);
+            print.VerticalOptions = LayoutOptions.End;
             header.Children.Add(new HorizontalStackLayout
             {
                 Spacing = 10,
-                Children = { Ui.Field("Źródło karencji na wydruku", withdrawalSource), Ui.Action("Wydrukuj cennik", PreviewPrices) }
+                Children = { Ui.Field("Źródło karencji na wydruku", withdrawalSource), print }
             });
         }
         if (!prices)
