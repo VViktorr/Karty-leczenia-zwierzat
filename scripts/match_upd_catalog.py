@@ -26,6 +26,8 @@ FORM = {
     "pour-on": r"\b(pour on|polewania)\b",
     "intramammary": r"\b(intramammary|dowymieniow\w*)\b",
     "tablet": r"\b(tablet\w*|tabl|tbl|tab)\b",
+    "powder": r"\b(proszek|powder)\b",
+    "spot-on": r"\b(spot on|pipet\w*)\b",
     "paste": r"\b(pasta|paste)\b",
     "spray": r"\b(spray|aerozol)\b",
 }
@@ -48,6 +50,31 @@ def signature(name):
     form = {key for key, pattern in FORM.items()
             if re.search(pattern, text.replace("-", " "))}
     return (words[0] if words else ""), strength, form
+
+
+def packaging_hint(label):
+    match = re.search(
+        r"\ba\s*['’]\s*\d+(?:[,.]\d+)?\s*"
+        r"(kg|g|ml|l|tab\w*|tbl\.?|pipet\w*|tubostrzykawk\w*)\b",
+        normalize(label),
+    )
+    if not match:
+        return set()
+    unit = match[1]
+    if unit in {"g", "kg"}:
+        return {"powder", "paste"}
+    if unit in {"ml", "l"}:
+        return {"injection", "pour-on", "spot-on"}
+    if unit.startswith("pipet"):
+        return {"spot-on"}
+    if unit.startswith("tubostrzykawk"):
+        return {"intramammary"}
+    return {"tablet"}
+
+
+def product_number(label):
+    match = re.match(r"^\s*[a-z]+\s+(\d+)(?=\s|%|$)", normalize(label))
+    return match[1] if match else ""
 
 
 def candidates(archive):
@@ -99,6 +126,8 @@ def main():
                 if " ".join(label.casefold().split()) in EXCLUDED_NAMES:
                     continue
                 brand, strength, form = signature(label)
+                hint = packaging_hint(label)
+                number = product_number(label)
                 ranked = {}
                 for upd_id, name, upd_strength, upd_form, countries in index.get(brand, ()):
                     if strength and upd_strength and strength.isdisjoint(upd_strength):
@@ -107,7 +136,9 @@ def main():
                         continue
                     same_strength = bool(strength and strength == upd_strength)
                     same_form = bool(form and form == upd_form)
-                    score = 2 * same_strength + same_form
+                    same_number = bool(number and number == product_number(name))
+                    score = (8 * same_strength + 4 * same_form + 2 * same_number
+                             + bool(hint & upd_form))
                     result = (score, name, countries, same_strength, same_form)
                     if upd_id not in ranked or result > ranked[upd_id]:
                         ranked[upd_id] = result
