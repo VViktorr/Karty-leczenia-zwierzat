@@ -10,6 +10,17 @@ from zipfile import ZipFile
 
 from openpyxl import load_workbook
 
+EXCLUDED_NAMES = {
+    "xforesto obroża dla psów powyżej 8 kg kp0bgz8",
+    "xnefrasin vet 100 mg/ml",
+    "xxxfiprex kot 0,7 ml x 3 szt. 1009",
+    "xxxfiprex l 4 ml x 3 szt. 0308",
+    "xxxfiprex m 2 ml x 3 szt. 0308",
+    "xxxfiprex s 1 ml x 3 szt. 1309",
+    "xxxfiprex s 1 ml x 3 szt. 1609",
+    "xxxfiprex xl 5,5 ml x 3 szt. 1309",
+}
+
 FORM = {
     "injection": r"\b(inj|injection|injectable|wstrzykiwan|iniekcja|rtu)\b",
     "pour-on": r"\b(pour on|polewania)\b",
@@ -85,6 +96,8 @@ def main():
                 if not row[symbol_col] or not row[name_col]:
                     continue
                 symbol, label = row[symbol_col], str(row[name_col])
+                if " ".join(label.casefold().split()) in EXCLUDED_NAMES:
+                    continue
                 brand, strength, form = signature(label)
                 ranked = {}
                 for upd_id, name, upd_strength, upd_form, countries in index.get(brand, ()):
