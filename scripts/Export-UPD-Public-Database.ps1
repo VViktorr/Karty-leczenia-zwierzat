@@ -1,8 +1,8 @@
-param(
+﻿param(
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\upd-export'),
     [ValidateRange(1, 1000)]
     [int]$PageSize = 250,
-    [ValidateRange(0, 30)]
+    [ValidateRange(0, 30000)]
     [int]$DelayMilliseconds = 400
 )
 
@@ -108,8 +108,22 @@ try {
         Write-Progress -Activity 'Pobieranie katalogu UPD' -Status "Strona $page, pobrano $($seenIds.Count) produktów"
 
         $bundle = Invoke-UpdGet -Uri $nextUrl -AccessToken $accessToken
-        if ($bundle.resourceType -ne 'Bundle') {
-            throw "Oczekiwano odpowiedzi FHIR Bundle, otrzymano: $($bundle.resourceType)."
+        if ($bundle -is [string] -and $bundle.TrimStart().StartsWith('{')) {
+            $bundle = ConvertFrom-Json -InputObject $bundle
+        }
+        if ($bundle -is [array] -and $bundle.Count -eq 1 -and $bundle[0].resourceType -eq 'Bundle') {
+            $bundle = $bundle[0]
+        }
+        if ($bundle.resourceType -ne 'Bundle' -or $bundle -is [array]) {
+            $items = @($bundle | Select-Object -First 3)
+            $shapes = foreach ($item in $items) {
+                if ($item -is [pscustomobject]) {
+                    'pola=' + ($item.PSObject.Properties.Name -join ',')
+                } else {
+                    $item.GetType().FullName
+                }
+            }
+            throw "UPD: brak pakietu FHIR Bundle. Elementy: $(@($bundle | Where-Object { $null -ne $_ }).Count). Struktura: $($shapes -join ' | ')."
         }
         if ($null -ne $bundle.total) { $reportedTotal = [long]$bundle.total }
 
