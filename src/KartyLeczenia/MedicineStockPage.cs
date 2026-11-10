@@ -62,7 +62,7 @@ public sealed class MedicineStockPage : ContentPage
             filter.Title = null;
             withdrawalSource.WidthRequest = 235;
             withdrawalSource.Title = null;
-            foreach (var control in new VisualElement[] { search, filter, priceBasis, withdrawalSource, refresh })
+            foreach (var control in new View[] { search, filter, priceBasis, withdrawalSource, refresh })
             {
                 control.HeightRequest = 44;
                 control.VerticalOptions = LayoutOptions.End;
