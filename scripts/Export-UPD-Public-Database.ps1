@@ -24,7 +24,16 @@ function Invoke-UpdGet([string]$Uri, [string]$AccessToken) {
                 Authorization = "Bearer $AccessToken"
                 Accept        = 'application/fhir+json'
             }
-            return ($response.Content | ConvertFrom-Json)
+            $body = $response.Content
+            if ($body -is [byte[]]) {
+                $body = [System.Text.Encoding]::UTF8.GetString($body)
+            }
+            if ($body -isnot [string] -or [string]::IsNullOrWhiteSpace($body)) {
+                throw 'UPD returned an empty or unsupported HTTP body.'
+            }
+            $body = $body.TrimStart([char]0xFEFF)
+            $parsed = ConvertFrom-Json -InputObject $body
+            return ,$parsed
         }
         catch {
             $statusCode = 0
