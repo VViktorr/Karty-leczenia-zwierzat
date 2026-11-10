@@ -8,7 +8,7 @@ from pathlib import Path
 
 PACKAGE = re.compile(
     r"(.*?)\s+A\s*['’]\s*\d+(?:[.,]\d+)?\s*(?:ML|L|G|KG)"
-    r"(?:\s+([A-Z0-9/-]+))?", re.I
+    r"(?:\s+([A-Z0-9/.-]+(?:\s+[A-Z0-9/.-]+)*))?", re.I
 )
 
 
@@ -30,7 +30,7 @@ def main():
     groups = defaultdict(list)
     for symbol, (name, ids) in cards.items():
         match = PACKAGE.fullmatch(name.strip())
-        if match and (not match[2] or any(c.isdigit() for c in match[2])):
+        if match and (not match[2] or all(any(c.isdigit() for c in token) for token in match[2].split())):
             key = " ".join(match[1].upper().split())
             groups[key].append((symbol, name, ids))
     with args.output.open("w", encoding="utf-8-sig", newline="") as output:
