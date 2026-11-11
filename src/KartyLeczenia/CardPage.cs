@@ -190,7 +190,7 @@ public sealed class CardPage : ContentPage
             { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
         footer.Add(status, 0, 0);
         var outputActions = new HorizontalStackLayout { Spacing = 8, Children = {
-            Ui.Action("Podgląd A4", () => Preview("preview")), Ui.Action("Drukuj", () => Preview("print")),
+            Ui.Action("Edytuj kartę A4", OpenInteractiveCard), Ui.Action("Drukuj", () => Preview("print")),
             Ui.PrimaryAction("Eksport do PDF", () => Preview("pdf")) } };
         footer.Add(outputActions, 1, 0);
         root.Add(footer, 0, 4);
@@ -313,7 +313,8 @@ public sealed class CardPage : ContentPage
         if (rows.Count > 0) list.SelectedItem = rows[0];
         status.Text = $"Pobrano {rows.Count} pozycji dostaw z grupy {options.DrugGroup}.";
         CrashLog.Write("Document.UI.Applied");
-        if (withdrawal.SelectedIndex == 0) { CrashLog.Write("Document.Catalogue.Start"); await FillWithdrawals(generation); CrashLog.Write("Document.Catalogue.Finished"); }
+        if (withdrawal.SelectedIndex == 0) await FillWithdrawals(generation);
+        if (generation == documentGeneration) await OpenInteractiveCard();
     }
     async Task ChooseCatalogueVariant()
     {
@@ -431,13 +432,25 @@ public sealed class CardPage : ContentPage
         row.ApplyRegistry(result);
         if (selected == row) Select(row); status.Text = "Zatwierdzono karencję dla wybranej pozycji.";
     }
-    async Task Preview(string mode)
+    async Task OpenInteractiveCard()
     {
+        ILookup<string, MedicineCatalogue.Entry>? catalogue = null;
+        try { catalogue = await MedicineCatalogue.GetAsync(); }
+        catch (Exception ex) { CrashLog.Write("Card.Interactive.Catalogue", ex); }
+        var page = new InteractiveCardPage(header, rows,
+            row => catalogue is null ? null : MedicineCatalogue.Match(catalogue, row),
+            (host, mode) => Preview(mode, host));
+        await Navigation.PushModalAsync(page);
+    }
+
+    async Task Preview(string mode, ContentPage? host = null)
+    {
+        host ??= this;
         var snapshot = Capture();
         if (snapshot.Rows.Where(r => string.Equals(r.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)).Any(CardSchema.NeedsReview) &&
-            !await DisplayAlertAsync("Weryfikacja karencji", "Nie wszystkie karencje i dopasowania leków zostały zatwierdzone. Sprawdź uzupełnione dane i ewentualne braki. Czy potwierdzasz ich sprawdzenie przed podglądem?", "Potwierdzam", "Wróć")) return;
+            !await host.DisplayAlertAsync("Weryfikacja karencji", "Nie wszystkie karencje i dopasowania leków zostały zatwierdzone. Sprawdź uzupełnione dane i ewentualne braki. Czy potwierdzasz ich sprawdzenie przed podglądem?", "Potwierdzam", "Wróć")) return;
         string html = CardHtmlRenderer.Render(snapshot);
-        await Navigation.PushModalAsync(new PrintPreviewPage(html, mode));
+        await host.Navigation.PushModalAsync(new PrintPreviewPage(html, mode));
         status.Text = "Otwarto podgląd formularza A4 poziomo.";
     }
 }
