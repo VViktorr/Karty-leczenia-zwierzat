@@ -34,8 +34,11 @@ internal static class MedicineCatalogue
     internal static bool IsCattle(Variant variant) =>
         variant.Species.StartsWith("Bydło", StringComparison.OrdinalIgnoreCase);
 
+    static string NormalizeSpecies(string species) => species.Trim().ToUpperInvariant()
+        .Replace("(KROWY W OKRESIE LAKTACJI)", "(KROWY W LAKTACJI)", StringComparison.Ordinal);
+
     internal static Variant[] DistinctVariants(Entry entry) => entry.Variants
-        .DistinctBy(v => (v.Species, v.Indication, v.Route, v.Dosing, v.Meat, v.Milk, v.Restrictions))
+        .DistinctBy(v => (NormalizeSpecies(v.Species), v.Indication, v.Route, v.Dosing, v.Meat, v.Milk, v.Restrictions))
         .ToArray();
 
     internal static string Withdrawal(Variant variant) => string.Join("\n", new[] {
@@ -71,7 +74,7 @@ internal static class MedicineCatalogue
         var route = row.Get("Droga podania").Trim();
         bool defaultSpecies = row.Get("Domyślny gatunek") == "True";
         var variants = DistinctVariants(entry).Where(v =>
-            (defaultSpecies ? IsCattle(v) : species.Length == 0 || string.Equals(species, v.Species, StringComparison.OrdinalIgnoreCase)) &&
+            (defaultSpecies ? IsCattle(v) : species.Length == 0 || NormalizeSpecies(species) == NormalizeSpecies(v.Species)) &&
             (route.Length == 0 || string.Equals(route, v.Route, StringComparison.OrdinalIgnoreCase))).ToArray();
         if (variants.Length != 1)
         {
