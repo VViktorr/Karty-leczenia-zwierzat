@@ -28,6 +28,8 @@ public sealed class CardPage : ContentPage
     readonly DocumentService documents = new();
     readonly VerticalStackLayout detail = new() { Spacing = 4, Padding = 4 };
     readonly ScrollView detailScroll = new();
+    View? medicinePanel;
+    Grid? medicineGrid;
     readonly Label selectedMedicine = Ui.Heading("Dane leku");
     readonly Label deliveryDetails = Ui.Note("");
     TreatmentRow? selected;
@@ -43,7 +45,7 @@ public sealed class CardPage : ContentPage
         for (int i = 1; i <= 8; i++) withdrawal.Items.Add("Pole własne " + i);
         withdrawal.SelectedIndex = 0; owner.Items.Add("Płatnik"); owner.Items.Add("Odbiorca"); owner.SelectedIndex = 0;
         owner.SelectedIndexChanged += (_, _) => { if (!changing && scope != "") header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient; };
-        var searchTypes = new HorizontalStackLayout { Spacing = 6, HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Center };
+        var searchTypes = new HorizontalStackLayout { Spacing = 6, HorizontalOptions = LayoutOptions.Start, VerticalOptions = LayoutOptions.Center };
         foreach (var item in new[] { (Toggle: searchInvoices, Title: "FS"), (Toggle: searchWarehouse, Title: "WZ"), (Toggle: searchReceipts, Title: "PA") })
         {
             item.Toggle.WidthRequest = item.Toggle.MinimumWidthRequest = 28;
@@ -76,6 +78,8 @@ public sealed class CardPage : ContentPage
         var searchLabel = (Label)searchFields[0].Children[0];
         searchFields[0].Children.RemoveAt(0);
         var searchHeader = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
+        searchHeader.ColumnDefinitions[0].Width = GridLength.Auto;
+        searchHeader.ColumnDefinitions[1].Width = GridLength.Star;
         searchHeader.Add(searchLabel, 0, 0); searchHeader.Add(searchTypes, 1, 0);
         searchFields[0].Children.Insert(0, searchHeader);
         actions.SizeChanged += (_, _) =>
@@ -165,7 +169,7 @@ public sealed class CardPage : ContentPage
             {
                 detail.Add(provenance);
                 detail.Add(registryActions);
-                detail.Add(Ui.Heading("Dane pozycji"));
+                detail.Add(Ui.Heading("Dostawy i dane pozycji"));
                 detail.Add(deliveryDetails);
                 detail.Add(new HorizontalStackLayout { Children = { printed, new Label { Text = "Uwzględnij na wydruku", VerticalOptions = LayoutOptions.Center } } });
             }
@@ -177,8 +181,14 @@ public sealed class CardPage : ContentPage
             CompactTable.Header(medicineColumns, "Druk", "Nazwa leku", "Ilość", "Seria", "") } }, 0, 0);
         list.EmptyView = new Label { Text = "Brak pozycji. Wybierz dokument powyżej lub dodaj lek ręcznie.", Margin = 12, LineBreakMode = LineBreakMode.WordWrap };
         drugList.Add(list, 0, 1);
-        split.Add(Ui.Card(drugList), 0, 0); detailScroll.Content = detail;
-        split.Add(Ui.Card(detailScroll), 1, 0);
+        medicineGrid = split;
+        var listPanel = Ui.Card(drugList);
+        split.Add(listPanel, 0, 0);
+        Grid.SetColumnSpan(listPanel, 2);
+        detailScroll.Content = detail;
+        medicinePanel = Ui.Card(detailScroll);
+        medicinePanel.IsVisible = false;
+        split.Add(medicinePanel, 1, 0);
         var rowActions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = {
             Ui.Action("Uzupełnij brakujące karencje", () => FillWithdrawals(documentGeneration)),
             Ui.Action("Dodaj pozycję ręcznie", () => { var row = new TreatmentRow(); row.Set("Produkt", "Nowa pozycja"); rows.Add(row); list.SelectedItem = row; return Task.CompletedTask; }),
@@ -268,7 +278,13 @@ public sealed class CardPage : ContentPage
         foreach (var pair in editors) pair.Value.Text = row?.Get(pair.Key) ?? "";
         printed.IsChecked = row?.Printed ?? false;
         provenance.Text = row is null ? "Wybierz pozycję." : row.RegistryStatus + "\n" + row.Get("Źródło karencji");
-        detail.IsEnabled = row != null; changing = false;
+        detail.IsEnabled = row != null;
+        if (medicinePanel != null && medicineGrid != null)
+        {
+            medicinePanel.IsVisible = row != null;
+            Grid.SetColumnSpan((View)medicineGrid.Children[0], row == null ? 2 : 1);
+        }
+        changing = false;
     }
     Card Capture()
     {
