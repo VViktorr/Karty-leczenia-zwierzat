@@ -10,8 +10,8 @@ public sealed class CardPage : ContentPage
     readonly ObservableCollection<TreatmentRow> rows = new();
     readonly CollectionView list = new() { SelectionMode = SelectionMode.Single };
     readonly Dictionary<string, Editor> header = new(), editors = new();
-    readonly Entry number = new() { Placeholder = "Numer lub nazwisko — Enter otwiera wybór dokumentu", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill, MaxLength = 100 };
-    readonly Picker documentSuggestions = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
+    readonly Entry number = new() { Placeholder = "Numer lub nazwisko — Enter otwiera wybór dokumentu", HeightRequest = 32, HorizontalOptions = LayoutOptions.Fill, MaxLength = 100 };
+    readonly Picker documentSuggestions = new() { Title = "", HeightRequest = 32, HorizontalOptions = LayoutOptions.Fill };
     DocumentSuggestion? chosenDocument;
     ConnectionOptions? documentLookupConnection;
     bool choosingDocument, loadingDocument;
@@ -19,14 +19,14 @@ public sealed class CardPage : ContentPage
     DocumentSearchKinds SearchKinds => (searchInvoices.IsChecked ? DocumentSearchKinds.Invoices : DocumentSearchKinds.None)
         | (searchWarehouse.IsChecked ? DocumentSearchKinds.WarehouseReleases : DocumentSearchKinds.None)
         | (searchReceipts.IsChecked ? DocumentSearchKinds.Receipts : DocumentSearchKinds.None);
-    readonly Picker withdrawal = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
-    readonly Picker owner = new() { Title = "", HeightRequest = 44, HorizontalOptions = LayoutOptions.Fill };
+    readonly Picker withdrawal = new() { Title = "", HeightRequest = 32, HorizontalOptions = LayoutOptions.Fill };
+    readonly Picker owner = new() { Title = "", HeightRequest = 32, HorizontalOptions = LayoutOptions.Fill };
     readonly Label searchHint = Ui.Note("Wpisz numer lub nazwisko i naciśnij Enter. W oknie wyboru możesz ustawić rok lub zakres dat.");
     readonly Label status = Ui.Note("Wybierz dokument lub otwórz zapisaną kartę.");
     readonly Label provenance = Ui.Note("Wybierz lek z listy, aby poprawić jego dane.");
     readonly CheckBox printed = new();
     readonly DocumentService documents = new();
-    readonly VerticalStackLayout detail = new() { Spacing = 10, Padding = 12 };
+    readonly VerticalStackLayout detail = new() { Spacing = 4, Padding = 4 };
     readonly ScrollView detailScroll = new();
     readonly Label selectedMedicine = Ui.Heading("Dane leku");
     readonly Label deliveryDetails = Ui.Note("");
@@ -68,11 +68,11 @@ public sealed class CardPage : ContentPage
             item.Toggle.CheckedChanged += async (_, _) => { UpdateFilterAppearance(); await RefreshDocumentSuggestions(); };
             UpdateFilterAppearance(); searchTypes.Add(frame);
         }
-        var actions = new Grid { ColumnSpacing = 16, RowSpacing = 10,
+        var actions = new Grid { ColumnSpacing = 8, RowSpacing = 4,
             ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
         var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło danych leku", withdrawal), Ui.Field("Dane właściciela", owner) };
-        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 32; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
+        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 28; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
         var searchLabel = (Label)searchFields[0].Children[0];
         searchFields[0].Children.RemoveAt(0);
         var searchHeader = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
@@ -97,7 +97,7 @@ public sealed class CardPage : ContentPage
             try { await OpenDocumentSearch(); }
             catch (Exception ex) { CrashLog.Write("DocumentSearch.Enter.Failed", ex); await DisplayAlertAsync("Nie pobrano dokumentu", SubiektConnectionService.FriendlyError(ex), "OK"); }
         };
-        var documentPanel = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("Dokument źródłowy"), actions, searchHint, documentActions } };
+        var documentPanel = new VerticalStackLayout { Spacing = 3, Children = { actions, documentActions, searchHint } };
         var headerPanel = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         foreach (string field in CardSchema.Fields)
         {
@@ -123,7 +123,9 @@ public sealed class CardPage : ContentPage
         list.SelectionChanged += (_, e) => Select(e.CurrentSelection.FirstOrDefault() as TreatmentRow);
         printed.CheckedChanged += (_, e) => { if (!changing && selected != null) selected.Printed = e.Value; };
         detail.Add(selectedMedicine);
-        detail.Add(Ui.PrimaryAction("Wybierz wariant leczenia…", ChooseCatalogueVariant));
+        var variantAction = Ui.Action("Wybierz wariant…", ChooseCatalogueVariant);
+        variantAction.HorizontalOptions = LayoutOptions.Start;
+        detail.Add(variantAction);
         var registryActions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         registryActions.Add(Ui.Action("Karencja z RPL…", ApplyRegistry));
         registryActions.Add(Ui.Action("Otwórz ChPL lub kartę UPD", async () =>
@@ -145,7 +147,7 @@ public sealed class CardPage : ContentPage
         detail.Add(contextFields);
         foreach (string field in clinicalFields.Concat(CardSchema.RowFields.Concat(CardSchema.ContextFields).Except(clinicalFields)).Distinct())
         {
-            var editor = new Editor { HeightRequest = field is "Karencja" or "Dawkowanie i okres stosowania" or "Zalecenia / uwagi" ? 82 : 48 };
+            var editor = new Editor { HeightRequest = field is "Karencja" or "Dawkowanie i okres stosowania" or "Zalecenia / uwagi" ? 52 : 32 };
             string key = field;
             editor.TextChanged += (_, e) => { if (!changing && selected != null) { selected.Set(key, e.NewTextValue ?? "");
                 if (key is "Gatunek" or "Droga podania")
@@ -182,11 +184,15 @@ public sealed class CardPage : ContentPage
             Ui.Action("Dodaj pozycję ręcznie", () => { var row = new TreatmentRow(); row.Set("Produkt", "Nowa pozycja"); rows.Add(row); list.SelectedItem = row; return Task.CompletedTask; }),
             Ui.Action("Usuń wybraną pozycję", async () => { if (selected is TreatmentRow item) await RemoveRow(item); })
         } };
-        var root = new Grid { Padding = 18, RowSpacing = 8, RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = new GridLength(0) }, new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }, new RowDefinition { Height = GridLength.Auto } } };
+        var root = new Grid { Padding = 8, RowSpacing = 4, RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = new GridLength(0) }, new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }, new RowDefinition { Height = GridLength.Auto } } };
         var cardDetails = Ui.Card(new ScrollView { Content = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("Dane karty"), headerPanel } } });
         cardDetails.IsVisible = false;
         documentActions.Add(Ui.Action("Pokaż / ukryj dane karty", () => { cardDetails.IsVisible = !cardDetails.IsVisible; root.RowDefinitions[1].Height = new GridLength(cardDetails.IsVisible ? 225 : 0); return Task.CompletedTask; }));
-        root.Add(Ui.Card(documentPanel), 0, 0); root.Add(cardDetails, 0, 1); root.Add(rowActions, 0, 2); root.Add(split, 0, 3); var footer = new Grid { ColumnSpacing = 12, ColumnDefinitions =
+        root.Add(documentPanel, 0, 0); root.Add(cardDetails, 0, 1); foreach (var action in rowActions.Children.ToArray())
+        {
+            rowActions.Children.Remove(action);
+            documentActions.Children.Add(action);
+        } root.Add(split, 0, 3); var footer = new Grid { ColumnSpacing = 12, ColumnDefinitions =
             { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
         footer.Add(status, 0, 0);
         var outputActions = new HorizontalStackLayout { Spacing = 8, Children = {
