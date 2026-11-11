@@ -2,7 +2,7 @@ namespace KartyLeczenia.Views;
 
 internal sealed class InteractiveCardPage : ContentPage
 {
-    static readonly GridLength[] Columns = [52, 155, 230, 125, 215, 145, 285, 205, 160];
+    static readonly GridLength[] Columns = [46, 145, 220, 190, 190, 135, 285, 185, 150];
     static readonly double TableWidth = Columns.Sum(column => column.Value) + 52;
 
     internal InteractiveCardPage(IReadOnlyDictionary<string, Editor> header, IEnumerable<TreatmentRow> rows,
@@ -18,11 +18,18 @@ internal sealed class InteractiveCardPage : ContentPage
             fields.Add(Ui.Field(pair.Key, input));
         }
         var details = new VerticalStackLayout { Children = { fields }, IsVisible = false };
-        var table = new VerticalStackLayout { Spacing = 4, WidthRequest = TableWidth, HorizontalOptions = LayoutOptions.Start, Children = {
+        var table = new VerticalStackLayout { Spacing = 1, WidthRequest = TableWidth, HorizontalOptions = LayoutOptions.Start, Children = {
             CompactTable.Header(Columns, "Druk", "Zwierzęta", "Lek", "Ilość / seria", "Droga podania",
                 "Rozpoznanie", "Dawkowanie", "Karencja", "Uwagi") } };
-        foreach (var row in rows) table.Add(EditRow(row, match(row)));
+        var extraFields = new List<View>();
+        foreach (var row in rows) table.Add(EditRow(row, match(row), extraFields));
+        bool showDetails = false;
         var toolbar = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = {
+            Ui.Action("Szczegóły pozycji", () => {
+                showDetails = !showDetails;
+                foreach (var field in extraFields) field.IsVisible = showDetails;
+                return Task.CompletedTask;
+            }),
             Ui.Action("Dane karty", () => { details.IsVisible = !details.IsVisible; return Task.CompletedTask; }),
             Ui.Action("Podgląd wydruku", () => output(this, "preview")),
             Ui.Action("Drukuj", () => output(this, "print")),
@@ -38,7 +45,7 @@ internal sealed class InteractiveCardPage : ContentPage
         Content = Ui.WithClose(this, root, async () => { await Navigation.PopModalAsync(); });
     }
 
-    static Grid EditRow(TreatmentRow row, MedicineCatalogue.Entry? entry)
+    static Grid EditRow(TreatmentRow row, MedicineCatalogue.Entry? entry, List<View> extraFields)
     {
         var editors = new Dictionary<string, Editor>();
         bool refreshing = false;
@@ -53,7 +60,7 @@ internal sealed class InteractiveCardPage : ContentPage
         printed.CheckedChanged += (_, e) => row.Printed = e.Value;
         var species = Field("Gatunek", "Gatunek");
         var route = Field("Droga podania", "Droga podania");
-        var picker = new Picker { Title = "Wybierz wariant", IsVisible = false, WidthRequest = 211 };
+        var picker = new Picker { Title = "Wybierz wariant", IsVisible = false, WidthRequest = 184 };
         var variants = entry is { Excluded: false } ? MedicineCatalogue.DistinctVariants(entry) : [];
         MedicineCatalogue.Variant[] choices = [];
         void RefreshChoices()
@@ -82,7 +89,12 @@ internal sealed class InteractiveCardPage : ContentPage
             if (entry is null) return;
             MedicineCatalogue.ApplySelected(row, entry, variant);
             refreshing = true;
-            foreach (var field in editors) field.Value.Text = row.Get(field.Key);
+            foreach (var field in editors)
+            {
+                var value = row.Get(field.Key);
+                field.Value.Text = field.Key == "Opis zwierząt / numer siedziby stada" && value == row.Get("Gatunek")
+                    ? "" : value;
+            }
             refreshing = false;
         }
         species.TextChanged += (_, _) => { if (!refreshing) RefreshChoices(); };
@@ -93,10 +105,24 @@ internal sealed class InteractiveCardPage : ContentPage
             int index = picker.SelectedIndex;
             if (index >= 0 && index < choices.Length) ApplyChoice(choices[index]);
         };
+        var description = Field("Opis zwierząt / numer siedziby stada", "Opis / nr stada");
+        if (string.Equals(description.Text, species.Text, StringComparison.OrdinalIgnoreCase))
+        {
+            refreshing = true;
+            description.Text = "";
+            refreshing = false;
+        }
+        var count = Field("Liczba zwierząt", "Liczba");
+        var expiry = Field("Ważność", "Ważność");
+        foreach (var field in new[] { description, count, expiry })
+        {
+            field.IsVisible = false;
+            extraFields.Add(field);
+        }
         var line = CompactTable.Row(Columns, false, printed,
-            new VerticalStackLayout { Children = { species, Field("Opis zwierząt / numer siedziby stada", "Opis / nr stada"), Field("Liczba zwierząt", "Liczba") } },
+            new VerticalStackLayout { Children = { species, description, count } },
             Field("Produkt", "Nazwa leku"),
-            new VerticalStackLayout { Children = { Field("Ilość wydana", "Ilość"), Field("Seria", "Seria"), Field("Ważność", "Ważność") } },
+            new VerticalStackLayout { Children = { Field("Ilość wydana", "Ilość"), Field("Seria", "Seria"), expiry } },
             new VerticalStackLayout { Children = { picker, route } },
             Field("Rozpoznanie", "Rozpoznanie"),
             Field("Dawkowanie i okres stosowania", "Dawkowanie"),
