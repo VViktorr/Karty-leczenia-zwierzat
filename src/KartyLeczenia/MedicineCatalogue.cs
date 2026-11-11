@@ -24,13 +24,19 @@ internal static class MedicineCatalogue
     internal static Entry? Match(ILookup<string, Entry> catalogue, TreatmentRow row)
     {
         var entries = catalogue[row.Get("Symbol Subiekta").Trim()];
-        var exact = entries.Where(entry => string.Equals(entry.SubiektName, row.Product.Trim(),
+        static string NormalizeName(string value) => System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
+        var name = NormalizeName(row.Product);
+        var exact = entries.Where(entry => string.Equals(NormalizeName(entry.SubiektName), name,
             StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();
         return exact.Length == 1 ? exact[0] : null;
     }
 
     internal static bool IsCattle(Variant variant) =>
         variant.Species.StartsWith("Bydło", StringComparison.OrdinalIgnoreCase);
+
+    internal static Variant[] DistinctVariants(Entry entry) => entry.Variants
+        .DistinctBy(v => (v.Species, v.Indication, v.Route, v.Dosing, v.Meat, v.Milk, v.Restrictions))
+        .ToArray();
 
     internal static string Withdrawal(Variant variant) => string.Join("\n", new[] {
         variant.Meat.Length > 0 ? "Tkanki jadalne: " + variant.Meat : "",
@@ -61,9 +67,12 @@ internal static class MedicineCatalogue
         }
         row.Set("Produkt rejestru", entry.RegisterName, false);
         row.Set("Źródło karencji", entry.Source, false);
-        var variants = entry.Variants.Distinct().ToArray();
-        if (row.Get("Domyślny gatunek") == "True")
-            variants = variants.Where(IsCattle).ToArray();
+        var species = row.Get("Gatunek").Trim();
+        var route = row.Get("Droga podania").Trim();
+        bool defaultSpecies = row.Get("Domyślny gatunek") == "True";
+        var variants = DistinctVariants(entry).Where(v =>
+            (defaultSpecies ? IsCattle(v) : species.Length == 0 || string.Equals(species, v.Species, StringComparison.OrdinalIgnoreCase)) &&
+            (route.Length == 0 || string.Equals(route, v.Route, StringComparison.OrdinalIgnoreCase))).ToArray();
         if (variants.Length != 1)
         {
             row.Set("Status karencji", variants.Length == 0
@@ -72,14 +81,6 @@ internal static class MedicineCatalogue
             return false;
         }
         var v = variants[0];
-        var species = row.Get("Gatunek");
-        var route = row.Get("Droga podania");
-        if ((row.Get("Domyślny gatunek") != "True" && species.Length > 0 && !string.Equals(species, v.Species, StringComparison.OrdinalIgnoreCase))
-            || (route.Length > 0 && !string.Equals(route, v.Route, StringComparison.OrdinalIgnoreCase)))
-        {
-            row.Set("Status karencji", "Katalog — wariant dotyczy innego gatunku lub drogi podania", false);
-            return false;
-        }
         row.FillMissingContext(v.Species, v.Route);
         var withdrawal = Withdrawal(v);
         if (row.Get("Karencja").Length == 0) row.Set("Karencja", withdrawal, false);
