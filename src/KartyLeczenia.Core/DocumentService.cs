@@ -61,8 +61,9 @@ public sealed class DocumentService
             SELECT DISTINCT h.dok_Id, h.dok_NrPelny, m.dok_Id, m.dok_NrPelny
             FROM dbo.dok_Pozycja p
             INNER JOIN dbo.dok__Dokument h ON h.dok_Id=p.ob_DokHanId
-            INNER JOIN dbo.dok__Dokument m ON m.dok_Id=p.ob_DokMagId
-            WHERE (p.ob_DokHanId IN ({parameters}) OR p.ob_DokMagId IN ({parameters}))
+            LEFT JOIN dbo.dok_Pozycja source ON source.ob_Id=p.ob_DoId AND source.ob_TowId=p.ob_TowId
+            INNER JOIN dbo.dok__Dokument m ON m.dok_Id=p.ob_DokMagId OR m.dok_Id=source.ob_DokMagId
+            WHERE (h.dok_Id IN ({parameters}) OR m.dok_Id IN ({parameters}))
               AND (h.dok_NrPelny LIKE N'FS %' OR h.dok_NrPelny LIKE N'PA %')
               AND m.dok_NrPelny LIKE N'WZ %'
               AND m.dok_MagId = @warehouseId AND h.dok_MagId = @warehouseId
@@ -191,7 +192,7 @@ public sealed class DocumentService
             SELECT p.ob_Id, p.ob_TowId, t.tw_Symbol, t.tw_Nazwa, p.ob_Opis, p.ob_Ilosc, p.ob_IloscMag, p.ob_Jm,
               {withdrawal} AS Karencja,
               r.mr_Id, r.mr_Ilosc, r.mr_DoId,
-              zp.ob_NumerSeryjny AS Seria,
+              COALESCE(NULLIF(zp.ob_NumerSeryjny, ''), NULLIF(p.ob_NumerSeryjny, '')) AS Seria,
               zp.ob_Termin AS Waznosc, z.mr_Termin AS TerminRuchu
             FROM dbo.dok_Pozycja p
             LEFT JOIN dbo.tw__Towar t ON t.tw_Id=p.ob_TowId
@@ -199,12 +200,24 @@ public sealed class DocumentService
             LEFT JOIN dbo.dok_MagRuch z ON z.mr_Id=r.mr_DoId AND z.mr_TowId=r.mr_TowId
             LEFT JOIN dbo.dok_Pozycja zp ON zp.ob_Id=z.mr_PozId
             LEFT JOIN dbo.dok__Dokument mag ON mag.dok_Id=p.ob_DokMagId
-            WHERE (p.ob_DokHanId=@id OR p.ob_DokMagId=@id)
+            WHERE (
+                (@useWz = 0 AND (p.ob_DokHanId=@id OR p.ob_DokMagId=@id))
+                OR (@useWz = 1 AND mag.dok_NrPelny LIKE N'WZ %' AND EXISTS (
+                    SELECT 1
+                    FROM dbo.dok_Pozycja handlowa
+                    WHERE handlowa.ob_DokHanId=@id
+                      AND ((handlowa.ob_DoId=p.ob_Id AND handlowa.ob_TowId=p.ob_TowId)
+                           OR handlowa.ob_Id=p.ob_Id)
+                ))
+              )
               AND (p.ob_DokMagId IS NULL OR p.ob_DokMagId = 0 OR mag.dok_MagId = @warehouseId)
               AND t.tw_IdGrupa IN (SELECT grt_Id FROM dbo.sl_GrupaTw WHERE grt_Nazwa=@drugGroup)
             ORDER BY p.ob_Id, r.mr_Id
             """, con);
         cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
+        bool useWz = number.StartsWith("FS ", StringComparison.OrdinalIgnoreCase)
+            || number.StartsWith("PA ", StringComparison.OrdinalIgnoreCase);
+        cmd.Parameters.Add("@useWz", SqlDbType.Bit).Value = useWz;
         cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
         cmd.Parameters.Add("@drugGroup", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
         var deliveries = new List<DocumentDelivery>();
@@ -235,6 +248,8 @@ public sealed class DocumentService
                 ["ID towaru"] = V("ob_TowId"), ["Symbol Subiekta"] = V("tw_Symbol")
             }), quantity, V("ob_Jm")));
         }
+        if (useWz && deliveries.Count == 0)
+            throw new InvalidOperationException("Nie znaleziono pozycji leków na WZ powiązanych z tym dokumentem w wybranym magazynie.");
         return new(number, payer, recipient, DocumentRowMerger.Merge(deliveries), options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant());
     }
 }
