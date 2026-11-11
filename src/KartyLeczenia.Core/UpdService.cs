@@ -125,6 +125,14 @@ public static class UpdService
         // Never present the portal's unfiltered default first page as matching search results.
         return ParseSearch(result).Where(p => p.Name.Contains(firstWord, StringComparison.OrdinalIgnoreCase)).ToList();
     }
+    public static async Task<(string Name, bool Poland, string Status)> ReadAuthorisation(string id, CancellationToken token)
+    {
+        var root = Html(await Download(Url(id), token)).DocumentNode;
+        var countries = Field(root, "products__extra-field-upd-products-authorised-countries");
+        bool poland = countries?.Descendants().Any(n => Has(n, "field__item") && Text(n) == "Poland") == true;
+        return (Value(Field(root, "products__extra-field-upd-products-medicine-name")), poland,
+            Value(Field(root, "upd-auth-status__field-upd-term-name")));
+    }
     public static async Task<RegistryDocument> Fetch(string id, CancellationToken token) => Parse(id, await Download(Url(id), token));
     static string MappingPath(string key) => RegistryService.MappingPath("UPD|" + key);
     public static string? ReadMapping(string key) { string path = MappingPath(key); return File.Exists(path) ? ParseId(File.ReadAllText(path)) : null; }

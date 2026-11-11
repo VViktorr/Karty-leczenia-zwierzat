@@ -24,6 +24,7 @@
     <RuntimeIdentifier>$(RuntimeIdentifierOverride)</RuntimeIdentifier>
   </PropertyGroup>
   <ItemGroup>
+    <MauiAsset Include="Resources/Raw/upd-index.json.gz" LogicalName="upd-index.json.gz" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <ProjectReference Include="../KartyLeczenia.Core/KartyLeczenia.Core.csproj" />
   </ItemGroup>

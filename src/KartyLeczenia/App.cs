@@ -73,6 +73,9 @@ public sealed class AppShell : Shell
         var expiry = new Tab { Title = "Kontrola terminów ważności", Route = "medicine-expiry" };
         expiry.Items.Add(new ShellContent { Content = new Views.MedicineStockPage(state, prices: false) });
         tabs.Items.Add(expiry);
+        var registers = new Tab { Title = "Rejestry leków", Route = "medicine-registers" };
+        registers.Items.Add(new ShellContent { ContentTemplate = new DataTemplate(() => new Views.MedicineRegistersPage()) });
+        tabs.Items.Add(registers);
         tabs.Items.Add(connection);
         tabs.CurrentItem = cards;
         Items.Add(tabs);
