@@ -18,7 +18,7 @@ def document_id(value):
 
 def source_url(value):
     match = re.search(
-        r"https://(?:rejestry(?:medyczne)?\.ezdrowie\.gov\.pl/api/rpl/medicinal-products/\d+/characteristic|medicines\.health\.europa\.eu/veterinary/(?:en|pl)/\d{12})(?![\w/])",
+        r"https://(?:rejestry(?:medyczne)?\.ezdrowie\.gov\.pl/api/rpl/medicinal-products/\d+/(?:characteristic|leaflet)|medicines\.health\.europa\.eu/veterinary/(?:en|pl)/\d{12})(?![\w/])",
         val(value),
     )
     return match.group() if match else ""
