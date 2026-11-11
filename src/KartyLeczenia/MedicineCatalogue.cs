@@ -34,8 +34,22 @@ internal static class MedicineCatalogue
     internal static bool IsCattle(Variant variant) =>
         variant.Species.StartsWith("Bydło", StringComparison.OrdinalIgnoreCase);
 
-    static string NormalizeSpecies(string species) => species.Trim().ToUpperInvariant()
-        .Replace("(KROWY W OKRESIE LAKTACJI)", "(KROWY W LAKTACJI)", StringComparison.Ordinal);
+    static string NormalizeSpecies(string species)
+    {
+        string name = System.Text.RegularExpressions.Regex.Replace(species.Trim().ToUpperInvariant(), @"\s+", " ");
+        return name switch
+        {
+            "CIELĘ" or "CIELĘTA" or "CIELĘTA BYDŁA" or "BYDŁO (CIELĘTA)" => "BYDŁO (CIELĘTA)",
+            "BYDŁO (KROWY W OKRESIE LAKTACJI)" or "BYDŁO (KROWA W LAKTACJI)" => "BYDŁO (KROWY W LAKTACJI)",
+            "BYDŁO (KROWY ZASUSZONE)" or "BYDŁO (KROWA W OKRESIE ZASUSZENIA)"
+                or "BYDŁO (KROWY W OKRESIE ZASUSZENIA)" or "BYDŁO (KROWY W ZASUSZENIU)"
+                or "BYDŁO – KROWY W ZASUSZENIU" => "BYDŁO (KROWY W ZASUSZENIU)",
+            _ => name
+        };
+    }
+
+    internal static bool SameSpecies(string first, string second) =>
+        NormalizeSpecies(first) == NormalizeSpecies(second);
 
     internal static Variant[] DistinctVariants(Entry entry) => entry.Variants
         .DistinctBy(v => (NormalizeSpecies(v.Species), v.Indication, v.Route, v.Dosing, v.Meat, v.Milk, v.Restrictions))
@@ -74,7 +88,7 @@ internal static class MedicineCatalogue
         var route = row.Get("Droga podania").Trim();
         bool defaultSpecies = row.Get("Domyślny gatunek") == "True";
         var variants = DistinctVariants(entry).Where(v =>
-            (defaultSpecies ? IsCattle(v) : species.Length == 0 || NormalizeSpecies(species) == NormalizeSpecies(v.Species)) &&
+            (defaultSpecies ? IsCattle(v) : species.Length == 0 || SameSpecies(species, v.Species)) &&
             (route.Length == 0 || string.Equals(route, v.Route, StringComparison.OrdinalIgnoreCase))).ToArray();
         if (variants.Length != 1)
         {

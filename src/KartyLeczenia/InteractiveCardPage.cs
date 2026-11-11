@@ -67,7 +67,7 @@ internal sealed class InteractiveCardPage : ContentPage
         {
             var value = row.Get("Gatunek").Trim();
             choices = variants.Where(v => value.Length == 0 ||
-                string.Equals(v.Species, value, StringComparison.OrdinalIgnoreCase) ||
+                MedicineCatalogue.SameSpecies(v.Species, value) ||
                 (string.Equals(value, "Bydło", StringComparison.OrdinalIgnoreCase) && MedicineCatalogue.IsCattle(v))).ToArray();
             refreshing = true;
             var labels = choices.Select(v => string.Join(" · ", new[] { v.Route, v.Species, v.Indication }
