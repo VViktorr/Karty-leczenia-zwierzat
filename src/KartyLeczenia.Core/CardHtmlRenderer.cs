@@ -58,6 +58,8 @@ public static class CardHtmlRenderer
                 string description = row.GetValueOrDefault("Opis zwierząt / numer siedziby stada") ?? "";
                 string species = row.GetValueOrDefault("Gatunek") ?? "";
                 if (species.Length > 0 && !description.Contains(species, StringComparison.OrdinalIgnoreCase)) description += "\n" + species;
+                string animalNumbers = (row.GetValueOrDefault("Numery zwierząt") ?? "").Trim();
+                if (animalNumbers.Length > 0) description = (description.Trim() + "\n" + animalNumbers).Trim();
                 string expiry = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Ważność")) ? "" : "<br><small>Ważność: " + V("Ważność") + "</small>";
                 string notes = string.Join("\n", (row.GetValueOrDefault("Zalecenia / uwagi") ?? "").Split('\n')
                     .Where(line => !System.Text.RegularExpressions.Regex.IsMatch(line,

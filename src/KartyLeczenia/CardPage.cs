@@ -145,7 +145,7 @@ public sealed class CardPage : ContentPage
         }));
 
         registryActions.Add(Ui.Action("UPD — źródło zapasowe…", () => ApplyRegistrySource(true)));
-        string[] clinicalFields = ["Gatunek", "Droga podania", "Dawkowanie i okres stosowania", "Karencja"];
+        string[] clinicalFields = ["Numery zwierząt", "Rozpoznanie", "Gatunek", "Droga podania", "Dawkowanie i okres stosowania", "Karencja"];
         var contextFields = new Grid { ColumnSpacing = 12, ColumnDefinitions =
             { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Star } } };
         detail.Add(contextFields);
@@ -165,6 +165,12 @@ public sealed class CardPage : ContentPage
             var fieldView = Ui.Field(field, editor);
             if (field is "Gatunek" or "Droga podania") contextFields.Add(fieldView, field == "Gatunek" ? 0 : 1, 0);
             else detail.Add(fieldView);
+            if (field == "Rozpoznanie")
+            {
+                var choose = Ui.Action("Wybierz rozpoznanie z karty…", ChooseDiagnosis);
+                choose.HorizontalOptions = LayoutOptions.Start;
+                detail.Add(choose);
+            }
             if (field == "Karencja")
             {
                 detail.Add(provenance);
@@ -266,6 +272,21 @@ public sealed class CardPage : ContentPage
             header["Lekarz i nr prawa wykonywania zawodu"].Text = state.Clinic.Doctor;
         lastClinic = state.Clinic.CardText; lastDoctor = state.Clinic.Doctor;
     }
+    async Task ChooseDiagnosis()
+    {
+        if (selected is not { } row) return;
+        var diagnoses = rows.Select(item => item.Get("Rozpoznanie").Trim())
+            .Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (diagnoses.Length == 0)
+        {
+            editors["Rozpoznanie"].Focus();
+            return;
+        }
+        var choice = await DisplayActionSheetAsync("Rozpoznanie", "Anuluj", null, diagnoses);
+        if (ReferenceEquals(selected, row) && diagnoses.Contains(choice))
+            editors["Rozpoznanie"].Text = choice;
+    }
+
     void Select(TreatmentRow? row)
     {
         bool changedRow = !ReferenceEquals(selected, row);
