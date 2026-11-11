@@ -63,8 +63,14 @@ internal sealed class InteractiveCardPage : ContentPage
                 string.Equals(v.Species, value, StringComparison.OrdinalIgnoreCase) ||
                 (string.Equals(value, "Bydło", StringComparison.OrdinalIgnoreCase) && MedicineCatalogue.IsCattle(v))).ToArray();
             refreshing = true;
-            picker.ItemsSource = choices.Select((v, index) => $"{index + 1}. {v.Route}" +
-                (v.Indication.Length > 0 ? " · " + v.Indication : "")).ToArray();
+            var labels = choices.Select(v => string.Join(" · ", new[] { v.Route, v.Species, v.Indication }
+                .Where(text => text.Length > 0))).ToArray();
+            var repeatedLabels = labels.GroupBy(label => label).Where(group => group.Count() > 1)
+                .Select(group => group.Key).ToHashSet();
+            picker.ItemsSource = choices.Select((v, index) => repeatedLabels.Contains(labels[index])
+                ? string.Join(" · ", new[] { labels[index], v.Dosing,
+                    MedicineCatalogue.Withdrawal(v).Replace("\n", "; "), v.Restrictions }.Where(text => text.Length > 0))
+                : labels[index]).ToArray();
             picker.SelectedIndex = Array.FindIndex(choices, v =>
                 v.Route == row.Get("Droga podania") && v.Dosing == row.Get("Dawkowanie i okres stosowania") &&
                 MedicineCatalogue.Withdrawal(v) == row.Get("Karencja"));
