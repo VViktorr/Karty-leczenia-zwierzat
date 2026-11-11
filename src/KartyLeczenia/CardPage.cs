@@ -307,11 +307,13 @@ public sealed class CardPage : ContentPage
         status.Text = "Pobieranie leków z dokumentu…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         string requestedNumber = number.Text ?? "";
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        var catalogueLoad = MedicineCatalogue.GetAsync();
         CrashLog.Write("Document.SQL.Read");
         var data = await documents.ReadAsync(options, requestedNumber, withdrawal.SelectedIndex, timeout.Token, chosenDocument?.Id);
         if (generation != documentGeneration || SearchKinds != requestedKinds || number.Text != requestedNumber) return;
         if (state.ValidatedConnection != options) throw new InvalidOperationException("Zmieniono połączenie w trakcie pobierania. Ponów operację.");
-        CrashLog.Write("Document.UI.Apply rows=" + data.Rows.Count);
+        CrashLog.Write($"Document.SQL.Read ms={elapsed.ElapsedMilliseconds}, rows={data.Rows.Count}");
         Select(null); list.SelectedItem = null; rows.Clear(); foreach (var row in data.Rows) rows.Add(row);
         scope = data.Scope; payer = data.Payer; recipient = data.Recipient;
         header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient;
@@ -319,8 +321,12 @@ public sealed class CardPage : ContentPage
         if (rows.Count > 0) list.SelectedItem = rows[0];
         status.Text = $"Pobrano {rows.Count} pozycji dostaw z grupy {options.DrugGroup}.";
         CrashLog.Write("Document.UI.Applied");
-        if (withdrawal.SelectedIndex == 0) await FillWithdrawals(generation);
-        if (generation == documentGeneration) await OpenInteractiveCard();
+        if (withdrawal.SelectedIndex == 0) await FillWithdrawals(generation, catalogueLoad);
+        if (generation == documentGeneration)
+        {
+            await OpenInteractiveCardCore(catalogueLoad);
+            CrashLog.Write($"Document.Card.Open ms={elapsed.ElapsedMilliseconds}");
+        }
     }
     async Task ChooseCatalogueVariant()
     {
@@ -366,11 +372,11 @@ public sealed class CardPage : ContentPage
         Select(row);
     }
 
-    async Task FillWithdrawals(int generation)
+    async Task FillWithdrawals(int generation, Task<ILookup<string, MedicineCatalogue.Entry>>? catalogueLoad = null)
     {
         try
         {
-            var catalogue = await MedicineCatalogue.GetAsync();
+            var catalogue = await (catalogueLoad ?? MedicineCatalogue.GetAsync());
             if (generation != documentGeneration) return;
             int filled = 0, excluded = 0, review = 0;
             foreach (var row in rows.ToList())
@@ -438,10 +444,12 @@ public sealed class CardPage : ContentPage
         row.ApplyRegistry(result);
         if (selected == row) Select(row); status.Text = "Zatwierdzono karencję dla wybranej pozycji.";
     }
-    async Task OpenInteractiveCard()
+    Task OpenInteractiveCard() => OpenInteractiveCardCore(MedicineCatalogue.GetAsync());
+
+    async Task OpenInteractiveCardCore(Task<ILookup<string, MedicineCatalogue.Entry>> catalogueLoad)
     {
         ILookup<string, MedicineCatalogue.Entry>? catalogue = null;
-        try { catalogue = await MedicineCatalogue.GetAsync(); }
+        try { catalogue = await catalogueLoad; }
         catch (Exception ex) { CrashLog.Write("Card.Interactive.Catalogue", ex); }
         var page = new InteractiveCardPage(header, rows,
             row => catalogue is null ? null : MedicineCatalogue.Match(catalogue, row),

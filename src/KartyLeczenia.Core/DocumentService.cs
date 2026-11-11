@@ -189,28 +189,30 @@ public sealed class DocumentService
         }
         string withdrawal = withdrawalSource == 0 ? "CAST(NULL AS nvarchar(4000))" : withdrawalSource == 1 ? "t.tw_Opis" : "t.tw_Pole" + (withdrawalSource - 1);
         using var cmd = new SqlCommand($"""
+            WITH CandidatePositions AS (
+                SELECT ob_Id FROM dbo.dok_Pozycja WHERE ob_DokHanId=@id
+                UNION
+                SELECT ob_Id FROM dbo.dok_Pozycja WHERE @useWz=0 AND ob_DokMagId=@id
+                UNION
+                SELECT source.ob_Id
+                FROM dbo.dok_Pozycja trade
+                INNER JOIN dbo.dok_Pozycja source ON source.ob_Id=trade.ob_DoId AND source.ob_TowId=trade.ob_TowId
+                WHERE @useWz=1 AND trade.ob_DokHanId=@id
+            )
             SELECT p.ob_Id, p.ob_TowId, t.tw_Symbol, t.tw_Nazwa, p.ob_Opis, p.ob_Ilosc, p.ob_IloscMag, p.ob_Jm,
               {withdrawal} AS Karencja,
               r.mr_Id, r.mr_Ilosc, r.mr_DoId, mag.dok_NrPelny AS NumerWz,
               COALESCE(NULLIF(LTRIM(RTRIM(zp.ob_NumerSeryjny)), ''),
                        NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), '')) AS Seria,
               zp.ob_Termin AS Waznosc, z.mr_Termin AS TerminRuchu
-            FROM dbo.dok_Pozycja p
+            FROM CandidatePositions candidate
+            INNER JOIN dbo.dok_Pozycja p ON p.ob_Id=candidate.ob_Id
             LEFT JOIN dbo.tw__Towar t ON t.tw_Id=p.ob_TowId
             LEFT JOIN dbo.dok_MagRuch r ON r.mr_PozId=p.ob_Id
             LEFT JOIN dbo.dok_MagRuch z ON z.mr_Id=r.mr_DoId AND z.mr_TowId=r.mr_TowId
             LEFT JOIN dbo.dok_Pozycja zp ON zp.ob_Id=z.mr_PozId
             LEFT JOIN dbo.dok__Dokument mag ON mag.dok_Id=p.ob_DokMagId
-            WHERE (
-                (@useWz = 0 AND (p.ob_DokHanId=@id OR p.ob_DokMagId=@id))
-                OR (@useWz = 1 AND mag.dok_NrPelny LIKE N'WZ %' AND EXISTS (
-                    SELECT 1
-                    FROM dbo.dok_Pozycja handlowa
-                    WHERE handlowa.ob_DokHanId=@id
-                      AND ((handlowa.ob_DoId=p.ob_Id AND handlowa.ob_TowId=p.ob_TowId)
-                           OR handlowa.ob_Id=p.ob_Id)
-                ))
-              )
+            WHERE (@useWz=0 OR mag.dok_NrPelny LIKE N'WZ %')
               AND (p.ob_DokMagId IS NULL OR p.ob_DokMagId = 0 OR mag.dok_MagId = @warehouseId)
               AND t.tw_IdGrupa IN (SELECT grt_Id FROM dbo.sl_GrupaTw WHERE grt_Nazwa=@drugGroup)
             ORDER BY p.ob_Id, r.mr_Id
