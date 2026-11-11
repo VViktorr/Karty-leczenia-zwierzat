@@ -1,0 +1,71 @@
+using System.IO.Compression;
+using System.Text.Json;
+
+namespace KartyLeczenia;
+
+internal static class MedicineCatalogue
+{
+    internal sealed record Variant(string Species, string Indication, string Route, string Dosing,
+        string Meat, string Milk, string Restrictions, string Source);
+    internal sealed record Entry(string Symbol, string SubiektName, string RegisterName,
+        string Source, bool Excluded, Variant[] Variants);
+
+    static readonly Lazy<Task<ILookup<string, Entry>>> Catalogue = new(Load);
+    static async Task<ILookup<string, Entry>> Load()
+    {
+        using var asset = await FileSystem.OpenAppPackageFileAsync("medicine-catalog.json.gz");
+        using var stream = new GZipStream(asset, CompressionMode.Decompress);
+        var entries = await JsonSerializer.DeserializeAsync<Entry[]>(stream) ?? [];
+        return entries.ToLookup(entry => entry.Symbol, StringComparer.OrdinalIgnoreCase);
+    }
+
+    internal static async Task<ILookup<string, Entry>> GetAsync() => await Catalogue.Value;
+
+    internal static Entry? Match(ILookup<string, Entry> catalogue, TreatmentRow row)
+    {
+        var entries = catalogue[row.Get("Symbol Subiekta").Trim()];
+        var exact = entries.Where(entry => string.Equals(entry.SubiektName, row.Product.Trim(),
+            StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();
+        return exact.Length == 1 ? exact[0] : null;
+    }
+
+    internal static bool Apply(TreatmentRow row, Entry? entry)
+    {
+        if (entry == null)
+        {
+            row.Set("Status karencji", "Brak dopasowania w katalogu — sprawdź w Rejestrach leków", false);
+            return false;
+        }
+        row.Set("Produkt rejestru", entry.RegisterName, false);
+        row.Set("Źródło karencji", entry.Source, false);
+        var variants = entry.Variants.Distinct().ToArray();
+        if (variants.Length != 1)
+        {
+            row.Set("Status karencji", variants.Length == 0
+                ? "Katalog — brak potwierdzonego wariantu dawkowania i karencji"
+                : "Katalog — kilka wariantów, sprawdź gatunek, drogę i wskazanie w ChPL", false);
+            return false;
+        }
+        var v = variants[0];
+        var species = row.Get("Gatunek");
+        var route = row.Get("Droga podania");
+        if ((row.Get("Domyślny gatunek") != "True" && species.Length > 0 && !string.Equals(species, v.Species, StringComparison.OrdinalIgnoreCase))
+            || (route.Length > 0 && !string.Equals(route, v.Route, StringComparison.OrdinalIgnoreCase)))
+        {
+            row.Set("Status karencji", "Katalog — wariant dotyczy innego gatunku lub drogi podania", false);
+            return false;
+        }
+        row.FillMissingContext(v.Species, v.Route);
+        var withdrawal = string.Join("\n", new[] {
+            v.Meat.Length > 0 ? "Tkanki jadalne: " + v.Meat : "",
+            v.Milk.Length > 0 ? "Mleko: " + v.Milk : ""
+        }.Where(value => value.Length > 0));
+        if (row.Get("Karencja").Length == 0) row.Set("Karencja", withdrawal, false);
+        if (row.Get("Dawkowanie i okres stosowania").Length == 0)
+            row.Set("Dawkowanie i okres stosowania", v.Dosing, false);
+        row.Set("Źródło karencji", v.Source, false);
+        row.Set("Status karencji", "Katalog — sprawdź wskazanie i warunki podania: " +
+            string.Join(" · ", new[] { v.Indication, v.Restrictions }.Where(value => value.Length > 0)), false);
+        return withdrawal.Length > 0;
+    }
+}

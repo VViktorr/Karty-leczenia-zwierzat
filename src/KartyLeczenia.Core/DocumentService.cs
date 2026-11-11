@@ -188,7 +188,7 @@ public sealed class DocumentService
         }
         string withdrawal = withdrawalSource == 0 ? "CAST(NULL AS nvarchar(4000))" : withdrawalSource == 1 ? "t.tw_Opis" : "t.tw_Pole" + (withdrawalSource - 1);
         using var cmd = new SqlCommand($"""
-            SELECT p.ob_Id, p.ob_TowId, t.tw_Nazwa, p.ob_Opis, p.ob_Ilosc, p.ob_IloscMag, p.ob_Jm,
+            SELECT p.ob_Id, p.ob_TowId, t.tw_Symbol, t.tw_Nazwa, p.ob_Opis, p.ob_Ilosc, p.ob_IloscMag, p.ob_Jm,
               {withdrawal} AS Karencja,
               r.mr_Id, r.mr_Ilosc, r.mr_DoId,
               zp.ob_NumerSeryjny AS Seria,
@@ -230,9 +230,9 @@ public sealed class DocumentService
                 ["Gatunek"] = "Bydło", ["Opis zwierząt / numer siedziby stada"] = "Bydło", ["Domyślny gatunek"] = "True",
                 ["Seria"] = V("Seria"), ["Ważność"] = expiry, ["Ilość wydana"] = quantity.ToString("0.####") + " " + V("ob_Jm"),
                 ["Karencja"] = V("Karencja"), ["Zalecenia / uwagi"] = note,
-                ["Status karencji"] = withdrawalSource == 0 ? "Brak karencji — wybierz produkt w RPL" : "Dane Subiekta — do weryfikacji",
+                ["Status karencji"] = withdrawalSource == 0 ? "Oczekuje na dopasowanie w katalogu leków" : "Dane Subiekta — do weryfikacji",
                 ["Źródło karencji"] = withdrawalSource == 0 ? "" : "Subiekt: " + withdrawal,
-                ["ID towaru"] = V("ob_TowId")
+                ["ID towaru"] = V("ob_TowId"), ["Symbol Subiekta"] = V("tw_Symbol")
             }), quantity, V("ob_Jm")));
         }
         return new(number, payer, recipient, DocumentRowMerger.Merge(deliveries), options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant());
