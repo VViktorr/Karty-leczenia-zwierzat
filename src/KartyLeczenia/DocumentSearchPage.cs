@@ -30,26 +30,23 @@ public sealed class DocumentSearchPage : ContentPage
         var filter = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.End, Children = { Ui.Field("Numer lub klient", query), Ui.Field("Rok / okres", year), Ui.PrimaryAction("Szukaj", Search) } };
         var top = new VerticalStackLayout { Spacing = 10, Children = { Ui.Heading("Wyszukaj i wybierz dokument"), filter, dates, status } };
         results.EmptyView = new Label { Text = "Brak wyników. Zmień nazwę, numer albo rok.", Margin = 16 };
-        results.ItemTemplate = new DataTemplate(() =>
-        {
-            var number = new Label { FontAttributes = FontAttributes.Bold, FontSize = 15 };
-            number.SetBinding(Label.TextProperty, nameof(DocumentSuggestion.Number));
-            var detail = Ui.Note(""); detail.SetBinding(Label.TextProperty, nameof(DocumentSuggestion.Details));
-            var amount = new Label { FontAttributes = FontAttributes.Bold, FontSize = 14, HorizontalTextAlignment = TextAlignment.End, VerticalOptions = LayoutOptions.Center };
-            amount.SetBinding(Label.TextProperty, nameof(DocumentSuggestion.AmountText));
-            var heading = new Grid { ColumnSpacing = 16, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
-            heading.Add(number, 0, 0); heading.Add(amount, 1, 0);
-            var related = Ui.Note(""); related.SetBinding(Label.TextProperty, nameof(DocumentSuggestion.RelatedText));
-            related.SetBinding(VisualElement.IsVisibleProperty, nameof(DocumentSuggestion.HasRelatedText));
-            return new VerticalStackLayout { Padding = new Thickness(14, 9), Spacing = 4, Children = { heading, detail, related } };
-        });
+        GridLength[] columns = [100, 165, GridLength.Star, 145, new GridLength(0.65, GridUnitType.Star)];
+        results.ItemTemplate = new DataTemplate(() => CompactTable.Row(columns, false,
+            CompactTable.Cell(nameof(DocumentSuggestion.Date), format: "{0:dd.MM.yyyy}"),
+            CompactTable.Cell(nameof(DocumentSuggestion.Number)),
+            CompactTable.Cell(nameof(DocumentSuggestion.Payer)),
+            CompactTable.Cell(nameof(DocumentSuggestion.AmountText), right: true),
+            CompactTable.Cell(nameof(DocumentSuggestion.RelatedText))));
         results.SelectionChanged += async (_, e) =>
         {
             if (closing || e.CurrentSelection.FirstOrDefault() is not DocumentSuggestion chosen) return;
             await CloseSearch(chosen);
         };
         var root = new Grid { Padding = 20, RowSpacing = 12, RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }, new RowDefinition { Height = GridLength.Auto } } };
-        root.Add(Ui.Card(top), 0, 0); root.Add(Ui.Card(results), 0, 1);
+        root.Add(Ui.Card(top), 0, 0); var table = new Grid { RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } } };
+        table.Add(CompactTable.Header(columns, "Data", "Numer", "Kontrahent", "Wartość", "Powiązane dokumenty"), 0, 0);
+        table.Add(results, 0, 1);
+        root.Add(Ui.Card(table), 0, 1);
         root.Add(Ui.Action("Anuluj", () => CloseSearch(null)), 0, 2);
         Content = Ui.WithClose(this, root, () => CloseSearch(null));
         query.TextChanged += (_, _) => { work?.Cancel(); results.ItemsSource = null; };

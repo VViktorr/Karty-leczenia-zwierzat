@@ -103,22 +103,21 @@ public sealed class CardPage : ContentPage
             var input = new Editor { HeightRequest = 56, WidthRequest = 265 };
             header.Add(field, input); var panel = Ui.Field(field, input); panel.Margin = new Thickness(0, 0, 12, 8); headerPanel.Add(panel);
         }
+        GridLength[] medicineColumns = [44, GridLength.Star, 82, new GridLength(0.5, GridUnitType.Star), 38];
         list.ItemsSource = rows;
         list.ItemTemplate = new DataTemplate(() =>
         {
             var check = new CheckBox { VerticalOptions = LayoutOptions.Center };
             check.SetBinding(CheckBox.IsCheckedProperty, new Binding(nameof(TreatmentRow.Printed), mode: BindingMode.TwoWay));
-            var name = new Label { FontAttributes = FontAttributes.Bold, LineBreakMode = LineBreakMode.WordWrap };
-            name.SetBinding(Label.TextProperty, nameof(TreatmentRow.Product));
-            var summary = Ui.Note(""); summary.SetBinding(Label.TextProperty, nameof(TreatmentRow.Summary));
-            var text = new VerticalStackLayout { Spacing = 3, Children = { name, summary } };
+            var name = CompactTable.Cell(nameof(TreatmentRow.Product));
+            var quantity = CompactTable.Cell("Values[Ilość wydana]", right: true);
+            var series = CompactTable.Cell("Values[Seria]");
             var remove = new Button { Text = "×", FontSize = 20, WidthRequest = 30, HeightRequest = 30,
                 MinimumWidthRequest = 30, MinimumHeightRequest = 30, Padding = 0, VerticalOptions = LayoutOptions.Center };
             SemanticProperties.SetDescription(remove, "Usuń ten lek z karty");
             ToolTipProperties.SetText(remove, "Usuń pozycję");
             remove.Clicked += async (_, _) => { if (remove.BindingContext is TreatmentRow item) await RemoveRow(item); };
-            var row = new Grid { Padding = 8, ColumnSpacing = 8, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
-            row.Add(check, 0, 0); row.Add(text, 1, 0); row.Add(remove, 2, 0); return row;
+            return CompactTable.Row(medicineColumns, false, check, name, quantity, series, remove);
         });
         list.SelectionChanged += (_, e) => Select(e.CurrentSelection.FirstOrDefault() as TreatmentRow);
         printed.CheckedChanged += (_, e) => { if (!changing && selected != null) selected.Printed = e.Value; };
@@ -168,9 +167,10 @@ public sealed class CardPage : ContentPage
             }
         }
         detail.IsEnabled = false;
-        var split = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(0.36, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(0.64, GridUnitType.Star) } } };
+        var split = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(0.56, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(0.44, GridUnitType.Star) } } };
         var drugList = new Grid { RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } }, RowSpacing = 8 };
-        drugList.Add(new VerticalStackLayout { Children = { Ui.Heading("Leki i dostawy") } }, 0, 0);
+        drugList.Add(new VerticalStackLayout { Spacing = 4, Children = { Ui.Heading("Leki i dostawy"),
+            CompactTable.Header(medicineColumns, "Druk", "Nazwa leku", "Ilość", "Seria", "") } }, 0, 0);
         list.EmptyView = new Label { Text = "Brak pozycji. Wybierz dokument powyżej lub dodaj lek ręcznie.", Margin = 12, LineBreakMode = LineBreakMode.WordWrap };
         drugList.Add(list, 0, 1);
         split.Add(Ui.Card(drugList), 0, 0); detailScroll.Content = detail;
