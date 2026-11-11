@@ -29,6 +29,29 @@ internal static class MedicineCatalogue
         return exact.Length == 1 ? exact[0] : null;
     }
 
+    internal static bool IsCattle(Variant variant) =>
+        variant.Species.StartsWith("Bydło", StringComparison.OrdinalIgnoreCase);
+
+    internal static string Withdrawal(Variant variant) => string.Join("\n", new[] {
+        variant.Meat.Length > 0 ? "Tkanki jadalne: " + variant.Meat : "",
+        variant.Milk.Length > 0 ? "Mleko: " + variant.Milk : ""
+    }.Where(value => value.Length > 0));
+
+    internal static void ApplySelected(TreatmentRow row, Entry entry, Variant variant)
+    {
+        row.Set("Dokument kontekstu JSON", "", false);
+        row.Set("Automatyczna karencja", "", false);
+        row.Set("Automatyczne dawkowanie", "", false);
+        row.Set("Gatunek", variant.Species);
+        row.Set("Droga podania", variant.Route, false);
+        row.Set("Produkt rejestru", entry.RegisterName, false);
+        row.Set("Źródło karencji", variant.Source, false);
+        row.Set("Karencja", Withdrawal(variant), false);
+        row.Set("Dawkowanie i okres stosowania", variant.Dosing, false);
+        row.Set("Status karencji", "Wybrano wariant z katalogu — " +
+            string.Join(" · ", new[] { variant.Indication, variant.Restrictions }.Where(value => value.Length > 0)), false);
+    }
+
     internal static bool Apply(TreatmentRow row, Entry? entry)
     {
         if (entry == null)
@@ -39,6 +62,8 @@ internal static class MedicineCatalogue
         row.Set("Produkt rejestru", entry.RegisterName, false);
         row.Set("Źródło karencji", entry.Source, false);
         var variants = entry.Variants.Distinct().ToArray();
+        if (row.Get("Domyślny gatunek") == "True")
+            variants = variants.Where(IsCattle).ToArray();
         if (variants.Length != 1)
         {
             row.Set("Status karencji", variants.Length == 0
@@ -56,10 +81,7 @@ internal static class MedicineCatalogue
             return false;
         }
         row.FillMissingContext(v.Species, v.Route);
-        var withdrawal = string.Join("\n", new[] {
-            v.Meat.Length > 0 ? "Tkanki jadalne: " + v.Meat : "",
-            v.Milk.Length > 0 ? "Mleko: " + v.Milk : ""
-        }.Where(value => value.Length > 0));
+        var withdrawal = Withdrawal(v);
         if (row.Get("Karencja").Length == 0) row.Set("Karencja", withdrawal, false);
         if (row.Get("Dawkowanie i okres stosowania").Length == 0)
             row.Set("Dawkowanie i okres stosowania", v.Dosing, false);

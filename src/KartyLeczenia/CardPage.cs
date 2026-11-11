@@ -125,6 +125,7 @@ public sealed class CardPage : ContentPage
         detail.Add(Ui.Heading("4. Dane wybranego leku"));
         detail.Add(Ui.Note("Wybierz lek z listy po lewej. Każde pole możesz poprawić przed wydrukiem."));
         detail.Add(new HorizontalStackLayout { Children = { printed, new Label { Text = "Uwzględnij na wydruku", VerticalOptions = LayoutOptions.Center } } });
+        detail.Add(Ui.Action("Wybierz wariant z katalogu…", ChooseCatalogueVariant));
         detail.Add(Ui.Action("Karencja z RPL…", ApplyRegistry));
         detail.Add(Ui.Action("Otwórz ChPL lub kartę UPD", async () =>
         {
@@ -285,6 +286,35 @@ public sealed class CardPage : ContentPage
         CrashLog.Write("Document.UI.Applied");
         if (withdrawal.SelectedIndex == 0) { CrashLog.Write("Document.Catalogue.Start"); await FillWithdrawals(generation); CrashLog.Write("Document.Catalogue.Finished"); }
     }
+    async Task ChooseCatalogueVariant()
+    {
+        if (selected is not { } row) return;
+        var entry = MedicineCatalogue.Match(await MedicineCatalogue.GetAsync(), row);
+        if (entry is null || entry.Excluded || entry.Variants.Length == 0)
+        {
+            status.Text = "Brak zgodnego wariantu w katalogu dla tej kartoteki.";
+            return;
+        }
+        var variants = entry.Variants.Distinct().OrderByDescending(MedicineCatalogue.IsCattle).ToArray();
+        var labels = variants.Select((v, i) =>
+            $"{i + 1}. {v.Species} · {v.Route} · {v.Indication}").ToArray();
+        var choice = await DisplayActionSheetAsync("Wybierz wariant leczenia", "Anuluj", null, labels);
+        int index = Array.IndexOf(labels, choice);
+        if (index < 0 || !ReferenceEquals(selected, row)) return;
+        var variant = variants[index];
+        var preview = string.Join("\n\n", new[] {
+            labels[index],
+            "Dawkowanie: " + (variant.Dosing.Length > 0 ? variant.Dosing : "brak danych"),
+            "Karencja: " + (MedicineCatalogue.Withdrawal(variant) is { Length: > 0 } withdrawal ? withdrawal : "brak danych"),
+            variant.Restrictions,
+            "Zastosowanie wariantu zastąpi aktualne dawkowanie i karencję tej pozycji."
+        }.Where(value => value.Length > 0));
+        if (!await DisplayAlertAsync("Zastosować wariant z katalogu?", preview, "Zastosuj", "Anuluj")
+            || !ReferenceEquals(selected, row) || !rows.Contains(row)) return;
+        MedicineCatalogue.ApplySelected(row, entry, variant);
+        Select(row);
+    }
+
     async Task FillWithdrawals(int generation)
     {
         try
