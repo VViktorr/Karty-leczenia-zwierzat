@@ -29,6 +29,7 @@ public sealed class CardPage : ContentPage
     readonly VerticalStackLayout detail = new() { Spacing = 10, Padding = 12 };
     readonly ScrollView detailScroll = new();
     readonly Label selectedMedicine = Ui.Heading("Dane leku");
+    readonly Label deliveryDetails = Ui.Note("");
     TreatmentRow? selected;
     bool changing;
     string scope = "", payer = "", recipient = "";
@@ -163,6 +164,7 @@ public sealed class CardPage : ContentPage
                 detail.Add(provenance);
                 detail.Add(registryActions);
                 detail.Add(Ui.Heading("Dane pozycji"));
+                detail.Add(deliveryDetails);
                 detail.Add(new HorizontalStackLayout { Children = { printed, new Label { Text = "Uwzględnij na wydruku", VerticalOptions = LayoutOptions.Center } } });
             }
         }
@@ -253,6 +255,9 @@ public sealed class CardPage : ContentPage
         bool changedRow = !ReferenceEquals(selected, row);
         selected = row; changing = true;
         selectedMedicine.Text = row?.Product ?? "Wybierz lek";
+        string deliveries = row?.Get("Rozbicie dostaw") ?? "";
+        deliveryDetails.IsVisible = deliveries.Length > 0;
+        deliveryDetails.Text = deliveryDetails.IsVisible ? "Rozbicie dostaw\n" + deliveries : "";
         if (changedRow) _ = detailScroll.ScrollToAsync(0, 0, false);
         foreach (var pair in editors) pair.Value.Text = row?.Get(pair.Key) ?? "";
         printed.IsChecked = row?.Printed ?? false;

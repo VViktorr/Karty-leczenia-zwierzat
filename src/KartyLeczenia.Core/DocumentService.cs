@@ -251,7 +251,7 @@ public sealed class DocumentService
                 ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II", ["Produkt"] = product,
                 ["Gatunek"] = "Bydło", ["Opis zwierząt / numer siedziby stada"] = "Bydło", ["Domyślny gatunek"] = "True",
                 ["Seria"] = V("Seria"), ["Ważność"] = expiry, ["Ilość wydana"] = quantity.ToString("0.####") + " " + V("ob_Jm"),
-                ["Karencja"] = V("Karencja"), ["Zalecenia / uwagi"] = note,
+                ["Karencja"] = V("Karencja"), ["Rozbicie dostaw"] = note,
                 ["Status karencji"] = withdrawalSource == 0 ? "Oczekuje na dopasowanie w katalogu leków" : "Dane Subiekta — do weryfikacji",
                 ["Źródło karencji"] = withdrawalSource == 0 ? "" : "Subiekt: " + withdrawal,
                 ["ID towaru"] = V("ob_TowId"), ["Symbol Subiekta"] = V("tw_Symbol")
@@ -288,7 +288,7 @@ public static class DocumentRowMerger
                 .Select(d => items.Count > 1 && d.Series.Length > 0 ? d.Series + ": " + d.Date : d.Date)
                 .Distinct(StringComparer.OrdinalIgnoreCase);
             merged.Set("Ważność", string.Join(", ", expiries), false);
-            merged.Set("Zalecenia / uwagi", string.Join("\n", items.Select(d => d.Row.Get("Zalecenia / uwagi").Trim()).Where(v => v.Length > 0).Distinct()), false);
+            merged.Set("Rozbicie dostaw", string.Join("\n", items.Select(d => d.Row.Get("Rozbicie dostaw").Trim()).Where(v => v.Length > 0).Distinct()), false);
             result.Add(merged);
         }
         return result;
