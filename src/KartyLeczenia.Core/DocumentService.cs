@@ -191,8 +191,9 @@ public sealed class DocumentService
         using var cmd = new SqlCommand($"""
             SELECT p.ob_Id, p.ob_TowId, t.tw_Symbol, t.tw_Nazwa, p.ob_Opis, p.ob_Ilosc, p.ob_IloscMag, p.ob_Jm,
               {withdrawal} AS Karencja,
-              r.mr_Id, r.mr_Ilosc, r.mr_DoId,
-              COALESCE(NULLIF(zp.ob_NumerSeryjny, ''), NULLIF(p.ob_NumerSeryjny, '')) AS Seria,
+              r.mr_Id, r.mr_Ilosc, r.mr_DoId, mag.dok_NrPelny AS NumerWz,
+              COALESCE(NULLIF(LTRIM(RTRIM(zp.ob_NumerSeryjny)), ''),
+                       NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), '')) AS Seria,
               zp.ob_Termin AS Waznosc, z.mr_Termin AS TerminRuchu
             FROM dbo.dok_Pozycja p
             LEFT JOIN dbo.tw__Towar t ON t.tw_Id=p.ob_TowId
@@ -237,6 +238,14 @@ public sealed class DocumentService
                 else note += " Nie można przeliczyć ilości dostawy — sprawdź ilość ręcznie.";
             }
             if (reader["mr_DoId"] is DBNull) note += " Brak powiązania z dostawą źródłową — sprawdź ręcznie.";
+            if (useWz)
+            {
+                string series = V("Seria");
+                string source = $"{V("NumerWz")}, poz. ID {V("ob_Id")}, ruch ID {V("mr_Id")}: " +
+                    $"{quantity:0.####} {V("ob_Jm")}; seria: {(series.Length == 0 ? "brak w odczycie" : series)}; " +
+                    $"ważność: {(expiry.Length == 0 ? "brak w odczycie" : expiry)}.";
+                note = string.IsNullOrWhiteSpace(note) ? source : source + " " + note.Trim();
+            }
             deliveries.Add(new(new TreatmentRow(new()
             {
                 ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II", ["Produkt"] = product,
