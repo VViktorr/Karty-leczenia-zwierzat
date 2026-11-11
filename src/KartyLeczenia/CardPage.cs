@@ -23,15 +23,12 @@ public sealed class CardPage : ContentPage
     readonly Picker owner = new() { Title = "", HeightRequest = 32, HorizontalOptions = LayoutOptions.Fill };
     readonly Label searchHint = Ui.Note("Wpisz numer lub nazwisko i naciśnij Enter. W oknie wyboru możesz ustawić rok lub zakres dat.");
     readonly Label status = Ui.Note("Wybierz dokument lub otwórz zapisaną kartę.");
-    readonly Label provenance = Ui.Note("Wybierz lek z listy, aby poprawić jego dane.");
-    readonly CheckBox printed = new();
     readonly DocumentService documents = new();
     readonly VerticalStackLayout detail = new() { Spacing = 4, Padding = 4 };
     readonly ScrollView detailScroll = new();
     View? medicinePanel;
     Grid? medicineGrid;
     readonly Label selectedMedicine = Ui.Heading("Dane leku");
-    readonly Label deliveryDetails = Ui.Note("");
     TreatmentRow? selected;
     bool changing;
     string scope = "", payer = "", recipient = "";
@@ -125,61 +122,20 @@ public sealed class CardPage : ContentPage
             return CompactTable.Row(medicineColumns, false, check, name, quantity, series, remove);
         });
         list.SelectionChanged += (_, e) => Select(e.CurrentSelection.FirstOrDefault() as TreatmentRow);
-        printed.CheckedChanged += (_, e) => { if (!changing && selected != null) selected.Printed = e.Value; };
         detail.Add(selectedMedicine);
-        var variantAction = Ui.Action("Wybierz wariant…", ChooseCatalogueVariant);
-        variantAction.HorizontalOptions = LayoutOptions.Start;
-        detail.Add(variantAction);
-        var registryActions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
-        registryActions.Add(Ui.Action("Karencja z RPL…", ApplyRegistry));
-        registryActions.Add(Ui.Action("Otwórz ChPL lub kartę UPD", async () =>
+        foreach (string field in new[] { "Numery zwierząt", "Rozpoznanie" })
         {
-            var source = selected?.Get("Źródło karencji")?.Split(" | ")[0];
-            if (!Uri.TryCreate(source, UriKind.Absolute, out var uri) || uri.Scheme != "https" ||
-                uri.Host is not ("rejestry.ezdrowie.gov.pl" or "rejestrymedyczne.ezdrowie.gov.pl" or "medicines.health.europa.eu"))
+            var editor = new Editor { HeightRequest = 52 };
+            editor.TextChanged += (_, e) =>
             {
-                status.Text = "Brak oficjalnego odnośnika dla wybranej pozycji.";
-                return;
-            }
-            await Launcher.Default.OpenAsync(uri);
-        }));
-
-        registryActions.Add(Ui.Action("UPD — źródło zapasowe…", () => ApplyRegistrySource(true)));
-        string[] clinicalFields = ["Numery zwierząt", "Rozpoznanie", "Gatunek", "Droga podania", "Dawkowanie i okres stosowania", "Karencja"];
-        var contextFields = new Grid { ColumnSpacing = 12, ColumnDefinitions =
-            { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Star } } };
-        detail.Add(contextFields);
-        foreach (string field in clinicalFields.Concat(CardSchema.RowFields.Concat(CardSchema.ContextFields).Except(clinicalFields)).Distinct())
-        {
-            var editor = new Editor { HeightRequest = field is "Karencja" or "Dawkowanie i okres stosowania" or "Zalecenia / uwagi" ? 52 : 32 };
-            string key = field;
-            editor.TextChanged += (_, e) => { if (!changing && selected != null) { selected.Set(key, e.NewTextValue ?? "");
-                if (key is "Gatunek" or "Droga podania")
-                {
-                    changing = true;
-                    foreach (string updated in new[] { "Karencja", "Dawkowanie i okres stosowania", "Droga podania", "Opis zwierząt / numer siedziby stada" }) editors[updated].Text = selected.Get(updated);
-                    changing = false;
-                }
-                provenance.Text = selected.RegistryStatus + "\n" + selected.Get("Źródło karencji"); } };
+                if (!changing && selected is { } row) row.Set(field, e.NewTextValue ?? "");
+            };
             editors.Add(field, editor);
-            var fieldView = Ui.Field(field, editor);
-            if (field is "Gatunek" or "Droga podania") contextFields.Add(fieldView, field == "Gatunek" ? 0 : 1, 0);
-            else detail.Add(fieldView);
-            if (field == "Rozpoznanie")
-            {
-                var choose = Ui.Action("Wybierz rozpoznanie z karty…", ChooseDiagnosis);
-                choose.HorizontalOptions = LayoutOptions.Start;
-                detail.Add(choose);
-            }
-            if (field == "Karencja")
-            {
-                detail.Add(provenance);
-                detail.Add(registryActions);
-                detail.Add(Ui.Heading("Dostawy i dane pozycji"));
-                detail.Add(deliveryDetails);
-                detail.Add(new HorizontalStackLayout { Children = { printed, new Label { Text = "Uwzględnij na wydruku", VerticalOptions = LayoutOptions.Center } } });
-            }
+            detail.Add(Ui.Field(field, editor));
         }
+        var choose = Ui.Action("Wybierz rozpoznanie z karty…", ChooseDiagnosis);
+        choose.HorizontalOptions = LayoutOptions.Start;
+        detail.Add(choose);
         detail.IsEnabled = false;
         var split = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(0.56, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(0.44, GridUnitType.Star) } } };
         var drugList = new Grid { RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } }, RowSpacing = 8 };
@@ -292,13 +248,8 @@ public sealed class CardPage : ContentPage
         bool changedRow = !ReferenceEquals(selected, row);
         selected = row; changing = true;
         selectedMedicine.Text = row?.Product ?? "Wybierz lek";
-        string deliveries = row?.Get("Rozbicie dostaw") ?? "";
-        deliveryDetails.IsVisible = deliveries.Length > 0;
-        deliveryDetails.Text = deliveryDetails.IsVisible ? "Rozbicie dostaw\n" + deliveries : "";
         if (changedRow) _ = detailScroll.ScrollToAsync(0, 0, false);
         foreach (var pair in editors) pair.Value.Text = row?.Get(pair.Key) ?? "";
-        printed.IsChecked = row?.Printed ?? false;
-        provenance.Text = row is null ? "Wybierz pozycję." : row.RegistryStatus + "\n" + row.Get("Źródło karencji");
         detail.IsEnabled = row != null;
         if (medicinePanel != null && medicineGrid != null)
         {
@@ -365,50 +316,6 @@ public sealed class CardPage : ContentPage
             CrashLog.Write($"Document.Card.Open ms={elapsed.ElapsedMilliseconds}");
         }
     }
-    async Task ChooseCatalogueVariant()
-    {
-        if (selected is not { } row) return;
-        var entry = MedicineCatalogue.Match(await MedicineCatalogue.GetAsync(), row);
-        if (entry is null || entry.Excluded || entry.Variants.Length == 0)
-        {
-            status.Text = "Brak zgodnego wariantu w katalogu dla tej kartoteki.";
-            return;
-        }
-        var variants = MedicineCatalogue.DistinctVariants(entry);
-        var species = variants.Select(v => v.Species).Distinct().OrderByDescending(s =>
-            s.StartsWith("Bydło", StringComparison.OrdinalIgnoreCase)).ToArray();
-        var chosenSpecies = species.Length == 1 ? species[0] :
-            await DisplayActionSheetAsync("Wybierz gatunek", "Anuluj", null, species);
-        if (!species.Contains(chosenSpecies) || !ReferenceEquals(selected, row)) return;
-
-        variants = variants.Where(v => v.Species == chosenSpecies).ToArray();
-        var routes = variants.Select(v => v.Route).Distinct().ToArray();
-        var chosenRoute = routes.Length == 1 ? routes[0] :
-            await DisplayActionSheetAsync("Wybierz drogę podania", "Anuluj", null, routes);
-        if (!routes.Contains(chosenRoute) || !ReferenceEquals(selected, row)) return;
-
-        variants = variants.Where(v => v.Route == chosenRoute).ToArray();
-        var labels = variants.Select((v, i) => $"{i + 1}. " +
-            (v.Indication.Length > 0 ? v.Indication : "Wariant leczenia") +
-            (v.Dosing.Length > 0 ? " · " + v.Dosing : "")).ToArray();
-        int index = variants.Length == 1 ? 0 : Array.IndexOf(labels,
-            await DisplayActionSheetAsync("Wybierz wskazanie lub schemat", "Anuluj", null, labels));
-        if (index < 0 || !ReferenceEquals(selected, row)) return;
-        var variant = variants[index];
-        var preview = string.Join("\n\n", new[] {
-            variant.Species + " · " + variant.Route,
-            variant.Indication,
-            "Dawkowanie: " + (variant.Dosing.Length > 0 ? variant.Dosing : "brak danych"),
-            "Karencja: " + (MedicineCatalogue.Withdrawal(variant) is { Length: > 0 } withdrawal ? withdrawal : "brak danych"),
-            variant.Restrictions,
-            "Zastosowanie wariantu zastąpi aktualne dawkowanie i karencję tej pozycji."
-        }.Where(value => value.Length > 0));
-        if (!await DisplayAlertAsync("Zastosować wariant z katalogu?", preview, "Zastosuj", "Anuluj")
-            || !ReferenceEquals(selected, row) || !rows.Contains(row)) return;
-        MedicineCatalogue.ApplySelected(row, entry, variant);
-        Select(row);
-    }
-
     async Task FillWithdrawals(int generation, Task<ILookup<string, MedicineCatalogue.Entry>>? catalogueLoad = null)
     {
         try
@@ -458,28 +365,6 @@ public sealed class CardPage : ContentPage
         scope = card.Fields.GetValueOrDefault("Zakres mapowania towarów", "archiwum");
         payer = recipient = header["Właściciel i adres"].Text ?? ""; changing = false;
         if (rows.Count > 0) list.SelectedItem = rows[0]; status.Text = "Otworzono kartę. Zapisane dane źródłowe pozostają zachowane.";
-    }
-    Task ApplyRegistry() => ApplyRegistrySource(false);
-    async Task ApplyRegistrySource(bool useUpd)
-    {
-        var row = selected ?? throw new InvalidOperationException("Wybierz lek.");
-        string key = AutomaticWithdrawalService.MappingKey(scope, row);
-        RegistrySelection? result;
-        if (useUpd)
-        {
-            var page = new UpdRegistryPage(row.Product, UpdService.ReadMapping(key), RegistryService.ReadMapping(key));
-            await Navigation.PushModalAsync(page); result = await page.Completion;
-        }
-        else
-        {
-            var page = new RegistryPage(row.Product, RegistryService.ReadMapping(key), row.Get("Domyślny gatunek") == "True" ? "" : row.Get("Gatunek"), row.Get("Droga podania"));
-            await Navigation.PushModalAsync(page); result = await page.Completion;
-        }
-        if (result == null || !rows.Contains(row)) return;
-        if (result.Document.UpdId != null) UpdService.SaveMapping(key, result.Document.UpdId);
-        else RegistryService.SaveMapping(key, result.Document.Id);
-        row.ApplyRegistry(result);
-        if (selected == row) Select(row); status.Text = "Zatwierdzono karencję dla wybranej pozycji.";
     }
     Task OpenInteractiveCard() => OpenInteractiveCardCore(MedicineCatalogue.GetAsync());
 
