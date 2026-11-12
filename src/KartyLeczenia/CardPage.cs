@@ -89,16 +89,14 @@ public sealed class CardPage : ContentPage
                 Grid.SetColumnSpan(searchFields[i], narrow && i == 0 ? 3 : narrow && i == 2 ? 2 : 1);
             }
         };
-        var documentActions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
-        documentActions.Add(Ui.PrimaryAction("Wyszukaj dokument", OpenDocumentSearch));
-        documentActions.Add(Ui.Action("Otwórz kartę", OpenCard)); documentActions.Add(Ui.Action("Zapisz kartę", SaveCard));
+        
 
         number.Completed += async (_, _) =>
         {
             try { await OpenDocumentSearch(); }
             catch (Exception ex) { CrashLog.Write("DocumentSearch.Enter.Failed", ex); await DisplayAlertAsync("Nie pobrano dokumentu", SubiektConnectionService.FriendlyError(ex), "OK"); }
         };
-        var documentPanel = new VerticalStackLayout { Spacing = 3, Children = { actions, documentActions, searchHint } };
+        var documentPanel = new VerticalStackLayout { Spacing = 6, Padding = new Thickness(12, 4, 12, 8), Children = { actions, searchHint } };
         var headerPanel = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
         foreach (string field in CardSchema.Fields)
         {
@@ -139,39 +137,75 @@ public sealed class CardPage : ContentPage
         detail.IsEnabled = false;
         var split = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(0.56, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(0.44, GridUnitType.Star) } } };
         var drugList = new Grid { RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } }, RowSpacing = 8 };
-        drugList.Add(new VerticalStackLayout { Spacing = 4, Children = { Ui.Heading("Leki i dostawy"),
-            CompactTable.Header(medicineColumns, "Druk", "Nazwa leku", "Ilość", "Seria", "") } }, 0, 0);
-        list.EmptyView = new Label { Text = "Brak pozycji. Wybierz dokument powyżej lub dodaj lek ręcznie.", Margin = 12, LineBreakMode = LineBreakMode.WordWrap };
+        var tableHeader = CompactTable.Header(medicineColumns, "Druk", "Nazwa leku", "Ilość", "Seria", "");
+        var count = Ui.Note("");
+        var tableHeading = new HorizontalStackLayout { Spacing = 12, Padding = new Thickness(8, 6),
+            Children = { Ui.Heading("Pozycje karty"), count } };
+        drugList.Add(new VerticalStackLayout { Children = { tableHeading, tableHeader } }, 0, 0);
+        list.EmptyView = new VerticalStackLayout {
+            HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+            Padding = 24, Spacing = 8, Children = {
+                Ui.Heading("Zacznij od dokumentu"),
+                Ui.Note("Wyszukaj fakturę, WZ lub paragon albo otwórz zapisaną kartę.")
+            }
+        };
         drugList.Add(list, 0, 1);
         medicineGrid = split;
-        var listPanel = Ui.Card(drugList);
+        var listPanel = new Border { Content = drugList, StrokeThickness = 0, Padding = 4 };
+        listPanel.SetAppThemeColor(VisualElement.BackgroundColorProperty, Colors.White, Color.FromArgb("#20242B"));
         split.Add(listPanel, 0, 0);
         Grid.SetColumnSpan(listPanel, 2);
         detailScroll.Content = detail;
         medicinePanel = Ui.Card(detailScroll);
         medicinePanel.IsVisible = false;
         split.Add(medicinePanel, 1, 0);
-        var rowActions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = {
-            Ui.Action("Uzupełnij brakujące karencje", () => FillWithdrawals(documentGeneration)),
-            Ui.Action("Dodaj pozycję ręcznie", () => { var row = new TreatmentRow(); row.Set("Produkt", "Nowa pozycja"); rows.Add(row); list.SelectedItem = row; return Task.CompletedTask; }),
-            Ui.Action("Usuń wybraną pozycję", async () => { if (selected is TreatmentRow item) await RemoveRow(item); })
+        var root = new Grid { Padding = 12, RowSpacing = 6, RowDefinitions = {
+            new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto },
+            new RowDefinition { Height = 0 }, new RowDefinition { Height = GridLength.Star },
+            new RowDefinition { Height = GridLength.Auto }
         } };
-        var root = new Grid { Padding = 8, RowSpacing = 4, RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = new GridLength(0) }, new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }, new RowDefinition { Height = GridLength.Auto } } };
-        var cardDetails = Ui.Card(new ScrollView { Content = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading("Dane karty"), headerPanel } } });
+        var cardDetails = Ui.Card(new ScrollView { Content = headerPanel });
         cardDetails.IsVisible = false;
-        documentActions.Add(Ui.Action("Pokaż / ukryj dane karty", () => { cardDetails.IsVisible = !cardDetails.IsVisible; root.RowDefinitions[1].Height = new GridLength(cardDetails.IsVisible ? 225 : 0); return Task.CompletedTask; }));
-        root.Add(documentPanel, 0, 0); root.Add(cardDetails, 0, 1); foreach (var action in rowActions.Children.ToArray())
+        var edit = Ui.Action("Edytuj A4", OpenInteractiveCard);
+        var print = Ui.Action("Drukuj", () => Preview("print"));
+        var pdf = Ui.Action("PDF", () => Preview("pdf"));
+        var save = Ui.Action("Zapisz", SaveCard);
+        void RefreshActions()
         {
-            rowActions.Children.Remove(action);
-            documentActions.Children.Add(action);
-        } root.Add(split, 0, 3); var footer = new Grid { ColumnSpacing = 12, ColumnDefinitions =
-            { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
-        footer.Add(status, 0, 0);
-        var outputActions = new HorizontalStackLayout { Spacing = 8, Children = {
-            Ui.Action("Edytuj kartę A4", OpenInteractiveCard), Ui.Action("Drukuj", () => Preview("print")),
-            Ui.PrimaryAction("Eksport do PDF", () => Preview("pdf")) } };
-        footer.Add(outputActions, 1, 0);
-        root.Add(footer, 0, 4);
+            tableHeader.IsVisible = rows.Count > 0;
+            count.Text = rows.Count > 0 ? rows.Count.ToString() : "";
+            edit.IsEnabled = print.IsEnabled = pdf.IsEnabled = save.IsEnabled = rows.Count > 0;
+        }
+        rows.CollectionChanged += (_, _) => RefreshActions();
+        RefreshActions();
+        var toolbar = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = {
+            Ui.PrimaryAction("Szukaj dokumentu", OpenDocumentSearch), Ui.Action("Otwórz kartę", OpenCard),
+            save, edit, print, pdf, Ui.Action("Więcej…", async () =>
+            {
+                switch (await DisplayActionSheetAsync("Akcje karty", "Anuluj", null,
+                    "Dane karty", "Dodaj lek", "Uzupełnij karencje"))
+                {
+                    case "Dane karty":
+                        cardDetails.IsVisible = !cardDetails.IsVisible;
+                        root.RowDefinitions[2].Height = new GridLength(cardDetails.IsVisible ? 225 : 0);
+                        break;
+                    case "Dodaj lek":
+                        var row = new TreatmentRow();
+                        row.Set("Produkt", "Nowa pozycja");
+                        rows.Add(row);
+                        list.SelectedItem = row;
+                        break;
+                    case "Uzupełnij karencje":
+                        await FillWithdrawals(documentGeneration);
+                        break;
+                }
+            })
+        } };
+        root.Add(toolbar, 0, 0);
+        root.Add(documentPanel, 0, 1);
+        root.Add(cardDetails, 0, 2);
+        root.Add(split, 0, 3);
+        root.Add(status, 0, 4);
         Content = root;
         number.TextChanged += async (_, _) => await RefreshDocumentSuggestions();
         documentSuggestions.SelectedIndexChanged += (_, _) =>
