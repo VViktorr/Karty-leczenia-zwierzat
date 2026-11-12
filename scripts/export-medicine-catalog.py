@@ -80,6 +80,12 @@ for symbol, name, _, _, _, _, rpl_id, status in list(workbook["Kartoteki"].value
     if not excluded:
         for row in variants[key[0]]:
             source = source_url(row[10])
+            if not source and not re.search(r"zawieszon|wycofan|archiwaln", val(status), re.IGNORECASE):
+                manufacturer = re.search(
+                    r"https://www\.zoetis\.com\.pl/charakterystyki-produktow/[^\s;()]+", val(row[10])
+                )
+                if manufacturer:
+                    source = manufacturer.group()
             if verified and rpl_id and document_id(row[2]) == document_id(rpl_id) and source:
                 matching.append((row, source))
             elif (upd := upd_source(row, decision, choice, val(status))):
