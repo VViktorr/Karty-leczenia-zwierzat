@@ -1055,6 +1055,16 @@ INSERT INTO #Rpl (Symbol, IdRpl) VALUES
 (N'000003358', N'100490423'),
 (N'000003356', N'100490423');
 
+-- Pierwsze dwa wpisy to odniesienia do produktow leczniczych dla ludzi.
+INSERT INTO #Rpl (Symbol, IdRpl) VALUES
+(N'02641', N'100148060'),
+(N'000003130', N'100056345'),
+(N'05275', N'18712'),
+(N'05258', N'18712'),
+(N'000003025', N'100435456'),
+(N'000000000000001649', N'100304949'),
+(N'05044', N'24876');
+
 ;WITH Mapowanie AS (
     SELECT Symbol, MIN(IdRpl) AS IdRpl
     FROM #Rpl GROUP BY Symbol HAVING COUNT(DISTINCT IdRpl) = 1
