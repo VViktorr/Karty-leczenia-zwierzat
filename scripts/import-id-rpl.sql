@@ -1008,6 +1008,16 @@ INSERT INTO #Rpl (Symbol, IdRpl) VALUES
 (N'PKO484', N'17238'),
 (N'Z678', N'20048');
 
+-- Kartoteki zweryfikowane w katalogu ze statusem RPL PL.
+INSERT INTO #Rpl (Symbol, IdRpl) VALUES
+(N'0000003314(1)(1)', N'19772'),
+(N'0000003314(1)', N'19772'),
+(N'0000003314', N'19772'),
+(N'0000003807', N'19773'),
+(N'0000003807(1)(1)', N'19773'),
+(N'0000003807(1)', N'19773'),
+(N'0000003131(1)', N'16594');
+
 ;WITH Mapowanie AS (
     SELECT Symbol, MIN(IdRpl) AS IdRpl
     FROM #Rpl GROUP BY Symbol HAVING COUNT(DISTINCT IdRpl) = 1
