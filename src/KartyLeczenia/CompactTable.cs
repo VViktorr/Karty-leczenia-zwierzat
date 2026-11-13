@@ -2,6 +2,16 @@ namespace KartyLeczenia.Views;
 
 internal static class CompactTable
 {
+    sealed class RowHeight : BindableObject
+    {
+        internal static readonly BindableProperty ValueProperty =
+            BindableProperty.Create(nameof(Value), typeof(double), typeof(RowHeight), 20d);
+
+        public double Value { get => (double)GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
+    }
+
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TableColumns, RowHeight> RowHeights = new();
+
     internal static Label Cell(string path, bool right = false, string? format = null)
     {
         var label = new Label { FontSize = 12, LineBreakMode = LineBreakMode.TailTruncation,
@@ -21,6 +31,9 @@ internal static class CompactTable
         var row = new Grid { Padding = new Thickness(3, 0), ColumnSpacing = 3,
             MinimumHeightRequest = header ? 22 : 20,
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = 1 } } };
+        var height = RowHeights.GetValue(widths, _ => new RowHeight());
+        if (!header)
+            row.SetBinding(VisualElement.MinimumHeightRequestProperty, new Binding(nameof(RowHeight.Value), source: height));
         if (header)
             row.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#EAEAEA"), Color.FromArgb("#27374A"));
         if (!header)
@@ -53,6 +66,51 @@ internal static class CompactTable
         line.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#B8B8B8"), Color.FromArgb("#344457"));
         row.Add(line, 0, 1);
         Grid.SetColumnSpan(line, widths.Count);
+        if (header) AttachHeightGrip(row, height, widths.Count);
         return row;
+    }
+
+    static void AttachHeightGrip(Grid row, RowHeight height, int columnCount)
+    {
+#if WINDOWS
+        var grip = new BoxView { Color = Colors.Transparent, HeightRequest = 7,
+            VerticalOptions = LayoutOptions.End, Margin = new Thickness(0, 0, 0, -3), ZIndex = 11 };
+        row.Add(grip, 0, 0);
+        Grid.SetColumnSpan(grip, columnCount);
+        Grid.SetRowSpan(grip, 2);
+
+        void Attach()
+        {
+            if (grip.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement element) return;
+            uint? pointerId = null;
+            double start = 0, initialHeight = 0;
+            element.PointerPressed += (_, args) =>
+            {
+                var point = args.GetCurrentPoint(null);
+                if (!point.Properties.IsLeftButtonPressed || !element.CapturePointer(args.Pointer)) return;
+                pointerId = args.Pointer.PointerId;
+                start = point.Position.Y;
+                initialHeight = height.Value;
+                args.Handled = true;
+            };
+            element.PointerMoved += (_, args) =>
+            {
+                if (pointerId != args.Pointer.PointerId) return;
+                height.Value = Math.Clamp(initialHeight + args.GetCurrentPoint(null).Position.Y - start, 18, 100);
+                args.Handled = true;
+            };
+            element.PointerReleased += (_, args) =>
+            {
+                if (pointerId != args.Pointer.PointerId) return;
+                pointerId = null;
+                element.ReleasePointerCapture(args.Pointer);
+                args.Handled = true;
+            };
+            element.PointerCaptureLost += (_, _) => pointerId = null;
+        }
+
+        grip.HandlerChanged += (_, _) => Attach();
+        Attach();
+#endif
     }
 }
