@@ -107,10 +107,10 @@ public sealed class DocumentService
         DateColumns[key] = value;
         return value;
     }
-    public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token, DocumentSearchKinds kinds = DocumentSearchKinds.All, DateTime? dateFrom = null, DateTime? dateUntil = null, int limit = 21)
+    public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token, DocumentSearchKinds kinds = DocumentSearchKinds.All, DateTime? dateFrom = null, DateTime? dateUntil = null, int limit = 21, bool allowEmpty = false)
     {
         string fragment = input.Trim();
-        if (fragment.Length < 1 || kinds == DocumentSearchKinds.None) return [];
+        if ((!allowEmpty && fragment.Length < 1) || kinds == DocumentSearchKinds.None) return [];
         string escaped = fragment.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace("[", "~[");
         await using var con = new SqlConnection(options.BuildConnectionString());
         await con.OpenAsync(token);
@@ -133,7 +133,7 @@ public sealed class DocumentService
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
             WHERE ((@invoices=1 AND d.dok_NrPelny LIKE N'FS %') OR (@receipts=1 AND d.dok_NrPelny LIKE N'PA %') OR (@warehouse=1 AND d.dok_NrPelny LIKE N'WZ %'))
               AND d.dok_MagId = @warehouseId
-              AND (d.dok_NrPelny LIKE @fragment ESCAPE N'~'
+              AND (@empty=1 OR d.dok_NrPelny LIKE @fragment ESCAPE N'~'
                 OR pl.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
                 OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
                 OR od.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
@@ -142,12 +142,13 @@ public sealed class DocumentService
             ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, d.dok_Id DESC
             """, con) { CommandTimeout = 10 };
         cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
-        cmd.Parameters.Add("@limit", SqlDbType.Int).Value = Math.Clamp(limit, 1, 101);
+        cmd.Parameters.Add("@limit", SqlDbType.Int).Value = Math.Clamp(limit, 1, allowEmpty ? 501 : 101);
         cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = (object?)dateFrom ?? DBNull.Value;
         cmd.Parameters.Add("@until", SqlDbType.DateTime).Value = (object?)dateUntil ?? DBNull.Value;
         cmd.Parameters.Add("@invoices", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Invoices);
         cmd.Parameters.Add("@receipts", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Receipts);
         cmd.Parameters.Add("@warehouse", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.WarehouseReleases);
+        cmd.Parameters.Add("@empty", SqlDbType.Bit).Value = fragment.Length == 0;
         cmd.Parameters.Add("@fragment", SqlDbType.NVarChar, 250).Value = "%" + escaped + "%";
         cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
         var found = new List<DocumentSuggestion>();

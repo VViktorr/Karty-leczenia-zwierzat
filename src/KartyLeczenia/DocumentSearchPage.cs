@@ -3,7 +3,12 @@ namespace KartyLeczenia.Views;
 public sealed class DocumentSearchPage : ContentPage
 {
     readonly ConnectionOptions options;
-    readonly DocumentSearchKinds kinds;
+    DocumentSearchKinds kinds;
+    readonly DocumentSearchKinds initialKinds;
+    readonly record struct SearchKey(DocumentSearchKinds Kinds, string Text, DateTime? From, DateTime? Until);
+    sealed record CachedList(long SavedAt, List<DocumentSuggestion> Rows);
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ConnectionOptions,
+        Dictionary<SearchKey, CachedList>> Cache = new();
     readonly Entry query = new() { Placeholder = "Numer dokumentu, nazwisko lub nazwa klienta", MaxLength = 100, WidthRequest = 450 };
     readonly Picker year = new() { Title = "Rok", WidthRequest = 180 };
     readonly DatePicker from = new() { Format = "dd.MM.yyyy", WidthRequest = 160 }, until = new() { Format = "dd.MM.yyyy", WidthRequest = 160 };
@@ -16,7 +21,7 @@ public sealed class DocumentSearchPage : ContentPage
     public Task<DocumentSuggestion?> Completion => completion.Task;
     public DocumentSearchPage(ConnectionOptions connection, string input, DocumentSearchKinds selectedKinds)
     {
-        options = connection; kinds = selectedKinds; Title = "Wybierz dokument";
+        options = connection; initialKinds = kinds = selectedKinds; Title = "Wybierz dokument";
         query.Text = input;
         int thisYear = DateTime.Today.Year;
         year.Items.Add("Wszystkie lata");
@@ -27,8 +32,14 @@ public sealed class DocumentSearchPage : ContentPage
         if (documentYear.Success && year.Items.Contains(documentYear.Groups[1].Value)) year.SelectedItem = documentYear.Groups[1].Value;
         from.Date = new DateTime(thisYear, 1, 1); until.Date = new DateTime(thisYear, 12, 31);
         var dates = new HorizontalStackLayout { Spacing = 12, IsVisible = false, Children = { Ui.Field("Od", from), Ui.Field("Do (włącznie)", until) } };
-        var filter = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.End, Children = { Ui.Field("Numer lub klient", query), Ui.Field("Rok / okres", year), Ui.PrimaryAction("Szukaj", Search) } };
-        var top = new VerticalStackLayout { Spacing = 10, Children = { Ui.Heading("Wyszukaj i wybierz dokument"), filter, dates, status } };
+        var filter = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.End, Children = { Ui.Field("Numer lub klient", query), Ui.Field("Rok / okres", year), Ui.PrimaryAction("Szukaj", () => Search(force: true)) } };
+        var tabs = new HorizontalStackLayout { Spacing = 4, Children = {
+            Ui.Action("FS (Alt+1)", () => SelectKind(DocumentSearchKinds.Invoices)),
+            Ui.Action("Paragony (Alt+2)", () => SelectKind(DocumentSearchKinds.Receipts)),
+            Ui.Action("WZ", () => SelectKind(DocumentSearchKinds.WarehouseReleases)),
+            Ui.Action("Wybrane typy", () => SelectKind(initialKinds))
+        } };
+        var top = new VerticalStackLayout { Spacing = 10, Children = { Ui.Heading("Wyszukaj i wybierz dokument"), tabs, filter, dates, status } };
         results.EmptyView = new Label { Text = "Brak wyników. Zmień nazwę, numer albo rok.", Margin = 16 };
         var columns = new TableColumns(100, 165, GridLength.Star, 145, new GridLength(0.65, GridUnitType.Star));
         results.ItemTemplate = new DataTemplate(() => CompactTable.Row(columns, false,
@@ -49,17 +60,42 @@ public sealed class DocumentSearchPage : ContentPage
         root.Add(Ui.Card(table), 0, 1);
         root.Add(Ui.Action("Anuluj", () => CloseSearch(null)), 0, 2);
         Content = Ui.WithClose(this, root, () => CloseSearch(null));
-        query.TextChanged += (_, _) => { work?.Cancel(); results.ItemsSource = null; };
+        query.TextChanged += (_, _) => { work?.Cancel(); status.Text = "Naciśnij Enter, aby wyszukać. Możesz nadal wybrać dokument z listy."; };
         query.Completed += async (_, _) => await Search();
         year.SelectedIndexChanged += async (_, _) => { dates.IsVisible = year.SelectedItem as string == "Zakres dat"; if (initialized) await Search(); };
+#if WINDOWS
+        HandlerChanged += (_, _) =>
+        {
+            if (Handler?.PlatformView is not Microsoft.UI.Xaml.UIElement view) return;
+            void AddShortcut(Windows.System.VirtualKey key, DocumentSearchKinds kind)
+            {
+                var shortcut = new Microsoft.UI.Xaml.Input.KeyboardAccelerator
+                {
+                    Key = key, Modifiers = Windows.System.VirtualKeyModifiers.Menu
+                };
+                shortcut.Invoked += async (_, args) =>
+                {
+                    args.Handled = true;
+                    await SelectKind(kind);
+                };
+                view.KeyboardAccelerators.Add(shortcut);
+            }
+            AddShortcut(Windows.System.VirtualKey.Number1, DocumentSearchKinds.Invoices);
+            AddShortcut(Windows.System.VirtualKey.Number2, DocumentSearchKinds.Receipts);
+        };
+#endif
         Loaded += async (_, _) => { if (initialized) return; initialized = true; await Search(); };
     }
-    async Task Search()
+    Task SelectKind(DocumentSearchKinds kind)
+    {
+        kinds = kind;
+        return Search();
+    }
+
+    async Task Search(bool force = false)
     {
         work?.Cancel();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20)); work = cts;
-        results.ItemsSource = null;
-        if (string.IsNullOrWhiteSpace(query.Text)) { status.Text = "Wpisz numer, nazwisko lub nazwę klienta."; work = null; return; }
         DateTime? start = null, end = null;
         string selected = year.SelectedItem as string ?? "Wszystkie lata";
         if (int.TryParse(selected, out int y)) { start = new DateTime(y, 1, 1); end = start.Value.AddYears(1); }
@@ -70,19 +106,37 @@ public sealed class DocumentSearchPage : ContentPage
             if (last < start.Value) { status.Text = "Data końcowa nie może poprzedzać początkowej."; work = null; return; }
             end = last.AddDays(1);
         }
-        status.Text = "Wyszukiwanie…";
+        var key = new SearchKey(kinds, (query.Text ?? "").Trim(), start, end);
+        var cache = Cache.GetOrCreateValue(options);
+        foreach (var expired in cache.Where(item => Environment.TickCount64 - item.Value.SavedAt >= 300_000).Select(item => item.Key).ToArray())
+            cache.Remove(expired);
+        if (!force && cache.TryGetValue(key, out var saved))
+        {
+            ApplyResults(saved.Rows);
+            work = null;
+            return;
+        }
+        status.Text = results.ItemsSource is null ? "Wczytywanie dokumentów…" :
+            "Odświeżanie… Nadal możesz przewijać i wybierać dokumenty z poprzedniej listy.";
         try
         {
-            var found = await service.SearchAsync(options, query.Text.Trim(), cts.Token, kinds, start, end, 101);
+            var found = await service.SearchAsync(options, key.Text, cts.Token, key.Kinds, start, end, 501, allowEmpty: true);
             if (cts.IsCancellationRequested || closing) return;
-            results.ItemsSource = found.Take(100).ToList();
-            status.Text = found.Count > 100 ? "Ponad 100 wyników. Zawęź nazwę, numer lub okres. Kliknij dokument, aby go pobrać." :
-                found.Count == 0 ? "Brak dokumentów w wybranym okresie. Spróbuj opcji „Wszystkie lata”." : $"Dokumenty: {found.Count}. Kliknij właściwy dokument — dane zostaną pobrane automatycznie.";
+            if (cache.Count >= 32) cache.Remove(cache.MinBy(item => item.Value.SavedAt).Key);
+            cache[key] = new(Environment.TickCount64, found);
+            ApplyResults(found);
         }
         catch (OperationCanceledException) { if (!closing && ReferenceEquals(work, cts)) status.Text = "Wyszukiwanie anulowane lub przekroczono czas oczekiwania."; }
         catch (Exception ex) { CrashLog.Write("DocumentSearch.Query.Failed", ex); if (!closing && ReferenceEquals(work, cts)) status.Text = SubiektConnectionService.FriendlyError(ex); }
         finally { if (ReferenceEquals(work, cts)) work = null; }
     }
+    void ApplyResults(List<DocumentSuggestion> found)
+    {
+        results.ItemsSource = found.Take(500).ToList();
+        status.Text = found.Count > 500 ? "Pokazano 500 dokumentów. Zawęź okres lub wpisz numer albo klienta." :
+            found.Count == 0 ? "Brak dokumentów dla wybranych filtrów." : $"Dokumenty: {found.Count}. Kliknij dokument, aby go pobrać.";
+    }
+
     async Task CloseSearch(DocumentSuggestion? chosen)
     {
         if (closing) return;
