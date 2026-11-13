@@ -2,8 +2,7 @@ namespace KartyLeczenia.Views;
 
 internal sealed class InteractiveCardPage : ContentPage
 {
-    static readonly GridLength[] Columns = [46, 145, 220, 190, 190, 135, 285, 185, 150];
-    static readonly double TableWidth = Columns.Sum(column => column.Value) + 52;
+    readonly TableColumns columns = new(46, 145, 220, 190, 190, 135, 285, 185, 150);
 
     internal InteractiveCardPage(IReadOnlyDictionary<string, Editor> header, IEnumerable<TreatmentRow> rows,
         Func<TreatmentRow, MedicineCatalogue.Entry?> match, Func<ContentPage, string, Task> output)
@@ -18,8 +17,8 @@ internal sealed class InteractiveCardPage : ContentPage
             fields.Add(Ui.Field(pair.Key, input));
         }
         var details = new VerticalStackLayout { Children = { fields }, IsVisible = false };
-        var table = new VerticalStackLayout { Spacing = 1, WidthRequest = TableWidth, HorizontalOptions = LayoutOptions.Start, Children = {
-            CompactTable.Header(Columns, "Druk", "Zwierzęta", "Lek", "Ilość / seria", "Droga podania",
+        var table = new VerticalStackLayout { Spacing = 1, HorizontalOptions = LayoutOptions.Start, Children = {
+            CompactTable.Header(columns, "Druk", "Zwierzęta", "Lek", "Ilość / seria", "Droga podania",
                 "Rozpoznanie", "Dawkowanie", "Karencja", "Uwagi") } };
         var extraFields = new List<View>();
         foreach (var row in rows) table.Add(EditRow(row, match(row), extraFields));
@@ -39,13 +38,15 @@ internal sealed class InteractiveCardPage : ContentPage
             new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }
         } };
         root.Add(toolbar, 0, 0);
-        root.Add(new ScrollView { Orientation = ScrollOrientation.Both, Content = new VerticalStackLayout {
-            WidthRequest = TableWidth, Spacing = 8, Children = { details, table }
-        } }, 0, 1);
+        var content = new VerticalStackLayout { Spacing = 8, Children = { details, table } };
+        root.Add(new ScrollView { Orientation = ScrollOrientation.Both, Content = content }, 0, 1);
+        void UpdateWidth() => content.WidthRequest = columns.FixedWidth + 30;
+        columns.WidthChanged += UpdateWidth;
+        UpdateWidth();
         Content = Ui.WithClose(this, root, async () => { await Navigation.PopModalAsync(); });
     }
 
-    static Grid EditRow(TreatmentRow row, MedicineCatalogue.Entry? entry, List<View> extraFields)
+    Grid EditRow(TreatmentRow row, MedicineCatalogue.Entry? entry, List<View> extraFields)
     {
         var editors = new Dictionary<string, Editor>();
         bool refreshing = false;
@@ -139,7 +140,7 @@ internal sealed class InteractiveCardPage : ContentPage
             field.IsVisible = false;
             extraFields.Add(field);
         }
-        var line = CompactTable.Row(Columns, false, printed,
+        var line = CompactTable.Row(columns, false, printed,
             new VerticalStackLayout { Children = { species, description, count } },
             Field("Produkt", "Nazwa leku"),
             new VerticalStackLayout { Children = { Field("Ilość wydana", "Ilość"), Field("Seria", "Seria"), expiry } },

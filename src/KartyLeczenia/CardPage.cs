@@ -103,7 +103,7 @@ public sealed class CardPage : ContentPage
             var input = new Editor { HeightRequest = 56, WidthRequest = 265 };
             header.Add(field, input); var panel = Ui.Field(field, input); panel.Margin = new Thickness(0, 0, 12, 8); headerPanel.Add(panel);
         }
-        GridLength[] medicineColumns = [44, GridLength.Star, 82, new GridLength(0.5, GridUnitType.Star), 38];
+        var medicineColumns = new TableColumns(44, GridLength.Star, 82, new GridLength(0.5, GridUnitType.Star), 38);
         list.ItemsSource = rows;
         list.ItemTemplate = new DataTemplate(() =>
         {

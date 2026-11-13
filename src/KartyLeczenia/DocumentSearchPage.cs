@@ -30,7 +30,7 @@ public sealed class DocumentSearchPage : ContentPage
         var filter = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.End, Children = { Ui.Field("Numer lub klient", query), Ui.Field("Rok / okres", year), Ui.PrimaryAction("Szukaj", Search) } };
         var top = new VerticalStackLayout { Spacing = 10, Children = { Ui.Heading("Wyszukaj i wybierz dokument"), filter, dates, status } };
         results.EmptyView = new Label { Text = "Brak wyników. Zmień nazwę, numer albo rok.", Margin = 16 };
-        GridLength[] columns = [100, 165, GridLength.Star, 145, new GridLength(0.65, GridUnitType.Star)];
+        var columns = new TableColumns(100, 165, GridLength.Star, 145, new GridLength(0.65, GridUnitType.Star));
         results.ItemTemplate = new DataTemplate(() => CompactTable.Row(columns, false,
             CompactTable.Cell(nameof(DocumentSuggestion.Date), format: "{0:dd.MM.yyyy}"),
             CompactTable.Cell(nameof(DocumentSuggestion.Number)),

@@ -11,12 +11,12 @@ internal static class CompactTable
         return label;
     }
 
-    internal static Grid Header(GridLength[] widths, params string[] headings) =>
+    internal static Grid Header(TableColumns widths, params string[] headings) =>
         Row(widths, true, headings.Select(text => new Label { Text = text, FontSize = 12,
             FontAttributes = FontAttributes.Bold, VerticalTextAlignment = TextAlignment.Center,
             LineBreakMode = LineBreakMode.TailTruncation }).ToArray());
 
-    internal static Grid Row(GridLength[] widths, bool header, params View[] cells)
+    internal static Grid Row(TableColumns widths, bool header, params View[] cells)
     {
         var row = new Grid { Padding = new Thickness(3, 0), ColumnSpacing = 3,
             MinimumHeightRequest = header ? 22 : 20,
@@ -32,9 +32,17 @@ internal static class CompactTable
             states.States.Add(selected);
             VisualStateManager.SetVisualStateGroups(row, new VisualStateGroupList { states });
         }
-        foreach (var width in widths) row.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
-        for (int i = 0; i < cells.Length; i++) row.Add(cells[i], i, 0);
-        for (int i = 1; i < widths.Length; i++)
+        for (int i = 0; i < widths.Count; i++)
+        {
+            var column = new ColumnDefinition();
+            column.SetBinding(ColumnDefinition.WidthProperty, new Binding(nameof(TableColumns.Slot.Width), source: widths.Position(i)));
+            row.ColumnDefinitions.Add(column);
+            var cell = cells[i];
+            cell.SetBinding(Grid.ColumnProperty, new Binding(nameof(TableColumns.Slot.Index), source: widths.Column(i)));
+            row.Children.Add(cell);
+            if (header) widths.AttachHeader(row, cell, i);
+        }
+        for (int i = 1; i < widths.Count; i++)
         {
             var divider = new BoxView { WidthRequest = 1, HorizontalOptions = LayoutOptions.Start, InputTransparent = true };
             divider.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#AAAAAA"), Color.FromArgb("#455267"));
@@ -44,7 +52,7 @@ internal static class CompactTable
         var line = new BoxView { HeightRequest = 1, InputTransparent = true };
         line.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#B8B8B8"), Color.FromArgb("#344457"));
         row.Add(line, 0, 1);
-        Grid.SetColumnSpan(line, widths.Length);
+        Grid.SetColumnSpan(line, widths.Count);
         return row;
     }
 }
