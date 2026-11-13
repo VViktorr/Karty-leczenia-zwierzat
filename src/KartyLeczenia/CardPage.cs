@@ -46,27 +46,18 @@ public sealed class CardPage : ContentPage
         var searchTypes = new HorizontalStackLayout { Spacing = 6, HorizontalOptions = LayoutOptions.Start, VerticalOptions = LayoutOptions.Center };
         foreach (var item in new[] { (Toggle: searchInvoices, Title: "FS"), (Toggle: searchWarehouse, Title: "WZ"), (Toggle: searchReceipts, Title: "PA") })
         {
-            item.Toggle.WidthRequest = item.Toggle.MinimumWidthRequest = 28;
-            item.Toggle.HeightRequest = item.Toggle.MinimumHeightRequest = 28;
-            item.Toggle.Margin = 0; item.Toggle.HorizontalOptions = LayoutOptions.End; item.Toggle.VerticalOptions = LayoutOptions.Center;
-            item.Toggle.Color = Color.FromArgb("#14B8A6");
+            item.Toggle.VerticalOptions = LayoutOptions.Center;
             SemanticProperties.SetDescription(item.Toggle, "Uwzględnij dokumenty " + item.Title);
-            var label = new Label { Text = item.Title, FontSize = 12, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center, VerticalTextAlignment = TextAlignment.Center };
-            var pair = new Grid { ColumnSpacing = 2, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = new GridLength(28) } } };
-            pair.Add(label, 0, 0); pair.Add(item.Toggle, 1, 0);
-            var frame = new Border { Content = pair, WidthRequest = 58, HeightRequest = 30, Padding = new Thickness(5, 0, 1, 0), StrokeThickness = 1,
-                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(5) } };
-            void UpdateFilterAppearance()
+            var label = new Label { Text = item.Title, FontSize = 12, VerticalOptions = LayoutOptions.Center };
+            var pair = new HorizontalStackLayout
             {
-                frame.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb(item.Toggle.IsChecked ? "#CCFBF1" : "#F8FAFC"), Color.FromArgb(item.Toggle.IsChecked ? "#173C40" : "#1E293B"));
-                frame.Stroke = new SolidColorBrush(Color.FromArgb(item.Toggle.IsChecked ? "#14B8A6" : "#64748B"));
-                label.SetAppThemeColor(Label.TextColorProperty, Color.FromArgb(item.Toggle.IsChecked ? "#115E59" : "#475569"), Color.FromArgb(item.Toggle.IsChecked ? "#CCFBF1" : "#CBD5E1"));
-            }
+                Spacing = 2, VerticalOptions = LayoutOptions.Center, Children = { label, item.Toggle }
+            };
             var tap = new TapGestureRecognizer();
             tap.Tapped += (_, _) => item.Toggle.IsChecked = !item.Toggle.IsChecked;
             label.GestureRecognizers.Add(tap);
-            item.Toggle.CheckedChanged += async (_, _) => { UpdateFilterAppearance(); await RefreshDocumentSuggestions(); };
-            UpdateFilterAppearance(); searchTypes.Add(frame);
+            item.Toggle.CheckedChanged += async (_, _) => await RefreshDocumentSuggestions();
+            searchTypes.Add(pair);
         }
         var actions = new Grid { ColumnSpacing = 8, RowSpacing = 4,
             ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
