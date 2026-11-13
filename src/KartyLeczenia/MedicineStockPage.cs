@@ -26,6 +26,8 @@ public sealed class MedicineStockPage : ContentPage
     List<MedicineExpiry> expiryRows = [];
     bool loading, loaded, openingPrint;
     ConnectionOptions? priceSelectionConnection;
+    ConnectionOptions? loadedConnection;
+    long lastRefreshTick;
 
     public MedicineStockPage(AppState state, bool prices)
     {
@@ -198,6 +200,8 @@ public sealed class MedicineStockPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        if (loaded && ReferenceEquals(loadedConnection, state.ValidatedConnection) &&
+            Environment.TickCount64 - lastRefreshTick < 30_000) return;
         await Refresh();
     }
 
@@ -213,6 +217,7 @@ public sealed class MedicineStockPage : ContentPage
         }
 
         loading = true;
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
         filter.IsEnabled = priceBasis.IsEnabled = false;
         status.Text = "Pobieranie danych z Subiekta…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -247,8 +252,12 @@ public sealed class MedicineStockPage : ContentPage
                 status.Text = "Zmieniono połączenie z bazą. Kliknij „Odśwież”.";
                 return;
             }
+            var readMilliseconds = elapsed.ElapsedMilliseconds;
+            loadedConnection = options;
+            lastRefreshTick = Environment.TickCount64;
             loaded = true;
             ShowRows();
+            CrashLog.Write($"{(prices ? "MedicinePrices" : "MedicineExpiries")}.Refresh readMs={readMilliseconds}, rowsMs={elapsed.ElapsedMilliseconds - readMilliseconds}");
         }
         catch (OperationCanceledException) { status.Text = "Przekroczono czas odczytu. Spróbuj odświeżyć listę."; }
         catch (Exception ex)
