@@ -81,7 +81,7 @@ public sealed class MedicineStockPage : ContentPage
             actions.Add(filter, 1, 0);
         }
         actions.Add(refresh, 2, 0);
-        var header = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading(Title), actions } };
+        var header = new VerticalStackLayout { Spacing = 4, Children = { actions } };
         if (prices)
         {
             withdrawalSource.ItemsSource = new[] { "Katalog SQLite (ChPL)", "Opis leku" }
@@ -121,7 +121,7 @@ public sealed class MedicineStockPage : ContentPage
         header.Children.Add(status);
         var root = new Grid
         {
-            Padding = 18, RowSpacing = 10,
+            Padding = prices ? 12 : 4, RowSpacing = 4,
             RowDefinitions =
             {
                 new RowDefinition { Height = GridLength.Auto },
@@ -143,7 +143,7 @@ public sealed class MedicineStockPage : ContentPage
             table.Add(list, 0, 1);
             root.Add(Ui.Card(table), 0, 1);
         }
-        else root.Add(Ui.Card(CreateExpiryTable()), 0, 1);
+        else root.Add(new Border { Content = CreateExpiryTable(), Stroke = new SolidColorBrush(Color.FromArgb("#999999")), StrokeThickness = 1, Padding = 0 }, 0, 1);
         Content = root;
         search.TextChanged += (_, _) => ShowRows();
         priceBasis.SelectedIndexChanged += async (_, _) => { if (prices && !loading) await Refresh(); };
@@ -299,7 +299,7 @@ public sealed class MedicineStockPage : ContentPage
         for (int i = 0; i < expiryColumns.Length; i++)
         {
             int column = i;
-            var button = new Button { Padding = new Thickness(4, 0), MinimumHeightRequest = 26,
+            var button = new Button { Padding = new Thickness(4, 0), MinimumHeightRequest = 22, HeightRequest = 22, BorderWidth = 0,
                 CornerRadius = 0, FontSize = 12, BackgroundColor = Colors.Transparent };
             button.Clicked += (_, _) =>
             {
@@ -370,10 +370,9 @@ public sealed class MedicineStockPage : ContentPage
     View CreateExpiryRow()
     {
         var name = CompactTable.Cell(nameof(ExpiryRow.Name));
-        name.SetBinding(IsVisibleProperty, nameof(ExpiryRow.IsDetail));
-        var toggle = new Button { Padding = new Thickness(4, 0), MinimumHeightRequest = 24,
+        var toggle = new Button { Padding = 0, MinimumHeightRequest = 18, HeightRequest = 18, WidthRequest = 18, BorderWidth = 0,
             CornerRadius = 0, FontSize = 12, HorizontalOptions = LayoutOptions.Start, BackgroundColor = Colors.Transparent };
-        toggle.SetBinding(Button.TextProperty, nameof(ExpiryRow.Name));
+        toggle.SetBinding(Button.TextProperty, nameof(ExpiryRow.ExpansionMark));
         toggle.SetBinding(IsVisibleProperty, nameof(ExpiryRow.IsProduct));
         toggle.SetBinding(IsEnabledProperty, nameof(ExpiryRow.CanExpand));
         toggle.Clicked += (_, _) =>
@@ -387,16 +386,22 @@ public sealed class MedicineStockPage : ContentPage
                 if (updated != null) list.ScrollTo(updated, position: ScrollToPosition.MakeVisible, animate: false);
             }
         };
-        var title = new Grid { Children = { name, toggle } };
+        SemanticProperties.SetDescription(toggle, "Rozwiń lub zwiń dostawy");
+        var title = new Grid
+        {
+            ColumnDefinitions = { new ColumnDefinition { Width = 20 }, new ColumnDefinition { Width = GridLength.Star } }
+        };
+        title.Add(toggle, 0, 0);
+        title.Add(name, 1, 0);
         return ExpiryGrid(false, title, CompactTable.Cell(nameof(ExpiryRow.Batch)),
             CompactTable.Cell(nameof(ExpiryRow.Received)), CompactTable.Cell(nameof(ExpiryRow.Expires)),
             CompactTable.Cell(nameof(ExpiryRow.Remaining), right: true));
     }
 
     sealed record ExpiryRow(string Product, string Name, string Batch, string Received, string Expires,
-        string Remaining, bool IsProduct, bool CanExpand)
+        string Remaining, bool IsProduct, bool CanExpand, string ExpansionMark = "")
     {
-        public bool IsDetail => !IsProduct;
+
     }
 
     static string BatchText(MedicinePrice row) => string.IsNullOrWhiteSpace(row.LatestBatch) ? "Brak danych" : row.LatestBatch;
@@ -467,11 +472,11 @@ public sealed class MedicineStockPage : ContentPage
 
             bool expanded = expandedProducts.Contains(group.Key);
             var earliest = deliveries.Where(row => row.Expires.HasValue).MinBy(row => row.Expires);
-            rows.Add(new(group.Key, (expanded ? "−  " : "+  ") + group.Key, $"{deliveries.Length} pozycji", "—",
-                earliest is null ? "—" : ExpiryText(earliest), deliveries.Sum(row => row.Remaining).ToString("0.####"), true, true));
+            rows.Add(new(group.Key, group.Key, $"{deliveries.Length} pozycji", "—",
+                earliest is null ? "—" : ExpiryText(earliest), deliveries.Sum(row => row.Remaining).ToString("0.####"), true, true, expanded ? "−" : "+"));
             if (!expanded) continue;
             foreach (var delivery in deliveries)
-                rows.Add(new(group.Key, "    ↳ Dostawa", Batch(delivery), delivery.Received?.ToString("dd.MM.yyyy") ?? "—",
+                rows.Add(new(group.Key, "↳ Dostawa", Batch(delivery), delivery.Received?.ToString("dd.MM.yyyy") ?? "—",
                     ExpiryText(delivery), delivery.Remaining.ToString("0.####"), false, false));
         }
         list.ItemsSource = rows;
