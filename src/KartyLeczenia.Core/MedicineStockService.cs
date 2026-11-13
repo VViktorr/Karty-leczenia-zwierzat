@@ -3,7 +3,10 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia;
 
-public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawal = "", string LatestBatch = "");
+public sealed record MedicinePrice(string Name, decimal? Gross, string Withdrawal = "", string LatestBatch = "")
+{
+    public string Symbol { get; init; } = "";
+}
 public sealed record MedicinePriceLevel(int Number, string Name)
 {
     public bool IsRetail => Name.Trim().ToUpperInvariant() is "DETALICZNA" or "CENA DETALICZNA" or "DETALICZNA BRUTTO" or "CENA DETALICZNA BRUTTO";
@@ -94,7 +97,7 @@ public static class MedicineStockService
                 throw new InvalidOperationException("Brak kolumny ceny netto dla wybranego poziomu w Subiekcie.");
         }
         using var command = new SqlCommand($"""
-            SELECT t.tw_Nazwa, c.{priceColumn}, {withdrawal}, t.tw_Id
+            SELECT t.tw_Nazwa, c.{priceColumn}, {withdrawal}, t.tw_Id, t.tw_Symbol
             FROM dbo.tw__Towar t
             JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
             LEFT JOIN dbo.tw_Cena c ON c.tc_IdTowar = t.tw_Id
@@ -112,7 +115,10 @@ public static class MedicineStockService
             while (await reader.ReadAsync(token))
                 prices.Add((reader.GetInt32(3), new(reader.GetString(0),
                     reader.IsDBNull(1) ? null : Convert.ToDecimal(reader.GetValue(1)),
-                    reader.IsDBNull(2) ? "" : reader.GetString(2).Trim())));
+                    reader.IsDBNull(2) ? "" : reader.GetString(2).Trim())
+                {
+                    Symbol = reader.IsDBNull(4) ? "" : reader.GetString(4).Trim()
+                }));
         }
         if (prices.Count == 0) return [];
 

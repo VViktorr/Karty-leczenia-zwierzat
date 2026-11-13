@@ -95,10 +95,13 @@ internal static class MedicineCatalogue
     internal static async Task<ILookup<string, Entry>> GetAsync() => await Catalogue.Value;
 
     internal static Entry? Match(ILookup<string, Entry> catalogue, TreatmentRow row)
+        => Match(catalogue, row.Get("Symbol Subiekta"), row.Product);
+
+    internal static Entry? Match(ILookup<string, Entry> catalogue, string symbol, string product)
     {
-        var entries = catalogue[row.Get("Symbol Subiekta").Trim()];
+        var entries = catalogue[symbol.Trim()];
         static string NormalizeName(string value) => System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
-        var name = NormalizeName(row.Product);
+        var name = NormalizeName(product);
         var exact = entries.Where(entry => string.Equals(NormalizeName(entry.SubiektName), name,
             StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();
         return exact.Length == 1 ? exact[0] : null;

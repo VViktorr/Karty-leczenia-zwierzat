@@ -2,7 +2,8 @@ namespace KartyLeczenia.Views;
 
 public sealed class MedicineStockPage : ContentPage
 {
-    sealed record Row(string Name, string Detail);
+    sealed record PriceRow(string Name, string Batch, string Price);
+    static readonly GridLength[] PriceWidths = [GridLength.Star, new(180), new(140)];
     readonly AppState state;
     readonly bool prices;
     readonly Picker priceBasis = new() { ItemsSource = new[] { "Brutto", "Netto" }, SelectedIndex = 0, WidthRequest = 105 };
@@ -37,14 +38,9 @@ public sealed class MedicineStockPage : ContentPage
             filter.SelectedIndex = 0;
         }
         list.SelectionMode = SelectionMode.None;
-        list.ItemTemplate = prices ? new DataTemplate(() =>
-        {
-            var name = new Label { FontAttributes = FontAttributes.Bold };
-            name.SetBinding(Label.TextProperty, nameof(Row.Name));
-            var detail = Ui.Note("");
-            detail.SetBinding(Label.TextProperty, nameof(Row.Detail));
-            return new VerticalStackLayout { Padding = new Thickness(12, 8), Spacing = 3, Children = { name, detail } };
-        }) : new DataTemplate(() => CreateExpiryRow());
+        list.ItemTemplate = prices ? new DataTemplate(() => CompactTable.Row(PriceWidths, false,
+            CompactTable.Cell(nameof(PriceRow.Name)), CompactTable.Cell(nameof(PriceRow.Batch)),
+            CompactTable.Cell(nameof(PriceRow.Price), right: true))) : new DataTemplate(() => CreateExpiryRow());
         var actions = new Grid
         {
             ColumnSpacing = 10,
@@ -85,8 +81,9 @@ public sealed class MedicineStockPage : ContentPage
         var header = new VerticalStackLayout { Spacing = 8, Children = { Ui.Heading(Title), actions } };
         if (prices)
         {
-            withdrawalSource.ItemsSource = new[] { "Opis leku" }
+            withdrawalSource.ItemsSource = new[] { "Katalog SQLite (ChPL)", "Opis leku" }
                 .Concat(Enumerable.Range(1, 8).Select(index => $"Pole własne {index}")).ToList();
+            withdrawalSource.SelectedIndex = 0;
             var print = Ui.Action("Wydrukuj cennik", PreviewPrices);
             print.HeightRequest = 44;
             print.Padding = new Thickness(14, 0);
@@ -129,7 +126,21 @@ public sealed class MedicineStockPage : ContentPage
             }
         };
         root.Add(Ui.Card(header), 0, 0);
-        root.Add(Ui.Card(prices ? list : CreateExpiryTable()), 0, 1);
+        if (prices)
+        {
+            var priceHeading = CompactTable.Header(PriceWidths, "Lek", "Najnowsza seria", "Cena brutto");
+            var priceLabel = (Label)priceHeading.Children[2];
+            priceLabel.HorizontalTextAlignment = TextAlignment.End;
+            priceBasis.SelectedIndexChanged += (_, _) => priceLabel.Text = NetPrice ? "Cena netto" : "Cena brutto";
+            var table = new Grid
+            {
+                RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } }
+            };
+            table.Add(priceHeading, 0, 0);
+            table.Add(list, 0, 1);
+            root.Add(Ui.Card(table), 0, 1);
+        }
+        else root.Add(Ui.Card(CreateExpiryTable()), 0, 1);
         Content = root;
         search.TextChanged += (_, _) => ShowRows();
         priceBasis.SelectedIndexChanged += async (_, _) => { if (prices && !loading) await Refresh(); };
@@ -211,11 +222,11 @@ public sealed class MedicineStockPage : ContentPage
         if (!loaded || loading || state.ValidatedConnection is not { } options || filter.SelectedItem is not MedicinePriceLevel level)
             throw new InvalidOperationException("Najpierw wczytaj cennik.");
         if (withdrawalSource.SelectedIndex < 0)
-            throw new InvalidOperationException("Wybierz opis lub pole własne zawierające karencję.");
+            throw new InvalidOperationException("Wybierz źródło karencji.");
         bool net = NetPrice;
         string basis = net ? "netto" : "brutto";
-        int source = withdrawalSource.SelectedIndex + 1;
-        string sourceName = (string)withdrawalSource.SelectedItem;
+        int source = withdrawalSource.SelectedIndex;
+        string sourceName = source == 0 ? "Katalog SQLite (ChPL)" : $"Subiekt ({withdrawalSource.SelectedItem})";
         string query = (search.Text ?? "").Trim();
 
         openingPrint = true;
@@ -223,7 +234,8 @@ public sealed class MedicineStockPage : ContentPage
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var data = await MedicineStockService.Prices(options, level.Number, timeout.Token, source, net);
-            if (state.ValidatedConnection != options || !loaded || loading || !Equals(filter.SelectedItem, level) || NetPrice != net)
+            var catalogue = source == 0 ? await MedicineCatalogue.GetAsync() : null;
+            if (state.ValidatedConnection != options || !loaded || loading || !Equals(filter.SelectedItem, level) || NetPrice != net || withdrawalSource.SelectedIndex != source || (search.Text ?? "").Trim() != query)
                 throw new InvalidOperationException("Cennik zmienił się w trakcie przygotowania wydruku. Ponów operację.");
 
             var rows = data.Where(row => row.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
@@ -232,7 +244,8 @@ public sealed class MedicineStockPage : ContentPage
             string body = string.Concat(rows.Select(row =>
             {
                 string gross = row.Gross?.ToString("N2") ?? "—";
-                string withdrawal = string.IsNullOrWhiteSpace(row.Withdrawal) ? "Brak danych" : row.Withdrawal;
+                string withdrawal = catalogue is null ? row.Withdrawal : CatalogueWithdrawal(catalogue, row);
+                if (string.IsNullOrWhiteSpace(withdrawal)) withdrawal = "Brak danych";
                 return $"<tr><td>{Encode(row.Name)}</td><td>{Encode(BatchText(row))}</td><td class='price'>{Encode(gross)}</td><td>{Encode(withdrawal)}</td></tr>";
             }));
             string html = $$"""
@@ -249,13 +262,24 @@ public sealed class MedicineStockPage : ContentPage
                     .price { text-align: right; white-space: nowrap; }
                 </style></head><body><main class="sheet">
                 <h1>Cennik leków</h1>
-                <p>{{DateTime.Today:dd.MM.yyyy}} · {{Encode(level.ToString())}} · Karencja z Subiekta ({{Encode(sourceName)}})</p>
+                <p>{{DateTime.Today:dd.MM.yyyy}} · {{Encode(level.ToString())}} · Źródło karencji: {{Encode(sourceName)}}</p>
                 <table><thead><tr><th>Lek</th><th>Najnowsza seria</th><th>Cena {{basis}}</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
                 </main></body></html>
                 """;
             await Navigation.PushModalAsync(new PrintPreviewPage(html, "preview", "Podgląd cennika leków", "cennik-lekow"));
         }
         finally { openingPrint = false; }
+    }
+
+    static string CatalogueWithdrawal(ILookup<string, MedicineCatalogue.Entry> catalogue, MedicinePrice row)
+    {
+        var entry = MedicineCatalogue.Match(catalogue, row.Symbol, row.Name);
+        if (entry is null || entry.Excluded) return "";
+        return string.Join("\n\n", entry.Variants
+            .Select(v => (Variant: v, Text: MedicineCatalogue.Withdrawal(v)))
+            .Where(item => item.Text.Length > 0)
+            .Select(item => $"{item.Variant.Species} · {item.Variant.Route}\n{item.Text}")
+            .Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
     static Grid ExpiryGrid() => new()
@@ -335,8 +359,7 @@ public sealed class MedicineStockPage : ContentPage
         if (prices)
         {
             var priceList = priceRows.Where(row => Matches(row.Name)).Select(row =>
-                new Row(row.Name, (row.Gross is decimal amount ? $"{(NetPrice ? "Netto" : "Brutto")}: {amount:N2}" : "Brak ceny")
-                    + $" | Najnowsza seria: {BatchText(row)}")).ToList();
+                new PriceRow(row.Name, BatchText(row), row.Gross?.ToString("N2") ?? "—")).ToList();
             list.ItemsSource = priceList;
             status.Text = priceList.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {priceList.Count}";
             return;
