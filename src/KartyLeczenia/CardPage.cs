@@ -19,6 +19,7 @@ public sealed class CardPage : ContentPage
     DocumentSearchKinds SearchKinds => (searchInvoices.IsChecked ? DocumentSearchKinds.Invoices : DocumentSearchKinds.None)
         | (searchWarehouse.IsChecked ? DocumentSearchKinds.WarehouseReleases : DocumentSearchKinds.None)
         | (searchReceipts.IsChecked ? DocumentSearchKinds.Receipts : DocumentSearchKinds.None);
+    readonly Picker withdrawalFormat = new() { ItemsSource = new[] { "Pełna karencja", "Skrót karencji" }, SelectedIndex = 0, HeightRequest = 32 };
     readonly Picker withdrawal = new() { Title = "", HeightRequest = 32, HorizontalOptions = LayoutOptions.Fill };
     readonly Picker owner = new() { Title = "", HeightRequest = 32, HorizontalOptions = LayoutOptions.Fill };
     readonly Label searchHint = Ui.Note("Wpisz numer lub nazwisko i naciśnij Enter. W oknie wyboru możesz ustawić rok lub zakres dat.");
@@ -68,9 +69,9 @@ public sealed class CardPage : ContentPage
             UpdateFilterAppearance(); searchTypes.Add(frame);
         }
         var actions = new Grid { ColumnSpacing = 8, RowSpacing = 4,
-            ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
+            ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
-        var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło danych leku", withdrawal), Ui.Field("Dane właściciela", owner) };
+        var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło danych leku", withdrawal), Ui.Field("Dane właściciela", owner), Ui.Field("Karencja na wydruku", withdrawalFormat) };
         for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 28; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
         var searchLabel = (Label)searchFields[0].Children[0];
         searchFields[0].Children.RemoveAt(0);
@@ -86,7 +87,7 @@ public sealed class CardPage : ContentPage
             {
                 Grid.SetColumn(searchFields[i], narrow ? i == 0 ? 0 : i - 1 : i);
                 Grid.SetRow(searchFields[i], narrow && i > 0 ? 1 : 0);
-                Grid.SetColumnSpan(searchFields[i], narrow && i == 0 ? 3 : narrow && i == 2 ? 2 : 1);
+                Grid.SetColumnSpan(searchFields[i], narrow && i == 0 ? 4 : narrow && i == 3 ? 2 : 1);
             }
         };
         
@@ -419,6 +420,17 @@ public sealed class CardPage : ContentPage
         var snapshot = Capture();
         if (snapshot.Rows.Where(r => string.Equals(r.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)).Any(CardSchema.NeedsReview) &&
             !await host.DisplayAlertAsync("Weryfikacja karencji", "Nie wszystkie karencje i dopasowania leków zostały zatwierdzone. Sprawdź uzupełnione dane i ewentualne braki. Czy potwierdzasz ich sprawdzenie przed podglądem?", "Potwierdzam", "Wróć")) return;
+        if (withdrawalFormat.SelectedIndex == 1)
+        {
+            foreach (var row in snapshot.Rows)
+            {
+                var text = row.GetValueOrDefault("Karencja", "");
+                text = text.Replace("Tkanki jadalne: ", "tk. ", StringComparison.OrdinalIgnoreCase)
+                    .Replace("Mleko: ", "ml. ", StringComparison.OrdinalIgnoreCase);
+                row["Karencja"] = string.Join(", ", text.Split(['\r', '\n'],
+                    StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
+            }
+        }
         string html = CardHtmlRenderer.Render(snapshot);
         await host.Navigation.PushModalAsync(new PrintPreviewPage(html, mode));
         status.Text = "Otwarto podgląd formularza A4 poziomo.";
