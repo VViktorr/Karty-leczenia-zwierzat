@@ -65,6 +65,8 @@ public sealed class CardPage : ContentPage
         var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło danych leku", withdrawal), Ui.Field("Dane właściciela", owner), Ui.Field("Karencja na wydruku", withdrawalFormat) };
         for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).MinimumHeightRequest = 34; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
         var searchLabel = (Label)searchFields[0].Children[0];
+        searchLabel.VerticalOptions = LayoutOptions.Center;
+        searchTypes.VerticalOptions = LayoutOptions.Center;
         searchFields[0].Children.RemoveAt(0);
         var searchHeader = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
         searchHeader.ColumnDefinitions[0].Width = GridLength.Auto;
