@@ -56,12 +56,12 @@ internal sealed class InteractiveCardPage : ContentPage
             Ui.PrimaryAction("Eksport do PDF", () => output(this, "pdf"))
         } };
         var format = Ui.Field("Karencja na wydruku", withdrawalFormat);
-        editing.Margin = format.Margin = new Thickness(0, 0, 18, 4);
+        editing.Margin = outputActions.Margin = new Thickness(0, 0, 18, 4);
         var toolbar = new FlexLayout
         {
             Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
             AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.End,
-            Children = { editing, format, outputActions }
+            Children = { editing, outputActions, format }
         };
         var root = new Grid { Padding = 12, RowSpacing = 8, RowDefinitions = {
             new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }
@@ -73,10 +73,7 @@ internal sealed class InteractiveCardPage : ContentPage
         void UpdateWidth() => content.WidthRequest = columns.FixedWidth + 30;
         columns.WidthChanged += UpdateWidth;
         UpdateWidth();
-        var routeLegend = Ui.Note("Drogi podania · IM – domięśniowo, IV – dożylnie, SC – podskórnie, " +
-            "ID – śródskórnie, IP – dootrzewnowo, IA – dostawowo | PO – doustnie, IUT – domacicznie, " +
-            "IMM – dowymieniowo, IVAG – dopochwowo, TOP / EXT – miejscowo / zewnętrznie, " +
-            "POUR-ON – przez polewanie, SPOT-ON – punktowo na skórę, OPH – do oka, OT / AUR – do ucha, PR – doodbytniczo.");
+        var routeLegend = Ui.Note("Drogi podania · " + AdministrationRouteLegend.Description);
         routeLegend.VerticalOptions = LayoutOptions.Center;
         Content = Ui.WithClose(this, root, async () => { await Navigation.PopModalAsync(); }, routeLegend);
     }
