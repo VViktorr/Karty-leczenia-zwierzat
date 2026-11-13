@@ -188,6 +188,9 @@ public sealed class DocumentService
             if (await reader.ReadAsync(token)) throw new InvalidOperationException("Numer dokumentu nie jest jednoznaczny.");
         }
         string withdrawal = withdrawalSource == 0 ? "CAST(NULL AS nvarchar(4000))" : withdrawalSource == 1 ? "t.tw_Opis" : "t.tw_Pole" + (withdrawalSource - 1);
+        string deliveryDateColumn = await DateColumn(con, token);
+        string sourceDate = deliveryDateColumn.Length == 0 ? "CAST(NULL AS datetime)" : "received." + deliveryDateColumn;
+        string laterDate = deliveryDateColumn.Length == 0 ? "CAST(NULL AS datetime)" : "laterDoc." + deliveryDateColumn;
         using var cmd = new SqlCommand($"""
             WITH CandidatePositions AS (
                 SELECT ob_Id FROM dbo.dok_Pozycja WHERE ob_DokHanId=@id
@@ -203,7 +206,7 @@ public sealed class DocumentService
               {withdrawal} AS Karencja,
               r.mr_Id, r.mr_Ilosc, r.mr_DoId, mag.dok_NrPelny AS NumerWz,
               COALESCE(NULLIF(LTRIM(RTRIM(zp.ob_NumerSeryjny)), ''),
-                       NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), '')) AS Seria,
+                       NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), '')) AS Seria, fallback.Batch AS SuggestedSeries, fallback.Received AS SuggestedReceived,
               zp.ob_Termin AS Waznosc, z.mr_Termin AS TerminRuchu
             FROM CandidatePositions candidate
             INNER JOIN dbo.dok_Pozycja p ON p.ob_Id=candidate.ob_Id
@@ -212,6 +215,21 @@ public sealed class DocumentService
             LEFT JOIN dbo.dok_MagRuch z ON z.mr_Id=r.mr_DoId AND z.mr_TowId=r.mr_TowId
             LEFT JOIN dbo.dok_Pozycja zp ON zp.ob_Id=z.mr_PozId
             LEFT JOIN dbo.dok__Dokument mag ON mag.dok_Id=p.ob_DokMagId
+            LEFT JOIN dbo.dok__Dokument received ON received.dok_Id=zp.ob_DokMagId
+            OUTER APPLY (
+                SELECT TOP (1) LTRIM(RTRIM(laterPosition.ob_NumerSeryjny)) AS Batch, {laterDate} AS Received
+                FROM dbo.dok_MagRuch later
+                JOIN dbo.dok_Pozycja laterPosition ON laterPosition.ob_Id=later.mr_PozId
+                JOIN dbo.dok__Dokument laterDoc ON laterDoc.dok_Id=laterPosition.ob_DokMagId
+                WHERE later.mr_TowId=p.ob_TowId AND laterDoc.dok_MagId=@warehouseId
+                  AND (later.mr_DoId IS NULL OR later.mr_DoId=0) AND later.mr_Ilosc>0
+                  AND received.dok_MagId=@warehouseId
+                  AND NULLIF(LTRIM(RTRIM(zp.ob_NumerSeryjny)), '') IS NULL
+                  AND NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), '') IS NULL
+                  AND NULLIF(LTRIM(RTRIM(laterPosition.ob_NumerSeryjny)), '') IS NOT NULL
+                  AND ({laterDate}>{sourceDate} OR ({laterDate}={sourceDate} AND later.mr_Id>z.mr_Id))
+                ORDER BY {laterDate}, later.mr_Id
+            ) fallback
             WHERE (@useWz=0 OR mag.dok_NrPelny LIKE N'WZ %')
               AND (p.ob_DokMagId IS NULL OR p.ob_DokMagId = 0 OR mag.dok_MagId = @warehouseId)
               AND t.tw_IdGrupa IN (SELECT grt_Id FROM dbo.sl_GrupaTw WHERE grt_Nazwa=@drugGroup)
@@ -232,7 +250,16 @@ public sealed class DocumentService
             string expiry = date is DateTime dt ? dt.ToString("dd.MM.yyyy") : "";
             string product = string.IsNullOrWhiteSpace(V("tw_Nazwa")) ? V("ob_Opis") : V("tw_Nazwa");
             decimal quantity = Convert.ToDecimal(reader["ob_Ilosc"]);
-            string note = V("Seria") == "" || expiry == "" ? "Sprawdź / uzupełnij serię i ważność." : "";
+            string actualSeries = V("Seria");
+            string suggestedSeries = V("SuggestedSeries");
+            string series = actualSeries.Length > 0 ? actualSeries : suggestedSeries;
+            string note = series.Length == 0 || expiry == "" ? "Sprawdź / uzupełnij serię i ważność." : "";
+            if (suggestedSeries.Length > 0 && actualSeries.Length == 0)
+            {
+                var receivedOn = reader["SuggestedReceived"] is DateTime receivedDate
+                    ? receivedDate.ToString("dd.MM.yyyy") : "";
+                note += $" Seria {suggestedSeries} uzupełniona z późniejszej dostawy ({receivedOn}); sprawdź z opakowaniem.";
+            }
             if (reader["mr_Ilosc"] is not DBNull)
             {
                 decimal warehouse = reader["ob_IloscMag"] is DBNull ? 0 : Convert.ToDecimal(reader["ob_IloscMag"]);
@@ -242,7 +269,6 @@ public sealed class DocumentService
             if (reader["mr_DoId"] is DBNull) note += " Brak powiązania z dostawą źródłową — sprawdź ręcznie.";
             if (useWz)
             {
-                string series = V("Seria");
                 string source = $"{V("NumerWz")}, poz. ID {V("ob_Id")}, ruch ID {V("mr_Id")}: " +
                     $"{quantity:0.####} {V("ob_Jm")}; seria: {(series.Length == 0 ? "brak w odczycie" : series)}; " +
                     $"ważność: {(expiry.Length == 0 ? "brak w odczycie" : expiry)}.";
@@ -252,7 +278,7 @@ public sealed class DocumentService
             {
                 ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II", ["Produkt"] = product,
                 ["Gatunek"] = "Bydło", ["Opis zwierząt / numer siedziby stada"] = "Bydło", ["Domyślny gatunek"] = "True",
-                ["Seria"] = V("Seria"), ["Ważność"] = expiry, ["Ilość wydana"] = quantity.ToString("0.####") + " " + V("ob_Jm"),
+                ["Seria"] = series, ["Ważność"] = expiry, ["Ilość wydana"] = quantity.ToString("0.####") + " " + V("ob_Jm"),
                 ["Karencja"] = V("Karencja"), ["Rozbicie dostaw"] = note,
                 ["Status karencji"] = withdrawalSource == 0 ? "Oczekuje na dopasowanie w katalogu leków" : "Dane Subiekta — do weryfikacji",
                 ["Źródło karencji"] = withdrawalSource == 0 ? "" : "Subiekt: " + withdrawal,

@@ -75,7 +75,7 @@ internal sealed class InteractiveCardPage : ContentPage
         printed.CheckedChanged += (_, e) => row.Printed = e.Value;
         var species = Field("Gatunek", "Gatunek");
         var route = Field("Droga podania", "Droga podania");
-        var picker = new Picker { Title = "Wybierz wariant", IsVisible = false, WidthRequest = 184 };
+        var picker = new Picker { Title = "Wybierz wariant", IsVisible = false };
         var variants = entry is { Excluded: false } ? MedicineCatalogue.DistinctVariants(entry) : [];
         MedicineCatalogue.Variant[] choices = [];
         var pdf = new Button { Text = "Otwórz ChPL", IsVisible = false };
@@ -115,6 +115,7 @@ internal sealed class InteractiveCardPage : ContentPage
                 v.Route == row.Get("Droga podania") && v.Dosing == row.Get("Dawkowanie i okres stosowania") &&
                 MedicineCatalogue.Withdrawal(v) == row.Get("Karencja"));
             picker.IsVisible = choices.Length > 1 || (choices.Length == 1 && picker.SelectedIndex < 0);
+            route.IsVisible = !picker.IsVisible || picker.SelectedIndex < 0;
             pdf.IsVisible = SelectedDocument().Length > 0;
             refreshing = false;
         }
@@ -139,6 +140,7 @@ internal sealed class InteractiveCardPage : ContentPage
             pdf.IsVisible = SelectedDocument().Length > 0;
             int index = picker.SelectedIndex;
             if (index >= 0 && index < choices.Length) ApplyChoice(choices[index]);
+            route.IsVisible = !picker.IsVisible || index < 0;
         };
         var description = Field("Opis zwierząt / numer siedziby stada", "Opis / nr stada");
         if (string.Equals(description.Text, species.Text, StringComparison.OrdinalIgnoreCase))
@@ -156,9 +158,9 @@ internal sealed class InteractiveCardPage : ContentPage
         }
         var line = CompactTable.Row(columns, false, printed,
             new VerticalStackLayout { Children = { species, description, count } },
-            Field("Produkt", "Nazwa leku"),
+            new VerticalStackLayout { Children = { Field("Produkt", "Nazwa leku"), pdf } },
             new VerticalStackLayout { Children = { Field("Ilość wydana", "Ilość"), Field("Seria", "Seria"), expiry } },
-            new VerticalStackLayout { Children = { picker, route, pdf } },
+            new VerticalStackLayout { Children = { picker, route } },
             Field("Rozpoznanie", "Rozpoznanie"),
             Field("Dawkowanie i okres stosowania", "Dawkowanie"),
             Field("Karencja", "Karencja"),
