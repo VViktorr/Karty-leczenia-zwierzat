@@ -69,10 +69,11 @@ internal sealed class TableColumns
         section.SelectedIndexChanged += (_, _) =>
         {
             headerOptions.IsVisible = section.SelectedIndex == 0;
-            bodyOptions.IsVisible = section.SelectedIndex == 1;
+            heightLabel.IsVisible = height.IsVisible = section.SelectedIndex == 1;
         };
         var fields = new VerticalStackLayout { Padding = 16, Spacing = 8, Children = {
-            Ui.Field("Sekcja", section), headerOptions, bodyOptions
+            Ui.Heading("Parametry tabeli"), bodyOptions,
+            Ui.Heading("Parametry kolumn"), Ui.Field("Sekcja", section), headerOptions
         } };
         var order = columns.OrderBy(column => column.Index).ToList();
         var sizes = columns.Select(column => new Entry
@@ -81,12 +82,71 @@ internal sealed class TableColumns
             Placeholder = "Auto", Keyboard = Keyboard.Numeric, WidthRequest = 100
         }).ToArray();
         var visible = columns.Select(column => new CheckBox { IsChecked = column.Shown }).ToArray();
-        var list = new VerticalStackLayout { Spacing = 4 };
+        var preview = new Grid { ColumnSpacing = 1, RowSpacing = 1 };
+        var previewFrame = new Border { Padding = 6, StrokeThickness = 1,
+            Content = new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = preview } };
+        fields.Children.Insert(0, previewFrame);
+        string Name(int index) => headers.TryGetValue(index, out var title) && !string.IsNullOrWhiteSpace(title)
+            ? title : $"Kolumna {index + 1}";
+        void DrawPreview()
+        {
+            preview.Children.Clear();
+            preview.ColumnDefinitions.Clear();
+            preview.RowDefinitions.Clear();
+            preview.ColumnSpacing = vertical.IsChecked ? 1 : 0;
+            preview.RowSpacing = horizontal.IsChecked ? 1 : 0;
+            preview.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#9BA6B1"), Color.FromArgb("#526174"));
+            for (int row = 0; row < 4; row++)
+                preview.RowDefinitions.Add(new RowDefinition { Height = row == 0 ? headerHeight.Value : height.Value });
+            foreach (var column in order)
+            {
+                int index = Array.IndexOf(columns, column);
+                if (!visible[index].IsChecked) continue;
+                int position = preview.ColumnDefinitions.Count;
+                double width = double.TryParse(sizes[index].Text, out var requested) ? Math.Clamp(requested, 32, 700) : 130;
+                preview.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
+                for (int row = 0; row < 4; row++)
+                {
+                    var cell = new Label { Text = row == 0 ? Name(index) : "Przykładowe dane",
+                        Padding = new Thickness(5, 0), VerticalTextAlignment = TextAlignment.Center,
+                        FontAttributes = row == 0 ? FontAttributes.Bold : FontAttributes.None,
+                        LineBreakMode = LineBreakMode.TailTruncation };
+                    cell.SetAppThemeColor(VisualElement.BackgroundColorProperty,
+                        row == 0 ? Color.FromArgb("#DCE5EF") : Colors.White,
+                        Color.FromArgb(row == 0 ? "#27374A" : "#20242B"));
+                    preview.Add(cell, position, row);
+                }
+            }
+        }
+        foreach (var size in sizes) size.TextChanged += (_, _) => DrawPreview();
+        foreach (var check in visible.Append(horizontal).Append(vertical)) check.CheckedChanged += (_, _) => DrawPreview();
+        height.ValueChanged += (_, _) => DrawPreview();
+        headerHeight.ValueChanged += (_, _) => DrawPreview();
+
+        var columnPicker = new Picker { ItemsSource = Enumerable.Range(0, Count).Select(Name).ToArray(), SelectedIndex = 0, WidthRequest = 220 };
+        var list = new VerticalStackLayout { Spacing = 4, IsVisible = false };
+        var selectedColumn = new ContentView();
+        void ShowColumn()
+        {
+            var selected = columnPicker.SelectedIndex;
+            if (selected < 0) return;
+            var width = new Entry { Text = sizes[selected].Text, Placeholder = "Auto", Keyboard = Keyboard.Numeric, WidthRequest = 110 };
+            width.TextChanged += (_, e) => sizes[selected].Text = e.NewTextValue;
+            selectedColumn.Content = Ui.Field("Szerokość kolumny", width);
+        }
+        columnPicker.SelectedIndexChanged += (_, _) => ShowColumn();
+        fields.Children.Add(new HorizontalStackLayout { Spacing = 8, Children = {
+            Ui.Field("Kolumna", columnPicker),
+            Ui.Action("Lista kolumn", () => { list.IsVisible = !list.IsVisible; return Task.CompletedTask; })
+        } });
+        fields.Children.Add(selectedColumn);
         void Draw()
         {
             foreach (var row in list.Children.OfType<HorizontalStackLayout>())
                 foreach (var field in row.Children.OfType<VerticalStackLayout>()) field.Children.Clear();
             list.Children.Clear();
+            DrawPreview();
+            ShowColumn();
             for (int i = 0; i < order.Count; i++)
             {
                 int position = i;
@@ -109,6 +169,7 @@ internal sealed class TableColumns
         Draw();
         fields.Add(Ui.Note("Szerokość w pikselach logicznych. Puste pole przywraca szerokość domyślną."));
         fields.Add(list);
+        ShowColumn();
         var page = new ContentPage { Title = "Parametry listy" };
         fields.Add(new HorizontalStackLayout { Children = {
             Ui.Action("Przywróć domyślne", () =>
@@ -122,7 +183,7 @@ internal sealed class TableColumns
                 Draw();
                 return Task.CompletedTask;
             }),
-            Ui.PrimaryAction("Zastosuj", async () =>
+            Ui.PrimaryAction("OK", async () =>
             {
                 if (!visible.Any(check => check.IsChecked))
                 {
