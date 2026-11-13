@@ -102,7 +102,35 @@ public sealed class MedicineStockPage : ContentPage
                 ("Lp.", printNumber), ("Seria", printBatch), ("Cena", printPrice),
                 ("Karencja", printWithdrawal), ("Legenda", printLegend) })
                 printOptions.Add(Ui.Field(label, check));
-            header.Children.Add(printOptions);
+            var layoutOptions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
+            layoutOptions.Add(Ui.Field("Orientacja", printOrientation));
+            layoutOptions.Add(PrintSliderField("Margines strony (mm)", printMargin));
+            layoutOptions.Add(PrintSliderField("Min. wysokość wiersza (mm)", printRowHeight));
+            layoutOptions.Add(PrintSliderField("Odstęp nad i pod tekstem (mm)", printRowPadding));
+            string[] widthLabels = ["Lp.", "Nazwa leku", "Seria", "Cena", "Karencja"];
+            CheckBox?[] visibilityOptions = [printNumber, null, printBatch, printPrice, printWithdrawal];
+            for (int i = 0; i < widthLabels.Length; i++)
+                {
+                var widthField = PrintSliderField("Szerokość: " + widthLabels[i], printColumnWidths[i]);
+                var visibility = visibilityOptions[i];
+                if (visibility is not null)
+                {
+                    widthField.IsVisible = visibility.IsChecked;
+                    visibility.CheckedChanged += (_, e) => widthField.IsVisible = e.Value;
+                }
+                layoutOptions.Add(widthField);
+            }
+
+            var settings = new VerticalStackLayout { Spacing = 4, IsVisible = false, Children = {
+                printOptions, Ui.Note("Szerokości są proporcjami widocznych kolumn. Wysokość wiersza rośnie, gdy tekst się zawija."),
+                layoutOptions } };
+            var settingsButton = Ui.Action("Ustawienia wydruku", () =>
+            {
+                settings.IsVisible = !settings.IsVisible;
+                return Task.CompletedTask;
+            });
+            header.Children.Add(settingsButton);
+            header.Children.Add(settings);
         }
         if (!prices)
         {
@@ -235,6 +263,23 @@ public sealed class MedicineStockPage : ContentPage
     readonly CheckBox printWithdrawal = new() { IsChecked = true };
     readonly CheckBox printLegend = new() { IsChecked = true };
 
+    readonly Picker printOrientation = new() { ItemsSource = new[] { "Pozioma", "Pionowa" }, SelectedIndex = 0 };
+    readonly Slider printMargin = new(4, 25, 7);
+    readonly Slider printRowHeight = new(0, 18, 0);
+    readonly Slider printRowPadding = new(0, 5, 0.5);
+    readonly Slider[] printColumnWidths = [new(2, 20, 4), new(10, 80, 43), new(5, 45, 14),
+        new(5, 45, 13), new(10, 85, 40)];
+
+    static View PrintSliderField(string title, Slider slider)
+    {
+        slider.WidthRequest = 155;
+        var field = Ui.Field($"{title}: {slider.Value:0.#}", slider);
+        var label = (Label)field.Children[0];
+        slider.ValueChanged += (_, e) => label.Text = $"{title}: {e.NewValue:0.#}";
+        field.Margin = new Thickness(0, 0, 12, 4);
+        return field;
+    }
+
     async Task PreviewPrices()
     {
         if (openingPrint) return;
@@ -249,6 +294,11 @@ public sealed class MedicineStockPage : ContentPage
         int source = Math.Max(0, withdrawalSource.SelectedIndex);
         string font = printFont.SelectedItem as string ?? PrintFonts[0];
         string fontSize = printSize.SelectedItem as string ?? "9";
+        string orientation = printOrientation.SelectedIndex == 1 ? "portrait" : "landscape";
+        string margin = FormattableString.Invariant($"{printMargin.Value:0.#}");
+        string rowHeight = FormattableString.Invariant($"{printRowHeight.Value:0.#}");
+        string rowPadding = FormattableString.Invariant($"{printRowPadding.Value:0.#}");
+        var weights = printColumnWidths.Select(slider => slider.Value).ToArray();
         string sourceName = source == 0 ? "Katalog SQLite (ChPL)" : $"Subiekt ({withdrawalSource.SelectedItem})";
         string query = (search.Text ?? "").Trim();
 
@@ -264,18 +314,18 @@ public sealed class MedicineStockPage : ContentPage
             var rows = data.Where(row => row.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
             if (rows.Count == 0) throw new InvalidOperationException("Brak pozycji do wydruku.");
             string Encode(string value) => System.Net.WebUtility.HtmlEncode(value);
-            var columns = new List<(string Heading, int Weight, Func<MedicinePrice, int, string> Value, string Class)>();
-            if (showNumber) columns.Add(("Lp.", 4, (_, i) => (i + 1).ToString(), "price"));
-            columns.Add(("Nazwa leku", 43, (row, _) => row.Name, ""));
-            if (showBatch) columns.Add(("Najnowsza seria", 14, (row, _) => row.LatestBatch, ""));
-            if (showPrice) columns.Add(($"Cena {basis}", 13, (row, _) => row.Gross?.ToString("N2") ?? "—", "price"));
-            if (showWithdrawal) columns.Add(("Karencja", 40, (row, _) =>
+            var columns = new List<(string Heading, double Weight, Func<MedicinePrice, int, string> Value, string Class)>();
+            if (showNumber) columns.Add(("Lp.", weights[0], (_, i) => (i + 1).ToString(), "price"));
+            columns.Add(("Nazwa leku", weights[1], (row, _) => row.Name, ""));
+            if (showBatch) columns.Add(("Najnowsza seria", weights[2], (row, _) => row.LatestBatch, ""));
+            if (showPrice) columns.Add(($"Cena {basis}", weights[3], (row, _) => row.Gross?.ToString("N2") ?? "—", "price"));
+            if (showWithdrawal) columns.Add(("Karencja", weights[4], (row, _) =>
             {
                 string text = catalogue is null ? row.Withdrawal : CatalogueWithdrawal(catalogue, row);
                 return string.Join(", ", text.Split(['\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
             }, ""));
 
-            int totalWeight = columns.Sum(column => column.Weight);
+            double totalWeight = columns.Sum(column => column.Weight);
             string widths = string.Concat(columns.Select(column =>
                 $"<col style='width:{FormattableString.Invariant($"{column.Weight * 100.0 / totalWeight:0.###}")}%'>"));
             string headings = string.Concat(columns.Select(column => $"<th>{Encode(column.Heading)}</th>"));
@@ -285,16 +335,16 @@ public sealed class MedicineStockPage : ContentPage
             string html = $$"""
                 <!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Cennik leków</title>
                 <style>
-                    @page { size: A4 landscape; margin: 7mm; }
+                    @page { size: A4 {{orientation}}; margin: {{margin}}mm; }
                     body { font: {{fontSize}}pt/1.15 "{{font}}", sans-serif; color: #171717; }
                     h1 { font-size: 13pt; margin: 0 0 1mm; }
                     p { margin: 0 0 1mm; }
                     table { width: 100%; table-layout: fixed; border-collapse: collapse; }
                     thead { display: table-header-group; }
                     tr { break-inside: avoid; }
-                    th, td { border: 1px solid #999; padding: 1px 3px; text-align: left; vertical-align: top; }
+                    th, td { border: 1px solid #999; padding: {{rowPadding}}mm 3px; text-align: left; vertical-align: top; }
                     th { background: #eee; }
-                    td { overflow-wrap: anywhere; }
+                    td { height: {{rowHeight}}mm; overflow-wrap: anywhere; }
                     .price { text-align: right; white-space: nowrap; }
                 </style></head><body><main class="sheet">
                 <h1>Cennik leków</h1>
