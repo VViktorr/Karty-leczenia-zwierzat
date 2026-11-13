@@ -50,6 +50,12 @@ public sealed class DocumentSearchPage : ContentPage
         filter.Add(query, 0, 1);
         filter.Add(year, 1, 1);
         filter.Add(searchButton, 2, 1);
+        var tabs = new HorizontalStackLayout { Spacing = 4, Children = {
+            Ui.Action("FS (Alt+1)", () => SelectKind(DocumentSearchKinds.Invoices)),
+            Ui.Action("Paragony (Alt+2)", () => SelectKind(DocumentSearchKinds.Receipts)),
+            Ui.Action("WZ", () => SelectKind(DocumentSearchKinds.WarehouseReleases)),
+            Ui.Action("Wybrane typy", () => SelectKind(initialKinds))
+        } };
         var top = new VerticalStackLayout { Spacing = 8, Children = { tabs, filter, dates, status } };
         results.EmptyView = new Label { Text = "Brak wyników. Zmień nazwę, numer albo rok.", Margin = 16 };
         var columns = new TableColumns(100, 165, GridLength.Star, 145, new GridLength(0.65, GridUnitType.Star));
