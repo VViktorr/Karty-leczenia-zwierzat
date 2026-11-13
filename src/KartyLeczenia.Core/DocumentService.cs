@@ -213,7 +213,7 @@ public sealed class DocumentService
             FROM CandidatePositions candidate
             INNER JOIN dbo.dok_Pozycja p ON p.ob_Id=candidate.ob_Id
             LEFT JOIN dbo.tw__Towar t ON t.tw_Id=p.ob_TowId
-            LEFT JOIN dbo.dok_MagRuch r ON r.mr_PozId=p.ob_Id
+            LEFT JOIN dbo.dok_MagRuch r ON r.mr_PozId=p.ob_Id AND r.mr_TowId=p.ob_TowId
             LEFT JOIN dbo.dok_MagRuch z ON z.mr_Id=r.mr_DoId AND z.mr_TowId=r.mr_TowId
             LEFT JOIN dbo.dok_Pozycja zp ON zp.ob_Id=z.mr_PozId
             LEFT JOIN dbo.dok__Dokument mag ON mag.dok_Id=p.ob_DokMagId
@@ -269,9 +269,9 @@ public sealed class DocumentService
                 else note += " Nie można przeliczyć ilości dostawy — sprawdź ilość ręcznie.";
             }
             if (reader["mr_DoId"] is DBNull) note += " Brak powiązania z dostawą źródłową — sprawdź ręcznie.";
-            if (useWz)
+            if (useWz || reader["mr_Id"] is not DBNull)
             {
-                string source = $"{V("NumerWz")}, poz. ID {V("ob_Id")}, ruch ID {V("mr_Id")}: " +
+                string source = $"{(V("NumerWz").Length > 0 ? V("NumerWz") : number)}, poz. ID {V("ob_Id")}, ruch ID {V("mr_Id")}: " +
                     $"{quantity:0.####} {V("ob_Jm")}; seria: {(series.Length == 0 ? "brak w odczycie" : series)}; " +
                     $"ważność: {(expiry.Length == 0 ? "brak w odczycie" : expiry)}.";
                 note = string.IsNullOrWhiteSpace(note) ? source : source + " " + note.Trim();
