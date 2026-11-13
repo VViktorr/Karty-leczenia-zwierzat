@@ -73,6 +73,7 @@ public static class CardHtmlRenderer
         }
         Rows("II", 5); html.Append("</tbody></table><div class='section'>III. Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</div><table>" + columns + "<tbody>");
         Rows("III", 3); html.Append("</tbody></table>");
+        html.Append(AdministrationRouteLegend.Html);
         html.Append("<div class='statement'>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii</div>");
         html.Append($"<div class='signatures'><div class='signature'>{F("Lekarz i nr prawa wykonywania zawodu")}<br>........................................................<small>(podpis i pieczęć lekarza weterynarii)</small></div><div class='signature'><br>........................................................<small>(podpis posiadacza zwierzęcia)</small></div></div>");
         html.Append($"<div class='results'>IV. Wyniki badań uzupełniających: {Fill("Wyniki badań")}</div><div class='footnote'>*) W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych.</div></div>");

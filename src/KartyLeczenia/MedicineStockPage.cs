@@ -266,6 +266,7 @@ public sealed class MedicineStockPage : ContentPage
                 </style></head><body><main class="sheet">
                 <h1>Cennik leków</h1>
                 <p>{{DateTime.Today:dd.MM.yyyy}} · {{Encode(level.ToString())}} · Źródło karencji: {{Encode(sourceName)}}</p>
+                {{AdministrationRouteLegend.Html}}
                 <table><thead><tr><th>Lek</th><th>Najnowsza seria</th><th>Cena {{basis}}</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
                 </main></body></html>
                 """;
