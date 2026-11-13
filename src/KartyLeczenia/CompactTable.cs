@@ -12,6 +12,10 @@ internal static class CompactTable
 
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TableColumns, RowHeight> RowHeights = new();
 
+    internal static double GetRowHeight(TableColumns columns) => RowHeights.GetValue(columns, _ => new RowHeight()).Value;
+    internal static void SetRowHeight(TableColumns columns, double value) =>
+        RowHeights.GetValue(columns, _ => new RowHeight()).Value = value;
+
     internal static Label Cell(string path, bool right = false, string? format = null)
     {
         var label = new Label { LineBreakMode = LineBreakMode.TailTruncation,
@@ -53,6 +57,7 @@ internal static class CompactTable
             row.ColumnDefinitions.Add(column);
             var cell = cells[i];
             cell.SetBinding(Grid.ColumnProperty, new Binding(nameof(TableColumns.Slot.Index), source: widths.Column(i)));
+            cell.SetBinding(VisualElement.IsVisibleProperty, new Binding(nameof(TableColumns.Slot.Shown), source: widths.Column(i)));
             row.Children.Add(cell);
             if (header)
             {
@@ -71,10 +76,12 @@ internal static class CompactTable
             var divider = new BoxView { WidthRequest = 1, HorizontalOptions = LayoutOptions.Start, InputTransparent = true };
             divider.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#8795A5"), Color.FromArgb("#455267"));
             divider.Margin = new Thickness(-2, 0, 0, 0);
+            divider.SetBinding(VisualElement.IsVisibleProperty, new Binding(nameof(CheckBox.IsChecked), source: widths.VerticalLines));
             row.Add(divider, i, 0);
         }
         var line = new BoxView { HeightRequest = 1, InputTransparent = true };
         line.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#A0AAB6"), Color.FromArgb("#344457"));
+        line.SetBinding(VisualElement.IsVisibleProperty, new Binding(nameof(CheckBox.IsChecked), source: widths.HorizontalLines));
         row.Add(line, 0, 1);
         Grid.SetColumnSpan(line, widths.Count);
         if (header) AttachHeightGrip(row, height, widths.Count);

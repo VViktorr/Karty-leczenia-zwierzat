@@ -93,7 +93,7 @@ public sealed class MedicineStockPage : ContentPage
             printWithdrawal.CheckedChanged += (_, _) => UpdateFormatVisibility();
             withdrawalSource.SelectedIndexChanged += (_, _) => UpdateFormatVisibility();
             UpdateFormatVisibility();
-            var print = Ui.Action("Wydrukuj cennik", PreviewPrices);
+            var print = Ui.Action("Wydrukuj cennik", () => PreviewPrices());
             print.HeightRequest = 32;
             print.Padding = new Thickness(14, 0);
             print.VerticalOptions = LayoutOptions.End;
@@ -128,16 +128,24 @@ public sealed class MedicineStockPage : ContentPage
                 layoutOptions.Add(widthField);
             }
 
-            var settings = new VerticalStackLayout { Spacing = 4, IsVisible = false, Children = {
+            var settings = new VerticalStackLayout { Spacing = 6, Padding = 12, Children = {
                 printOptions, Ui.Note("Szerokości są proporcjami widocznych kolumn. Wysokość wiersza rośnie, gdy tekst się zawija."),
                 layoutOptions } };
-            var settingsButton = Ui.Action("Ustawienia wydruku", () =>
+            var settingsPage = new ContentPage { Title = "Ustawienia wydruku cennika" };
+            var preview = new WebView();
+            settings.Children.Add(Ui.Action("Odśwież próbkę PDF", () => PreviewPrices(preview)));
+            var editor = new Grid { RowDefinitions = {
+                new RowDefinition { Height = new GridLength(0.45, GridUnitType.Star) },
+                new RowDefinition { Height = new GridLength(0.55, GridUnitType.Star) }
+            } };
+            editor.Add(new ScrollView { Content = settings }, 0, 0);
+            editor.Add(preview, 0, 1);
+            settingsPage.Content = Ui.WithClose(settingsPage, editor, async () => await settingsPage.Navigation.PopModalAsync());
+            header.Children.Add(Ui.Action("Ustawienia wydruku", async () =>
             {
-                settings.IsVisible = !settings.IsVisible;
-                return Task.CompletedTask;
-            });
-            header.Children.Add(settingsButton);
-            header.Children.Add(settings);
+                await Navigation.PushModalAsync(settingsPage);
+                await PreviewPrices(preview);
+            }));
         }
         if (!prices)
         {
@@ -299,7 +307,7 @@ public sealed class MedicineStockPage : ContentPage
         return field;
     }
 
-    async Task PreviewPrices()
+    async Task PreviewPrices(WebView? sample = null)
     {
         if (openingPrint) return;
         if (!loaded || loading || state.ValidatedConnection is not { } options || filter.SelectedItem is not MedicinePriceLevel level)
@@ -332,6 +340,7 @@ public sealed class MedicineStockPage : ContentPage
                 throw new InvalidOperationException("Cennik zmienił się w trakcie przygotowania wydruku. Ponów operację.");
 
             var rows = data.Where(row => row.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
+            if (sample is not null) rows = rows.Take(12).ToList();
             if (rows.Count == 0) throw new InvalidOperationException("Brak pozycji do wydruku.");
             string Encode(string value) => System.Net.WebUtility.HtmlEncode(value);
             var columns = new List<(string Heading, double Weight, Func<MedicinePrice, int, string> Value, string Class)>();
@@ -357,6 +366,7 @@ public sealed class MedicineStockPage : ContentPage
                 <style>
                     @page { size: A4 {{orientation}}; margin: {{margin}}mm; }
                     body { font: {{fontSize}}pt/1.15 "{{font}}", sans-serif; color: #171717; }
+                    @media screen { body { margin: 0; } .sheet { box-sizing: border-box; width: {{(orientation == "portrait" ? 210 : 297)}}mm; padding: {{margin}}mm; } }
                     h1 { font-size: 13pt; margin: 0 0 1mm; }
                     p { margin: 0 0 1mm; }
                     table { width: 100%; table-layout: fixed; border-collapse: collapse; }
@@ -373,7 +383,8 @@ public sealed class MedicineStockPage : ContentPage
                 <table><colgroup>{{widths}}</colgroup><thead><tr>{{headings}}</tr></thead><tbody>{{body}}</tbody></table>
                 </main></body></html>
                 """;
-            await Navigation.PushModalAsync(new PrintPreviewPage(html, "preview", "Podgląd cennika leków", "cennik-lekow"));
+            if (sample is not null) sample.Source = new HtmlWebViewSource { Html = html };
+            else await Navigation.PushModalAsync(new PrintPreviewPage(html, "preview", "Podgląd cennika leków", "cennik-lekow"));
         }
         finally { openingPrint = false; }
     }
