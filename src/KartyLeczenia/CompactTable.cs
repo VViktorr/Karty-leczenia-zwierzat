@@ -85,6 +85,7 @@ internal static class CompactTable
         row.Add(line, 0, 1);
         Grid.SetColumnSpan(line, widths.Count);
         if (header) AttachHeightGrip(row, height, widths.Count);
+        if (!header) widths.AttachRowMenu(row);
         return row;
     }
 

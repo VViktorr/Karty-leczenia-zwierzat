@@ -62,7 +62,8 @@ internal sealed class TableColumns
 
     internal async Task ShowParameters()
     {
-        var host = Shell.Current;
+        var shell = Shell.Current;
+        var host = shell?.Navigation.ModalStack.LastOrDefault() ?? shell?.CurrentPage;
         if (host is null) return;
         var horizontal = new CheckBox { IsChecked = HorizontalLines.IsChecked };
         var vertical = new CheckBox { IsChecked = VerticalLines.IsChecked };
@@ -157,6 +158,23 @@ internal sealed class TableColumns
         } });
         page.Content = Ui.WithClose(page, new ScrollView { Content = fields }, async () => await page.Navigation.PopModalAsync());
         await host.Navigation.PushModalAsync(page);
+    }
+
+    internal void AttachRowMenu(Grid row)
+    {
+#if WINDOWS
+        void Attach()
+        {
+            if (row.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement element) return;
+            var menu = new Microsoft.UI.Xaml.Controls.MenuFlyout();
+            var settings = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = "Parametry listy…" };
+            settings.Click += async (_, _) => await ShowParameters();
+            menu.Items.Add(settings);
+            element.ContextFlyout = menu;
+        }
+        row.HandlerChanged += (_, _) => Attach();
+        Attach();
+#endif
     }
 
     internal void AttachHeader(Grid row, View cell, int index)

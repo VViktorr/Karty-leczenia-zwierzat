@@ -48,7 +48,6 @@ public sealed class DocumentSearchPage : ContentPage
         var top = new VerticalStackLayout { Spacing = 10, Children = { Ui.Heading("Wyszukaj i wybierz dokument"), tabs, filter, dates, status } };
         results.EmptyView = new Label { Text = "Brak wyników. Zmień nazwę, numer albo rok.", Margin = 16 };
         var columns = new TableColumns(100, 165, GridLength.Star, 145, new GridLength(0.65, GridUnitType.Star));
-        filter.Children.Add(Ui.Action("Parametry listy…", columns.ShowParameters));
         results.ItemTemplate = new DataTemplate(() => CompactTable.Row(columns, false,
             CompactTable.Cell(nameof(DocumentSuggestion.Date), format: "{0:dd.MM.yyyy}"),
             CompactTable.Cell(nameof(DocumentSuggestion.Number)),
