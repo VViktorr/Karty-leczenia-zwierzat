@@ -77,10 +77,14 @@ internal sealed class TableColumns
         cell.HandlerChanged += (_, _) => AttachMenu();
         AttachMenu();
 
-        var grip = new BoxView { Color = Colors.Transparent, WidthRequest = 7, HorizontalOptions = LayoutOptions.End };
+        var grip = new BoxView
+        {
+            Color = Colors.Transparent, WidthRequest = 12, HorizontalOptions = LayoutOptions.End,
+            VerticalOptions = LayoutOptions.Fill, Margin = new Thickness(0, 0, -4, 0), ZIndex = 10
+        };
         grip.SetBinding(Grid.ColumnProperty, new Binding(nameof(Slot.Index), source: column));
         row.Children.Add(grip);
-        grip.HandlerChanged += (_, _) =>
+        void AttachGrip()
         {
             if (grip.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement element) return;
             double start = 0, width = 0;
@@ -121,7 +125,9 @@ internal sealed class TableColumns
                 args.Handled = true;
             };
             element.PointerCaptureLost += (_, _) => pointerId = null;
-        };
+        }
+        grip.HandlerChanged += (_, _) => AttachGrip();
+        AttachGrip();
 #endif
     }
 }
