@@ -86,6 +86,11 @@ public sealed class MedicineStockPage : ContentPage
             withdrawalSource.ItemsSource = new[] { "Katalog SQLite (ChPL)", "Opis leku" }
                 .Concat(Enumerable.Range(1, 8).Select(index => $"Pole własne {index}")).ToList();
             withdrawalSource.SelectedIndex = 0;
+            var formatField = Ui.Field("Format karencji z SQLite", printWithdrawalFormat);
+            void UpdateFormatVisibility() => formatField.IsVisible = printWithdrawal.IsChecked && withdrawalSource.SelectedIndex == 0;
+            printWithdrawal.CheckedChanged += (_, _) => UpdateFormatVisibility();
+            withdrawalSource.SelectedIndexChanged += (_, _) => UpdateFormatVisibility();
+            UpdateFormatVisibility();
             var print = Ui.Action("Wydrukuj cennik", PreviewPrices);
             print.HeightRequest = 32;
             print.Padding = new Thickness(14, 0);
@@ -93,17 +98,11 @@ public sealed class MedicineStockPage : ContentPage
             header.Children.Add(new HorizontalStackLayout
             {
                 Spacing = 10,
-                Children = { Ui.Field("Źródło karencji na wydruku", withdrawalSource), print }
+                Children = { Ui.Field("Źródło karencji na wydruku", withdrawalSource), formatField, print }
             });
             var printOptions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
             printOptions.Add(Ui.Field("Czcionka wydruku", printFont));
             printOptions.Add(Ui.Field("Rozmiar (pt)", printSize));
-            var formatField = Ui.Field("Format karencji z SQLite", printWithdrawalFormat);
-            void UpdateFormatVisibility() => formatField.IsVisible = printWithdrawal.IsChecked && withdrawalSource.SelectedIndex == 0;
-            printWithdrawal.CheckedChanged += (_, _) => UpdateFormatVisibility();
-            withdrawalSource.SelectedIndexChanged += (_, _) => UpdateFormatVisibility();
-            UpdateFormatVisibility();
-            printOptions.Add(formatField);
             foreach (var (label, check) in new[] {
                 ("Lp.", printNumber), ("Seria", printBatch), ("Cena", printPrice),
                 ("Karencja", printWithdrawal), ("Legenda", printLegend) })
