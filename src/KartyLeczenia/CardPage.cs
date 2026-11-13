@@ -61,29 +61,36 @@ public sealed class CardPage : ContentPage
         }
         var actions = new Grid { ColumnSpacing = 8, RowSpacing = 4,
             ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
-            RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
-        var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło danych leku", withdrawal), Ui.Field("Dane właściciela", owner), Ui.Field("Karencja na wydruku", withdrawalFormat) };
-        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).MinimumHeightRequest = 34; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
-        var searchLabel = (Label)searchFields[0].Children[0];
-        searchLabel.VerticalOptions = LayoutOptions.Center;
-        searchTypes.VerticalOptions = LayoutOptions.Center;
-        searchFields[0].Children.RemoveAt(0);
-        var searchHeader = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
-        searchHeader.ColumnDefinitions[0].Width = GridLength.Auto;
-        searchHeader.ColumnDefinitions[1].Width = GridLength.Star;
-        searchHeader.Add(searchLabel, 0, 0); searchHeader.Add(searchTypes, 1, 0);
-        searchFields[0].Children.Insert(0, searchHeader);
+            RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
+        string[] titles = ["Numer dokumentu lub nazwisko", "Źródło danych leku", "Dane właściciela", "Karencja na wydruku"];
+        View[] inputs = [number, withdrawal, owner, withdrawalFormat];
+        var labels = titles.Select(title => new Label { Text = title, FontAttributes = FontAttributes.Bold,
+            VerticalOptions = LayoutOptions.Center }).ToArray();
+        var searchHeader = new HorizontalStackLayout { Spacing = 12, VerticalOptions = LayoutOptions.Center,
+            Children = { labels[0], searchTypes } };
+        View[] headings = [searchHeader, labels[1], labels[2], labels[3]];
+        for (int i = 0; i < inputs.Length; i++)
+        {
+            actions.Add(headings[i], i, 0);
+            actions.Add(inputs[i], i, 1);
+        }
         actions.SizeChanged += (_, _) =>
         {
             bool narrow = actions.Width > 0 && actions.Width < 1000;
-            for (int i = 0; i < searchFields.Length; i++)
+            for (int i = 0; i < inputs.Length; i++)
             {
-                Grid.SetColumn(searchFields[i], narrow ? i == 0 ? 0 : i - 1 : i);
-                Grid.SetRow(searchFields[i], narrow && i > 0 ? 1 : 0);
-                Grid.SetColumnSpan(searchFields[i], narrow && i == 0 ? 4 : narrow && i == 3 ? 2 : 1);
+                int column = narrow && i > 0 ? i - 1 : i;
+                int top = narrow && i > 0 ? 2 : 0;
+                int span = narrow && i == 0 ? 4 : narrow && i == 3 ? 2 : 1;
+                Grid.SetColumn(headings[i], column);
+                Grid.SetColumn(inputs[i], column);
+                Grid.SetRow(headings[i], top);
+                Grid.SetRow(inputs[i], top + 1);
+                Grid.SetColumnSpan(headings[i], span);
+                Grid.SetColumnSpan(inputs[i], span);
             }
         };
-        
 
         number.Completed += async (_, _) =>
         {
