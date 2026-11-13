@@ -146,6 +146,7 @@ public sealed class CardPage : ContentPage
         drugList.Add(list, 0, 1);
         medicineGrid = split;
         var listPanel = new Border { Content = drugList, StrokeThickness = 0, Padding = 4 };
+        medicineColumns.AttachTableMenu(listPanel);
         listPanel.SetAppThemeColor(VisualElement.BackgroundColorProperty, Colors.White, Color.FromArgb("#20242B"));
         split.Add(listPanel, 0, 0);
         Grid.SetColumnSpan(listPanel, 2);

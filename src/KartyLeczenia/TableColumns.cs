@@ -48,18 +48,6 @@ internal sealed class TableColumns
     internal Slot Column(int index) => columns[index];
     internal Slot Position(int index) => positions[index];
 
-    void Move(Slot column, int direction)
-    {
-        int index = column.Index;
-        int destination = index + direction;
-        if (destination < 0 || destination >= Count) return;
-        var neighbour = columns.Single(slot => slot.Index == destination);
-        neighbour.Index = index;
-        column.Index = destination;
-        positions[index].Width = neighbour.Shown ? neighbour.Width : new GridLength(0);
-        positions[destination].Width = column.Shown ? column.Width : new GridLength(0);
-    }
-
     internal async Task ShowParameters()
     {
         var shell = Shell.Current;
@@ -67,11 +55,24 @@ internal sealed class TableColumns
         if (host is null) return;
         var horizontal = new CheckBox { IsChecked = HorizontalLines.IsChecked };
         var vertical = new CheckBox { IsChecked = VerticalLines.IsChecked };
+        var section = new Picker { ItemsSource = new[] { "Nagłówek", "Zawartość" }, SelectedIndex = 1 };
+        var headerHeight = new Slider(24, 100, CompactTable.GetRowHeight(this, header: true));
         var height = new Slider(18, 100, CompactTable.GetRowHeight(this));
         var heightLabel = Ui.Note($"Minimalna wysokość wiersza: {height.Value:0}");
         height.ValueChanged += (_, e) => heightLabel.Text = $"Minimalna wysokość wiersza: {e.NewValue:0}";
-        var fields = new VerticalStackLayout { Padding = 16, Spacing = 8, Children = {
+        var headerLabel = Ui.Note($"Minimalna wysokość nagłówka: {headerHeight.Value:0}");
+        headerHeight.ValueChanged += (_, e) => headerLabel.Text = $"Minimalna wysokość nagłówka: {e.NewValue:0}";
+        var headerOptions = new VerticalStackLayout { IsVisible = false, Children = { headerLabel, headerHeight } };
+        var bodyOptions = new VerticalStackLayout { Children = {
             Ui.Field("Linie poziome", horizontal), Ui.Field("Linie pionowe", vertical), heightLabel, height
+        } };
+        section.SelectedIndexChanged += (_, _) =>
+        {
+            headerOptions.IsVisible = section.SelectedIndex == 0;
+            bodyOptions.IsVisible = section.SelectedIndex == 1;
+        };
+        var fields = new VerticalStackLayout { Padding = 16, Spacing = 8, Children = {
+            Ui.Field("Sekcja", section), headerOptions, bodyOptions
         } };
         var order = columns.OrderBy(column => column.Index).ToList();
         var sizes = columns.Select(column => new Entry
@@ -117,6 +118,7 @@ internal sealed class TableColumns
                 foreach (var check in visible) check.IsChecked = true;
                 horizontal.IsChecked = vertical.IsChecked = true;
                 height.Value = 26;
+                headerHeight.Value = 32;
                 Draw();
                 return Task.CompletedTask;
             }),
@@ -149,6 +151,7 @@ internal sealed class TableColumns
                     positions[i].Width = column.Shown ? column.Width : new GridLength(0);
                 }
                 CompactTable.SetRowHeight(this, height.Value);
+                CompactTable.SetRowHeight(this, headerHeight.Value, header: true);
                 HorizontalLines.IsChecked = horizontal.IsChecked;
                 VerticalLines.IsChecked = vertical.IsChecked;
                 WidthChanged?.Invoke();
@@ -160,19 +163,28 @@ internal sealed class TableColumns
         await host.Navigation.PushModalAsync(page);
     }
 
-    internal void AttachRowMenu(Grid row)
+    internal void AttachTableMenu(View table)
     {
 #if WINDOWS
+        if (table.BackgroundColor is null) table.BackgroundColor = Colors.Transparent;
         void Attach()
         {
-            if (row.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement element) return;
+            if (table.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement element) return;
             var menu = new Microsoft.UI.Xaml.Controls.MenuFlyout();
             var settings = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = "Parametry listy…" };
             settings.Click += async (_, _) => await ShowParameters();
             menu.Items.Add(settings);
-            element.ContextFlyout = menu;
+            element.AddHandler(Microsoft.UI.Xaml.UIElement.RightTappedEvent,
+                new Microsoft.UI.Xaml.Input.RightTappedEventHandler((_, args) =>
+                {
+                    args.Handled = true;
+                    menu.ShowAt(element, new Microsoft.UI.Xaml.Controls.Primitives.FlyoutShowOptions
+                    {
+                        Position = args.GetPosition(element)
+                    });
+                }), true);
         }
-        row.HandlerChanged += (_, _) => Attach();
+        table.HandlerChanged += (_, _) => Attach();
         Attach();
 #endif
     }
@@ -182,29 +194,6 @@ internal sealed class TableColumns
 #if WINDOWS
         headers[index] = cell switch { Label label => label.Text ?? "", Button button => button.Text ?? "", _ => "" };
         var column = columns[index];
-        void AttachMenu()
-        {
-            if (cell.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement element) return;
-            var menu = new Microsoft.UI.Xaml.Controls.MenuFlyout();
-            var left = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = "Przesuń w lewo" };
-            var right = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = "Przesuń w prawo" };
-            left.Click += (_, _) => Move(column, -1);
-            right.Click += (_, _) => Move(column, 1);
-            menu.Opening += (_, _) =>
-            {
-                left.IsEnabled = column.Index > 0;
-                right.IsEnabled = column.Index < Count - 1;
-            };
-            var settings = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = "Parametry listy…" };
-            settings.Click += async (_, _) => await ShowParameters();
-            menu.Items.Add(settings);
-            menu.Items.Add(left);
-            menu.Items.Add(right);
-            element.ContextFlyout = menu;
-        }
-        cell.HandlerChanged += (_, _) => AttachMenu();
-        AttachMenu();
-
         var grip = new BoxView
         {
             Color = Colors.Transparent, WidthRequest = 12, HorizontalOptions = LayoutOptions.End,

@@ -63,6 +63,7 @@ public sealed class DocumentSearchPage : ContentPage
         root.Add(Ui.Card(top), 0, 0); var table = new Grid { RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } } };
         table.Add(CompactTable.Header(columns, "Data", "Numer", "Kontrahent", "Wartość", "Powiązane dokumenty"), 0, 0);
         table.Add(results, 0, 1);
+        columns.AttachTableMenu(table);
         root.Add(Ui.Card(table), 0, 1);
         root.Add(Ui.Action("Anuluj", () => CloseSearch(null)), 0, 2);
         Content = Ui.WithClose(this, root, () => CloseSearch(null));

@@ -26,7 +26,6 @@ internal sealed class InteractiveCardPage : ContentPage
         var details = new VerticalStackLayout { Children = { fields }, IsVisible = false };
         var tableHeader = CompactTable.Header(columns, "Druk", "Zwierzęta", "Lek", "Ilość / seria",
             "Droga podania", "Rozpoznanie", "Dawkowanie", "Karencja", "Uwagi");
-        tableHeader.MinimumHeightRequest = 32;
         foreach (var label in tableHeader.Children.OfType<Label>())
         {
             label.Margin = new Thickness(3, 3);
@@ -68,8 +67,10 @@ internal sealed class InteractiveCardPage : ContentPage
         } };
         root.Add(toolbar, 0, 0);
         var content = new VerticalStackLayout { Spacing = 8, HorizontalOptions = LayoutOptions.Start, Children = { details, table } };
-        root.Add(new ScrollView { Orientation = ScrollOrientation.Both, Content = content,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Always }, 0, 1);
+        var tableScroll = new ScrollView { Orientation = ScrollOrientation.Both, Content = content,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Always };
+        root.Add(tableScroll, 0, 1);
+        columns.AttachTableMenu(tableScroll);
         void UpdateWidth() => content.WidthRequest = columns.FixedWidth + 30;
         columns.WidthChanged += UpdateWidth;
         UpdateWidth();

@@ -190,6 +190,7 @@ public sealed class MedicineStockPage : ContentPage
             };
             table.Add(priceHeading, 0, 0);
             table.Add(list, 0, 1);
+            priceWidths.AttachTableMenu(table);
             root.Add(Ui.Card(table), 0, 1);
         }
         else root.Add(new Border { Content = CreateExpiryTable(), Stroke = new SolidColorBrush(Color.FromArgb("#999999")), StrokeThickness = 1, Padding = 0 }, 0, 1);
@@ -438,6 +439,7 @@ public sealed class MedicineStockPage : ContentPage
         };
         table.Add(heading, 0, 0);
         table.Add(list, 0, 1);
+        expiryWidths.AttachTableMenu(table);
         return table;
     }
 

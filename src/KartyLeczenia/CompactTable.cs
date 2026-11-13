@@ -12,9 +12,15 @@ internal static class CompactTable
 
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TableColumns, RowHeight> RowHeights = new();
 
-    internal static double GetRowHeight(TableColumns columns) => RowHeights.GetValue(columns, _ => new RowHeight()).Value;
-    internal static void SetRowHeight(TableColumns columns, double value) =>
-        RowHeights.GetValue(columns, _ => new RowHeight()).Value = value;
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TableColumns, RowHeight> HeaderHeights = new();
+
+    static RowHeight Height(TableColumns columns, bool header) => header
+        ? HeaderHeights.GetValue(columns, _ => new RowHeight { Value = 32 })
+        : RowHeights.GetValue(columns, _ => new RowHeight());
+
+    internal static double GetRowHeight(TableColumns columns, bool header = false) => Height(columns, header).Value;
+    internal static void SetRowHeight(TableColumns columns, double value, bool header = false) =>
+        Height(columns, header).Value = value;
 
     internal static Label Cell(string path, bool right = false, string? format = null)
     {
@@ -37,8 +43,7 @@ internal static class CompactTable
             MinimumHeightRequest = header ? 32 : 26,
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = 1 } } };
         var height = RowHeights.GetValue(widths, _ => new RowHeight());
-        if (!header)
-            row.SetBinding(VisualElement.MinimumHeightRequestProperty, new Binding(nameof(RowHeight.Value), source: height));
+        row.SetBinding(VisualElement.MinimumHeightRequestProperty, new Binding(nameof(RowHeight.Value), source: Height(widths, header)));
         if (header)
             row.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#DCE5EF"), Color.FromArgb("#27374A"));
         if (!header)
@@ -85,7 +90,6 @@ internal static class CompactTable
         row.Add(line, 0, 1);
         Grid.SetColumnSpan(line, widths.Count);
         if (header) AttachHeightGrip(row, height, widths.Count);
-        if (!header) widths.AttachRowMenu(row);
         return row;
     }
 
