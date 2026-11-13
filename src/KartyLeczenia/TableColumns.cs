@@ -82,6 +82,8 @@ internal sealed class TableColumns
         var list = new VerticalStackLayout { Spacing = 4 };
         void Draw()
         {
+            foreach (var row in list.Children.OfType<HorizontalStackLayout>())
+                foreach (var field in row.Children.OfType<VerticalStackLayout>()) field.Children.Clear();
             list.Children.Clear();
             for (int i = 0; i < order.Count; i++)
             {
