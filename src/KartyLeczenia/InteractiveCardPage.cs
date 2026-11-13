@@ -5,7 +5,8 @@ internal sealed class InteractiveCardPage : ContentPage
     readonly TableColumns columns = new(46, 145, 220, 190, 190, 135, 285, 185, 150);
 
     internal InteractiveCardPage(IReadOnlyDictionary<string, Editor> header, IEnumerable<TreatmentRow> rows,
-        Func<TreatmentRow, MedicineCatalogue.Entry?> match, Func<ContentPage, string, Task> output)
+        Func<TreatmentRow, MedicineCatalogue.Entry?> match, Func<ContentPage, string, Task> output,
+        int withdrawalFormatIndex, Action<int> changeWithdrawalFormat)
     {
         Title = "Karta leczenia";
         var fields = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
@@ -22,6 +23,13 @@ internal sealed class InteractiveCardPage : ContentPage
                 "Rozpoznanie", "Dawkowanie", "Karencja", "Uwagi") } };
         var extraFields = new List<View>();
         foreach (var row in rows) table.Add(EditRow(row, match(row), extraFields));
+        var withdrawalFormat = new Picker
+        {
+            ItemsSource = new[] { "Pełna karencja", "Skrót karencji" },
+            SelectedIndex = withdrawalFormatIndex,
+            WidthRequest = 175
+        };
+        withdrawalFormat.SelectedIndexChanged += (_, _) => changeWithdrawalFormat(withdrawalFormat.SelectedIndex);
         bool showDetails = false;
         var toolbar = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = {
             Ui.Action("Szczegóły pozycji", () => {
@@ -30,6 +38,7 @@ internal sealed class InteractiveCardPage : ContentPage
                 return Task.CompletedTask;
             }),
             Ui.Action("Dane karty", () => { details.IsVisible = !details.IsVisible; return Task.CompletedTask; }),
+            Ui.Field("Karencja na wydruku", withdrawalFormat),
             Ui.Action("Podgląd wydruku", () => output(this, "preview")),
             Ui.Action("Drukuj", () => output(this, "print")),
             Ui.PrimaryAction("Eksport do PDF", () => output(this, "pdf"))

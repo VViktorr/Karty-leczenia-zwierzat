@@ -410,7 +410,8 @@ public sealed class CardPage : ContentPage
         catch (Exception ex) { CrashLog.Write("Card.Interactive.Catalogue", ex); }
         var page = new InteractiveCardPage(header, rows,
             row => catalogue is null ? null : MedicineCatalogue.Match(catalogue, row),
-            (host, mode) => Preview(mode, host));
+            (host, mode) => Preview(mode, host), withdrawalFormat.SelectedIndex,
+            index => withdrawalFormat.SelectedIndex = index);
         await Navigation.PushModalAsync(page);
     }
 
