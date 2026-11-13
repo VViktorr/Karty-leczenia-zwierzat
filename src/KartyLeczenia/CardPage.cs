@@ -39,7 +39,7 @@ public sealed class CardPage : ContentPage
     public CardPage(AppState appState)
     {
         state = appState; Title = "Karta leczenia";
-        withdrawal.Items.Add("Katalog leków (domyślnie)"); withdrawal.Items.Add("Opis leku");
+        withdrawal.Items.Add("Katalog SQLite (ChPL)"); withdrawal.Items.Add("Opis leku");
         for (int i = 1; i <= 8; i++) withdrawal.Items.Add("Pole własne " + i);
         withdrawal.SelectedIndex = 0; owner.Items.Add("Płatnik"); owner.Items.Add("Odbiorca"); owner.SelectedIndex = 0;
         owner.SelectedIndexChanged += (_, _) => { if (!changing && scope != "") header["Właściciel i adres"].Text = owner.SelectedIndex == 0 ? payer : recipient; };
