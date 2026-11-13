@@ -76,6 +76,12 @@ public sealed class DocumentSearchPage : ContentPage
         Content = Ui.WithClose(this, root, () => CloseSearch(null));
         query.TextChanged += (_, _) => { work?.Cancel(); status.Text = "Naciśnij Enter, aby wyszukać. Możesz nadal wybrać dokument z listy."; };
         query.Completed += async (_, _) => await Search();
+        async void RefreshDateRange(object? sender, DateChangedEventArgs args)
+        {
+            if (initialized && !closing && dates.IsVisible) await Search();
+        }
+        from.DateSelected += RefreshDateRange;
+        until.DateSelected += RefreshDateRange;
         year.SelectedIndexChanged += async (_, _) => { dates.IsVisible = year.SelectedItem as string == "Zakres dat"; if (initialized) await Search(); };
 #if WINDOWS
         HandlerChanged += (_, _) =>
@@ -108,6 +114,7 @@ public sealed class DocumentSearchPage : ContentPage
 
     async Task Search(bool force = false)
     {
+        if (closing) return;
         work?.Cancel();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20)); work = cts;
         DateTime? start = null, end = null;

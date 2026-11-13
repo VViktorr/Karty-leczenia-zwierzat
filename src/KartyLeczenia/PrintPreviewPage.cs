@@ -31,14 +31,14 @@ public sealed class PrintPreviewPage : ContentPage
             if (ready)
             {
                 try { ready = await browser.EvaluateJavaScriptAsync("document.querySelector('.sheet') !== null") == "true"; }
-                catch (Exception) { ready = false; }
+                catch (Exception ex) { CrashLog.Write("PrintPreview.Load.Failed", ex); ready = false; }
             }
             if (closed) return;
             print.IsEnabled = pdf.IsEnabled = ready;
             status.Text = ready ? "A4 poziomo. Podgląd, wydruk i PDF korzystają z tego samego formularza." : "Nie udało się przygotować podglądu.";
             if (!ready || firstAction) return; firstAction = true;
             try { if (firstMode == "print") await Print(); else if (firstMode == "pdf") await Export(); }
-            catch (Exception ex) { status.Text = "Nie wykonano operacji: " + ex.Message; }
+            catch (Exception ex) { CrashLog.Write("PrintPreview.Output.Failed", ex); status.Text = "Nie wykonano operacji: " + ex.Message; }
         };
         browser.Source = new HtmlWebViewSource { Html = html };
     }

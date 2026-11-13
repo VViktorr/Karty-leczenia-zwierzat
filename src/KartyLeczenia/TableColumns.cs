@@ -295,6 +295,7 @@ internal sealed class TableColumns
                 HorizontalLines.IsChecked = horizontal.IsChecked;
                 VerticalLines.IsChecked = vertical.IsChecked;
                 WidthChanged?.Invoke();
+                SaveLayout();
                 await page.Navigation.PopModalAsync();
                 parametersOpen = false;
             }),

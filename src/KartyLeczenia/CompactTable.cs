@@ -22,6 +22,16 @@ internal static class CompactTable
     internal static void SetRowHeight(TableColumns columns, double value, bool header = false) =>
         Height(columns, header).Value = value;
 
+    sealed class SingleLineConverter : IValueConverter
+    {
+        internal static readonly SingleLineConverter Instance = new();
+        public object? Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+            value is string text ? string.Join(" ", text.Split(['\r', '\n'],
+                StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)) : value;
+        public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+            throw new NotSupportedException();
+    }
+
     internal static Label Cell(string path, bool right = false, string? format = null, bool singleLine = false)
     {
         var label = new Label { LineBreakMode = LineBreakMode.TailTruncation,
@@ -29,7 +39,7 @@ internal static class CompactTable
             HorizontalTextAlignment = right ? TextAlignment.End : TextAlignment.Start };
         if (singleLine) label.MaxLines = 1;
         if (!right) label.SetDynamicResource(Label.HorizontalTextAlignmentProperty, "AppCellAlignment");
-        label.SetBinding(Label.TextProperty, new Binding(path, stringFormat: format));
+        label.SetBinding(Label.TextProperty, new Binding(path, converter: singleLine ? SingleLineConverter.Instance : null, stringFormat: format));
         return label;
     }
 
