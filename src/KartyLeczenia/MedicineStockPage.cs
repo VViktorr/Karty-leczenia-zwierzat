@@ -98,6 +98,12 @@ public sealed class MedicineStockPage : ContentPage
             var printOptions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
             printOptions.Add(Ui.Field("Czcionka wydruku", printFont));
             printOptions.Add(Ui.Field("Rozmiar (pt)", printSize));
+            var formatField = Ui.Field("Format karencji z SQLite", printWithdrawalFormat);
+            void UpdateFormatVisibility() => formatField.IsVisible = printWithdrawal.IsChecked && withdrawalSource.SelectedIndex == 0;
+            printWithdrawal.CheckedChanged += (_, _) => UpdateFormatVisibility();
+            withdrawalSource.SelectedIndexChanged += (_, _) => UpdateFormatVisibility();
+            UpdateFormatVisibility();
+            printOptions.Add(formatField);
             foreach (var (label, check) in new[] {
                 ("Lp.", printNumber), ("Seria", printBatch), ("Cena", printPrice),
                 ("Karencja", printWithdrawal), ("Legenda", printLegend) })
@@ -261,6 +267,7 @@ public sealed class MedicineStockPage : ContentPage
     readonly CheckBox printBatch = new();
     readonly CheckBox printPrice = new() { IsChecked = true };
     readonly CheckBox printWithdrawal = new() { IsChecked = true };
+    readonly Picker printWithdrawalFormat = new() { ItemsSource = new[] { "Krótka karencja", "Pełna karencja" }, SelectedIndex = 0 };
     readonly CheckBox printLegend = new() { IsChecked = true };
 
     readonly Picker printOrientation = new() { ItemsSource = new[] { "Pozioma", "Pionowa" }, SelectedIndex = 0 };
@@ -298,6 +305,7 @@ public sealed class MedicineStockPage : ContentPage
         string margin = FormattableString.Invariant($"{printMargin.Value:0.#}");
         string rowHeight = FormattableString.Invariant($"{printRowHeight.Value:0.#}");
         string rowPadding = FormattableString.Invariant($"{printRowPadding.Value:0.#}");
+        bool shortWithdrawal = printWithdrawalFormat.SelectedIndex == 0;
         var weights = printColumnWidths.Select(slider => slider.Value).ToArray();
         string sourceName = source == 0 ? "Katalog SQLite (ChPL)" : $"Subiekt ({withdrawalSource.SelectedItem})";
         string query = (search.Text ?? "").Trim();
@@ -321,7 +329,7 @@ public sealed class MedicineStockPage : ContentPage
             if (showPrice) columns.Add(($"Cena {basis}", weights[3], (row, _) => row.Gross?.ToString("N2") ?? "—", "price"));
             if (showWithdrawal) columns.Add(("Karencja", weights[4], (row, _) =>
             {
-                string text = catalogue is null ? row.Withdrawal : CatalogueWithdrawal(catalogue, row);
+                string text = catalogue is null ? row.Withdrawal : CatalogueWithdrawal(catalogue, row, shortWithdrawal);
                 return string.Join(", ", text.Split(['\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
             }, ""));
 
@@ -358,12 +366,12 @@ public sealed class MedicineStockPage : ContentPage
         finally { openingPrint = false; }
     }
 
-    static string CatalogueWithdrawal(ILookup<string, MedicineCatalogue.Entry> catalogue, MedicinePrice row)
+    static string CatalogueWithdrawal(ILookup<string, MedicineCatalogue.Entry> catalogue, MedicinePrice row, bool shortWithdrawal)
     {
         var entry = MedicineCatalogue.Match(catalogue, row.Symbol, row.Name);
         if (entry is null || entry.Excluded) return "";
         return string.Join(" | ", entry.Variants
-            .Select(v => (v.Species, Route: ShortRoute(v.Route), Text: v.WithdrawalShort.Length > 0
+            .Select(v => (v.Species, Route: shortWithdrawal ? ShortRoute(v.Route) : v.Route, Text: shortWithdrawal && v.WithdrawalShort.Length > 0
                 ? v.WithdrawalShort : FullWithdrawal(v)))
             .Where(item => item.Text.Length > 0)
             .GroupBy(item => (item.Species, item.Text))
