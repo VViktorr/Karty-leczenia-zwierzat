@@ -1,11 +1,12 @@
-name: Release MAUI Windows application
+name: Wydanie Windows – instalator i ZIP
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag nowego wydania'
+      version:
+        description: 'Numer wersji, np. 1.0.0'
         required: true
-        default: v0.2.0-alpha.1
+        type: string
+        default: '1.0.0'
 permissions:
   contents: write
   statuses: write
@@ -15,6 +16,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Validate release version
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:RELEASE_VERSION -cnotmatch '^(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\z' -or
+              ($env:RELEASE_VERSION.Split('.') | Where-Object { [int]$_ -gt 65534 })) {
+            throw 'Podaj numer wersji w formacie 1.0.0 (każdy człon od 0 do 65534).'
+          }
+          "RELEASE_VERSION=$env:RELEASE_VERSION" >> $env:GITHUB_ENV
+          "RELEASE_TAG=v$env:RELEASE_VERSION" >> $env:GITHUB_ENV
       - name: Report build start
         shell: pwsh
         env:
@@ -33,7 +45,8 @@ jobs:
       - name: Check connection settings and password protection
         run: dotnet run --project tests/ConnectionChecks -c Release
       - name: Publish MAUI Windows executable
-        run: dotnet publish src/KartyLeczenia -f net10.0-windows10.0.19041.0 -c Release -p:RuntimeIdentifierOverride=win-x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true --self-contained true -o publish
+        shell: pwsh
+        run: dotnet publish src/KartyLeczenia -f net10.0-windows10.0.19041.0 -c Release -p:RuntimeIdentifierOverride=win-x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true --self-contained true -p:ApplicationDisplayVersion=$env:RELEASE_VERSION -p:Version=$env:RELEASE_VERSION -o publish
       - name: Check native MAUI window startup
         shell: pwsh
         run: ./scripts/Smoke-Windows.ps1
@@ -42,26 +55,37 @@ jobs:
         run: |
           Copy-Item README.md publish/INSTRUKCJA.md
           Compress-Archive -Path publish/* -DestinationPath KartyLeczenia-MAUI-win-x64.zip
-          $hash = (Get-FileHash -Algorithm SHA256 KartyLeczenia-MAUI-win-x64.zip).Hash.ToLowerInvariant()
-          "$hash  KartyLeczenia-MAUI-win-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (!(Test-Path -LiteralPath $iscc)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+          }
+          & $iscc "/DReleaseVersion=$env:RELEASE_VERSION" "/O$env:GITHUB_WORKSPACE" installer/KartyLeczenia.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
+      - name: Write SHA-256 checksums
+        shell: pwsh
+        run: |
+          Get-FileHash -Algorithm SHA256 -Path KartyLeczenia-MAUI-win-x64.zip,KartyLeczenia-Setup-win-x64.exe |
+            ForEach-Object { "$($_.Hash.ToLowerInvariant())  $(Split-Path -Leaf $_.Path)" } |
+            Set-Content -Encoding ascii SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: KartyLeczenia-MAUI-win-x64
           path: |
             KartyLeczenia-MAUI-win-x64.zip
+            KartyLeczenia-Setup-win-x64.exe
             SHA256SUMS.txt
           if-no-files-found: error
-      - name: Publish prerelease
+      - name: Publish release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') {
-            throw "Invalid release tag: $env:RELEASE_TAG"
-          }
-          gh release create "$env:RELEASE_TAG" KartyLeczenia-MAUI-win-x64.zip SHA256SUMS.txt --target "$env:GITHUB_SHA" --title "Karty leczenia zwierząt $env:RELEASE_TAG — MAUI Windows" --prerelease --notes-file README.md
+          gh release create "$env:RELEASE_TAG" KartyLeczenia-MAUI-win-x64.zip KartyLeczenia-Setup-win-x64.exe SHA256SUMS.txt --target "$env:GITHUB_SHA" --title "Karty leczenia zwierząt $env:RELEASE_TAG — MAUI Windows" --notes-file README.md
           if ($LASTEXITCODE -ne 0) { throw "Release publication failed" }
       - name: Report build result
         if: always()
