@@ -1,5 +1,7 @@
 """Build the offline catalogue from the merged v10 workbook."""
 import argparse
+import gzip
+import json
 from decimal import Decimal
 from pathlib import Path
 import re
@@ -33,6 +35,7 @@ def build(workbook, repository, output):
                 withdrawal_from_subiekt TEXT, rpl_id TEXT, upd_id TEXT,
                 status TEXT, decision TEXT
             );
+            CREATE TABLE upd_search (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL);
             CREATE TABLE documents (path TEXT PRIMARY KEY NOT NULL);
             CREATE TABLE variants (
                 id INTEGER PRIMARY KEY,
@@ -50,7 +53,14 @@ def build(workbook, repository, output):
         def string(value):
             return None if value is None or value == "" else str(value)
 
+        index = repository / "src/KartyLeczenia/Resources/Raw/upd-index.json.gz"
+        with gzip.open(index, "rt", encoding="utf-8") as stream:
+            upd = json.load(stream)
         with db:
+            db.executemany("INSERT INTO upd_search VALUES (?,?)", (
+                (entry["id"], " / ".join(n["productName"] or "" for n in entry["name"]))
+                for entry in upd
+            ))
             db.executemany("INSERT INTO documents VALUES (?)", ((p,) for p in pdfs))
             for row in cards:
                 values = list(map(string, row[:9]))

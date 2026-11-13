@@ -1,22 +1,95 @@
-using System.IO.Compression;
-using System.Text.Json;
+using Microsoft.Data.Sqlite;
 
 namespace KartyLeczenia;
 
 internal static class MedicineCatalogue
 {
     internal sealed record Variant(string Species, string Indication, string Route, string Dosing,
-        string Meat, string Milk, string Restrictions, string Source);
+        string Meat, string Milk, string Restrictions, string Source, string PdfPath);
     internal sealed record Entry(string Symbol, string SubiektName, string RegisterName,
         string Source, bool Excluded, Variant[] Variants);
 
     static readonly Lazy<Task<ILookup<string, Entry>>> Catalogue = new(Load);
+    static readonly Lazy<Task<string>> DatabasePath = new(CopyDatabaseAsync);
+
+    static async Task<string> CopyDatabaseAsync()
+    {
+        var path = Path.Combine(FileSystem.CacheDirectory, "medicine-catalog.sqlite");
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using var asset = await FileSystem.OpenAppPackageFileAsync("medicine-catalog.sqlite");
+            using (var target = File.Create(temporary))
+                await asset.CopyToAsync(target);
+            File.Move(temporary, path, overwrite: true);
+            return path;
+        }
+        finally
+        {
+            File.Delete(temporary);
+        }
+    }
+
+    internal static async Task<SqliteConnection> OpenAsync()
+    {
+        var path = await DatabasePath.Value;
+        return new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false
+        }.ToString());
+    }
+
+    static string Text(SqliteDataReader reader, int index) =>
+        reader.IsDBNull(index) ? "" : reader.GetString(index);
+
     static async Task<ILookup<string, Entry>> Load()
     {
-        using var asset = await FileSystem.OpenAppPackageFileAsync("medicine-catalog.json.gz");
-        using var stream = new GZipStream(asset, CompressionMode.Decompress);
-        var entries = await JsonSerializer.DeserializeAsync<Entry[]>(stream) ?? [];
-        return entries.ToLookup(entry => entry.Symbol, StringComparer.OrdinalIgnoreCase);
+        using var db = await OpenAsync();
+        db.Open();
+        using var command = db.CreateCommand();
+        command.CommandText = """
+            SELECT p.symbol,p.name,p.status,p.decision,
+                   v.name,v.species,v.indication,v.route,v.dose,v.edible_tissues,
+                   v.milk,v.restrictions,v.source,v.pdf_path
+              FROM products p LEFT JOIN variants v ON v.symbol=p.symbol
+               AND COALESCE(v.scope,'') NOT LIKE '%referencyjne%'
+               AND COALESCE(v.scope,'') NOT LIKE '%Archiwalne%'
+             ORDER BY p.symbol,v.id
+            """;
+        using var reader = command.ExecuteReader();
+        var entries = new Dictionary<string, (string Name, bool Excluded, string Register, string Source, List<Variant> Variants)>();
+        while (reader.Read())
+        {
+            var symbol = Text(reader, 0);
+            if (!entries.TryGetValue(symbol, out var entry))
+            {
+                var status = Text(reader, 2);
+                var excluded = Text(reader, 3) == "NOT_MEDICINE" ||
+                    new[] { "To nie jest lek", "Nie lek", "Nie jest lekiem", "Nie jest produktem leczniczym",
+                        "Archiwalny", "Odniesienie" }.Any(prefix => status.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+                entry = (Text(reader, 1), excluded, Text(reader, 4), Text(reader, 12), []);
+                entries.Add(symbol, entry);
+            }
+            if (!entry.Excluded && Text(reader, 5).Length > 0 &&
+                Text(reader, 7).Length > 0 && Text(reader, 8).Length > 0)
+                entry.Variants.Add(new Variant(Text(reader, 5), Text(reader, 6), Text(reader, 7),
+                    Text(reader, 8), Text(reader, 9), Text(reader, 10), Text(reader, 11),
+                    Text(reader, 12), Text(reader, 13)));
+        }
+        return entries.Select(x => new Entry(x.Key, x.Value.Name, x.Value.Register, x.Value.Source,
+            x.Value.Excluded, x.Value.Variants.ToArray())).ToLookup(x => x.Symbol, StringComparer.OrdinalIgnoreCase);
+    }
+
+    internal static async Task OpenPdfAsync(string path)
+    {
+        var logicalName = path["data/".Length..];
+        using var asset = await FileSystem.OpenAppPackageFileAsync(logicalName);
+        var folder = Path.Combine(FileSystem.CacheDirectory, "ChPL", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        var file = Path.Combine(folder, Path.GetFileName(path));
+        using (var target = File.Create(file))
+            await asset.CopyToAsync(target);
+        await Launcher.Default.OpenAsync(new OpenFileRequest("ChPL", new ReadOnlyFile(file)));
     }
 
     internal static async Task<ILookup<string, Entry>> GetAsync() => await Catalogue.Value;
@@ -32,7 +105,7 @@ internal static class MedicineCatalogue
     }
 
     internal static bool IsCattle(Variant variant) =>
-        variant.Species.StartsWith("Bydło", StringComparison.OrdinalIgnoreCase);
+        NormalizeSpecies(variant.Species).StartsWith("BYDŁO", StringComparison.Ordinal);
 
     static string NormalizeSpecies(string species)
     {

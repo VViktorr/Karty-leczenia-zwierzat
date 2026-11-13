@@ -1,5 +1,3 @@
-using System.IO.Compression;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace KartyLeczenia.Views;
@@ -145,11 +143,13 @@ public sealed class MedicineRegistersPage : ContentPage
 
     static async Task<UpdProduct[]> LoadUpdIndex()
     {
-        using var asset = await FileSystem.OpenAppPackageFileAsync("upd-index.json.gz");
-        using var gzip = new GZipStream(asset, CompressionMode.Decompress);
-        using var doc = await JsonDocument.ParseAsync(gzip);
-        return doc.RootElement.EnumerateArray().Select(entry => new UpdProduct(
-            entry.GetProperty("id").GetString()!,
-            string.Join(" / ", entry.GetProperty("name").EnumerateArray().Select(n => n.GetProperty("productName").GetString())))).ToArray();
+        using var db = await MedicineCatalogue.OpenAsync();
+        db.Open();
+        using var command = db.CreateCommand();
+        command.CommandText = "SELECT id,name FROM upd_search";
+        using var reader = command.ExecuteReader();
+        var entries = new List<UpdProduct>();
+        while (reader.Read()) entries.Add(new UpdProduct(reader.GetString(0), reader.GetString(1)));
+        return entries.ToArray();
     }
 }

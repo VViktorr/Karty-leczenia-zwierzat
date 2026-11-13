@@ -63,6 +63,24 @@ internal sealed class InteractiveCardPage : ContentPage
         var picker = new Picker { Title = "Wybierz wariant", IsVisible = false, WidthRequest = 184 };
         var variants = entry is { Excluded: false } ? MedicineCatalogue.DistinctVariants(entry) : [];
         MedicineCatalogue.Variant[] choices = [];
+        var pdf = new Button { Text = "Otwórz ChPL", IsVisible = false };
+        string SelectedDocument()
+        {
+            var selected = picker.SelectedIndex;
+            if (selected >= 0 && selected < choices.Length)
+                return choices[selected].PdfPath;
+            var documents = variants.Select(v => v.PdfPath).Where(path => path.Length > 0)
+                .Distinct().Take(2).ToArray();
+            return documents.Length == 1 ? documents[0] : "";
+        }
+
+        pdf.Clicked += async (_, _) =>
+        {
+            var path = SelectedDocument();
+            if (path.Length == 0) return;
+            try { await MedicineCatalogue.OpenPdfAsync(path); }
+            catch (Exception ex) { await Shell.Current.DisplayAlertAsync("ChPL", ex.Message, "OK"); }
+        };
         void RefreshChoices()
         {
             var value = row.Get("Gatunek").Trim();
@@ -82,6 +100,7 @@ internal sealed class InteractiveCardPage : ContentPage
                 v.Route == row.Get("Droga podania") && v.Dosing == row.Get("Dawkowanie i okres stosowania") &&
                 MedicineCatalogue.Withdrawal(v) == row.Get("Karencja"));
             picker.IsVisible = choices.Length > 1 || (choices.Length == 1 && picker.SelectedIndex < 0);
+            pdf.IsVisible = SelectedDocument().Length > 0;
             refreshing = false;
         }
         void ApplyChoice(MedicineCatalogue.Variant variant)
@@ -102,6 +121,7 @@ internal sealed class InteractiveCardPage : ContentPage
         picker.SelectedIndexChanged += (_, _) =>
         {
             if (refreshing) return;
+            pdf.IsVisible = SelectedDocument().Length > 0;
             int index = picker.SelectedIndex;
             if (index >= 0 && index < choices.Length) ApplyChoice(choices[index]);
         };
@@ -123,7 +143,7 @@ internal sealed class InteractiveCardPage : ContentPage
             new VerticalStackLayout { Children = { species, description, count } },
             Field("Produkt", "Nazwa leku"),
             new VerticalStackLayout { Children = { Field("Ilość wydana", "Ilość"), Field("Seria", "Seria"), expiry } },
-            new VerticalStackLayout { Children = { picker, route } },
+            new VerticalStackLayout { Children = { picker, route, pdf } },
             Field("Rozpoznanie", "Rozpoznanie"),
             Field("Dawkowanie i okres stosowania", "Dawkowanie"),
             Field("Karencja", "Karencja"),
