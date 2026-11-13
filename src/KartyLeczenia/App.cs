@@ -15,9 +15,9 @@ public sealed class App : Application
                     <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
                 </Style>
                 <Style TargetType="Button">
-                    <Setter Property="CornerRadius" Value="8" />
-                    <Setter Property="Padding" Value="16,10" />
-                    <Setter Property="MinimumHeightRequest" Value="42" />
+                    <Setter Property="CornerRadius" Value="2" />
+                    <Setter Property="Padding" Value="12,4" />
+                    <Setter Property="MinimumHeightRequest" Value="30" />
                     <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E2E8F0, Dark=#2B3A50}" />
                     <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
                 </Style>
@@ -25,7 +25,7 @@ public sealed class App : Application
                     <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8FAFC, Dark=#1E293B}" />
                     <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
                     <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light=#64748B, Dark=#94A3B8}" />
-                    <Setter Property="MinimumHeightRequest" Value="44" />
+                    <Setter Property="MinimumHeightRequest" Value="32" />
                 </Style>
                 <Style TargetType="Editor">
                     <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8FAFC, Dark=#1E293B}" />

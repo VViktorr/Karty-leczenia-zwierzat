@@ -15,6 +15,9 @@ public sealed class MedicineStockPage : ContentPage
     readonly Switch useReceivedRange = new();
     readonly string[] expiryColumns = ["Lek", "Seria", "Data przyjęcia", "Termin ważności", "Pozostało"];
     readonly List<Button> sortHeaders = [];
+    readonly HashSet<string> expandedProducts = new(StringComparer.CurrentCultureIgnoreCase);
+    readonly ColumnDefinition[] expiryWidths = [new() { Width = GridLength.Star },
+        new() { Width = 125 }, new() { Width = 130 }, new() { Width = 175 }, new() { Width = 110 }];
     int sortColumn = 3;
     bool descending;
     readonly Entry search = new();
@@ -37,7 +40,7 @@ public sealed class MedicineStockPage : ContentPage
             filter.ItemsSource = new[] { "Wszystkie dostawy", "Po terminie", "Do 30 dni", "Do 90 dni", "Bez daty" };
             filter.SelectedIndex = 0;
         }
-        list.SelectionMode = SelectionMode.None;
+        list.SelectionMode = SelectionMode.Single;
         list.ItemTemplate = prices ? new DataTemplate(() => CompactTable.Row(PriceWidths, false,
             CompactTable.Cell(nameof(PriceRow.Name)), CompactTable.Cell(nameof(PriceRow.Batch)),
             CompactTable.Cell(nameof(PriceRow.Price), right: true))) : new DataTemplate(() => CreateExpiryRow());
@@ -60,7 +63,7 @@ public sealed class MedicineStockPage : ContentPage
             withdrawalSource.Title = null;
             foreach (var control in new View[] { search, filter, priceBasis, withdrawalSource, refresh })
             {
-                control.HeightRequest = 44;
+                control.HeightRequest = 32;
                 control.VerticalOptions = LayoutOptions.End;
             }
             refresh.Padding = new Thickness(14, 0);
@@ -85,7 +88,7 @@ public sealed class MedicineStockPage : ContentPage
                 .Concat(Enumerable.Range(1, 8).Select(index => $"Pole własne {index}")).ToList();
             withdrawalSource.SelectedIndex = 0;
             var print = Ui.Action("Wydrukuj cennik", PreviewPrices);
-            print.HeightRequest = 44;
+            print.HeightRequest = 32;
             print.Padding = new Thickness(14, 0);
             print.VerticalOptions = LayoutOptions.End;
             header.Children.Add(new HorizontalStackLayout
@@ -282,27 +285,22 @@ public sealed class MedicineStockPage : ContentPage
             .Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
-    static Grid ExpiryGrid() => new()
+    Grid ExpiryGrid(bool header, params View[] cells)
     {
-        Padding = new Thickness(8, 4),
-        ColumnSpacing = 8,
-        ColumnDefinitions =
-        {
-            new ColumnDefinition { Width = GridLength.Star },
-            new ColumnDefinition { Width = new GridLength(125) },
-            new ColumnDefinition { Width = new GridLength(130) },
-            new ColumnDefinition { Width = new GridLength(175) },
-            new ColumnDefinition { Width = new GridLength(110) }
-        }
-    };
+        var grid = CompactTable.Row(expiryWidths.Select(column => column.Width).ToArray(), header, cells);
+        for (int i = 0; i < expiryWidths.Length; i++)
+            grid.ColumnDefinitions[i].SetBinding(ColumnDefinition.WidthProperty,
+                new Binding(nameof(ColumnDefinition.Width), source: expiryWidths[i]));
+        return grid;
+    }
 
     View CreateExpiryTable()
     {
-        var heading = ExpiryGrid();
         for (int i = 0; i < expiryColumns.Length; i++)
         {
             int column = i;
-            var button = new Button { Padding = new Thickness(4) };
+            var button = new Button { Padding = new Thickness(4, 0), MinimumHeightRequest = 26,
+                CornerRadius = 0, FontSize = 12, BackgroundColor = Colors.Transparent };
             button.Clicked += (_, _) =>
             {
                 descending = sortColumn == column && !descending;
@@ -311,20 +309,56 @@ public sealed class MedicineStockPage : ContentPage
                 ShowRows();
             };
             sortHeaders.Add(button);
-            heading.Add(button, i, 0);
         }
         UpdateSortHeaders();
+        var heading = ExpiryGrid(true, sortHeaders.ToArray());
+        for (int i = 1; i < expiryWidths.Length; i++)
+            AddColumnGrip(heading, i);
         var table = new Grid
         {
-            RowDefinitions =
-            {
-                new RowDefinition { Height = GridLength.Auto },
-                new RowDefinition { Height = GridLength.Star }
-            }
+            RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } }
         };
         table.Add(heading, 0, 0);
         table.Add(list, 0, 1);
         return table;
+    }
+
+    void AddColumnGrip(Grid heading, int column)
+    {
+        // The name column fills the remaining space. Dragging a boundary resizes the column to its right.
+        var grip = new BoxView { Color = Colors.Transparent, WidthRequest = 8, HorizontalOptions = LayoutOptions.Start };
+        heading.Add(grip, column, 0);
+#if WINDOWS
+        grip.HandlerChanged += (_, _) =>
+        {
+            if (grip.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement element) return;
+            double start = 0, width = 0;
+            uint? pointerId = null;
+            element.PointerPressed += (_, args) =>
+            {
+                var point = args.GetCurrentPoint(null);
+                if (!point.Properties.IsLeftButtonPressed || !element.CapturePointer(args.Pointer)) return;
+                pointerId = args.Pointer.PointerId;
+                start = point.Position.X;
+                width = expiryWidths[column].Width.Value;
+                args.Handled = true;
+            };
+            element.PointerMoved += (_, args) =>
+            {
+                if (pointerId != args.Pointer.PointerId) return;
+                double offset = args.GetCurrentPoint(null).Position.X - start;
+                expiryWidths[column].Width = new GridLength(Math.Clamp(width - offset, 65, 400));
+                args.Handled = true;
+            };
+            element.PointerReleased += (_, args) =>
+            {
+                if (pointerId != args.Pointer.PointerId) return;
+                element.ReleasePointerCapture(args.Pointer);
+                args.Handled = true;
+            };
+            element.PointerCaptureLost += (_, _) => pointerId = null;
+        };
+#endif
     }
 
     void UpdateSortHeaders()
@@ -333,21 +367,37 @@ public sealed class MedicineStockPage : ContentPage
             sortHeaders[i].Text = expiryColumns[i] + (i == sortColumn ? descending ? " ↓" : " ↑" : "");
     }
 
-    static View CreateExpiryRow()
+    View CreateExpiryRow()
     {
-        var grid = ExpiryGrid();
-        string[] properties = [nameof(ExpiryRow.Name), nameof(ExpiryRow.Batch), nameof(ExpiryRow.Received),
-            nameof(ExpiryRow.Expires), nameof(ExpiryRow.Remaining)];
-        for (int i = 0; i < properties.Length; i++)
+        var name = CompactTable.Cell(nameof(ExpiryRow.Name));
+        name.SetBinding(IsVisibleProperty, nameof(ExpiryRow.IsDetail));
+        var toggle = new Button { Padding = new Thickness(4, 0), MinimumHeightRequest = 24,
+            CornerRadius = 0, FontSize = 12, HorizontalOptions = LayoutOptions.Start, BackgroundColor = Colors.Transparent };
+        toggle.SetBinding(Button.TextProperty, nameof(ExpiryRow.Name));
+        toggle.SetBinding(IsVisibleProperty, nameof(ExpiryRow.IsProduct));
+        toggle.SetBinding(IsEnabledProperty, nameof(ExpiryRow.CanExpand));
+        toggle.Clicked += (_, _) =>
         {
-            var cell = new Label { VerticalOptions = LayoutOptions.Center };
-            cell.SetBinding(Label.TextProperty, properties[i]);
-            grid.Add(cell, i, 0);
-        }
-        return grid;
+            if (toggle.BindingContext is not ExpiryRow { CanExpand: true } row) return;
+            if (!expandedProducts.Add(row.Product)) expandedProducts.Remove(row.Product);
+            ShowRows();
+            if (list.ItemsSource is List<ExpiryRow> rows)
+            {
+                var updated = rows.FirstOrDefault(item => item.IsProduct && item.Product == row.Product);
+                if (updated != null) list.ScrollTo(updated, position: ScrollToPosition.MakeVisible, animate: false);
+            }
+        };
+        var title = new Grid { Children = { name, toggle } };
+        return ExpiryGrid(false, title, CompactTable.Cell(nameof(ExpiryRow.Batch)),
+            CompactTable.Cell(nameof(ExpiryRow.Received)), CompactTable.Cell(nameof(ExpiryRow.Expires)),
+            CompactTable.Cell(nameof(ExpiryRow.Remaining), right: true));
     }
 
-    sealed record ExpiryRow(string Name, string Batch, string Received, string Expires, string Remaining);
+    sealed record ExpiryRow(string Product, string Name, string Batch, string Received, string Expires,
+        string Remaining, bool IsProduct, bool CanExpand)
+    {
+        public bool IsDetail => !IsProduct;
+    }
 
     static string BatchText(MedicinePrice row) => string.IsNullOrWhiteSpace(row.LatestBatch) ? "Brak danych" : row.LatestBatch;
 
@@ -389,16 +439,45 @@ public sealed class MedicineStockPage : ContentPage
             _ => Order(row => row.Expires ?? (descending ? DateTime.MinValue : DateTime.MaxValue))
         };
         var sortedRows = sorted.ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-        var rows = sortedRows.Select(row =>
+        var groups = sortedRows.GroupBy(row => row.Name.Trim(), StringComparer.CurrentCultureIgnoreCase);
+        if (sortColumn == 4)
+            groups = descending
+                ? groups.OrderByDescending(group => group.Sum(row => row.Remaining))
+                : groups.OrderBy(group => group.Sum(row => row.Remaining));
+
+        string ExpiryText(MedicineExpiry row)
         {
             string expiry = row.DeliveriesConfirmed ? row.Expires?.ToString("dd.MM.yyyy") ?? "—" : "Nie ustalono dostaw";
-            if (row.Expires?.Date < today) expiry += " (po terminie)";
-            return new ExpiryRow(row.Name, string.IsNullOrWhiteSpace(row.Batch) ? "—" : row.Batch,
-                row.Received?.ToString("dd.MM.yyyy") ?? "—", expiry, row.Remaining.ToString("0.####"));
-        }).ToList();
+            return row.Expires?.Date < today ? expiry + " (po terminie)" : expiry;
+        }
+        string Batch(MedicineExpiry row) => string.IsNullOrWhiteSpace(row.Batch) ? "—" : row.Batch;
+        var rows = new List<ExpiryRow>();
+        int products = 0;
+        foreach (var group in groups)
+        {
+            products++;
+            var deliveries = group.ToArray();
+            var first = deliveries[0];
+            if (deliveries.Length == 1)
+            {
+                rows.Add(new(group.Key, group.Key, Batch(first), first.Received?.ToString("dd.MM.yyyy") ?? "—",
+                    ExpiryText(first), first.Remaining.ToString("0.####"), false, false));
+                continue;
+            }
+
+            bool expanded = expandedProducts.Contains(group.Key);
+            var earliest = deliveries.Where(row => row.Expires.HasValue).MinBy(row => row.Expires);
+            rows.Add(new(group.Key, (expanded ? "−  " : "+  ") + group.Key, $"{deliveries.Length} pozycji", "—",
+                earliest is null ? "—" : ExpiryText(earliest), deliveries.Sum(row => row.Remaining).ToString("0.####"), true, true));
+            if (!expanded) continue;
+            foreach (var delivery in deliveries)
+                rows.Add(new(group.Key, "    ↳ Dostawa", Batch(delivery), delivery.Received?.ToString("dd.MM.yyyy") ?? "—",
+                    ExpiryText(delivery), delivery.Remaining.ToString("0.####"), false, false));
+        }
         list.ItemsSource = rows;
-        int unresolved = sortedRows.Count(row => !row.DeliveriesConfirmed);
-        status.Text = rows.Count == 0 ? "Brak pasujących pozycji." : $"Pozycje: {rows.Count}";
+        int unresolved = sortedRows.Where(row => !row.DeliveriesConfirmed).Select(row => row.Name)
+            .Distinct(StringComparer.CurrentCultureIgnoreCase).Count();
+        status.Text = products == 0 ? "Brak pasujących pozycji." : $"Produkty: {products} | Pozycje: {sortedRows.Count}";
         if (unresolved > 0) status.Text += $" | Nie ustalono dostaw dla {unresolved} leków. Pokazano ich łączny stan.";
     }
 
