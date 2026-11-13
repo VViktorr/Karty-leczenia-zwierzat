@@ -16,7 +16,7 @@ static class Ui
         border.Stroke = new SolidColorBrush(Color.FromArgb("#64748B"));
         return border;
     }
-    public static View WithClose(ContentPage page, View content, Func<Task> close)
+    public static View WithClose(ContentPage page, View content, Func<Task> close, View? titleDetail = null)
     {
         var button = Action("✕", close);
         button.WidthRequest = button.MinimumWidthRequest = 36;
@@ -25,7 +25,16 @@ static class Ui
         SemanticProperties.SetDescription(button, "Zamknij okno");
         var bar = new Grid { Padding = new Thickness(16, 8), ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };
         bar.Add(new Label { Text = page.Title, FontSize = 16, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center }, 0, 0);
-        bar.Add(button, 1, 0);
+        if (titleDetail is null) bar.Add(button, 1, 0);
+        else
+        {
+            bar.ColumnDefinitions[0].Width = GridLength.Auto;
+            bar.ColumnDefinitions[1].Width = GridLength.Star;
+            bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            bar.ColumnSpacing = 12;
+            bar.Add(titleDetail, 1, 0);
+            bar.Add(button, 2, 0);
+        }
         var root = new Grid { RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } } };
         root.Add(bar, 0, 0); root.Add(content, 0, 1);
         return root;

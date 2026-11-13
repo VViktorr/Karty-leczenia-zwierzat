@@ -52,7 +52,12 @@ internal sealed class InteractiveCardPage : ContentPage
         void UpdateWidth() => content.WidthRequest = columns.FixedWidth + 30;
         columns.WidthChanged += UpdateWidth;
         UpdateWidth();
-        Content = Ui.WithClose(this, root, async () => { await Navigation.PopModalAsync(); });
+        var routeLegend = Ui.Note("Drogi podania · IM – domięśniowo, IV – dożylnie, SC – podskórnie, " +
+            "ID – śródskórnie, IP – dootrzewnowo, IA – dostawowo | PO – doustnie, IUT – domacicznie, " +
+            "IMM – dowymieniowo, IVAG – dopochwowo, TOP / EXT – miejscowo / zewnętrznie, " +
+            "POUR-ON – przez polewanie, SPOT-ON – punktowo na skórę, OPH – do oka, OT / AUR – do ucha, PR – doodbytniczo.");
+        routeLegend.VerticalOptions = LayoutOptions.Center;
+        Content = Ui.WithClose(this, root, async () => { await Navigation.PopModalAsync(); }, routeLegend);
     }
 
     Grid EditRow(TreatmentRow row, MedicineCatalogue.Entry? entry, List<View> extraFields)
