@@ -1,14 +1,20 @@
 namespace KartyLeczenia.Views;
 static class Ui
 {
-    public static Label Heading(string text) => new() { Text = text, FontSize = 18, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 0, 0, 6) };
+    public static Label Heading(string text)
+    {
+        var label = new Label { Text = text, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 0, 0, 6) };
+        label.SetDynamicResource(Label.FontSizeProperty, "AppHeadingSize");
+        label.SetDynamicResource(Label.HorizontalTextAlignmentProperty, "AppHeadingAlignment");
+        return label;
+    }
     public static Label Note(string text)
     {
-        var label = new Label { Text = text, FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
+        var label = new Label { Text = text, LineBreakMode = LineBreakMode.WordWrap };
         label.SetAppThemeColor(Label.TextColorProperty, Color.FromArgb("#475569"), Color.FromArgb("#CBD5E1"));
         return label;
     }
-    public static VerticalStackLayout Field(string title, View control) => new() { Spacing = 4, Children = { new Label { Text = title, FontSize = 13, FontAttributes = FontAttributes.Bold }, control } };
+    public static VerticalStackLayout Field(string title, View control) => new() { Spacing = 4, Children = { new Label { Text = title, FontAttributes = FontAttributes.Bold }, control } };
     public static Border Card(View content)
     {
         var border = new Border { Content = content, Padding = 10, StrokeThickness = 1, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(2) } };

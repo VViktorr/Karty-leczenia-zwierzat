@@ -15,7 +15,7 @@ public sealed class CardPage : ContentPage
     DocumentSuggestion? chosenDocument;
     ConnectionOptions? documentLookupConnection;
     bool choosingDocument, loadingDocument;
-    readonly CheckBox searchInvoices = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 24, MinimumWidthRequest = 24, MinimumHeightRequest = 24 }, searchWarehouse = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 24, MinimumWidthRequest = 24, MinimumHeightRequest = 24 }, searchReceipts = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 24, MinimumWidthRequest = 24, MinimumHeightRequest = 24 };
+    readonly CheckBox searchInvoices = new() { IsChecked = true, WidthRequest = 32, HeightRequest = 32, MinimumWidthRequest = 32, MinimumHeightRequest = 32 }, searchWarehouse = new() { IsChecked = true, WidthRequest = 32, HeightRequest = 32, MinimumWidthRequest = 32, MinimumHeightRequest = 32 }, searchReceipts = new() { IsChecked = true, WidthRequest = 32, HeightRequest = 32, MinimumWidthRequest = 32, MinimumHeightRequest = 32 };
     DocumentSearchKinds SearchKinds => (searchInvoices.IsChecked ? DocumentSearchKinds.Invoices : DocumentSearchKinds.None)
         | (searchWarehouse.IsChecked ? DocumentSearchKinds.WarehouseReleases : DocumentSearchKinds.None)
         | (searchReceipts.IsChecked ? DocumentSearchKinds.Receipts : DocumentSearchKinds.None);
@@ -48,7 +48,7 @@ public sealed class CardPage : ContentPage
         {
             item.Toggle.VerticalOptions = LayoutOptions.Center;
             SemanticProperties.SetDescription(item.Toggle, "Uwzględnij dokumenty " + item.Title);
-            var label = new Label { Text = item.Title, FontSize = 12, VerticalOptions = LayoutOptions.Center };
+            var label = new Label { Text = item.Title, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center };
             var pair = new HorizontalStackLayout
             {
                 Spacing = 2, VerticalOptions = LayoutOptions.Center, Children = { label, item.Toggle }
@@ -63,7 +63,7 @@ public sealed class CardPage : ContentPage
             ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(5, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) }, new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) } },
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
         var searchFields = new[] { Ui.Field("Numer dokumentu lub nazwisko", number), Ui.Field("Źródło danych leku", withdrawal), Ui.Field("Dane właściciela", owner), Ui.Field("Karencja na wydruku", withdrawalFormat) };
-        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).HeightRequest = 28; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
+        for (int i = 0; i < searchFields.Length; i++) { ((Label)searchFields[i].Children[0]).MinimumHeightRequest = 34; ((Label)searchFields[i].Children[0]).VerticalTextAlignment = TextAlignment.Center; actions.Add(searchFields[i], i, 0); }
         var searchLabel = (Label)searchFields[0].Children[0];
         searchFields[0].Children.RemoveAt(0);
         var searchHeader = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star }, new ColumnDefinition { Width = GridLength.Auto } } };

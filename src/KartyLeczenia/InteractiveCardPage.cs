@@ -29,7 +29,6 @@ internal sealed class InteractiveCardPage : ContentPage
         tableHeader.MinimumHeightRequest = 32;
         foreach (var label in tableHeader.Children.OfType<Label>())
         {
-            label.FontSize = 14;
             label.Margin = new Thickness(3, 3);
         }
         var table = new VerticalStackLayout { Spacing = 0, Children = { tableHeader } };

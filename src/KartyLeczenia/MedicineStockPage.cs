@@ -175,7 +175,6 @@ public sealed class MedicineStockPage : ContentPage
         {
             var priceHeading = CompactTable.Header(priceWidths, "Lek", "Najnowsza seria", "Cena brutto");
             var priceLabel = priceHeading.Children.OfType<Label>().ElementAt(2);
-            priceLabel.HorizontalTextAlignment = TextAlignment.End;
             priceBasis.SelectedIndexChanged += (_, _) => priceLabel.Text = NetPrice ? "Cena netto" : "Cena brutto";
             var table = new Grid
             {
@@ -409,7 +408,7 @@ public sealed class MedicineStockPage : ContentPage
         for (int i = 0; i < expiryColumns.Length; i++)
         {
             int column = i;
-            var button = new Button { Padding = new Thickness(4, 0), MinimumHeightRequest = 22, HeightRequest = 22, BorderWidth = 0,
+            var button = new Button { Padding = new Thickness(4, 0), MinimumHeightRequest = 32, BorderWidth = 0,
                 CornerRadius = 0, FontSize = 12, BackgroundColor = Colors.Transparent };
             button.Clicked += (_, _) =>
             {

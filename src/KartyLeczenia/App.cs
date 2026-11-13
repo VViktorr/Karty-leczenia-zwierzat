@@ -12,9 +12,13 @@ public sealed class App : Application
                     <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F1F5F9, Dark=#0F172A}" />
                 </Style>
                 <Style TargetType="Label">
+                    <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
+                    <Setter Property="FontSize" Value="{DynamicResource AppTextSize}" />
                     <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
                 </Style>
                 <Style TargetType="Button">
+                    <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
+                    <Setter Property="FontSize" Value="{DynamicResource AppTextSize}" />
                     <Setter Property="CornerRadius" Value="2" />
                     <Setter Property="Padding" Value="12,4" />
                     <Setter Property="MinimumHeightRequest" Value="30" />
@@ -22,22 +26,29 @@ public sealed class App : Application
                     <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
                 </Style>
                 <Style TargetType="Entry">
+                    <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
+                    <Setter Property="FontSize" Value="{DynamicResource AppTextSize}" />
                     <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8FAFC, Dark=#1E293B}" />
                     <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
                     <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light=#64748B, Dark=#94A3B8}" />
                     <Setter Property="MinimumHeightRequest" Value="32" />
                 </Style>
                 <Style TargetType="Editor">
+                    <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
+                    <Setter Property="FontSize" Value="{DynamicResource AppTextSize}" />
                     <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8FAFC, Dark=#1E293B}" />
                     <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
                 </Style>
                 <Style TargetType="Picker">
+                    <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
+                    <Setter Property="FontSize" Value="{DynamicResource AppTextSize}" />
                     <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8FAFC, Dark=#1E293B}" />
                     <Setter Property="TextColor" Value="{AppThemeBinding Light=#0F172A, Dark=#F1F5F9}" />
                     <Setter Property="TitleColor" Value="{AppThemeBinding Light=#64748B, Dark=#94A3B8}" />
                 </Style>
             </ResourceDictionary>
             """);
+        Views.PersonalizationPage.Apply(Resources);
         ApplyTheme(UiPreferencesStore.Load().Theme);
     }
     public static void ApplyTheme(ThemeMode mode)
@@ -64,7 +75,8 @@ public sealed class AppShell : Shell
         var tabs = new TabBar();
         var connection = new Tab { Title = "Ustawienia", Route = "connection" };
         var connectionPage = new Views.ConnectionPage(state);
-        connection.Items.Add(new ShellContent { Content = connectionPage });
+        connection.Items.Add(new ShellContent { Title = "Połączenie i ustawienia", Content = connectionPage });
+        connection.Items.Add(new ShellContent { Title = "Personalizacja", ContentTemplate = new DataTemplate(() => new Views.PersonalizationPage()) });
         var cards = new Tab { Title = "Karta leczenia", Route = "cards" };
         cards.Items.Add(new ShellContent { Content = new Views.CardPage(state) }); tabs.Items.Add(cards);
         var prices = new Tab { Title = "Cennik leków", Route = "medicine-prices" };

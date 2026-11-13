@@ -5,7 +5,7 @@ internal static class CompactTable
     sealed class RowHeight : BindableObject
     {
         internal static readonly BindableProperty ValueProperty =
-            BindableProperty.Create(nameof(Value), typeof(double), typeof(RowHeight), 20d);
+            BindableProperty.Create(nameof(Value), typeof(double), typeof(RowHeight), 26d);
 
         public double Value { get => (double)GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
     }
@@ -14,9 +14,10 @@ internal static class CompactTable
 
     internal static Label Cell(string path, bool right = false, string? format = null)
     {
-        var label = new Label { FontSize = 12, LineBreakMode = LineBreakMode.TailTruncation,
+        var label = new Label { LineBreakMode = LineBreakMode.TailTruncation,
             VerticalTextAlignment = TextAlignment.Center,
             HorizontalTextAlignment = right ? TextAlignment.End : TextAlignment.Start };
+        if (!right) label.SetDynamicResource(Label.HorizontalTextAlignmentProperty, "AppCellAlignment");
         label.SetBinding(Label.TextProperty, new Binding(path, stringFormat: format));
         return label;
     }
@@ -29,13 +30,13 @@ internal static class CompactTable
     internal static Grid Row(TableColumns widths, bool header, params View[] cells)
     {
         var row = new Grid { Padding = new Thickness(3, 0), ColumnSpacing = 3,
-            MinimumHeightRequest = header ? 22 : 20,
+            MinimumHeightRequest = header ? 32 : 26,
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = 1 } } };
         var height = RowHeights.GetValue(widths, _ => new RowHeight());
         if (!header)
             row.SetBinding(VisualElement.MinimumHeightRequestProperty, new Binding(nameof(RowHeight.Value), source: height));
         if (header)
-            row.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#EAEAEA"), Color.FromArgb("#27374A"));
+            row.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#DCE5EF"), Color.FromArgb("#27374A"));
         if (!header)
         {
             var selected = new VisualState { Name = "Selected" };
@@ -53,17 +54,27 @@ internal static class CompactTable
             var cell = cells[i];
             cell.SetBinding(Grid.ColumnProperty, new Binding(nameof(TableColumns.Slot.Index), source: widths.Column(i)));
             row.Children.Add(cell);
-            if (header) widths.AttachHeader(row, cell, i);
+            if (header)
+            {
+                if (cell is Label heading)
+                {
+                    heading.SetDynamicResource(Label.FontSizeProperty, "AppHeadingSize");
+                    heading.SetDynamicResource(Label.HorizontalTextAlignmentProperty, "AppHeadingAlignment");
+                }
+                else if (cell is Button button)
+                    button.SetDynamicResource(Button.FontSizeProperty, "AppHeadingSize");
+                widths.AttachHeader(row, cell, i);
+            }
         }
         for (int i = 1; i < widths.Count; i++)
         {
             var divider = new BoxView { WidthRequest = 1, HorizontalOptions = LayoutOptions.Start, InputTransparent = true };
-            divider.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#AAAAAA"), Color.FromArgb("#455267"));
+            divider.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#8795A5"), Color.FromArgb("#455267"));
             divider.Margin = new Thickness(-2, 0, 0, 0);
             row.Add(divider, i, 0);
         }
         var line = new BoxView { HeightRequest = 1, InputTransparent = true };
-        line.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#B8B8B8"), Color.FromArgb("#344457"));
+        line.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#A0AAB6"), Color.FromArgb("#344457"));
         row.Add(line, 0, 1);
         Grid.SetColumnSpan(line, widths.Count);
         if (header) AttachHeightGrip(row, height, widths.Count);
