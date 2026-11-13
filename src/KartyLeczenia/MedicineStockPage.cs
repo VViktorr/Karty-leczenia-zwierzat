@@ -3,7 +3,8 @@ namespace KartyLeczenia.Views;
 public sealed class MedicineStockPage : ContentPage
 {
     sealed record PriceRow(string Name, string Batch, string Price);
-    static readonly GridLength[] PriceWidths = [GridLength.Star, new(180), new(140)];
+    readonly ColumnDefinition[] priceWidths = [new() { Width = GridLength.Star },
+        new() { Width = 180 }, new() { Width = 140 }];
     readonly AppState state;
     readonly bool prices;
     readonly Picker priceBasis = new() { ItemsSource = new[] { "Brutto", "Netto" }, SelectedIndex = 0, WidthRequest = 105 };
@@ -41,7 +42,7 @@ public sealed class MedicineStockPage : ContentPage
             filter.SelectedIndex = 0;
         }
         list.SelectionMode = SelectionMode.Single;
-        list.ItemTemplate = prices ? new DataTemplate(() => CompactTable.Row(PriceWidths, false,
+        list.ItemTemplate = prices ? new DataTemplate(() => ResizableRow(priceWidths, false,
             CompactTable.Cell(nameof(PriceRow.Name)), CompactTable.Cell(nameof(PriceRow.Batch)),
             CompactTable.Cell(nameof(PriceRow.Price), right: true))) : new DataTemplate(() => CreateExpiryRow());
         var actions = new Grid
@@ -131,7 +132,9 @@ public sealed class MedicineStockPage : ContentPage
         root.Add(Ui.Card(header), 0, 0);
         if (prices)
         {
-            var priceHeading = CompactTable.Header(PriceWidths, "Lek", "Najnowsza seria", "Cena brutto");
+            var priceHeading = CompactTable.Header(priceWidths.Select(column => column.Width).ToArray(), "Lek", "Najnowsza seria", "Cena brutto");
+            BindColumnWidths(priceHeading, priceWidths);
+            for (int i = 1; i < priceWidths.Length; i++) AddColumnGrip(priceHeading, priceWidths, i);
             var priceLabel = (Label)priceHeading.Children[2];
             priceLabel.HorizontalTextAlignment = TextAlignment.End;
             priceBasis.SelectedIndexChanged += (_, _) => priceLabel.Text = NetPrice ? "Cena netto" : "Cena brutto";
@@ -285,13 +288,18 @@ public sealed class MedicineStockPage : ContentPage
             .Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
-    Grid ExpiryGrid(bool header, params View[] cells)
+    static Grid ResizableRow(ColumnDefinition[] widths, bool header, params View[] cells)
     {
-        var grid = CompactTable.Row(expiryWidths.Select(column => column.Width).ToArray(), header, cells);
-        for (int i = 0; i < expiryWidths.Length; i++)
-            grid.ColumnDefinitions[i].SetBinding(ColumnDefinition.WidthProperty,
-                new Binding(nameof(ColumnDefinition.Width), source: expiryWidths[i]));
+        var grid = CompactTable.Row(widths.Select(column => column.Width).ToArray(), header, cells);
+        BindColumnWidths(grid, widths);
         return grid;
+    }
+
+    static void BindColumnWidths(Grid grid, ColumnDefinition[] widths)
+    {
+        for (int i = 0; i < widths.Length; i++)
+            grid.ColumnDefinitions[i].SetBinding(ColumnDefinition.WidthProperty,
+                new Binding(nameof(ColumnDefinition.Width), source: widths[i]));
     }
 
     View CreateExpiryTable()
@@ -311,9 +319,9 @@ public sealed class MedicineStockPage : ContentPage
             sortHeaders.Add(button);
         }
         UpdateSortHeaders();
-        var heading = ExpiryGrid(true, sortHeaders.ToArray());
+        var heading = ResizableRow(expiryWidths, true, sortHeaders.ToArray());
         for (int i = 1; i < expiryWidths.Length; i++)
-            AddColumnGrip(heading, i);
+            AddColumnGrip(heading, expiryWidths, i);
         var table = new Grid
         {
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star } }
@@ -323,7 +331,7 @@ public sealed class MedicineStockPage : ContentPage
         return table;
     }
 
-    void AddColumnGrip(Grid heading, int column)
+    static void AddColumnGrip(Grid heading, ColumnDefinition[] widths, int column)
     {
         // The name column fills the remaining space. Dragging a boundary resizes the column to its right.
         var grip = new BoxView { Color = Colors.Transparent, WidthRequest = 8, HorizontalOptions = LayoutOptions.Start };
@@ -340,14 +348,14 @@ public sealed class MedicineStockPage : ContentPage
                 if (!point.Properties.IsLeftButtonPressed || !element.CapturePointer(args.Pointer)) return;
                 pointerId = args.Pointer.PointerId;
                 start = point.Position.X;
-                width = expiryWidths[column].Width.Value;
+                width = widths[column].Width.Value;
                 args.Handled = true;
             };
             element.PointerMoved += (_, args) =>
             {
                 if (pointerId != args.Pointer.PointerId) return;
                 double offset = args.GetCurrentPoint(null).Position.X - start;
-                expiryWidths[column].Width = new GridLength(Math.Clamp(width - offset, 65, 400));
+                widths[column].Width = new GridLength(Math.Clamp(width - offset, 65, 400));
                 args.Handled = true;
             };
             element.PointerReleased += (_, args) =>
@@ -393,7 +401,7 @@ public sealed class MedicineStockPage : ContentPage
         };
         title.Add(toggle, 0, 0);
         title.Add(name, 1, 0);
-        return ExpiryGrid(false, title, CompactTable.Cell(nameof(ExpiryRow.Batch)),
+        return ResizableRow(expiryWidths, false, title, CompactTable.Cell(nameof(ExpiryRow.Batch)),
             CompactTable.Cell(nameof(ExpiryRow.Received)), CompactTable.Cell(nameof(ExpiryRow.Expires)),
             CompactTable.Cell(nameof(ExpiryRow.Remaining), right: true));
     }
