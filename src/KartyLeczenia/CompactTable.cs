@@ -22,11 +22,12 @@ internal static class CompactTable
     internal static void SetRowHeight(TableColumns columns, double value, bool header = false) =>
         Height(columns, header).Value = value;
 
-    internal static Label Cell(string path, bool right = false, string? format = null)
+    internal static Label Cell(string path, bool right = false, string? format = null, bool singleLine = false)
     {
         var label = new Label { LineBreakMode = LineBreakMode.TailTruncation,
             VerticalTextAlignment = TextAlignment.Center,
             HorizontalTextAlignment = right ? TextAlignment.End : TextAlignment.Start };
+        if (singleLine) label.MaxLines = 1;
         if (!right) label.SetDynamicResource(Label.HorizontalTextAlignmentProperty, "AppCellAlignment");
         label.SetBinding(Label.TextProperty, new Binding(path, stringFormat: format));
         return label;
@@ -39,9 +40,9 @@ internal static class CompactTable
 
     internal static Grid Row(TableColumns widths, bool header, params View[] cells)
     {
-        var row = new Grid { Padding = new Thickness(3, 0), ColumnSpacing = 3,
+        var row = new Grid { Padding = new Thickness(3, 0), ColumnSpacing = 0,
             MinimumHeightRequest = header ? 32 : 26,
-            RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = 1 } } };
+            RowDefinitions = { new RowDefinition { Height = GridLength.Star }, new RowDefinition { Height = 1 } } };
         var height = RowHeights.GetValue(widths, _ => new RowHeight());
         row.SetBinding(VisualElement.MinimumHeightRequestProperty, new Binding(nameof(RowHeight.Value), source: Height(widths, header)));
         if (header)
@@ -84,6 +85,7 @@ internal static class CompactTable
                 }
                 ApplyAlignment();
             }
+            if (cell is Label) cell.Margin = new Thickness(5, 0);
             row.Children.Add(cell);
             if (header)
             {
@@ -101,9 +103,10 @@ internal static class CompactTable
         {
             var divider = new BoxView { WidthRequest = 1, HorizontalOptions = LayoutOptions.Start, InputTransparent = true };
             divider.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#687786"), Color.FromArgb("#69788A"));
-            divider.Margin = new Thickness(-2, 0, 0, 0);
+            divider.VerticalOptions = LayoutOptions.Fill;
             divider.SetBinding(VisualElement.IsVisibleProperty, new Binding(nameof(CheckBox.IsChecked), source: widths.VerticalLines));
             row.Add(divider, i, 0);
+            Grid.SetRowSpan(divider, 2);
         }
         var line = new BoxView { HeightRequest = 1, InputTransparent = true };
         line.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#748292"), Color.FromArgb("#657588"));

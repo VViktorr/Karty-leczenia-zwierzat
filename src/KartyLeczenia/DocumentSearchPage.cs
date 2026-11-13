@@ -15,8 +15,8 @@ public sealed class DocumentSearchPage : ContentPage
     sealed record CachedList(long SavedAt, List<DocumentSuggestion> Rows);
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ConnectionOptions,
         Dictionary<SearchKey, CachedList>> Cache = new();
-    readonly Entry query = new() { Placeholder = "Numer dokumentu, nazwisko lub nazwa klienta", MaxLength = 100, WidthRequest = 450 };
-    readonly Picker year = new() { Title = "Rok", WidthRequest = 180 };
+    readonly Entry query = new() { Placeholder = "Numer dokumentu, nazwisko lub nazwa klienta", MaxLength = 100 };
+    readonly Picker year = new() { WidthRequest = 180 };
     readonly DatePicker from = new() { Format = "dd.MM.yyyy", WidthRequest = 160 }, until = new() { Format = "dd.MM.yyyy", WidthRequest = 160 };
     readonly CollectionView results = new() { SelectionMode = SelectionMode.Single };
     readonly Label status = Ui.Note("Wpisz numer lub nazwisko i naciśnij Enter. Kliknij dokument, aby go pobrać.");
@@ -38,22 +38,27 @@ public sealed class DocumentSearchPage : ContentPage
         if (documentYear.Success && year.Items.Contains(documentYear.Groups[1].Value)) year.SelectedItem = documentYear.Groups[1].Value;
         from.Date = new DateTime(thisYear, 1, 1); until.Date = new DateTime(thisYear, 12, 31);
         var dates = new HorizontalStackLayout { Spacing = 12, IsVisible = false, Children = { Ui.Field("Od", from), Ui.Field("Do (włącznie)", until) } };
-        var filter = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.End, Children = { Ui.Field("Numer lub klient", query), Ui.Field("Rok / okres", year), Ui.PrimaryAction("Szukaj", () => Search(force: true)) } };
-        var tabs = new HorizontalStackLayout { Spacing = 4, Children = {
-            Ui.Action("FS (Alt+1)", () => SelectKind(DocumentSearchKinds.Invoices)),
-            Ui.Action("Paragony (Alt+2)", () => SelectKind(DocumentSearchKinds.Receipts)),
-            Ui.Action("WZ", () => SelectKind(DocumentSearchKinds.WarehouseReleases)),
-            Ui.Action("Wybrane typy", () => SelectKind(initialKinds))
-        } };
-        var top = new VerticalStackLayout { Spacing = 10, Children = { Ui.Heading("Wyszukaj i wybierz dokument"), tabs, filter, dates, status } };
+        var filter = new Grid { ColumnSpacing = 8, RowSpacing = 4,
+            ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Star },
+                new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition { Width = GridLength.Auto } },
+            RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } } };
+        var searchButton = Ui.PrimaryAction("Szukaj", () => Search(force: true));
+        searchButton.Margin = 0;
+        query.HeightRequest = year.HeightRequest = searchButton.HeightRequest = 36;
+        filter.Add(new Label { Text = "Numer lub klient", FontAttributes = FontAttributes.Bold }, 0, 0);
+        filter.Add(new Label { Text = "Rok / okres", FontAttributes = FontAttributes.Bold }, 1, 0);
+        filter.Add(query, 0, 1);
+        filter.Add(year, 1, 1);
+        filter.Add(searchButton, 2, 1);
+        var top = new VerticalStackLayout { Spacing = 8, Children = { tabs, filter, dates, status } };
         results.EmptyView = new Label { Text = "Brak wyników. Zmień nazwę, numer albo rok.", Margin = 16 };
         var columns = new TableColumns(100, 165, GridLength.Star, 145, new GridLength(0.65, GridUnitType.Star));
         results.ItemTemplate = new DataTemplate(() => CompactTable.Row(columns, false,
             CompactTable.Cell(nameof(DocumentSuggestion.Date), format: "{0:dd.MM.yyyy}"),
             CompactTable.Cell(nameof(DocumentSuggestion.Number)),
-            CompactTable.Cell(nameof(DocumentSuggestion.Payer)),
+            CompactTable.Cell(nameof(DocumentSuggestion.Payer), singleLine: true),
             CompactTable.Cell(nameof(DocumentSuggestion.AmountText), right: true),
-            CompactTable.Cell(nameof(DocumentSuggestion.RelatedText))));
+            CompactTable.Cell(nameof(DocumentSuggestion.RelatedText), singleLine: true)));
         results.SelectionChanged += async (_, e) =>
         {
             if (closing || e.CurrentSelection.FirstOrDefault() is not DocumentSuggestion chosen) return;
@@ -65,7 +70,9 @@ public sealed class DocumentSearchPage : ContentPage
         table.Add(results, 0, 1);
         columns.AttachTableMenu(table, "DocumentSearch");
         root.Add(Ui.Card(table), 0, 1);
-        root.Add(Ui.Action("Anuluj", () => CloseSearch(null)), 0, 2);
+        var cancel = Ui.Action("Anuluj", () => CloseSearch(null));
+        cancel.HorizontalOptions = LayoutOptions.End;
+        root.Add(cancel, 0, 2);
         Content = Ui.WithClose(this, root, () => CloseSearch(null));
         query.TextChanged += (_, _) => { work?.Cancel(); status.Text = "Naciśnij Enter, aby wyszukać. Możesz nadal wybrać dokument z listy."; };
         query.Completed += async (_, _) => await Search();
