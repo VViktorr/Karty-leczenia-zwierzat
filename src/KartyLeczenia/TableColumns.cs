@@ -48,8 +48,51 @@ internal sealed class TableColumns
     internal Slot Column(int index) => columns[index];
     internal Slot Position(int index) => positions[index];
 
+    sealed record ColumnLayout(int Index, double Width, bool Star, bool Shown);
+    sealed record Layout(ColumnLayout[] Columns, bool Horizontal, bool Vertical, double HeaderHeight, double RowHeight);
+    string? preferenceKey;
+
+    internal void SaveLayout()
+    {
+        if (preferenceKey is null) return;
+        var layout = new Layout(columns.Select(column => new ColumnLayout(column.Index, column.Width.Value,
+            column.Width.IsStar, column.Shown)).ToArray(), HorizontalLines.IsChecked, VerticalLines.IsChecked,
+            CompactTable.GetRowHeight(this, true), CompactTable.GetRowHeight(this));
+        Preferences.Default.Set(preferenceKey, System.Text.Json.JsonSerializer.Serialize(layout));
+    }
+
+    void RestoreLayout()
+    {
+        if (preferenceKey is null) return;
+        var json = Preferences.Default.Get(preferenceKey, "");
+        if (json.Length == 0) return;
+        Layout? layout;
+        try { layout = System.Text.Json.JsonSerializer.Deserialize<Layout>(json); }
+        catch (System.Text.Json.JsonException) { return; }
+        if (layout is null || layout.Columns is null || layout.Columns.Length != Count || !layout.Columns.Any(item => item.Shown) ||
+            layout.Columns.Any(item => !double.IsFinite(item.Width) || item.Width <= 0) ||
+            !layout.Columns.Select(item => item.Index).OrderBy(index => index).SequenceEqual(Enumerable.Range(0, Count))) return;
+        for (int i = 0; i < Count; i++)
+        {
+            var item = layout.Columns[i];
+            var column = columns[i];
+            column.Index = item.Index;
+            column.Width = new GridLength(item.Width, item.Star ? GridUnitType.Star : GridUnitType.Absolute);
+            column.Shown = item.Shown;
+            positions[item.Index].Width = item.Shown ? column.Width : new GridLength(0);
+        }
+        HorizontalLines.IsChecked = layout.Horizontal;
+        VerticalLines.IsChecked = layout.Vertical;
+        CompactTable.SetRowHeight(this, Math.Clamp(layout.HeaderHeight, 24, 100), true);
+        CompactTable.SetRowHeight(this, Math.Clamp(layout.RowHeight, 18, 100));
+        WidthChanged?.Invoke();
+    }
+
+    bool parametersOpen;
+
     internal async Task ShowParameters()
     {
+        if (parametersOpen) return;
         var shell = Shell.Current;
         var host = shell?.Navigation.ModalStack.LastOrDefault() ?? shell?.CurrentPage;
         if (host is null) return;
@@ -88,6 +131,7 @@ internal sealed class TableColumns
         fields.Children.Insert(0, previewFrame);
         string Name(int index) => headers.TryGetValue(index, out var title) && !string.IsNullOrWhiteSpace(title)
             ? title : $"Kolumna {index + 1}";
+        Picker? columnPicker = null;
         void DrawPreview()
         {
             preview.Children.Clear();
@@ -114,6 +158,14 @@ internal sealed class TableColumns
                     cell.SetAppThemeColor(VisualElement.BackgroundColorProperty,
                         row == 0 ? Color.FromArgb("#DCE5EF") : Colors.White,
                         Color.FromArgb(row == 0 ? "#27374A" : "#20242B"));
+                    int sectionIndex = row == 0 ? 0 : 1;
+                    var tap = new TapGestureRecognizer();
+                    tap.Tapped += (_, _) =>
+                    {
+                        if (columnPicker is not null) columnPicker.SelectedIndex = index;
+                        section.SelectedIndex = sectionIndex;
+                    };
+                    cell.GestureRecognizers.Add(tap);
                     preview.Add(cell, position, row);
                 }
             }
@@ -123,7 +175,7 @@ internal sealed class TableColumns
         height.ValueChanged += (_, _) => DrawPreview();
         headerHeight.ValueChanged += (_, _) => DrawPreview();
 
-        var columnPicker = new Picker { ItemsSource = Enumerable.Range(0, Count).Select(Name).ToArray(), SelectedIndex = 0, WidthRequest = 220 };
+        columnPicker = new Picker { ItemsSource = Enumerable.Range(0, Count).Select(Name).ToArray(), SelectedIndex = 0, WidthRequest = 220 };
         var list = new VerticalStackLayout { Spacing = 4, IsVisible = false };
         var selectedColumn = new ContentView();
         void ShowColumn()
@@ -217,16 +269,22 @@ internal sealed class TableColumns
                 VerticalLines.IsChecked = vertical.IsChecked;
                 WidthChanged?.Invoke();
                 await page.Navigation.PopModalAsync();
+                parametersOpen = false;
             }),
             Ui.Action("Anuluj", async () => await page.Navigation.PopModalAsync())
         } });
         page.Content = Ui.WithClose(page, new ScrollView { Content = fields }, async () => await page.Navigation.PopModalAsync());
-        await host.Navigation.PushModalAsync(page);
+        parametersOpen = true;
+        page.Unloaded += (_, _) => parametersOpen = false;
+        try { await host.Navigation.PushModalAsync(page); }
+        catch { parametersOpen = false; throw; }
     }
 
-    internal void AttachTableMenu(View table)
+    internal void AttachTableMenu(View table, string key)
     {
 #if WINDOWS
+        preferenceKey = "TableLayout." + key;
+        RestoreLayout();
         if (table.BackgroundColor is null) table.BackgroundColor = Colors.Transparent;
         void Attach()
         {
@@ -235,6 +293,18 @@ internal sealed class TableColumns
             var settings = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = "Parametry listy…" };
             settings.Click += async (_, _) => await ShowParameters();
             menu.Items.Add(settings);
+            var shortcut = new Microsoft.UI.Xaml.Input.KeyboardAccelerator
+            {
+                Key = Windows.System.VirtualKey.L,
+                Modifiers = Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift
+            };
+            shortcut.Invoked += async (_, args) =>
+            {
+                if (parametersOpen) return;
+                args.Handled = true;
+                await ShowParameters();
+            };
+            element.KeyboardAccelerators.Add(shortcut);
             element.AddHandler(Microsoft.UI.Xaml.UIElement.RightTappedEvent,
                 new Microsoft.UI.Xaml.Input.RightTappedEventHandler((_, args) =>
                 {
@@ -301,6 +371,7 @@ internal sealed class TableColumns
             {
                 if (pointerId != args.Pointer.PointerId) return;
                 element.ReleasePointerCapture(args.Pointer);
+                SaveLayout();
                 args.Handled = true;
             };
             element.PointerCaptureLost += (_, _) => pointerId = null;

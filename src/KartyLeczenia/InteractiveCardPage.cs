@@ -70,7 +70,7 @@ internal sealed class InteractiveCardPage : ContentPage
         var tableScroll = new ScrollView { Orientation = ScrollOrientation.Both, Content = content,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Always };
         root.Add(tableScroll, 0, 1);
-        columns.AttachTableMenu(tableScroll);
+        columns.AttachTableMenu(tableScroll, "TreatmentEditor");
         void UpdateWidth() => content.WidthRequest = columns.FixedWidth + 30;
         columns.WidthChanged += UpdateWidth;
         UpdateWidth();

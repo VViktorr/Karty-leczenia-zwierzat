@@ -89,17 +89,17 @@ internal static class CompactTable
         line.SetBinding(VisualElement.IsVisibleProperty, new Binding(nameof(CheckBox.IsChecked), source: widths.HorizontalLines));
         row.Add(line, 0, 1);
         Grid.SetColumnSpan(line, widths.Count);
-        if (header) AttachHeightGrip(row, height, widths.Count);
+        if (header) AttachHeightGrip(row, height, widths);
         return row;
     }
 
-    static void AttachHeightGrip(Grid row, RowHeight height, int columnCount)
+    static void AttachHeightGrip(Grid row, RowHeight height, TableColumns columns)
     {
 #if WINDOWS
         var grip = new BoxView { Color = Colors.Transparent, HeightRequest = 7,
             VerticalOptions = LayoutOptions.End, Margin = new Thickness(0, 0, 0, -3), ZIndex = 11 };
         row.Add(grip, 0, 0);
-        Grid.SetColumnSpan(grip, columnCount);
+        Grid.SetColumnSpan(grip, columns.Count);
         Grid.SetRowSpan(grip, 2);
 
         void Attach()
@@ -127,6 +127,7 @@ internal static class CompactTable
                 if (pointerId != args.Pointer.PointerId) return;
                 pointerId = null;
                 element.ReleasePointerCapture(args.Pointer);
+                columns.SaveLayout();
                 args.Handled = true;
             };
             element.PointerCaptureLost += (_, _) => pointerId = null;
