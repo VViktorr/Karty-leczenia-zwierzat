@@ -95,6 +95,14 @@ public sealed class MedicineStockPage : ContentPage
                 Spacing = 10,
                 Children = { Ui.Field("Źródło karencji na wydruku", withdrawalSource), print }
             });
+            var printOptions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
+            printOptions.Add(Ui.Field("Czcionka wydruku", printFont));
+            printOptions.Add(Ui.Field("Rozmiar (pt)", printSize));
+            foreach (var (label, check) in new[] {
+                ("Lp.", printNumber), ("Seria", printBatch), ("Cena", printPrice),
+                ("Karencja", printWithdrawal), ("Legenda", printLegend) })
+                printOptions.Add(Ui.Field(label, check));
+            header.Children.Add(printOptions);
         }
         if (!prices)
         {
@@ -218,16 +226,29 @@ public sealed class MedicineStockPage : ContentPage
         finally { filter.IsEnabled = priceBasis.IsEnabled = true; loading = false; }
     }
 
+    static readonly string[] PrintFonts = ["Arial", "Calibri", "Tahoma", "Segoe UI", "Times New Roman"];
+    readonly Picker printFont = new() { ItemsSource = PrintFonts, SelectedIndex = 0, WidthRequest = 145 };
+    readonly Picker printSize = new() { ItemsSource = new[] { "8", "9", "10", "11", "12" }, SelectedIndex = 1, WidthRequest = 80 };
+    readonly CheckBox printNumber = new() { IsChecked = true };
+    readonly CheckBox printBatch = new();
+    readonly CheckBox printPrice = new() { IsChecked = true };
+    readonly CheckBox printWithdrawal = new() { IsChecked = true };
+    readonly CheckBox printLegend = new() { IsChecked = true };
+
     async Task PreviewPrices()
     {
         if (openingPrint) return;
         if (!loaded || loading || state.ValidatedConnection is not { } options || filter.SelectedItem is not MedicinePriceLevel level)
             throw new InvalidOperationException("Najpierw wczytaj cennik.");
-        if (withdrawalSource.SelectedIndex < 0)
+        if (printWithdrawal.IsChecked && withdrawalSource.SelectedIndex < 0)
             throw new InvalidOperationException("Wybierz źródło karencji.");
         bool net = NetPrice;
         string basis = net ? "netto" : "brutto";
-        int source = withdrawalSource.SelectedIndex;
+        bool showNumber = printNumber.IsChecked, showBatch = printBatch.IsChecked,
+            showPrice = printPrice.IsChecked, showWithdrawal = printWithdrawal.IsChecked, showLegend = printLegend.IsChecked;
+        int source = Math.Max(0, withdrawalSource.SelectedIndex);
+        string font = printFont.SelectedItem as string ?? PrintFonts[0];
+        string fontSize = printSize.SelectedItem as string ?? "9";
         string sourceName = source == 0 ? "Katalog SQLite (ChPL)" : $"Subiekt ({withdrawalSource.SelectedItem})";
         string query = (search.Text ?? "").Trim();
 
@@ -235,39 +256,51 @@ public sealed class MedicineStockPage : ContentPage
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var data = await MedicineStockService.Prices(options, level.Number, timeout.Token, source, net);
-            var catalogue = source == 0 ? await MedicineCatalogue.GetAsync() : null;
-            if (state.ValidatedConnection != options || !loaded || loading || !Equals(filter.SelectedItem, level) || NetPrice != net || withdrawalSource.SelectedIndex != source || (search.Text ?? "").Trim() != query)
+            var data = await MedicineStockService.Prices(options, level.Number, timeout.Token, showWithdrawal ? source : 0, net);
+            var catalogue = showWithdrawal && source == 0 ? await MedicineCatalogue.GetAsync() : null;
+            if (state.ValidatedConnection != options || !loaded || loading || !Equals(filter.SelectedItem, level) || NetPrice != net || (showWithdrawal && withdrawalSource.SelectedIndex != source) || (search.Text ?? "").Trim() != query)
                 throw new InvalidOperationException("Cennik zmienił się w trakcie przygotowania wydruku. Ponów operację.");
 
             var rows = data.Where(row => row.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToList();
             if (rows.Count == 0) throw new InvalidOperationException("Brak pozycji do wydruku.");
             string Encode(string value) => System.Net.WebUtility.HtmlEncode(value);
-            string body = string.Concat(rows.Select(row =>
+            var columns = new List<(string Heading, int Weight, Func<MedicinePrice, int, string> Value, string Class)>();
+            if (showNumber) columns.Add(("Lp.", 4, (_, i) => (i + 1).ToString(), "price"));
+            columns.Add(("Nazwa leku", 43, (row, _) => row.Name, ""));
+            if (showBatch) columns.Add(("Najnowsza seria", 14, (row, _) => row.LatestBatch, ""));
+            if (showPrice) columns.Add(($"Cena {basis}", 13, (row, _) => row.Gross?.ToString("N2") ?? "—", "price"));
+            if (showWithdrawal) columns.Add(("Karencja", 40, (row, _) =>
             {
-                string gross = row.Gross?.ToString("N2") ?? "—";
-                string withdrawal = catalogue is null ? row.Withdrawal : CatalogueWithdrawal(catalogue, row);
-                if (string.IsNullOrWhiteSpace(withdrawal)) withdrawal = "Brak danych";
-                else withdrawal = string.Join(", ", withdrawal.Split(['\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
-                return $"<tr><td>{Encode(row.Name)}</td><td>{Encode(BatchText(row))}</td><td class='price'>{Encode(gross)}</td><td>{Encode(withdrawal)}</td></tr>";
-            }));
+                string text = catalogue is null ? row.Withdrawal : CatalogueWithdrawal(catalogue, row);
+                return string.Join(", ", text.Split(['\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
+            }, ""));
+
+            int totalWeight = columns.Sum(column => column.Weight);
+            string widths = string.Concat(columns.Select(column =>
+                $"<col style='width:{FormattableString.Invariant($"{column.Weight * 100.0 / totalWeight:0.###}")}%'>"));
+            string headings = string.Concat(columns.Select(column => $"<th>{Encode(column.Heading)}</th>"));
+            string body = string.Concat(rows.Select((row, index) => "<tr>" +
+                string.Concat(columns.Select(column => $"<td class='{column.Class}'>{Encode(column.Value(row, index))}</td>"))
+                + "</tr>"));
             string html = $$"""
                 <!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Cennik leków</title>
                 <style>
-                    @page { size: A4 landscape; margin: 12mm; }
-                    body { font: 11pt Arial, sans-serif; color: #171717; }
-                    h1 { font-size: 18pt; }
-                    table { width: 100%; border-collapse: collapse; }
+                    @page { size: A4 landscape; margin: 7mm; }
+                    body { font: {{fontSize}}pt/1.15 "{{font}}", sans-serif; color: #171717; }
+                    h1 { font-size: 13pt; margin: 0 0 1mm; }
+                    p { margin: 0 0 1mm; }
+                    table { width: 100%; table-layout: fixed; border-collapse: collapse; }
                     thead { display: table-header-group; }
                     tr { break-inside: avoid; }
-                    th, td { border: 1px solid #999; padding: 6px; text-align: left; vertical-align: top; }
-                    td { white-space: pre-wrap; overflow-wrap: anywhere; }
+                    th, td { border: 1px solid #999; padding: 1px 3px; text-align: left; vertical-align: top; }
+                    th { background: #eee; }
+                    td { overflow-wrap: anywhere; }
                     .price { text-align: right; white-space: nowrap; }
                 </style></head><body><main class="sheet">
                 <h1>Cennik leków</h1>
-                <p>{{DateTime.Today:dd.MM.yyyy}} · {{Encode(level.ToString())}} · Źródło karencji: {{Encode(sourceName)}}</p>
-                {{AdministrationRouteLegend.Html}}
-                <table><thead><tr><th>Lek</th><th>Najnowsza seria</th><th>Cena {{basis}}</th><th>Karencja</th></tr></thead><tbody>{{body}}</tbody></table>
+                <p>{{DateTime.Today:dd.MM.yyyy}} · {{Encode(level.ToString())}}{{(showWithdrawal ? " · Źródło karencji: " + Encode(sourceName) : "")}}</p>
+                {{(showLegend ? AdministrationRouteLegend.Html : "")}}
+                <table><colgroup>{{widths}}</colgroup><thead><tr>{{headings}}</tr></thead><tbody>{{body}}</tbody></table>
                 </main></body></html>
                 """;
             await Navigation.PushModalAsync(new PrintPreviewPage(html, "preview", "Podgląd cennika leków", "cennik-lekow"));
