@@ -8,7 +8,7 @@ internal sealed class InteractiveCardPage : ContentPage
         CrashLog.Write("InteractiveCardPage.Open");
     }
 
-    readonly TableColumns columns = new(46, 145, 220, 190, 190, 135, 285, 185, 150);
+    readonly TableColumns columns = new(52, 110, 180, 125, 155, 112, 215, 185, 116);
 
     internal InteractiveCardPage(IReadOnlyDictionary<string, Editor> header, IEnumerable<TreatmentRow> rows,
         Func<TreatmentRow, MedicineCatalogue.Entry?> match, Func<ContentPage, string, Task> output,
@@ -24,9 +24,15 @@ internal sealed class InteractiveCardPage : ContentPage
             fields.Add(Ui.Field(pair.Key, input));
         }
         var details = new VerticalStackLayout { Children = { fields }, IsVisible = false };
-        var table = new VerticalStackLayout { Spacing = 1, HorizontalOptions = LayoutOptions.Start, Children = {
-            CompactTable.Header(columns, "Druk", "Zwierzęta", "Lek", "Ilość / seria", "Droga podania",
-                "Rozpoznanie", "Dawkowanie", "Karencja", "Uwagi") } };
+        var tableHeader = CompactTable.Header(columns, "Druk", "Zwierzęta", "Lek", "Ilość / seria",
+            "Droga podania", "Rozpoznanie", "Dawkowanie", "Karencja", "Uwagi");
+        tableHeader.MinimumHeightRequest = 32;
+        foreach (var label in tableHeader.Children.OfType<Label>())
+        {
+            label.FontSize = 14;
+            label.Margin = new Thickness(3, 3);
+        }
+        var table = new VerticalStackLayout { Spacing = 0, Children = { tableHeader } };
         var extraFields = new List<View>();
         foreach (var row in rows) table.Add(EditRow(row, match(row), extraFields));
         var withdrawalFormat = new Picker
@@ -37,24 +43,34 @@ internal sealed class InteractiveCardPage : ContentPage
         };
         withdrawalFormat.SelectedIndexChanged += (_, _) => changeWithdrawalFormat(withdrawalFormat.SelectedIndex);
         bool showDetails = false;
-        var toolbar = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Children = {
+        var editing = new HorizontalStackLayout { Spacing = 4, Children = {
             Ui.Action("Szczegóły pozycji", () => {
                 showDetails = !showDetails;
                 foreach (var field in extraFields) field.IsVisible = showDetails;
                 return Task.CompletedTask;
             }),
-            Ui.Action("Dane karty", () => { details.IsVisible = !details.IsVisible; return Task.CompletedTask; }),
-            Ui.Field("Karencja na wydruku", withdrawalFormat),
+            Ui.Action("Dane karty", () => { details.IsVisible = !details.IsVisible; return Task.CompletedTask; })
+        } };
+        var outputActions = new HorizontalStackLayout { Spacing = 4, Children = {
             Ui.Action("Podgląd wydruku", () => output(this, "preview")),
             Ui.Action("Drukuj", () => output(this, "print")),
             Ui.PrimaryAction("Eksport do PDF", () => output(this, "pdf"))
         } };
+        var format = Ui.Field("Karencja na wydruku", withdrawalFormat);
+        editing.Margin = format.Margin = new Thickness(0, 0, 18, 4);
+        var toolbar = new FlexLayout
+        {
+            Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
+            AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.End,
+            Children = { editing, format, outputActions }
+        };
         var root = new Grid { Padding = 12, RowSpacing = 8, RowDefinitions = {
             new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Star }
         } };
         root.Add(toolbar, 0, 0);
-        var content = new VerticalStackLayout { Spacing = 8, Children = { details, table } };
-        root.Add(new ScrollView { Orientation = ScrollOrientation.Both, Content = content }, 0, 1);
+        var content = new VerticalStackLayout { Spacing = 8, HorizontalOptions = LayoutOptions.Start, Children = { details, table } };
+        root.Add(new ScrollView { Orientation = ScrollOrientation.Both, Content = content,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Always }, 0, 1);
         void UpdateWidth() => content.WidthRequest = columns.FixedWidth + 30;
         columns.WidthChanged += UpdateWidth;
         UpdateWidth();
