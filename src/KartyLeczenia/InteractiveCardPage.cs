@@ -2,6 +2,12 @@ namespace KartyLeczenia.Views;
 
 internal sealed class InteractiveCardPage : ContentPage
 {
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        CrashLog.Write("InteractiveCardPage.Open");
+    }
+
     readonly TableColumns columns = new(46, 145, 220, 190, 190, 135, 285, 185, 150);
 
     internal InteractiveCardPage(IReadOnlyDictionary<string, Editor> header, IEnumerable<TreatmentRow> rows,

@@ -2,6 +2,12 @@ namespace KartyLeczenia.Views;
 
 public sealed class ConnectionPage : ContentPage
 {
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        CrashLog.Write("ConnectionPage.Open");
+    }
+
     readonly AppState state;
     readonly Entry clinicName = new();
     readonly Editor clinicAddress = new() { HeightRequest = 90 };

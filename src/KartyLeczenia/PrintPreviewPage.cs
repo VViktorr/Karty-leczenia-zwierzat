@@ -2,6 +2,12 @@ namespace KartyLeczenia.Views;
 
 public sealed class PrintPreviewPage : ContentPage
 {
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        CrashLog.Write("PrintPreviewPage.Open");
+    }
+
     readonly WebView browser = new();
     readonly Label status = Ui.Note("Przygotowywanie formularza A4 poziomo…");
     readonly Button print, pdf;

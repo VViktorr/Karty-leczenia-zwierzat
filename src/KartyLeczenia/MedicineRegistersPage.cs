@@ -4,6 +4,12 @@ namespace KartyLeczenia.Views;
 
 public sealed class MedicineRegistersPage : ContentPage
 {
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        CrashLog.Write("MedicineRegistersPage.Open");
+    }
+
     const int PageSize = 20;
     readonly Entry query = new() { Placeholder = "Nazwa, ID lub link do produktu" };
     readonly Label notice = Ui.Note("Wpisz nazwę i wybierz rejestr.");

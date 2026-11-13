@@ -45,9 +45,15 @@ static class Ui
         button.Clicked += async (_, _) =>
         {
             button.IsEnabled = false;
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            CrashLog.Write("Action.Start " + text);
             try { await run(); }
             catch (Exception ex) { CrashLog.Write("Action." + text, ex); await Shell.Current.DisplayAlertAsync("Nie udało się wykonać operacji", SubiektConnectionService.FriendlyError(ex), "OK"); }
-            finally { button.IsEnabled = true; }
+            finally
+            {
+                button.IsEnabled = true;
+                CrashLog.Write($"Action.End {text} elapsedMs={timer.ElapsedMilliseconds}");
+            }
         };
         return button;
     }

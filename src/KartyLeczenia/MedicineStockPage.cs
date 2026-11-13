@@ -200,8 +200,13 @@ public sealed class MedicineStockPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        CrashLog.Write("MedicineStockPage.Open");
         if (loaded && ReferenceEquals(loadedConnection, state.ValidatedConnection) &&
-            Environment.TickCount64 - lastRefreshTick < 30_000) return;
+            Environment.TickCount64 - lastRefreshTick < 30_000)
+        {
+            CrashLog.Write(prices ? "MedicinePrices.CacheHit" : "MedicineExpiries.CacheHit");
+            return;
+        }
         await Refresh();
     }
 

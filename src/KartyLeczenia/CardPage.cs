@@ -256,6 +256,7 @@ public sealed class CardPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        CrashLog.Write("CardPage.Open");
         if (rows.Count > 0 || !string.IsNullOrWhiteSpace(header["Dokument źródłowy"].Text)) return;
         if (header["Lecznica i adres"].Text is null or "" || header["Lecznica i adres"].Text == lastClinic)
             header["Lecznica i adres"].Text = state.Clinic.CardText;

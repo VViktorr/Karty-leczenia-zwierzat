@@ -2,6 +2,12 @@ namespace KartyLeczenia.Views;
 
 public sealed class DocumentSearchPage : ContentPage
 {
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        CrashLog.Write("DocumentSearchPage.Open");
+    }
+
     readonly ConnectionOptions options;
     DocumentSearchKinds kinds;
     readonly DocumentSearchKinds initialKinds;
@@ -107,15 +113,19 @@ public sealed class DocumentSearchPage : ContentPage
             end = last.AddDays(1);
         }
         var key = new SearchKey(kinds, (query.Text ?? "").Trim(), start, end);
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        CrashLog.Write($"DocumentSearch.Start kinds={key.Kinds} empty={key.Text.Length == 0} force={force}");
         var cache = Cache.GetOrCreateValue(options);
         foreach (var expired in cache.Where(item => Environment.TickCount64 - item.Value.SavedAt >= 300_000).Select(item => item.Key).ToArray())
             cache.Remove(expired);
         if (!force && cache.TryGetValue(key, out var saved))
         {
             ApplyResults(saved.Rows);
+            CrashLog.Write($"DocumentSearch.CacheHit rows={saved.Rows.Count} elapsedMs={timer.ElapsedMilliseconds}");
             work = null;
             return;
         }
+        CrashLog.Write("DocumentSearch.CacheMiss");
         status.Text = results.ItemsSource is null ? "Wczytywanie dokumentów…" :
             "Odświeżanie… Nadal możesz przewijać i wybierać dokumenty z poprzedniej listy.";
         try
@@ -124,10 +134,12 @@ public sealed class DocumentSearchPage : ContentPage
             if (cts.IsCancellationRequested || closing) return;
             if (cache.Count >= 32) cache.Remove(cache.MinBy(item => item.Value.SavedAt).Key);
             cache[key] = new(Environment.TickCount64, found);
+            var readMs = timer.ElapsedMilliseconds;
             ApplyResults(found);
+            CrashLog.Write($"DocumentSearch.Success rows={found.Count} readMs={readMs} listMs={timer.ElapsedMilliseconds - readMs}");
         }
-        catch (OperationCanceledException) { if (!closing && ReferenceEquals(work, cts)) status.Text = "Wyszukiwanie anulowane lub przekroczono czas oczekiwania."; }
-        catch (Exception ex) { CrashLog.Write("DocumentSearch.Query.Failed", ex); if (!closing && ReferenceEquals(work, cts)) status.Text = SubiektConnectionService.FriendlyError(ex); }
+        catch (OperationCanceledException) { CrashLog.Write($"DocumentSearch.Cancelled elapsedMs={timer.ElapsedMilliseconds}"); if (!closing && ReferenceEquals(work, cts)) status.Text = "Wyszukiwanie anulowane lub przekroczono czas oczekiwania."; }
+        catch (Exception ex) { CrashLog.Write($"DocumentSearch.Query.Failed type={ex.GetType().Name} elapsedMs={timer.ElapsedMilliseconds}"); if (!closing && ReferenceEquals(work, cts)) status.Text = SubiektConnectionService.FriendlyError(ex); }
         finally { if (ReferenceEquals(work, cts)) work = null; }
     }
     void ApplyResults(List<DocumentSuggestion> found)
