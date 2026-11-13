@@ -422,9 +422,24 @@ public sealed class CardPage : ContentPage
             !await host.DisplayAlertAsync("Weryfikacja karencji", "Nie wszystkie karencje i dopasowania leków zostały zatwierdzone. Sprawdź uzupełnione dane i ewentualne braki. Czy potwierdzasz ich sprawdzenie przed podglądem?", "Potwierdzam", "Wróć")) return;
         if (withdrawalFormat.SelectedIndex == 1)
         {
+            ILookup<string, MedicineCatalogue.Entry>? catalogue = null;
+            try { catalogue = await MedicineCatalogue.GetAsync(); }
+            catch (Exception ex) { CrashLog.Write("Card.Print.Catalogue", ex); }
             foreach (var row in snapshot.Rows)
             {
                 var text = row.GetValueOrDefault("Karencja", "");
+                var entry = catalogue is null ? null : MedicineCatalogue.Match(catalogue,
+                    row.GetValueOrDefault("Symbol Subiekta", ""), row.GetValueOrDefault("Produkt", ""));
+                var shortValues = entry?.Variants.Where(v =>
+                    MedicineCatalogue.SameSpecies(v.Species, row.GetValueOrDefault("Gatunek", "")) &&
+                    string.Equals(v.Route, row.GetValueOrDefault("Droga podania"), StringComparison.OrdinalIgnoreCase) &&
+                    MedicineCatalogue.Withdrawal(v) == text)
+                    .Select(v => v.WithdrawalShort).Distinct().ToArray();
+                if (shortValues is [var shortText] && shortText.Length > 0)
+                {
+                    row["Karencja"] = shortText;
+                    continue;
+                }
                 text = text.Replace("Tkanki jadalne: ", "tk. ", StringComparison.OrdinalIgnoreCase)
                     .Replace("Mleko: ", "ml. ", StringComparison.OrdinalIgnoreCase);
                 row["Karencja"] = string.Join(", ", text.Split(['\r', '\n'],

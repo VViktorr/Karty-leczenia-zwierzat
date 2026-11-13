@@ -25,6 +25,7 @@
     <RuntimeIdentifier>$(RuntimeIdentifierOverride)</RuntimeIdentifier>
   </PropertyGroup>
   <ItemGroup>
+    <MauiAsset Include="Resources/Raw/withdrawal-short-v2.sql" LogicalName="withdrawal-short-v2.sql" />
     <MauiAsset Include="Resources/Raw/medicine-catalog.sqlite" LogicalName="medicine-catalog.sqlite" />
     <MauiAsset Include="../../data/ChPL/**/*.pdf" LogicalName="ChPL/%(RecursiveDir)%(Filename)%(Extension)" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />

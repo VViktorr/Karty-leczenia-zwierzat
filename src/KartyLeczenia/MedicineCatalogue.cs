@@ -5,7 +5,7 @@ namespace KartyLeczenia;
 internal static class MedicineCatalogue
 {
     internal sealed record Variant(string Species, string Indication, string Route, string Dosing,
-        string Meat, string Milk, string Restrictions, string Source, string PdfPath);
+        string Meat, string Milk, string Restrictions, string Source, string PdfPath, string WithdrawalShort);
     internal sealed record Entry(string Symbol, string SubiektName, string RegisterName,
         string Source, bool Excluded, Variant[] Variants);
 
@@ -21,6 +21,7 @@ internal static class MedicineCatalogue
             using var asset = await FileSystem.OpenAppPackageFileAsync("medicine-catalog.sqlite");
             using (var target = File.Create(temporary))
                 await asset.CopyToAsync(target);
+            await UpgradeWithdrawalSchemaAsync(temporary);
             File.Move(temporary, path, overwrite: true);
             return path;
         }
@@ -28,6 +29,25 @@ internal static class MedicineCatalogue
         {
             File.Delete(temporary);
         }
+    }
+
+    static async Task UpgradeWithdrawalSchemaAsync(string path)
+    {
+        using var db = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = path, Mode = SqliteOpenMode.ReadWrite, Pooling = false
+        }.ToString());
+        db.Open();
+        using var command = db.CreateCommand();
+        command.CommandText = "PRAGMA user_version";
+        if (Convert.ToInt32(command.ExecuteScalar()) != 1) return;
+        using var migration = await FileSystem.OpenAppPackageFileAsync("withdrawal-short-v2.sql");
+        using var reader = new StreamReader(migration);
+        using var transaction = db.BeginTransaction();
+        command.Transaction = transaction;
+        command.CommandText = await reader.ReadToEndAsync();
+        command.ExecuteNonQuery();
+        transaction.Commit();
     }
 
     internal static async Task<SqliteConnection> OpenAsync()
@@ -50,7 +70,7 @@ internal static class MedicineCatalogue
         command.CommandText = """
             SELECT p.symbol,p.name,p.status,p.decision,
                    v.name,v.species,v.indication,v.route,v.dose,v.edible_tissues,
-                   v.milk,v.restrictions,v.source,v.pdf_path
+                   v.milk,v.restrictions,v.source,v.pdf_path,v.withdrawal_short
               FROM products p LEFT JOIN variants v ON v.symbol=p.symbol
                AND COALESCE(v.scope,'') NOT LIKE '%referencyjne%'
                AND COALESCE(v.scope,'') NOT LIKE '%Archiwalne%'
@@ -74,7 +94,7 @@ internal static class MedicineCatalogue
                 Text(reader, 7).Length > 0 && Text(reader, 8).Length > 0)
                 entry.Variants.Add(new Variant(Text(reader, 5), Text(reader, 6), Text(reader, 7),
                     Text(reader, 8), Text(reader, 9), Text(reader, 10), Text(reader, 11),
-                    Text(reader, 12), Text(reader, 13)));
+                    Text(reader, 12), Text(reader, 13), Text(reader, 14)));
         }
         return entries.Select(x => new Entry(x.Key, x.Value.Name, x.Value.Register, x.Value.Source,
             x.Value.Excluded, x.Value.Variants.ToArray())).ToLookup(x => x.Symbol, StringComparer.OrdinalIgnoreCase);

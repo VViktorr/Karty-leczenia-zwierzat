@@ -11,6 +11,26 @@ from tempfile import TemporaryDirectory
 from openpyxl import load_workbook
 
 
+def withdrawal_short(rpl_id, meat, milk):
+    parts = []
+    for label, value in (("tk.", meat), ("ml.", milk)):
+        value = " ".join((value or "").split())
+        if not value or value in {"-", "—", "–"} or value.lower() == "nie dotyczy" or value.lower().startswith("nie dotyczy — chpl ustanawia dla świń karencję tkanek jadalnych"):
+            continue
+        if label == "ml." and value.lower() == "niedopuszczony":
+            value = {
+                "50492": "zakaz u klaczy produkujących mleko do spożycia przez ludzi",
+                "32709": "zakaz u bydła produkującego mleko do spożycia przez ludzi, także w zasuszeniu",
+            }.get(rpl_id)
+            if value is None:
+                return None
+        elif not re.fullmatch(r"\d+([,.]\d+)? (dni|dzień|h|godzin(?:a|y)?)", value, re.I):
+            return None
+        value = re.sub(r" godzin(?:a|y)?$", " h", value, flags=re.I)
+        parts.append(f"{label} {value}")
+    return ", ".join(parts) or None
+
+
 def worksheet(book, name):
     return list(book[name].values)[1:]
 
@@ -28,7 +48,7 @@ def build(workbook, repository, output):
         db = sqlite3.connect(database)
         db.executescript("""
             PRAGMA foreign_keys = ON;
-            PRAGMA user_version = 1;
+            PRAGMA user_version = 2;
             CREATE TABLE products (
                 symbol TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL,
                 description TEXT, stock REAL NOT NULL, unit TEXT,
@@ -44,7 +64,8 @@ def build(workbook, repository, output):
                 indication TEXT, route TEXT, dose TEXT, edible_tissues TEXT,
                 milk TEXT, restrictions TEXT, source TEXT,
                 verified_at TEXT, card_text TEXT, scope TEXT,
-                pdf_path TEXT REFERENCES documents(path)
+                pdf_path TEXT REFERENCES documents(path),
+                withdrawal_short TEXT
             );
             CREATE INDEX products_rpl ON products(rpl_id);
             CREATE INDEX products_upd ON products(upd_id);
@@ -84,8 +105,8 @@ def build(workbook, repository, output):
                     keys = re.findall(r"/medicinal-products/(\d+)/characteristic", source)
                     candidates = by_register.get(("RPL", keys[0]), []) if len(keys) == 1 else []
                     pdf_path = candidates[0] if len(candidates) == 1 else None
-                db.execute("INSERT INTO variants VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                           (*values, pdf_path))
+                db.execute("INSERT INTO variants VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                           (*values, pdf_path, withdrawal_short(values[2], values[8], values[9])))
         assert db.execute("PRAGMA integrity_check").fetchone() == ("ok",)
         assert db.execute("PRAGMA foreign_key_check").fetchone() is None
         print(db.execute("""

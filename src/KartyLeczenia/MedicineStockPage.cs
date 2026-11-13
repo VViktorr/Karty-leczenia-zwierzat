@@ -363,33 +363,25 @@ public sealed class MedicineStockPage : ContentPage
         var entry = MedicineCatalogue.Match(catalogue, row.Symbol, row.Name);
         if (entry is null || entry.Excluded) return "";
         return string.Join(" | ", entry.Variants
-            .Select(v => (v.Species, v.Route, Text: FormatWithdrawal(v.Species, v.Meat, v.Milk)))
+            .Select(v => (v.Species, Route: ShortRoute(v.Route), Text: v.WithdrawalShort.Length > 0
+                ? v.WithdrawalShort : FullWithdrawal(v)))
             .Where(item => item.Text.Length > 0)
-            .Select(item => $"{item.Species} ({item.Route}): {item.Text}")
-            .Distinct(StringComparer.OrdinalIgnoreCase));
+            .GroupBy(item => (item.Species, item.Text))
+            .Select(group => $"{group.Key.Species} {string.Join("/", group.Select(item => item.Route).Distinct(StringComparer.OrdinalIgnoreCase))} · {group.Key.Text}"));
     }
 
-    static string FormatWithdrawal(string species, string meat, string milk)
+    static string ShortRoute(string route) => route.Trim().ToLowerInvariant() switch
     {
-        static bool Applies(string value)
-        {
-            var text = value.Trim();
-            return text.Length > 0 && text is not ("—" or "-" or "–")
-                && !text.StartsWith("Nie dotyczy", StringComparison.OrdinalIgnoreCase)
-                && !text.StartsWith("Brak", StringComparison.OrdinalIgnoreCase);
-        }
+        "domięśniowa" or "domięśniowo" => "IM",
+        "dożylna" or "dożylnie" => "IV",
+        "podskórna" or "podskórnie" => "SC",
+        "domaciczna" or "domacicznie" => "IUT",
+        "dowymieniowa" or "dowymieniowo" => "IMM",
+        _ => route
+    };
 
-        var parts = new List<string>();
-        if (Applies(meat)) parts.Add("Tkanki: " + meat.Trim());
-        bool companionAnimal = System.Text.RegularExpressions.Regex.IsMatch(species,
-            @"\b(pies|psy|psów|kot|koty|kotów)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        bool milkWithdrawal = System.Text.RegularExpressions.Regex.IsMatch(milk,
-            @"\b(?:dni|dzień|godzin\w*|h|tygodni\w*|miesi[eą]\w*|udoj\w*|niedopuszcz\w*)\b|nie stosować.*mlek|nie.*przeznaczon.*mlek",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (!companionAnimal && Applies(milk) && milkWithdrawal && !milk.Contains("(jaja)", StringComparison.OrdinalIgnoreCase))
-            parts.Add("Mleko: " + milk.Trim());
-        return string.Join(", ", parts);
-    }
+    static string FullWithdrawal(MedicineCatalogue.Variant variant) =>
+        string.Join(", ", MedicineCatalogue.Withdrawal(variant).Split('\n', StringSplitOptions.RemoveEmptyEntries));
 
     View CreateExpiryTable()
     {
