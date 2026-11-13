@@ -139,7 +139,8 @@ public sealed class DocumentService
                 OR od.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
                 OR od.adrh_Nazwa LIKE @fragment ESCAPE N'~')
               {dateFilter}
-            ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, d.dok_Id DESC
+            ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END,
+                     CASE WHEN @empty=1 THEN {dateValue} END DESC, d.dok_Id DESC
             """, con) { CommandTimeout = 10 };
         cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         cmd.Parameters.Add("@limit", SqlDbType.Int).Value = Math.Clamp(limit, 1, allowEmpty ? 501 : 101);
