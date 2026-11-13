@@ -14,6 +14,8 @@ internal sealed class TableColumns
 
         internal static readonly BindableProperty ShownProperty = BindableProperty.Create(nameof(Shown), typeof(bool), typeof(Slot), true);
         public bool Shown { get => (bool)GetValue(ShownProperty); set => SetValue(ShownProperty, value); }
+        internal readonly Label HeaderStyle = new();
+        internal readonly Label DataStyle = new();
         internal void Initialize()
         {
             Index = index;
@@ -48,7 +50,7 @@ internal sealed class TableColumns
     internal Slot Column(int index) => columns[index];
     internal Slot Position(int index) => positions[index];
 
-    sealed record ColumnLayout(int Index, double Width, bool Star, bool Shown);
+    sealed record ColumnLayout(int Index, double Width, bool Star, bool Shown, int HeaderAlign = -1, int DataAlign = -1);
     sealed record Layout(ColumnLayout[] Columns, bool Horizontal, bool Vertical, double HeaderHeight, double RowHeight);
     string? preferenceKey;
 
@@ -56,7 +58,7 @@ internal sealed class TableColumns
     {
         if (preferenceKey is null) return;
         var layout = new Layout(columns.Select(column => new ColumnLayout(column.Index, column.Width.Value,
-            column.Width.IsStar, column.Shown)).ToArray(), HorizontalLines.IsChecked, VerticalLines.IsChecked,
+            column.Width.IsStar, column.Shown, AlignmentCode(column.HeaderStyle), AlignmentCode(column.DataStyle))).ToArray(), HorizontalLines.IsChecked, VerticalLines.IsChecked,
             CompactTable.GetRowHeight(this, true), CompactTable.GetRowHeight(this));
         Preferences.Default.Set(preferenceKey, System.Text.Json.JsonSerializer.Serialize(layout));
     }
@@ -79,6 +81,8 @@ internal sealed class TableColumns
             column.Index = item.Index;
             column.Width = new GridLength(item.Width, item.Star ? GridUnitType.Star : GridUnitType.Absolute);
             column.Shown = item.Shown;
+            SetAlignment(column.HeaderStyle, item.HeaderAlign);
+            SetAlignment(column.DataStyle, item.DataAlign);
             positions[item.Index].Width = item.Shown ? column.Width : new GridLength(0);
         }
         HorizontalLines.IsChecked = layout.Horizontal;
@@ -86,6 +90,13 @@ internal sealed class TableColumns
         CompactTable.SetRowHeight(this, Math.Clamp(layout.HeaderHeight, 24, 100), true);
         CompactTable.SetRowHeight(this, Math.Clamp(layout.RowHeight, 18, 100));
         WidthChanged?.Invoke();
+    }
+
+    static int AlignmentCode(Label label) => label.ClassId is null ? -1 : (int)label.HorizontalTextAlignment;
+    static void SetAlignment(Label label, int code)
+    {
+        if (code is >= 0 and <= 2) label.HorizontalTextAlignment = (TextAlignment)code;
+        label.ClassId = code is >= 0 and <= 2 ? "Custom" : null;
     }
 
     bool parametersOpen;
@@ -124,6 +135,7 @@ internal sealed class TableColumns
             Text = column.Width.IsAbsolute ? column.Width.Value.ToString("0") : "",
             Placeholder = "Auto", Keyboard = Keyboard.Numeric, WidthRequest = 100
         }).ToArray();
+        var alignment = columns.Select(column => new[] { AlignmentCode(column.HeaderStyle), AlignmentCode(column.DataStyle) }).ToArray();
         var visible = columns.Select(column => new CheckBox { IsChecked = column.Shown }).ToArray();
         var preview = new Grid { ColumnSpacing = 1, RowSpacing = 1 };
         var previewFrame = new Border { Padding = 6, StrokeThickness = 1,
@@ -166,6 +178,7 @@ internal sealed class TableColumns
                         section.SelectedIndex = sectionIndex;
                     };
                     cell.GestureRecognizers.Add(tap);
+                    if (alignment[index][sectionIndex] >= 0) cell.HorizontalTextAlignment = (TextAlignment)alignment[index][sectionIndex];
                     preview.Add(cell, position, row);
                 }
             }
@@ -184,8 +197,19 @@ internal sealed class TableColumns
             if (selected < 0) return;
             var width = new Entry { Text = sizes[selected].Text, Placeholder = "Auto", Keyboard = Keyboard.Numeric, WidthRequest = 110 };
             width.TextChanged += (_, e) => sizes[selected].Text = e.NewTextValue;
-            selectedColumn.Content = Ui.Field("Szerokość kolumny", width);
+            int part = Math.Max(0, section.SelectedIndex);
+            var align = new Picker { ItemsSource = new[] { "Domyślne", "Do lewej", "Do środka", "Do prawej" },
+                SelectedIndex = alignment[selected][part] + 1 };
+            align.SelectedIndexChanged += (_, _) =>
+            {
+                alignment[selected][part] = align.SelectedIndex - 1;
+                DrawPreview();
+            };
+            selectedColumn.Content = new HorizontalStackLayout { Spacing = 12, Children = {
+                Ui.Field("Szerokość kolumny", width), Ui.Field("Wyrównanie", align)
+            } };
         }
+        section.SelectedIndexChanged += (_, _) => ShowColumn();
         columnPicker.SelectedIndexChanged += (_, _) => ShowColumn();
         fields.Children.Add(new HorizontalStackLayout { Spacing = 8, Children = {
             Ui.Field("Kolumna", columnPicker),
@@ -228,6 +252,7 @@ internal sealed class TableColumns
             {
                 order = columns.ToList();
                 foreach (var size in sizes) size.Text = "";
+                foreach (var pair in alignment) Array.Fill(pair, -1);
                 foreach (var check in visible) check.IsChecked = true;
                 horizontal.IsChecked = vertical.IsChecked = true;
                 height.Value = 26;
@@ -260,6 +285,8 @@ internal sealed class TableColumns
                     column.Index = i;
                     int original = Array.IndexOf(columns, column);
                     column.Width = widths[original];
+                    SetAlignment(column.HeaderStyle, alignment[original][0]);
+                    SetAlignment(column.DataStyle, alignment[original][1]);
                     column.Shown = visible[original].IsChecked;
                     positions[i].Width = column.Shown ? column.Width : new GridLength(0);
                 }

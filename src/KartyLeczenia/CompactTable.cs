@@ -63,13 +63,34 @@ internal static class CompactTable
             var cell = cells[i];
             cell.SetBinding(Grid.ColumnProperty, new Binding(nameof(TableColumns.Slot.Index), source: widths.Column(i)));
             cell.SetBinding(VisualElement.IsVisibleProperty, new Binding(nameof(TableColumns.Slot.Shown), source: widths.Column(i)));
+            if (cell is Label text)
+            {
+                var style = header ? widths.Column(i).HeaderStyle : widths.Column(i).DataStyle;
+                var original = text.HorizontalTextAlignment;
+                void ApplyAlignment()
+                {
+                    if (style.ClassId is not null) text.HorizontalTextAlignment = style.HorizontalTextAlignment;
+                    else if (!header && original == TextAlignment.End) text.HorizontalTextAlignment = original;
+                    else text.SetDynamicResource(Label.HorizontalTextAlignmentProperty, header ? "AppHeadingAlignment" : "AppCellAlignment");
+                }
+                var reference = new WeakReference<Label>(text);
+                style.PropertyChanged += Changed;
+                void Changed(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+                {
+                    if (!reference.TryGetTarget(out var target)) { style.PropertyChanged -= Changed; return; }
+                    if (style.ClassId is not null) target.HorizontalTextAlignment = style.HorizontalTextAlignment;
+                    else if (!header && original == TextAlignment.End) target.HorizontalTextAlignment = original;
+                    else target.SetDynamicResource(Label.HorizontalTextAlignmentProperty, header ? "AppHeadingAlignment" : "AppCellAlignment");
+                }
+                ApplyAlignment();
+            }
             row.Children.Add(cell);
             if (header)
             {
                 if (cell is Label heading)
                 {
                     heading.SetDynamicResource(Label.FontSizeProperty, "AppHeadingSize");
-                    heading.SetDynamicResource(Label.HorizontalTextAlignmentProperty, "AppHeadingAlignment");
+
                 }
                 else if (cell is Button button)
                     button.SetDynamicResource(Button.FontSizeProperty, "AppHeadingSize");
@@ -79,13 +100,13 @@ internal static class CompactTable
         for (int i = 1; i < widths.Count; i++)
         {
             var divider = new BoxView { WidthRequest = 1, HorizontalOptions = LayoutOptions.Start, InputTransparent = true };
-            divider.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#8795A5"), Color.FromArgb("#455267"));
+            divider.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#687786"), Color.FromArgb("#69788A"));
             divider.Margin = new Thickness(-2, 0, 0, 0);
             divider.SetBinding(VisualElement.IsVisibleProperty, new Binding(nameof(CheckBox.IsChecked), source: widths.VerticalLines));
             row.Add(divider, i, 0);
         }
         var line = new BoxView { HeightRequest = 1, InputTransparent = true };
-        line.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#A0AAB6"), Color.FromArgb("#344457"));
+        line.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#748292"), Color.FromArgb("#657588"));
         line.SetBinding(VisualElement.IsVisibleProperty, new Binding(nameof(CheckBox.IsChecked), source: widths.HorizontalLines));
         row.Add(line, 0, 1);
         Grid.SetColumnSpan(line, widths.Count);
