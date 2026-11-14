@@ -11,6 +11,9 @@ internal sealed class LocalCatalogue
     }
 
     readonly Dictionary<string, (string Name, List<Variant> Variants)> products = new(StringComparer.OrdinalIgnoreCase);
+    readonly HashSet<string> nonMedicines = new(StringComparer.OrdinalIgnoreCase);
+    internal bool IsNonMedicine(string symbol) => nonMedicines.Contains(symbol.Trim());
+
     static readonly Lazy<LocalCatalogue> Cached = new(Read);
     internal static LocalCatalogue Load() => Cached.Value;
 
@@ -36,6 +39,16 @@ internal sealed class LocalCatalogue
               AND COALESCE(v.dose,'') <> '' AND COALESCE(v.route,'') <> ''
             ORDER BY p.symbol,v.id
             """;
+        using (var classification = db.CreateCommand())
+        {
+            classification.CommandText = """
+                SELECT symbol FROM products
+                WHERE decision = 'NOT_MEDICINE' OR TRIM(status) LIKE 'Nie lek / inne%'
+                """;
+            using var entries = classification.ExecuteReader();
+            while (entries.Read())
+                if (!entries.IsDBNull(0)) result.nonMedicines.Add(entries.GetString(0).Trim());
+        }
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {

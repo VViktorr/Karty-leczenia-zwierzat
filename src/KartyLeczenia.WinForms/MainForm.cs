@@ -755,6 +755,9 @@ internal sealed class MainForm : Form
         selectedTreatmentVariants.Clear();
         treatment.Rows.Clear();
         foreach (var entry in card.Rows)
+            if (catalogue.IsNonMedicine(entry.Get("Symbol Subiekta")))
+                entry.Printed = false;
+        foreach (var entry in card.Rows.OrderByDescending(entry => entry.Printed))
         {
             var gridRow = treatment.Rows[treatment.Rows.Add()];
             foreach (DataGridViewCell cell in gridRow.Cells)
