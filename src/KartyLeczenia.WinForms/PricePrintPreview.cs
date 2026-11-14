@@ -5,7 +5,7 @@ namespace KartyLeczenia.Windows;
 
 internal sealed class PricePrintPreview : Form
 {
-    internal PricePrintPreview(string html, bool landscape, decimal margin)
+    internal PricePrintPreview(string html, bool landscape, decimal margin, bool direct = false)
     {
         Text = "Podgląd wydruku cennika";
         StartPosition = FormStartPosition.CenterParent;
@@ -19,6 +19,11 @@ internal sealed class PricePrintPreview : Form
         Controls.Add(browser);
         Controls.Add(bar);
         CancelButton = close;
+        if (direct)
+        {
+            Opacity = 0;
+            ShowInTaskbar = false;
+        }
 
         var file = Path.Combine(Path.GetTempPath(), $"cennik-lekow-{Guid.NewGuid():N}.html");
         bool saving = false;
@@ -34,17 +39,43 @@ internal sealed class PricePrintPreview : Form
             CrashLog.Write("PricePreview.Failed", ex);
             if (!IsDisposed) MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+        CoreWebView2PrintSettings PrintSettings()
+        {
+            var settings = browser.CoreWebView2.Environment.CreatePrintSettings();
+            settings.Orientation = landscape ? CoreWebView2PrintOrientation.Landscape : CoreWebView2PrintOrientation.Portrait;
+            settings.PageWidth = 210 / 25.4;
+            settings.PageHeight = 297 / 25.4;
+            settings.MarginTop = settings.MarginBottom = settings.MarginLeft = settings.MarginRight = (double)margin / 25.4;
+            settings.ShouldPrintBackgrounds = true;
+            return settings;
+        }
         Shown += async (_, _) =>
         {
             try
             {
                 await browser.EnsureCoreWebView2Async();
                 if (IsDisposed) return;
-                browser.CoreWebView2.NavigationCompleted += (_, e) => print.Enabled = pdf.Enabled = e.IsSuccess;
+                browser.CoreWebView2.NavigationCompleted += async (_, e) =>
+                {
+                    if (!direct)
+                    {
+                        print.Enabled = pdf.Enabled = e.IsSuccess;
+                        return;
+                    }
+                    try
+                    {
+                        if (!e.IsSuccess) throw new IOException("Nie udało się przygotować wydruku cennika.");
+                        var result = await browser.CoreWebView2.PrintAsync(PrintSettings());
+                        if (result != CoreWebView2PrintStatus.Succeeded)
+                            throw new IOException($"Nie udało się wysłać cennika na domyślną drukarkę ({result}).");
+                    }
+                    catch (Exception ex) { Report(ex); }
+                    finally { Close(); }
+                };
                 File.WriteAllText(file, html);
                 browser.Source = new Uri(file);
             }
-            catch (Exception ex) { Report(ex); }
+            catch (Exception ex) { Report(ex); if (direct) Close(); }
         };
         print.Click += (_, _) =>
         {
@@ -59,13 +90,7 @@ internal sealed class PricePrintPreview : Form
             print.Enabled = pdf.Enabled = close.Enabled = false;
             try
             {
-                var settings = browser.CoreWebView2.Environment.CreatePrintSettings();
-                settings.Orientation = landscape ? CoreWebView2PrintOrientation.Landscape : CoreWebView2PrintOrientation.Portrait;
-                settings.PageWidth = 210 / 25.4;
-                settings.PageHeight = 297 / 25.4;
-                settings.MarginTop = settings.MarginBottom = settings.MarginLeft = settings.MarginRight = (double)margin / 25.4;
-                settings.ShouldPrintBackgrounds = true;
-                if (!await browser.CoreWebView2.PrintToPdfAsync(target.FileName, settings))
+                if (!await browser.CoreWebView2.PrintToPdfAsync(target.FileName, PrintSettings()))
                     throw new IOException("Nie udało się zapisać cennika jako PDF.");
             }
             catch (Exception ex) { Report(ex); }

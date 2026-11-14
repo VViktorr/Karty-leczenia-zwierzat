@@ -518,8 +518,8 @@ internal sealed class MainForm : Form
         using var editor = new PricePrintEditor(pricePrintSettings, rows, prices.Columns["Gross"]!.HeaderText, catalogue);
         if (direct)
         {
-            using var preview = new PricePrintPreview(editor.Render(rows), pricePrintSettings.Landscape, pricePrintSettings.Margin);
-            DialogPlacement.Show(preview, this, "price-print-preview");
+            using var preview = new PricePrintPreview(editor.Render(rows), pricePrintSettings.Landscape, pricePrintSettings.Margin, direct: true);
+            preview.ShowDialog(this);
         }
         else DialogPlacement.Show(editor, this, "price-print-settings");
     }
