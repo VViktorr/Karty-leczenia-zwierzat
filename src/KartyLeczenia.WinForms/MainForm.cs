@@ -494,11 +494,13 @@ internal sealed class MainForm : Form
     }
 
     readonly CheckBox rememberTreatment = new() { Text = "Zapamiętuj wybory", AutoSize = true };
+    readonly ComboBox withdrawalMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+    readonly Dictionary<DataGridViewRow, LocalCatalogue.Variant> selectedTreatmentVariants = new();
     LocalCatalogue? treatmentCatalogue;
     bool updatingTreatmentChoices;
 
     void SetTreatmentChoices(DataGridViewRow gridRow, string species, string route,
-        LocalCatalogue.Variant? exact = null, bool changed = false)
+        bool changed = false)
     {
         if (gridRow.Tag is not TreatmentRow row || treatmentCatalogue is null) return;
         var choices = treatmentCatalogue.ForProduct(row.Get("Symbol Subiekta"), row.Product);
@@ -509,7 +511,20 @@ internal sealed class MainForm : Form
             ?? speciesList.FirstOrDefault(item => string.Equals(item, "bydło", StringComparison.OrdinalIgnoreCase))
             ?? (speciesList.Length == 1 ? speciesList[0] : "");
         var matching = choices.Where(v => string.Equals(v.Species, species, StringComparison.OrdinalIgnoreCase)).ToArray();
-        var routes = matching.Select(v => v.Route).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var labels = new Dictionary<string, LocalCatalogue.Variant>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in matching.Distinct().GroupBy(v => v.Route, StringComparer.OrdinalIgnoreCase))
+        {
+            bool multiple = group.Skip(1).Any();
+            foreach (var option in group)
+            {
+                string label = multiple && !string.IsNullOrWhiteSpace(option.Indication)
+                    ? $"{option.Route} – {option.Indication}" : option.Route;
+                string unique = label;
+                for (int i = 2; labels.ContainsKey(unique); i++) unique = $"{label} ({i})";
+                labels.Add(unique, option);
+            }
+        }
+        var routes = labels.Keys.ToArray();
         route = routes.FirstOrDefault(item => string.Equals(item, route, StringComparison.OrdinalIgnoreCase))
             ?? (routes.Length == 1 ? routes[0] : "");
         updatingTreatmentChoices = true;
@@ -527,16 +542,21 @@ internal sealed class MainForm : Form
                 cell.Value = value.Length > 0 ? value : null;
             }
 
-            var variants = matching.Where(v => string.Equals(v.Route, route, StringComparison.OrdinalIgnoreCase)).ToArray();
-            var variant = exact ?? (variants.Length == 1 ? variants[0] : null);
+            labels.TryGetValue(route, out var variant);
+            if (variant is null) selectedTreatmentVariants.Remove(gridRow);
+            else selectedTreatmentVariants[gridRow] = variant;
             gridRow.Cells["Dawkowanie i okres stosowania"].Value = variant?.Dose ?? "";
-            gridRow.Cells["Karencja"].Value = variant?.Withdrawal ?? "";
+            gridRow.Cells["Karencja"].Value = TreatmentWithdrawal(variant);
             row.Set("Źródło karencji", variant?.Source ?? "", false);
             if (changed && rememberTreatment.Checked && species.Length > 0)
                 TreatmentChoices.Save(row, species, route);
         }
         finally { updatingTreatmentChoices = false; }
     }
+
+    string TreatmentWithdrawal(LocalCatalogue.Variant? variant) =>
+        variant is null ? "" : withdrawalMode.SelectedIndex == 1 && !string.IsNullOrWhiteSpace(variant.ShortWithdrawal)
+            ? variant.ShortWithdrawal : variant.Withdrawal;
 
     void ConfigureCard()
     {
@@ -570,7 +590,21 @@ internal sealed class MainForm : Form
                 return Task.CompletedTask;
             });
         };
-        var page = Page("Karta leczenia", treatment, Action("Wybierz wariant ChPL", ChooseVariant),
+        withdrawalMode.Items.AddRange(["Pełna karencja", "Skrót karencji"]);
+        withdrawalMode.SelectedIndex = 0;
+        withdrawalMode.SelectedIndexChanged += (_, _) =>
+        {
+            treatment.EndEdit();
+            foreach (var (row, variant) in selectedTreatmentVariants)
+                row.Cells["Karencja"].Value = TreatmentWithdrawal(variant);
+        };
+        var page = Page("Karta leczenia", treatment, withdrawalMode,
+            Action("Otwórz ChPL", () =>
+            {
+                if (treatment.CurrentRow is { } row && selectedTreatmentVariants.TryGetValue(row, out var variant))
+                    LocalCatalogue.OpenPdf(variant.Pdf);
+                return Task.CompletedTask;
+            }),
             Action("Zapisz kartę JSON", SaveCard), Action("Podgląd HTML", PreviewCard));
         var actions = page.Controls.OfType<FlowLayoutPanel>().Single();
         var toolbar = new TableLayoutPanel
@@ -599,6 +633,7 @@ internal sealed class MainForm : Form
         if (connection != options) return;
         treatmentCatalogue = catalogue;
         currentCard = card;
+        selectedTreatmentVariants.Clear();
         treatment.Rows.Clear();
         foreach (var entry in card.Rows)
         {
@@ -614,32 +649,6 @@ internal sealed class MainForm : Form
         status.Text = $"Pozycje karty: {card.Rows.Count}";
     }
 
-    async Task ChooseVariant()
-    {
-        if (treatment.CurrentRow is not { Tag: TreatmentRow row } gridRow) return;
-        treatment.EndEdit();
-        var catalogue = await Task.Run(LocalCatalogue.Load);
-        var choices = catalogue.ForProduct(row.Get("Symbol Subiekta"), row.Product);
-        if (choices.Count == 0) { status.Text = "Brak wariantów w katalogu SQLite."; return; }
-        using var dialog = new Form { Text = "Wariant z katalogu SQLite", Size = new Size(820, 480), StartPosition = FormStartPosition.CenterParent };
-        var list = new ListBox { Dock = DockStyle.Fill };
-        list.Items.AddRange(choices.Cast<object>().ToArray());
-        list.SelectedIndex = 0;
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
-        var accept = Action("Użyj wariantu", () => { dialog.DialogResult = DialogResult.OK; return Task.CompletedTask; });
-        actions.Controls.Add(accept);
-        actions.Controls.Add(Action("Otwórz ChPL", () =>
-        {
-            if (list.SelectedItem is LocalCatalogue.Variant selected) LocalCatalogue.OpenPdf(selected.Pdf);
-            return Task.CompletedTask;
-        }));
-        dialog.Controls.Add(list);
-        dialog.Controls.Add(actions);
-        dialog.AcceptButton = accept;
-        if (dialog.ShowDialog(this) != DialogResult.OK || list.SelectedItem is not LocalCatalogue.Variant variant) return;
-        SetTreatmentChoices(gridRow, variant.Species, variant.Route, variant, changed: true);
-    }
-
     Card CaptureTreatmentCard()
     {
         var source = currentCard ?? throw new InvalidOperationException("Najpierw wczytaj dokument.");
@@ -653,7 +662,9 @@ internal sealed class MainForm : Form
             var values = new Dictionary<string, string>(((TreatmentRow)item.Tag!).Values);
             foreach (DataGridViewCell cell in item.Cells)
                 if (cell.OwningColumn is { } column)
-                    values[column.Name] = cell.Value?.ToString() ?? "";
+                    values[column.Name] = column.Name == TreatmentChoices.Route
+                        && selectedTreatmentVariants.TryGetValue(item, out var variant)
+                        ? variant.Route : cell.Value?.ToString() ?? "";
             return values;
         }).ToList();
         return new Card(fields, rows);
@@ -736,6 +747,7 @@ internal sealed class MainForm : Form
             displayedDocuments = null;
             UpdateRefreshLabel();
             documents.DataSource = prices.DataSource = expiry.DataSource = null;
+            selectedTreatmentVariants.Clear();
             treatment.Rows.Clear();
             currentCard = null;
             connection = draft;

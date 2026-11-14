@@ -5,7 +5,7 @@ namespace KartyLeczenia.Windows;
 internal sealed class LocalCatalogue
 {
     internal sealed record Variant(string Species, string Route, string Indication, string Dose,
-        string Withdrawal, string Pdf, string Source)
+        string Withdrawal, string Pdf, string Source, string ShortWithdrawal)
     {
         public override string ToString() => $"{Species} · {Route} · {Indication}";
     }
@@ -23,9 +23,12 @@ internal sealed class LocalCatalogue
         }.ToString());
         db.Open();
         using var command = db.CreateCommand();
-        command.CommandText = """
+        command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('variants') WHERE name='withdrawal_short'";
+        bool hasShortWithdrawal = Convert.ToInt64(command.ExecuteScalar()) > 0;
+        string shortColumn = hasShortWithdrawal ? "v.withdrawal_short" : "NULL";
+        command.CommandText = $"""
             SELECT p.symbol,p.name,v.species,v.route,v.indication,v.dose,
-                   v.edible_tissues,v.milk,v.pdf_path,v.source
+                   v.edible_tissues,v.milk,v.pdf_path,v.source,{shortColumn}
             FROM products p JOIN variants v ON v.symbol=p.symbol
             WHERE COALESCE(p.decision,'') <> 'NOT_MEDICINE'
               AND COALESCE(v.scope,'') NOT LIKE '%referencyjne%'
@@ -45,7 +48,7 @@ internal sealed class LocalCatalogue
             }
             var withdrawal = string.Join(", ", new[] { Text(6).Length == 0 ? "" : "Tkanki: " + Text(6),
                 Text(7).Length == 0 ? "" : "Mleko: " + Text(7) }.Where(value => value.Length > 0));
-            entry.Variants.Add(new(Text(2), Text(3), Text(4), Text(5), withdrawal, Text(8), Text(9)));
+            entry.Variants.Add(new(Text(2), Text(3), Text(4), Text(5), withdrawal, Text(8), Text(9), Text(10)));
         }
         return result;
     }
