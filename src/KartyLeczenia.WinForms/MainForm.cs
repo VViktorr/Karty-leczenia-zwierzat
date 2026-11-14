@@ -100,6 +100,20 @@ internal sealed class MainForm : Form
 
     void ConfigureDocuments()
     {
+        bool applyingRowHeight = false;
+        documents.RowHeightChanged += (_, e) =>
+        {
+            if (applyingRowHeight || e.Row.Index < 0) return;
+            applyingRowHeight = true;
+            try
+            {
+                int height = e.Row.Height;
+                documents.RowTemplate.Height = height;
+                foreach (DataGridViewRow row in documents.Rows)
+                    if (row.Height != height) row.Height = height;
+            }
+            finally { applyingRowHeight = false; }
+        };
         Column(documents, "Data", "Date", 100, "dd.MM.yyyy");
         Column(documents, "Numer", "Number", 180);
         Column(documents, "Kontrahent", "Payer", 290);
