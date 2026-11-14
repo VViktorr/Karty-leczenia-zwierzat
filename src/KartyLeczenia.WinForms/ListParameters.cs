@@ -46,6 +46,14 @@ internal static class ListParameters
                 AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false
             };
+            var columns = new ListBox { SelectionMode = SelectionMode.MultiExtended, Width = 300,
+                Height = 140, DisplayMember = "HeaderText" };
+            foreach (var item in list.Items) columns.Items.Add(item);
+            columns.SetSelected(list.SelectedIndex, true);
+            var size = new NumericUpDown { Minimum = 1, Maximum = 200, DecimalPlaces = 1,
+                Increment = 0.5m, Value = Math.Clamp((decimal)style.Size, 1, 200) };
+            bool sizeChanged = false, fontChanged = false, colorChanged = false, alignmentChanged = false;
+            size.ValueChanged += (_, _) => sizeChanged = true;
             var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Padding = new Padding(10) };
             var fontButton = new Button { AutoSize = true, Text = $"{style.Family}, {style.Size:g} pkt" };
             fontButton.Click += (_, _) =>
@@ -55,6 +63,8 @@ internal static class ListParameters
                 if (picker.ShowDialog(editor) != DialogResult.OK) return;
                 using var chosen = picker.Font;
                 style = style with { Family = chosen.Name, Size = chosen.SizeInPoints, FontStyle = chosen.Style };
+                fontChanged = true;
+                size.Value = Math.Clamp((decimal)style.Size, 1, 200);
                 fontButton.Text = $"{style.Family}, {style.Size:g} pkt";
             };
             var colorButton = new Button { AutoSize = true, Text = "Kolor tekstu", ForeColor = Color.FromArgb(style.Argb) };
@@ -64,27 +74,43 @@ internal static class ListParameters
                 if (picker.ShowDialog(editor) != DialogResult.OK) return;
                 style = style with { Argb = picker.Color.ToArgb() };
                 colorButton.ForeColor = picker.Color;
+                colorChanged = true;
             };
             var alignment = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
             alignment.Items.AddRange(["Do lewej", "Do środka", "Do prawej"]);
             alignment.SelectedIndex = style.Alignment.ToString().EndsWith("Right") ? 2
                 : style.Alignment.ToString().EndsWith("Center") ? 1 : 0;
+            alignment.SelectedIndexChanged += (_, _) => alignmentChanged = true;
             var accept = new Button { Text = "OK", DialogResult = DialogResult.OK };
             var dismiss = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel };
-            panel.Controls.AddRange([fontButton, colorButton, alignment, accept, dismiss]);
+            panel.Controls.AddRange([new Label { Text = "Kolumny (Ctrl+klik lub Shift+klik)", AutoSize = true },
+                columns, fontButton, new Label { Text = "Rozmiar czcionki (pkt)", AutoSize = true },
+                size, colorButton, alignment, accept, dismiss]);
             editor.Controls.Add(panel);
             editor.AcceptButton = accept;
             editor.CancelButton = dismiss;
             if (editor.ShowDialog(dialog) != DialogResult.OK) return;
-            styles[key] = style with
+            if (!sizeChanged && !fontChanged && !colorChanged && !alignmentChanged) return;
+            var selectedAlignment = alignment.SelectedIndex switch
             {
-                Alignment = alignment.SelectedIndex switch
-                {
-                    1 => DataGridViewContentAlignment.MiddleCenter,
-                    2 => DataGridViewContentAlignment.MiddleRight,
-                    _ => DataGridViewContentAlignment.MiddleLeft
-                }
+                1 => DataGridViewContentAlignment.MiddleCenter,
+                2 => DataGridViewContentAlignment.MiddleRight,
+                _ => DataGridViewContentAlignment.MiddleLeft
             };
+            foreach (DataGridViewColumn selected in columns.SelectedItems)
+            {
+                var selectedKey = (selected, header);
+                var current = styles.TryGetValue(selectedKey, out var edited) ? edited
+                    : ColumnTextStyle.Read(header ? selected.HeaderCell.InheritedStyle : selected.InheritedStyle);
+                styles[selectedKey] = current with
+                {
+                    Family = fontChanged ? style.Family : current.Family,
+                    FontStyle = fontChanged ? style.FontStyle : current.FontStyle,
+                    Size = sizeChanged || fontChanged ? (float)size.Value : current.Size,
+                    Argb = colorChanged ? style.Argb : current.Argb,
+                    Alignment = alignmentChanged ? selectedAlignment : current.Alignment
+                };
+            }
         }
         var headerStyle = new Button { Text = "Wygląd nagłówka…", AutoSize = true };
         var dataStyle = new Button { Text = "Wygląd danych…", AutoSize = true };
