@@ -4,7 +4,12 @@ namespace KartyLeczenia.Windows;
 
 internal sealed class MainForm : Form
 {
-    readonly TabControl tabs = new() { Dock = DockStyle.Fill };
+    readonly TabControl tabs = new()
+    {
+        Dock = DockStyle.Fill,
+        DrawMode = TabDrawMode.OwnerDrawFixed,
+        Padding = new Point(19, 8)
+    };
     readonly DataGridView documents = NewGrid(), prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new() { Width = 280 };
     Font? boldDocumentKindFont;
@@ -36,8 +41,10 @@ internal sealed class MainForm : Form
         statusBar.Items.Add(new ToolStripStatusLabel { Spring = true });
         statusBar.Items.Add(refreshDocuments);
         refreshDocuments.Click += async (_, _) => await Run(() => Search(true));
+        tabs.DrawItem += DrawMainTab;
         tabs.SelectedIndexChanged += (_, _) =>
         {
+            tabs.Invalidate();
             UpdateRefreshLabel();
             CrashLog.Write($"WinForms.TabChanged index={tabs.SelectedIndex}");
         };
@@ -69,6 +76,27 @@ internal sealed class MainForm : Form
         FormClosed += (_, _) => layout.Save();
         tabs.SelectedIndex = connection is null ? 4 : 0;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
+    }
+
+    void DrawMainTab(object? sender, DrawItemEventArgs e)
+    {
+        if (e.Index < 0 || e.Index >= tabs.TabCount) return;
+        bool selected = e.Index == tabs.SelectedIndex;
+        var bounds = e.Bounds;
+        bounds.Inflate(-1, -1);
+        if (!selected) bounds.Inflate(0, -2);
+        e.Graphics.FillRectangle(selected ? SystemBrushes.Highlight : SystemBrushes.Control, bounds);
+
+        using var selectedFont = selected ? new Font(tabs.Font, tabs.Font.Style | FontStyle.Bold) : null;
+        TextRenderer.DrawText(e.Graphics, tabs.TabPages[e.Index].Text, selectedFont ?? tabs.Font, bounds,
+            selected ? SystemColors.HighlightText : SystemColors.ControlText,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
+            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        if (selected && tabs.Focused)
+        {
+            bounds.Inflate(-3, -3);
+            ControlPaint.DrawFocusRectangle(e.Graphics, bounds, SystemColors.HighlightText, SystemColors.Highlight);
+        }
     }
 
     static DataGridView NewGrid() => new()
