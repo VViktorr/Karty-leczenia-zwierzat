@@ -94,6 +94,47 @@ public sealed class AppShell : Shell
         tabs.CurrentItem = cards;
         Items.Add(tabs);
         CurrentItem = tabs;
+#if WINDOWS
+        Loaded += (_, _) =>
+        {
+            if (Handler?.PlatformView is Microsoft.UI.Xaml.FrameworkElement root)
+                StyleMainTabs(root, tabs.Items.Select(tab => tab.Title).ToHashSet());
+        };
+#endif
         Loaded += async (_, _) => await connectionPage.InitializeAsync();
     }
+#if WINDOWS
+    static void StyleMainTabs(Microsoft.UI.Xaml.FrameworkElement root, HashSet<string> mainTitles)
+    {
+        void ApplyStyles(object? sender, object args) => Visit(root);
+
+        void Visit(Microsoft.UI.Xaml.DependencyObject view)
+        {
+            if (view is Microsoft.UI.Xaml.Controls.TabViewItem tab && HasMainTitle(tab.Header))
+            {
+                double width = tab.IsSelected ? 172 : 156;
+                double height = tab.IsSelected ? 42 : 37;
+                if (tab.MinWidth != width) tab.MinWidth = width;
+                if (tab.MinHeight != height) tab.MinHeight = height;
+                var weight = tab.IsSelected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
+                if (tab.FontWeight.Weight != weight.Weight) tab.FontWeight = weight;
+                return;
+            }
+
+            int count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(view);
+            for (int i = 0; i < count; i++)
+                Visit(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(view, i));
+        }
+
+        bool HasMainTitle(object header) => header switch
+        {
+            string title => mainTitles.Contains(title),
+            Microsoft.UI.Xaml.Controls.TextBlock text => mainTitles.Contains(text.Text),
+            _ => false
+        };
+
+        root.LayoutUpdated += ApplyStyles;
+        Visit(root);
+    }
+#endif
 }
