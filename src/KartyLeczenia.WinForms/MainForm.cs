@@ -435,23 +435,45 @@ internal sealed class MainForm : Form
         Column(prices, "Karencja z katalogu", "Withdrawal", 520);
         var levels = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
         var net = new CheckBox { Text = "Netto", AutoSize = true };
-        Page("Cennik leków", prices, levels, net, Action("Odśwież", async () =>
+        bool loading = false;
+        ConnectionOptions? levelsFor = null;
+        async Task LoadPrices()
         {
-            var options = Connection();
-            using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            if (levels.Items.Count == 0)
+            if (loading) return;
+            loading = true;
+            try
             {
-                levels.Items.AddRange(await MedicineStockService.PriceLevels(options, work.Token));
-                levels.SelectedItem = levels.Items.Cast<MedicinePriceLevel>().FirstOrDefault(item => item.IsRetail);
-                if (levels.SelectedIndex < 0 && levels.Items.Count > 0) levels.SelectedIndex = 0;
+                if (levelsFor != connection)
+                {
+                    levels.Items.Clear();
+                    levelsFor = connection;
+                }
+                var options = Connection();
+                using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                if (levels.Items.Count == 0)
+                {
+                    var available = await MedicineStockService.PriceLevels(options, work.Token);
+                    if (connection != options) return;
+                    levels.Items.AddRange(available);
+                    levels.SelectedItem = levels.Items.Cast<MedicinePriceLevel>().FirstOrDefault(item => item.IsRetail);
+                    if (levels.SelectedIndex < 0 && levels.Items.Count > 0) levels.SelectedIndex = 0;
+                }
+                if (levels.SelectedItem is not MedicinePriceLevel level) return;
+                var rows = await MedicineStockService.Prices(options, level.Number, work.Token, net: net.Checked);
+                var catalogue = await Task.Run(LocalCatalogue.Load);
+                if (connection != options) return;
+                prices.DataSource = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol, row.Name) }).ToList();
+                status.Text = $"Pozycje cennika: {rows.Count}";
             }
-            if (levels.SelectedItem is not MedicinePriceLevel level) return;
-            var rows = await MedicineStockService.Prices(options, level.Number, work.Token, net: net.Checked);
-            var catalogue = await Task.Run(LocalCatalogue.Load);
-            if (connection != options) return;
-            prices.DataSource = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol, row.Name) }).ToList();
-            status.Text = $"Pozycje cennika: {rows.Count}";
-        }));
+            finally { loading = false; }
+        }
+
+        var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices));
+        tabs.SelectedIndexChanged += async (_, _) =>
+        {
+            if (tabs.SelectedTab == page && connection is not null && prices.DataSource is null)
+                await Run(LoadPrices);
+        };
     }
 
     void ConfigureExpiry()
