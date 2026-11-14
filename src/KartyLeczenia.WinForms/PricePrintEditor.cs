@@ -55,25 +55,19 @@ internal sealed class PricePrintEditor : Form
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1040, 730);
         MinimumSize = new Size(660, 480);
-        var options = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 224, AutoScroll = true, Padding = new Padding(8) };
+        AutoScaleMode = AutoScaleMode.Dpi;
+        var options = new TabControl { Dock = DockStyle.Top, Height = 132, Padding = new Point(12, 4) };
         var sample = new WebBrowser { Dock = DockStyle.Fill, AllowWebBrowserDrop = false, ScriptErrorsSuppressed = true };
         var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
-
         var paper = new Label { Dock = DockStyle.Top, Height = 24, Padding = new Padding(8, 3, 0, 0) };
-        var section = options;
+        FlowLayoutPanel section = null!;
+
         void Section(string title)
         {
-            section = new FlowLayoutPanel { AutoSize = true, Width = 600, Padding = new Padding(0, 2, 0, 2) };
-            section.Controls.Add(new Label { Text = title, AutoSize = true, Margin = new Padding(3, 8, 12, 3) });
-            options.Controls.Add(section);
-            options.SetFlowBreak(section, true);
-            void ResizeSection()
-            {
-                foreach (FlowLayoutPanel row in options.Controls.OfType<FlowLayoutPanel>())
-                    row.MaximumSize = new Size(Math.Max(100, options.ClientSize.Width - 32), 0);
-            }
-            options.SizeChanged += (_, _) => ResizeSection();
-            ResizeSection();
+            var page = new TabPage(title);
+            section = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(5) };
+            page.Controls.Add(section);
+            options.TabPages.Add(page);
         }
         void Field(string label, Control control)
         {
@@ -84,7 +78,7 @@ internal sealed class PricePrintEditor : Form
         }
         ComboBox Select(string label, string[] items, int index)
         {
-            var box = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
+            var box = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 115 };
             box.Items.AddRange(items);
             box.SelectedIndex = Math.Clamp(index, 0, items.Length - 1);
             Field(label, box);
@@ -93,7 +87,7 @@ internal sealed class PricePrintEditor : Form
         NumericUpDown Measure(string label, decimal value, decimal min, decimal max, int decimals = 0)
         {
             var box = new NumericUpDown { Minimum = min, Maximum = max, Value = Math.Clamp(value, min, max), DecimalPlaces = decimals,
-                Increment = decimals == 0 ? 1 : 0.5m, Width = 80 };
+                Increment = decimals == 0 ? 1 : 0.5m, Width = 60 };
             Field(label, box);
             return box;
         }
@@ -104,7 +98,7 @@ internal sealed class PricePrintEditor : Form
             return box;
         }
 
-        Section("Strona i tekst");
+        Section("Strona");
         string[] fonts = ["Arial", "Calibri", "Tahoma", "Segoe UI", "Times New Roman"];
         var font = Select("Czcionka", fonts, Array.IndexOf(fonts, settings.Font));
         var size = Measure("Rozmiar (pt)", settings.Size, 8, 12);
@@ -112,10 +106,11 @@ internal sealed class PricePrintEditor : Form
         var margin = Measure("Margines (mm)", settings.Margin, 4, 25, 1);
         var height = Measure("Min. wysokość (mm)", settings.RowHeight, 0, 18, 1);
         var padding = Measure("Odstęp pionowy (mm)", settings.Padding, 0, 5, 1);
+        Section("Treść i legenda");
         var format = Select("Treść karencji", ["Pełny zapis", "Zwięźle według wariantów", "Zwięźle według gatunków"], settings.WithdrawalFormat);
-        format.Width = 210;
+        format.Width = 185;
         var routes = Select("Oznaczenie drogi podania", ["Nazwy (domięśniowo)", "Kody (IM)"], settings.RouteCodes ? 1 : 0);
-        Section("Widoczne kolumny i legenda");
+        section.SetFlowBreak(section.Controls[section.Controls.Count - 1], true);
         var number = Toggle("Lp.", settings.Number);
         var batch = Toggle("Seria", true);
         batch.Enabled = false;
@@ -126,18 +121,33 @@ internal sealed class PricePrintEditor : Form
         repeatLegend.Enabled = legend.Checked;
         legend.CheckedChanged += (_, _) => repeatLegend.Enabled = legend.Checked;
         string[] headings = ["Lp.", "Nazwa leku", "Najnowsza seria", priceHeading, "Karencja"];
-        Section("Proporcje kolumn");
-        var widths = headings.Select((heading, index) => Measure("Proporcja: " + heading, settings.Widths[index], 1, 100)).ToArray();
+        Section("Tabela");
+        var target = Select("Edytuj", ["Nagłówki kolumn", .. headings], 0);
+        var widths = new NumericUpDown[headings.Length];
+        var typographyFields = new Control[headings.Length + 1][];
 
         var typography = new (ComboBox Font, ComboBox Size, ComboBox Alignment)[6];
         for (int i = 0; i < typography.Length; i++)
         {
-            Section(i == 0 ? "Wszystkie nagłówki kolumn" : "Komórki · " + headings[i - 1]);
+            int start = section.Controls.Count;
+            if (i > 0)
+                widths[i - 1] = Measure("Proporcja szerokości", settings.Widths[i - 1], 1, 100);
             typography[i] = (
                 Select("Czcionka", ["Domyślna", .. fonts], settings.Fonts.ElementAtOrDefault(i)),
                 Select("Rozmiar (pt)", ["Domyślny", "8", "9", "10", "11", "12"], settings.Sizes.ElementAtOrDefault(i)),
                 Select("Wyrównanie", ["Do lewej", "Do środka", "Do prawej"], settings.Alignments.ElementAtOrDefault(i)));
+            typographyFields[i] = section.Controls.Cast<Control>().Skip(start).ToArray();
         }
+        void ShowTypography()
+        {
+            section.SuspendLayout();
+            for (int i = 0; i < typographyFields.Length; i++)
+                foreach (var field in typographyFields[i])
+                    field.Visible = i == target.SelectedIndex;
+            section.ResumeLayout();
+        }
+        target.SelectedIndexChanged += (_, _) => ShowTypography();
+        ShowTypography();
 
         string TypographyCss(int index)
         {
