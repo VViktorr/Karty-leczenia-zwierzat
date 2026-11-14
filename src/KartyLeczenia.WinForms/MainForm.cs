@@ -559,14 +559,34 @@ internal sealed class MainForm : Form
         Column(expiry, "Przyjęcie", "Received", 120, "dd.MM.yyyy");
         Column(expiry, "Ważność", "Expires", 120, "dd.MM.yyyy");
         Column(expiry, "Pozostało", "Remaining", 115, "0.####");
-        Page("Terminy ważności", expiry, Action("Odśwież", async () =>
+        ConnectionOptions? loadingFor = null;
+        TabPage? page = null;
+        async Task LoadExpiries()
         {
             var options = Connection();
-            using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var rows = await MedicineStockService.Expiries(options, work.Token);
-            if (connection == options) expiry.DataSource = rows;
-            status.Text = $"Dostawy: {rows.Count}";
-        }));
+            if (ReferenceEquals(loadingFor, options)) return;
+            loadingFor = options;
+            try
+            {
+                using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var rows = await MedicineStockService.Expiries(options, work.Token);
+                if (!ReferenceEquals(connection, options) || IsDisposed) return;
+                expiry.DataSource = rows;
+                if (tabs.SelectedTab == page)
+                    status.Text = $"Dostawy: {rows.Count}";
+            }
+            finally
+            {
+                if (ReferenceEquals(loadingFor, options)) loadingFor = null;
+            }
+        }
+
+        page = Page("Terminy ważności", expiry, Action("Odśwież", LoadExpiries));
+        tabs.SelectedIndexChanged += async (_, _) =>
+        {
+            if (tabs.SelectedTab == page && connection is not null && expiry.DataSource is null)
+                await Run(LoadExpiries);
+        };
     }
 
     readonly CheckBox rememberTreatment = new() { Text = "Zapamiętuj wybory", AutoSize = true };
