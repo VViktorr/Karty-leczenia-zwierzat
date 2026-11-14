@@ -742,6 +742,19 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(actions, 0, 0);
         rememberTreatment.Anchor = AnchorStyles.Right;
         toolbar.Controls.Add(rememberTreatment, 1, 0);
+        var routeLegend = new Label
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(6, 4, 6, 6),
+            Text = "Skróty dróg podania: " + AdministrationRouteLegend.Description,
+            Visible = routeMode.SelectedIndex == 1
+        };
+        void ResizeRouteLegend() => routeLegend.MaximumSize = new Size(Math.Max(1, page.ClientSize.Width - page.Padding.Horizontal), 0);
+        page.ClientSizeChanged += (_, _) => ResizeRouteLegend();
+        routeMode.SelectedIndexChanged += (_, _) => routeLegend.Visible = routeMode.SelectedIndex == 1;
+        ResizeRouteLegend();
+        page.Controls.Add(routeLegend);
         page.Controls.Add(toolbar);
     }
 
