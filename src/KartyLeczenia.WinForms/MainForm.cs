@@ -36,9 +36,14 @@ internal sealed class MainForm : Form
         statusBar.Items.Add(new ToolStripStatusLabel { Spring = true });
         statusBar.Items.Add(refreshDocuments);
         refreshDocuments.Click += async (_, _) => await Run(() => Search(true));
-        tabs.SelectedIndexChanged += (_, _) => UpdateRefreshLabel();
+        tabs.SelectedIndexChanged += (_, _) =>
+        {
+            UpdateRefreshLabel();
+            CrashLog.Write($"WinForms.TabChanged index={tabs.SelectedIndex}");
+        };
         FormClosed += (_, _) =>
         {
+            CrashLog.Write("WinForms.MainWindow.Closed");
             preloadWork?.Cancel();
             searchWork?.Cancel();
         };
@@ -110,15 +115,29 @@ internal sealed class MainForm : Form
     Button Action(string text, Func<Task> action)
     {
         var button = new Button { Text = text, AutoSize = true };
-        button.Click += async (_, _) => await Run(action);
+        button.Click += async (_, _) => await Run(action, text);
         return button;
     }
 
-    async Task Run(Func<Task> action)
+    async Task Run(Func<Task> action, [System.Runtime.CompilerServices.CallerMemberName] string operation = "")
     {
-        try { await action(); }
-        catch (OperationCanceledException) { }
-        catch (Exception ex) { status.Text = SubiektConnectionService.FriendlyError(ex); }
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        var name = $"WinForms.Action [{operation}]";
+        CrashLog.Write(name + ".Start");
+        try
+        {
+            await action();
+            CrashLog.Write($"{name}.Complete elapsedMs={timer.ElapsedMilliseconds}");
+        }
+        catch (OperationCanceledException)
+        {
+            CrashLog.Write($"{name}.Cancelled elapsedMs={timer.ElapsedMilliseconds}");
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write($"{name}.Failed elapsedMs={timer.ElapsedMilliseconds}", ex);
+            status.Text = SubiektConnectionService.FriendlyError(ex);
+        }
     }
 
     ConnectionOptions Connection() => connection ?? throw new InvalidOperationException("Skonfiguruj połączenie z Subiektem w Ustawieniach.");
@@ -343,7 +362,7 @@ internal sealed class MainForm : Form
                 catch (OperationCanceledException) { }
                 catch (Microsoft.Data.SqlClient.SqlException ex)
                 {
-                    System.Diagnostics.Trace.TraceWarning("Wstępne wczytanie dokumentów ({0}): {1}", type, ex.Number);
+                    CrashLog.Write($"WinForms.Documents.Preload.Failed kind={type}", ex);
                 }
             }
         }
@@ -353,8 +372,11 @@ internal sealed class MainForm : Form
 
     async Task LoadDocumentRows(ConnectionOptions options, DocumentListKey key, CancellationToken token)
     {
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        CrashLog.Write($"WinForms.Documents.Query.Start kind={key.Kind} textFilter={key.Query.Length > 0} dateFilter={key.From.HasValue}");
         var rows = await service.SearchAsync(options, key.Query, token, key.Kind, key.From, key.Until, limit: 501, allowEmpty: true);
         token.ThrowIfCancellationRequested();
+        CrashLog.Write($"WinForms.Documents.Query.Complete kind={key.Kind} rows={rows.Count} elapsedMs={timer.ElapsedMilliseconds}");
         var shown = rows.Take(500).ToList();
         if (cache.TryGetValue(key, out var previous)
             && previous.Rows.SequenceEqual(shown, DocumentRowComparer.Instance))
@@ -383,6 +405,7 @@ internal sealed class MainForm : Form
         var key = DocumentKey(kind, search.Text.Trim());
         if (cache.TryGetValue(key, out var hit))
         {
+            CrashLog.Write($"WinForms.Documents.CacheHit kind={key.Kind} rows={hit.Rows.Count}");
             ShowDocumentRows(key, cached: true);
             if (!refresh && DateTimeOffset.Now - hit.LoadedAt < TimeSpan.FromMinutes(5)) return;
         }
@@ -624,6 +647,12 @@ internal sealed class MainForm : Form
 
     void ConfigureCard()
     {
+        treatment.DataError += (_, e) =>
+        {
+            CrashLog.Write($"WinForms.Treatment.GridError row={e.RowIndex} column={e.ColumnIndex} context={e.Context}", e.Exception);
+            e.ThrowException = false;
+            status.Text = "Błąd danych w tabeli karty leczenia. Szczegóły zapisano w logu.";
+        };
         treatment.ReadOnly = false;
         treatment.Columns.Add(new DataGridViewCheckBoxColumn
         {
@@ -737,6 +766,7 @@ internal sealed class MainForm : Form
             SetTreatmentChoices(gridRow, saved.Species, saved.Route);
         }
         tabs.SelectedIndex = 3;
+        CrashLog.Write($"WinForms.Treatment.Loaded rows={card.Rows.Count}");
         status.Text = $"Pozycje karty: {card.Rows.Count}";
     }
 
