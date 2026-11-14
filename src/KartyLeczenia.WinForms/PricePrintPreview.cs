@@ -10,7 +10,7 @@ internal sealed class PricePrintPreview : Form
         Text = "Podgląd wydruku cennika";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1100, 800);
-        var browser = new WebView2 { Dock = DockStyle.Fill };
+        var browser = new WebView2 { Dock = DockStyle.Fill, Visible = false };
         var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
         var print = new Button { Text = "Drukuj", AutoSize = true, Enabled = false };
         var pdf = new Button { Text = "Zapisz jako PDF", AutoSize = true, Enabled = false };
@@ -26,13 +26,17 @@ internal sealed class PricePrintPreview : Form
         }
 
         var file = Path.Combine(Path.GetTempPath(), $"cennik-lekow-{Guid.NewGuid():N}.html");
+        var previewFile = Path.ChangeExtension(file, ".pdf");
         bool saving = false;
         FormClosing += (_, e) => e.Cancel = saving;
         Disposed += (_, _) =>
         {
-            try { File.Delete(file); }
-            catch (IOException ex) { CrashLog.Write("PricePreview.Cleanup", ex); }
-            catch (UnauthorizedAccessException ex) { CrashLog.Write("PricePreview.Cleanup", ex); }
+            foreach (var path in new[] { file, previewFile })
+            {
+                try { File.Delete(path); }
+                catch (IOException ex) { CrashLog.Write("PricePreview.Cleanup", ex); }
+                catch (UnauthorizedAccessException ex) { CrashLog.Write("PricePreview.Cleanup", ex); }
+            }
         };
         void Report(Exception ex)
         {
@@ -55,11 +59,31 @@ internal sealed class PricePrintPreview : Form
             {
                 await browser.EnsureCoreWebView2Async();
                 if (IsDisposed) return;
-                browser.CoreWebView2.NavigationCompleted += async (_, e) =>
+                async void PreparePreview(object? sender, CoreWebView2NavigationCompletedEventArgs e)
                 {
+                    browser.CoreWebView2.NavigationCompleted -= PreparePreview;
                     if (!direct)
                     {
-                        print.Enabled = pdf.Enabled = e.IsSuccess;
+                        saving = true;
+                        close.Enabled = false;
+                        try
+                        {
+                            if (!e.IsSuccess || !await browser.CoreWebView2.PrintToPdfAsync(previewFile, PrintSettings()))
+                                throw new IOException("Nie udało się przygotować podglądu stron cennika.");
+                            browser.CoreWebView2.NavigationCompleted += (_, loaded) =>
+                            {
+                                print.Enabled = pdf.Enabled = loaded.IsSuccess;
+                                if (!loaded.IsSuccess) Report(new IOException("Nie udało się otworzyć podglądu stron cennika."));
+                            };
+                            browser.Source = new Uri(previewFile);
+                            browser.Visible = true;
+                        }
+                        catch (Exception ex) { Report(ex); }
+                        finally
+                        {
+                            saving = false;
+                            close.Enabled = true;
+                        }
                         return;
                     }
                     try
@@ -71,7 +95,8 @@ internal sealed class PricePrintPreview : Form
                     }
                     catch (Exception ex) { Report(ex); }
                     finally { Close(); }
-                };
+                }
+                browser.CoreWebView2.NavigationCompleted += PreparePreview;
                 File.WriteAllText(file, html);
                 browser.Source = new Uri(file);
             }
@@ -90,8 +115,7 @@ internal sealed class PricePrintPreview : Form
             print.Enabled = pdf.Enabled = close.Enabled = false;
             try
             {
-                if (!await browser.CoreWebView2.PrintToPdfAsync(target.FileName, PrintSettings()))
-                    throw new IOException("Nie udało się zapisać cennika jako PDF.");
+                await Task.Run(() => File.Copy(previewFile, target.FileName, overwrite: true));
             }
             catch (Exception ex) { Report(ex); }
             finally
