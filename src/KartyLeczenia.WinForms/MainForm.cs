@@ -212,8 +212,17 @@ internal sealed class MainForm : Form
     {
         var rows = await service.SearchAsync(options, key.Query, token, key.Kind, limit: 501, allowEmpty: true);
         token.ThrowIfCancellationRequested();
-        if (cache.Count >= 32) cache.Remove(cache.MinBy(entry => entry.Value.LoadedAt).Key);
-        cache[key] = (DateTimeOffset.Now, rows.Take(500).ToList(), rows.Count > 500);
+        var shown = rows.Take(500).ToList();
+        if (cache.TryGetValue(key, out var previous)
+            && previous.Rows.SequenceEqual(shown, DocumentRowComparer.Instance))
+            shown = previous.Rows;
+        if (cache.Count >= 32 && !cache.ContainsKey(key))
+        {
+            var oldestSearch = cache.Where(entry => entry.Key.Query.Length > 0)
+                .MinBy(entry => entry.Value.LoadedAt);
+            cache.Remove(oldestSearch.Key);
+        }
+        cache[key] = (DateTimeOffset.Now, shown, rows.Count > 500);
     }
 
     void UpdateRefreshLabel()
@@ -229,35 +238,51 @@ internal sealed class MainForm : Form
         var options = Connection();
         var key = (kind, search.Text.Trim());
         searchWork?.Cancel();
-        if (displayedDocuments is { } displayed && displayed.Kind != key.kind)
+        if (cache.TryGetValue(key, out var hit))
+        {
+            ShowDocumentRows(key, cached: true);
+            if (!refresh && DateTimeOffset.Now - hit.LoadedAt < TimeSpan.FromMinutes(5)) return;
+        }
+        else if (displayedDocuments is { } displayed && displayed.Kind != key.kind)
         {
             documents.DataSource = null;
             displayedDocuments = null;
             UpdateRefreshLabel();
         }
 
-        bool cached = !refresh && cache.TryGetValue(key, out var hit)
-            && DateTimeOffset.Now - hit.LoadedAt < TimeSpan.FromMinutes(5);
-        if (!cached)
+        preloadWork?.Cancel();
+        using var work = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        searchWork = work;
+        try
         {
-            preloadWork?.Cancel();
-            using var work = new CancellationTokenSource(TimeSpan.FromSeconds(25));
-            searchWork = work;
-            try
-            {
-                status.Text = "Wczytywanie dokumentów…";
-                await LoadDocumentRows(options, key, work.Token);
-                work.Token.ThrowIfCancellationRequested();
-            }
-            finally { if (ReferenceEquals(searchWork, work)) searchWork = null; }
+            status.Text = documents.DataSource is null ? "Wczytywanie dokumentów…" : "Odświeżanie dokumentów…";
+            await LoadDocumentRows(options, key, work.Token);
+            work.Token.ThrowIfCancellationRequested();
+            ShowDocumentRows(key, cached: false);
         }
+        finally { if (ReferenceEquals(searchWork, work)) searchWork = null; }
+    }
 
+    void ShowDocumentRows((DocumentSearchKinds Kind, string Query) key, bool cached)
+    {
         var result = cache[key];
         if (!ReferenceEquals(documents.DataSource, result.Rows)) documents.DataSource = result.Rows;
         displayedDocuments = key;
         UpdateRefreshLabel();
-        status.Text = $"{key.kind} · {result.Rows.Count} dokumentów"
+        status.Text = $"{key.Kind} · {result.Rows.Count} dokumentów"
             + (cached ? " z pamięci" : "") + (result.Truncated ? " · zawęź wyszukiwanie" : "");
+    }
+
+    sealed class DocumentRowComparer : IEqualityComparer<DocumentSuggestion>
+    {
+        internal static readonly DocumentRowComparer Instance = new();
+
+        public bool Equals(DocumentSuggestion? left, DocumentSuggestion? right) =>
+            ReferenceEquals(left, right) || (left is not null && right is not null
+                && (left with { Related = right.Related }) == right
+                && left.Related.SequenceEqual(right.Related));
+
+        public int GetHashCode(DocumentSuggestion row) => row.Id;
     }
 
     void ConfigurePrices()
