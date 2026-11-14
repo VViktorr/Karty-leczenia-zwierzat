@@ -483,9 +483,11 @@ internal sealed class MainForm : Form
                     if (levels.SelectedIndex < 0 && levels.Items.Count > 0) levels.SelectedIndex = 0;
                 }
                 if (levels.SelectedItem is not MedicinePriceLevel level) return;
-                var rows = await MedicineStockService.Prices(options, level.Number, work.Token, net: net.Checked);
+                bool netPrice = net.Checked;
+                var rows = await MedicineStockService.Prices(options, level.Number, work.Token, net: netPrice);
                 var catalogue = await Task.Run(LocalCatalogue.Load);
                 if (connection != options) return;
+                prices.Columns["Gross"]!.HeaderText = netPrice ? "Cena netto" : "Cena brutto";
                 prices.DataSource = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol, row.Name) }).ToList();
                 status.Text = $"Pozycje cennika: {rows.Count}";
             }
@@ -500,40 +502,21 @@ internal sealed class MainForm : Form
         };
     }
 
+    readonly PricePrintSettings pricePrintSettings = new();
+
     async Task PreviewPrices()
     {
-        if (prices.Rows.Count == 0)
+        var rows = prices.Rows.Cast<DataGridViewRow>().Select(row => row.DataBoundItem)
+            .OfType<MedicinePrice>().ToArray();
+        if (rows.Length == 0)
         {
             status.Text = "Wczytaj cennik przed otwarciem podglądu wydruku.";
             return;
         }
-
-        var columns = prices.Columns.Cast<DataGridViewColumn>().Where(column => column.Visible)
-            .OrderBy(column => column.DisplayIndex).ToArray();
-        static string Encode(string? text) => System.Net.WebUtility.HtmlEncode(text ?? "");
-        var html = new System.Text.StringBuilder("""
-            <!doctype html><html lang="pl"><meta charset="utf-8"><title>Cennik leków</title>
-            <style>
-            @page { size: A4 landscape; margin: 12mm }
-            body { font: 11pt Arial, sans-serif }
-            table { width: 100%; border-collapse: collapse }
-            th, td { border: 1px solid #aaa; padding: 4px; text-align: left }
-            th { background: #eee }
-            tr { break-inside: avoid }
-            </style><body><h1>Cennik leków</h1><table><thead><tr>
-            """);
-        foreach (var column in columns)
-            html.Append("<th>").Append(Encode(column.HeaderText)).Append("</th>");
-        html.Append("</tr></thead><tbody>");
-        foreach (DataGridViewRow row in prices.Rows)
-        {
-            html.Append("<tr>");
-            foreach (var column in columns)
-                html.Append("<td>").Append(Encode(row.Cells[column.Index].FormattedValue?.ToString())).Append("</td>");
-            html.Append("</tr>");
-        }
-        html.Append("</tbody></table></body></html>");
-        await OpenPrintPreview("cennik-lekow", html.ToString());
+        var catalogue = await Task.Run(LocalCatalogue.Load);
+        using var editor = new PricePrintEditor(pricePrintSettings, rows, prices.Columns["Gross"]!.HeaderText, catalogue);
+        if (editor.ShowDialog(this) == DialogResult.OK)
+            await OpenPrintPreview("cennik-lekow", editor.Render(rows));
     }
 
     void ConfigureExpiry()

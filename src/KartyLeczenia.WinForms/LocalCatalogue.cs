@@ -90,6 +90,12 @@ internal sealed class LocalCatalogue
         .Where(v => v.Withdrawal.Length > 0)
         .Select(v => $"{v.Species} {v.Route} · {v.Withdrawal}").Distinct());
 
+    internal string ShortSummary(string symbol, string name) => string.Join(" | ", ForProduct(symbol, name)
+        .Where(v => v.Withdrawal.Length > 0)
+        .Select(v => $"{v.Species} {v.Route} · {(string.IsNullOrWhiteSpace(v.ShortWithdrawal)
+            ? v.Withdrawal.Replace("Tkanki: ", "tk. ").Replace("Mleko: ", "ml. ")
+            : v.ShortWithdrawal)}").Distinct());
+
     internal static void OpenPdf(string path)
     {
         if (!path.StartsWith("data/ChPL/", StringComparison.Ordinal))
