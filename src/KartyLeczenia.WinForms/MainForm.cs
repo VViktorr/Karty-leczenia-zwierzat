@@ -8,7 +8,6 @@ internal sealed class MainForm : Form
     readonly DataGridView documents = NewGrid(), prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new() { Width = 280 };
     readonly Dictionary<DocumentSearchKinds, Button> documentKinds = new();
-    Font? activeDocumentKindFont;
     readonly StatusStrip statusBar = new();
     readonly ToolStripStatusLabel status = new();
     readonly ToolStripStatusLabel refreshDocuments = new() { IsLink = true, Visible = false };
@@ -165,8 +164,6 @@ internal sealed class MainForm : Form
         Column(documents, "Powiązane dokumenty", "RelatedText", 300);
         documents.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0) await Run(OpenDocument); };
         search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await Run(() => Search(true)); } };
-        activeDocumentKindFont = new Font(Font.FontFamily, Font.Size + 1, FontStyle.Bold);
-        Disposed += (_, _) => activeDocumentKindFont?.Dispose();
         period.Items.AddRange(["(nieokreślony)", "bieżący dzień", "bieżący tydzień", "bieżący miesiąc",
             "bieżący kwartał", "bieżący rok", "ostatnie 7 dni", "ostatnie 30 dni", "dowolny miesiąc", "dowolny okres"]);
         period.SelectedIndex = 0;
@@ -208,8 +205,6 @@ internal sealed class MainForm : Form
         foreach (var (value, button) in documentKinds)
         {
             bool selected = value == kind;
-            button.Font = selected ? activeDocumentKindFont : Font;
-            button.Padding = selected ? new Padding(6, 2, 6, 2) : Padding.Empty;
             button.ForeColor = selected ? SystemColors.HighlightText : SystemColors.ControlText;
             button.BackColor = selected ? SystemColors.Highlight : SystemColors.Control;
             button.UseVisualStyleBackColor = !selected;
