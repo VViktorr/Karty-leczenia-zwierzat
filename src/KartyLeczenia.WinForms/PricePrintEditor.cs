@@ -24,12 +24,28 @@ internal sealed class PricePrintEditor : Form
         var sample = new WebBrowser { Dock = DockStyle.Fill, AllowWebBrowserDrop = false, ScriptErrorsSuppressed = true };
         var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
 
+        var paper = new Label { Dock = DockStyle.Top, Height = 24, Padding = new Padding(8, 3, 0, 0) };
+        var section = options;
+        void Section(string title)
+        {
+            section = new FlowLayoutPanel { AutoSize = true, Width = 600, Padding = new Padding(0, 2, 0, 2) };
+            section.Controls.Add(new Label { Text = title, AutoSize = true, Margin = new Padding(3, 8, 12, 3) });
+            options.Controls.Add(section);
+            options.SetFlowBreak(section, true);
+            void ResizeSection()
+            {
+                foreach (FlowLayoutPanel row in options.Controls.OfType<FlowLayoutPanel>())
+                    row.MaximumSize = new Size(Math.Max(100, options.ClientSize.Width - 32), 0);
+            }
+            options.SizeChanged += (_, _) => ResizeSection();
+            ResizeSection();
+        }
         void Field(string label, Control control)
         {
             var field = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true };
             field.Controls.Add(new Label { Text = label, AutoSize = true });
             field.Controls.Add(control);
-            options.Controls.Add(field);
+            section.Controls.Add(field);
         }
         ComboBox Select(string label, string[] items, int index)
         {
@@ -49,10 +65,11 @@ internal sealed class PricePrintEditor : Form
         CheckBox Toggle(string label, bool value)
         {
             var box = new CheckBox { Text = label, Checked = value, AutoSize = true };
-            options.Controls.Add(box);
+            section.Controls.Add(box);
             return box;
         }
 
+        Section("Strona i tekst");
         string[] fonts = ["Arial", "Calibri", "Tahoma", "Segoe UI", "Times New Roman"];
         var font = Select("Czcionka", fonts, Array.IndexOf(fonts, settings.Font));
         var size = Measure("Rozmiar (pt)", settings.Size, 8, 12);
@@ -61,12 +78,14 @@ internal sealed class PricePrintEditor : Form
         var height = Measure("Min. wysokość (mm)", settings.RowHeight, 0, 18, 1);
         var padding = Measure("Odstęp pionowy (mm)", settings.Padding, 0, 5, 1);
         var format = Select("Format karencji", ["Skrót karencji", "Pełna karencja"], settings.Short ? 0 : 1);
+        Section("Widoczne kolumny i legenda");
         var number = Toggle("Lp.", settings.Number);
         var batch = Toggle("Seria", settings.Batch);
         var price = Toggle("Cena", settings.Price);
         var withdrawal = Toggle("Karencja", settings.Withdrawal);
         var legend = Toggle("Legenda", settings.Legend);
         string[] headings = ["Lp.", "Nazwa leku", "Najnowsza seria", priceHeading, "Karencja"];
+        Section("Proporcje kolumn");
         var widths = headings.Select((heading, index) => Measure("Proporcja: " + heading, settings.Widths[index], 1, 100)).ToArray();
 
         render = data =>
@@ -79,7 +98,12 @@ internal sealed class PricePrintEditor : Form
                 <style>
                 @page { size: A4 {{(orientation.SelectedIndex == 0 ? "landscape" : "portrait")}}; margin: {{margin.Value}}mm }
                 body {font: {{size.Value}}pt "{{font.SelectedItem}}", sans-serif }
-                @media screen {body {margin: {{margin.Value}}mm } }
+                @media screen {
+                    html {background: #ddd}
+                    body {box-sizing: border-box; width: {{(orientation.SelectedIndex == 0 ? 297 : 210)}}mm;
+                          min-height: {{(orientation.SelectedIndex == 0 ? 210 : 297)}}mm;
+                          margin: 12px auto; padding: {{margin.Value}}mm; background: white; border: 1px solid #999 }
+                }
                 table {width: 100%; table-layout: fixed; border-collapse: collapse}
                 thead {display: table-header-group}
                 tr {break-inside: avoid; page-break-inside: avoid}
@@ -109,7 +133,17 @@ internal sealed class PricePrintEditor : Form
             return html.Append("</tbody></table></body></html>").ToString();
         };
 
-        void UpdateSample() => sample.DocumentText = Render(rows.Take(12));
+        void UpdateSample()
+        {
+            bool landscape = orientation.SelectedIndex == 0;
+            decimal available = (landscape ? 297 : 210) - 2 * margin.Value;
+            bool[] visible = [number.Checked, true, batch.Checked, price.Checked, withdrawal.Checked];
+            decimal total = widths.Where((_, i) => visible[i]).Sum(box => box.Value);
+            paper.Text = $"A4 {(landscape ? "297 × 210" : "210 × 297")} mm · na kolumny {available:0.#} mm · "
+                + string.Join("  |  ", headings.Where((_, i) => visible[i]).Zip(
+                    widths.Where((_, i) => visible[i]), (heading, box) => $"{heading} {available * box.Value / total:0.#} mm"));
+            sample.DocumentText = Render(rows.Take(12));
+        }
         var refreshTimer = new System.Windows.Forms.Timer { Interval = 150 };
         refreshTimer.Tick += (_, _) =>
         {
@@ -147,8 +181,25 @@ internal sealed class PricePrintEditor : Form
             settings.Widths = widths.Select(box => box.Value).ToArray();
         };
         var close = new Button { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
-        actions.Controls.AddRange([print, close]);
+        var printNow = new Button { Text = "Drukuj", AutoSize = true };
+        printNow.Click += (_, _) =>
+        {
+            var html = Render(rows).Replace("<body>", "<body onload=\"window.print()\">", StringComparison.Ordinal);
+            var file = Path.Combine(Path.GetTempPath(), $"cennik-lekow-{Guid.NewGuid():N}.html");
+            try
+            {
+                File.WriteAllText(file, html);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write("WinForms.PricePrint.Failed", ex);
+                MessageBox.Show(this, "Nie udało się otworzyć wydruku cennika.", Text);
+            }
+        };
+        actions.Controls.AddRange([print, printNow, close]);
         Controls.Add(sample);
+        Controls.Add(paper);
         Controls.Add(options);
         Controls.Add(actions);
         CancelButton = close;
