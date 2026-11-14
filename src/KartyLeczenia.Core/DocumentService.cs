@@ -39,8 +39,8 @@ public sealed class DocumentService
             WHERE object_id=OBJECT_ID(N'dbo.dok__Dokument') AND name IN (N'dok_WartBrutto', N'dok_Waluta')
             """, con) { CommandTimeout = 5 };
         bool gross = false, currency = false;
-        await using (var reader = await cmd.ExecuteReaderAsync(token))
-        while (await reader.ReadAsync(token))
+        await using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
+        while (await reader.ReadAsync(token).ConfigureAwait(false))
         {
             string name = reader.GetString(0), type = reader.GetString(1);
             if (name == "dok_WartBrutto" && (type is "money" or "smallmoney" or "decimal" or "numeric" or "float" or "real" or "int" or "bigint")) gross = true;
@@ -58,13 +58,28 @@ public sealed class DocumentService
         cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)warehouseId ?? DBNull.Value;
         // These are actual trade/warehouse references on document positions, never date/customer guesses.
         cmd.CommandText = $"""
-            SELECT DISTINCT h.dok_Id, h.dok_NrPelny, m.dok_Id, m.dok_NrPelny
-            FROM dbo.dok_Pozycja p
-            INNER JOIN dbo.dok__Dokument h ON h.dok_Id=p.ob_DokHanId
-            LEFT JOIN dbo.dok_Pozycja source ON source.ob_Id=p.ob_DoId AND source.ob_TowId=p.ob_TowId
-            INNER JOIN dbo.dok__Dokument m ON m.dok_Id=p.ob_DokMagId OR m.dok_Id=source.ob_DokMagId
-            WHERE (h.dok_Id IN ({parameters}) OR m.dok_Id IN ({parameters}))
-              AND (h.dok_NrPelny LIKE N'FS %' OR h.dok_NrPelny LIKE N'PA %')
+            WITH CandidateLinks AS (
+                SELECT p.ob_DokHanId AS TradeId, p.ob_DokMagId AS WarehouseId
+                FROM dbo.dok_Pozycja p WHERE p.ob_DokHanId IN ({parameters})
+                UNION
+                SELECT p.ob_DokHanId, source.ob_DokMagId
+                FROM dbo.dok_Pozycja p
+                JOIN dbo.dok_Pozycja source ON source.ob_Id=p.ob_DoId AND source.ob_TowId=p.ob_TowId
+                WHERE p.ob_DokHanId IN ({parameters})
+                UNION
+                SELECT p.ob_DokHanId, p.ob_DokMagId
+                FROM dbo.dok_Pozycja p WHERE p.ob_DokMagId IN ({parameters})
+                UNION
+                SELECT p.ob_DokHanId, source.ob_DokMagId
+                FROM dbo.dok_Pozycja source
+                JOIN dbo.dok_Pozycja p ON p.ob_DoId=source.ob_Id AND p.ob_TowId=source.ob_TowId
+                WHERE source.ob_DokMagId IN ({parameters})
+            )
+            SELECT h.dok_Id, h.dok_NrPelny, m.dok_Id, m.dok_NrPelny
+            FROM CandidateLinks links
+            JOIN dbo.dok__Dokument h ON h.dok_Id=links.TradeId
+            JOIN dbo.dok__Dokument m ON m.dok_Id=links.WarehouseId
+            WHERE (h.dok_NrPelny LIKE N'FS %' OR h.dok_NrPelny LIKE N'PA %')
               AND m.dok_NrPelny LIKE N'WZ %'
               AND m.dok_MagId = @warehouseId AND h.dok_MagId = @warehouseId
             """;
@@ -76,8 +91,8 @@ public sealed class DocumentService
         }
         try
         {
-            await using var reader = await cmd.ExecuteReaderAsync(token);
-            while (await reader.ReadAsync(token))
+            await using var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
+            while (await reader.ReadAsync(token).ConfigureAwait(false))
             {
                 int trade = reader.GetInt32(0), warehouse = reader.GetInt32(2);
                 Add(trade, new(warehouse, reader.GetString(3)));
@@ -101,7 +116,7 @@ public sealed class DocumentService
             WHERE object_id=OBJECT_ID(N'dbo.dok__Dokument') AND name IN (N'dok_DataWyst', N'dok_DataDok')
             ORDER BY CASE name WHEN N'dok_DataWyst' THEN 0 ELSE 1 END
             """, con) { CommandTimeout = 5 };
-        string value = (await cmd.ExecuteScalarAsync(token))?.ToString() ?? "";
+        string value = (await cmd.ExecuteScalarAsync(token).ConfigureAwait(false))?.ToString() ?? "";
         // Only these fixed identifiers may be inserted into a query.
         if (value is not ("dok_DataWyst" or "dok_DataDok")) value = "";
         DateColumns[key] = value;
@@ -113,9 +128,9 @@ public sealed class DocumentService
         if ((!allowEmpty && fragment.Length < 1) || kinds == DocumentSearchKinds.None) return [];
         string escaped = fragment.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace("[", "~[");
         await using var con = new SqlConnection(options.BuildConnectionString());
-        await con.OpenAsync(token);
-        string dateColumn = await DateColumn(con, token);
-        var amounts = await DetectAmounts(con, token);
+        await con.OpenAsync(token).ConfigureAwait(false);
+        string dateColumn = await DateColumn(con, token).ConfigureAwait(false);
+        var amounts = await DetectAmounts(con, token).ConfigureAwait(false);
         string grossValue = amounts.Gross ? "d.dok_WartBrutto" : "CAST(NULL AS decimal(19,4))";
         string currencyValue = amounts.Currency ? "d.dok_Waluta" : "CAST(NULL AS nvarchar(3))";
         if (dateColumn.Length == 0 && (dateFrom.HasValue || dateUntil.HasValue))
@@ -124,6 +139,15 @@ public sealed class DocumentService
         string dateFilter = "";
         if (dateColumn.Length > 0 && dateFrom.HasValue) dateFilter += $" AND d.{dateColumn}>=@from";
         if (dateColumn.Length > 0 && dateUntil.HasValue) dateFilter += $" AND d.{dateColumn}<@until";
+        string searchFilter = fragment.Length == 0 ? "" : """
+            AND (d.dok_NrPelny LIKE @fragment ESCAPE N'~'
+              OR pl.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
+              OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
+              OR od.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
+              OR od.adrh_Nazwa LIKE @fragment ESCAPE N'~')
+            """;
+        string order = fragment.Length > 0 ? "CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, "
+            : dateColumn.Length > 0 ? dateValue + " DESC, " : "";
         using var cmd = new SqlCommand($"""
             SELECT TOP (@limit) d.dok_Id, d.dok_NrPelny,
               COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_NazwaPelna)), N''), pl.adrh_Nazwa, N'') AS Payer,
@@ -133,14 +157,9 @@ public sealed class DocumentService
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
             WHERE ((@invoices=1 AND d.dok_NrPelny LIKE N'FS %') OR (@receipts=1 AND d.dok_NrPelny LIKE N'PA %') OR (@warehouse=1 AND d.dok_NrPelny LIKE N'WZ %'))
               AND d.dok_MagId = @warehouseId
-              AND (@empty=1 OR d.dok_NrPelny LIKE @fragment ESCAPE N'~'
-                OR pl.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
-                OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
-                OR od.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
-                OR od.adrh_Nazwa LIKE @fragment ESCAPE N'~')
+              {searchFilter}
               {dateFilter}
-            ORDER BY CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END,
-                     CASE WHEN @empty=1 THEN {dateValue} END DESC, d.dok_Id DESC
+            ORDER BY {order}d.dok_Id DESC
             """, con) { CommandTimeout = 10 };
         cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         cmd.Parameters.Add("@limit", SqlDbType.Int).Value = Math.Clamp(limit, 1, allowEmpty ? 501 : 101);
@@ -149,14 +168,13 @@ public sealed class DocumentService
         cmd.Parameters.Add("@invoices", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Invoices);
         cmd.Parameters.Add("@receipts", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Receipts);
         cmd.Parameters.Add("@warehouse", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.WarehouseReleases);
-        cmd.Parameters.Add("@empty", SqlDbType.Bit).Value = fragment.Length == 0;
         cmd.Parameters.Add("@fragment", SqlDbType.NVarChar, 250).Value = "%" + escaped + "%";
         cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
         var found = new List<DocumentSuggestion>();
-        await using (var reader = await cmd.ExecuteReaderAsync(token))
-        while (await reader.ReadAsync(token)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+        await using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
+        while (await reader.ReadAsync(token).ConfigureAwait(false)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetDateTime(4), reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5)), reader.IsDBNull(6) ? "" : reader.GetString(6).Trim()));
-        return await AttachRelations(con, found, options.WarehouseId, token);
+        return await AttachRelations(con, found, options.WarehouseId, token).ConfigureAwait(false);
     }
     public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null)
     {

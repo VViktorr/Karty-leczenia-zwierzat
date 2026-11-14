@@ -7,6 +7,8 @@ internal sealed class MainForm : Form
     readonly TabControl tabs = new() { Dock = DockStyle.Fill };
     readonly DataGridView documents = NewGrid(), prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new() { Width = 280 };
+    readonly Dictionary<DocumentSearchKinds, Button> documentKinds = new();
+    Font? activeDocumentKindFont;
     readonly StatusStrip statusBar = new();
     readonly ToolStripStatusLabel status = new();
     readonly DocumentService service = new();
@@ -93,10 +95,35 @@ internal sealed class MainForm : Form
         Column(documents, "Powiązane dokumenty", "RelatedText", 300);
         documents.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0) await Run(OpenDocument); };
         search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await Run(() => Search(true)); } };
-        Page("Dokumenty", documents, Action("FS (Alt+1)", () => SelectKind(DocumentSearchKinds.Invoices)),
-            Action("Paragony (Alt+2)", () => SelectKind(DocumentSearchKinds.Receipts)),
-            Action("WZ", () => SelectKind(DocumentSearchKinds.WarehouseReleases)), search,
-            Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
+        activeDocumentKindFont = new Font(Font.FontFamily, Font.Size + 1, FontStyle.Bold);
+        Disposed += (_, _) => activeDocumentKindFont?.Dispose();
+        Page("Dokumenty", documents,
+            DocumentKindButton(DocumentSearchKinds.Invoices, "Faktury sprzedaży", "Alt+1"),
+            DocumentKindButton(DocumentSearchKinds.Receipts, "Paragony", "Alt+2"),
+            DocumentKindButton(DocumentSearchKinds.WarehouseReleases, "Wydania zewnętrzne", "Alt+4"),
+            search, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
+        UpdateDocumentKindButtons();
+    }
+
+    Button DocumentKindButton(DocumentSearchKinds value, string label, string shortcut)
+    {
+        var button = Action(label, () => SelectKind(value));
+        button.AccessibleDescription = shortcut;
+        documentKinds.Add(value, button);
+        return button;
+    }
+
+    void UpdateDocumentKindButtons()
+    {
+        foreach (var (value, button) in documentKinds)
+        {
+            bool selected = value == kind;
+            button.Font = selected ? activeDocumentKindFont : Font;
+            button.Padding = selected ? new Padding(6, 2, 6, 2) : Padding.Empty;
+            button.ForeColor = selected ? SystemColors.HighlightText : SystemColors.ControlText;
+            button.BackColor = selected ? SystemColors.Highlight : SystemColors.Control;
+            button.UseVisualStyleBackColor = !selected;
+        }
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -106,9 +133,16 @@ internal sealed class MainForm : Form
             ListParameters.Show(this, grid);
             return true;
         }
-        if (keyData == (Keys.Alt | Keys.D1) || keyData == (Keys.Alt | Keys.D2))
+        var selected = keyData switch
         {
-            _ = Run(() => SelectKind(keyData == (Keys.Alt | Keys.D1) ? DocumentSearchKinds.Invoices : DocumentSearchKinds.Receipts));
+            Keys.Alt | Keys.D1 => DocumentSearchKinds.Invoices,
+            Keys.Alt | Keys.D2 => DocumentSearchKinds.Receipts,
+            Keys.Alt | Keys.D4 => DocumentSearchKinds.WarehouseReleases,
+            _ => DocumentSearchKinds.None
+        };
+        if (selected != DocumentSearchKinds.None)
+        {
+            _ = Run(() => SelectKind(selected));
             return true;
         }
         return base.ProcessCmdKey(ref msg, keyData);
@@ -120,6 +154,7 @@ internal sealed class MainForm : Form
     {
         tabs.SelectedIndex = 0;
         kind = selected;
+        UpdateDocumentKindButtons();
         return Search(false);
     }
 
