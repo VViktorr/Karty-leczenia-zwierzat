@@ -5,7 +5,7 @@ namespace KartyLeczenia.Windows;
 internal sealed class LocalCatalogue
 {
     internal sealed record Variant(string Species, string Route, string Indication, string Dose,
-        string Withdrawal, string Pdf, string Source, string ShortWithdrawal)
+        string Withdrawal, string Pdf, string Source, string ShortWithdrawal, string PriceCompactWithdrawal)
     {
         public override string ToString() => $"{Species} · {Route} · {Indication}";
     }
@@ -41,10 +41,18 @@ internal sealed class LocalCatalogue
             migration.ExecuteNonQuery();
             command.Connection = migrated;
         }
+        using (var script = typeof(LocalCatalogue).Assembly.GetManifestResourceStream("price-withdrawal-v1.sql")
+            ?? throw new InvalidOperationException("Brak definicji skrótów cennika."))
+        using (var text = new StreamReader(script))
+        {
+            command.CommandText = text.ReadToEnd();
+            command.ExecuteNonQuery();
+        }
         command.CommandText = """
             SELECT p.symbol,p.name,v.species,v.route,v.indication,v.dose,
-                   v.edible_tissues,v.milk,v.pdf_path,v.source,v.withdrawal_short
+                   v.edible_tissues,v.milk,v.pdf_path,v.source,v.withdrawal_short,price.compact_text
             FROM products p JOIN variants v ON v.symbol=p.symbol
+            JOIN price_withdrawal_entries price ON price.id=v.id
             WHERE COALESCE(p.decision,'') <> 'NOT_MEDICINE'
               AND COALESCE(v.scope,'') NOT LIKE '%referencyjne%'
               AND COALESCE(v.scope,'') NOT LIKE '%archiwalne%'
@@ -73,7 +81,7 @@ internal sealed class LocalCatalogue
             }
             var withdrawal = string.Join(", ", new[] { Text(6).Length == 0 ? "" : "Tkanki: " + Text(6),
                 Text(7).Length == 0 ? "" : "Mleko: " + Text(7) }.Where(value => value.Length > 0));
-            entry.Variants.Add(new(Text(2), Text(3), Text(4), Text(5), withdrawal, Text(8), Text(9), Text(10)));
+            entry.Variants.Add(new(Text(2), Text(3), Text(4), Text(5), withdrawal, Text(8), Text(9), Text(10), Text(11)));
         }
         return result;
     }
@@ -97,20 +105,11 @@ internal sealed class LocalCatalogue
         if (format == 0)
             return string.Join(" | ", variants.Select(v => $"{v.Species} {Route(v.Route)} · {v.Withdrawal}").Distinct());
 
-        var entries = variants.Select(v => (v.Species, Route: Route(v.Route), Text: CompactWithdrawal(v))).Distinct();
+        var entries = variants.Select(v => (v.Species, Route: Route(v.Route), Text: v.PriceCompactWithdrawal.ReplaceLineEndings(" "))).Where(v => v.Text.Length > 0).Distinct();
         return format == 2
             ? string.Join("; ", entries.GroupBy(v => v.Species).Select(group =>
                 $"{group.Key} — {string.Join(" / ", group.Select(v => $"{v.Route}: {v.Text}"))}"))
             : string.Join("; ", entries.Select(v => $"{v.Species} {v.Route}: {v.Text}"));
-    }
-
-    static string CompactWithdrawal(Variant variant)
-    {
-        if (!string.IsNullOrWhiteSpace(variant.ShortWithdrawal)) return variant.ShortWithdrawal;
-        return variant.Withdrawal
-            .Replace("Tkanki: ", "tk. ", StringComparison.OrdinalIgnoreCase)
-            .Replace("Mleko: ", "ml. ", StringComparison.OrdinalIgnoreCase)
-            .ReplaceLineEndings(" ");
     }
 
     internal static void OpenPdf(string path)
