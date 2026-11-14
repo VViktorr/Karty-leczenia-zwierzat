@@ -560,7 +560,7 @@ internal sealed class MainForm : Form
             else selectedTreatmentVariants[gridRow] = variant;
             treatment.InvalidateCell(gridRow.Cells[TreatmentChoices.Route]);
             gridRow.Cells["Dawkowanie i okres stosowania"].Value = variant?.Dose ?? "";
-            gridRow.Cells["Karencja"].Value = TreatmentWithdrawal(variant);
+            gridRow.Cells["Karencja"].Value = variant?.Withdrawal ?? "";
             row.Set("Źródło karencji", variant?.Source ?? "", false);
             if (changed && rememberTreatment.Checked && species.Length > 0)
                 TreatmentChoices.Save(row, species, route);
@@ -642,9 +642,18 @@ internal sealed class MainForm : Form
         return Task.CompletedTask;
     }
 
-    string TreatmentWithdrawal(LocalCatalogue.Variant? variant) =>
-        variant is null ? "" : withdrawalMode.SelectedIndex == 1 && !string.IsNullOrWhiteSpace(variant.ShortWithdrawal)
-            ? variant.ShortWithdrawal : variant.Withdrawal;
+    string FormatWithdrawal(DataGridViewRow row, string text)
+    {
+        if (withdrawalMode.SelectedIndex != 1) return text;
+        if (selectedTreatmentVariants.TryGetValue(row, out var variant)
+            && text == variant.Withdrawal && !string.IsNullOrWhiteSpace(variant.ShortWithdrawal))
+            return variant.ShortWithdrawal;
+        return string.Join(", ", text
+            .Replace("Tkanki jadalne:", "tk.", StringComparison.OrdinalIgnoreCase)
+            .Replace("Tkanki:", "tk.", StringComparison.OrdinalIgnoreCase)
+            .Replace("Mleko:", "ml.", StringComparison.OrdinalIgnoreCase)
+            .Split(['\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
+    }
 
     void ConfigureCard()
     {
@@ -715,8 +724,20 @@ internal sealed class MainForm : Form
         withdrawalMode.SelectedIndexChanged += (_, _) =>
         {
             treatment.EndEdit();
-            foreach (var (row, variant) in selectedTreatmentVariants)
-                row.Cells["Karencja"].Value = TreatmentWithdrawal(variant);
+            treatment.InvalidateColumn(treatment.Columns["Karencja"]!.Index);
+        };
+        treatment.CellFormatting += (_, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != "Karencja"
+                || e.Value is not string text || withdrawalMode.SelectedIndex != 1) return;
+            if (treatment.IsCurrentCellInEditMode && treatment.CurrentCellAddress == new Point(e.ColumnIndex, e.RowIndex)) return;
+            e.Value = FormatWithdrawal(treatment.Rows[e.RowIndex], text);
+            e.FormattingApplied = true;
+        };
+        treatment.EditingControlShowing += (_, e) =>
+        {
+            if (e.Control is TextBox editor && treatment.CurrentCell is { OwningColumn.Name: "Karencja" } cell)
+                editor.Text = cell.Value?.ToString() ?? "";
         };
         routeMode.Items.AddRange(["Pełna droga podania", "Skróty dróg podania"]);
         routeMode.SelectedIndex = 1;
@@ -799,7 +820,7 @@ internal sealed class MainForm : Form
         status.Text = $"Pozycje karty: {card.Rows.Count}";
     }
 
-    Card CaptureTreatmentCard()
+    Card CaptureTreatmentCard(bool forPrint = false)
     {
         var source = currentCard ?? throw new InvalidOperationException("Najpierw wczytaj dokument.");
         treatment.EndEdit();
@@ -815,6 +836,7 @@ internal sealed class MainForm : Form
                     values[column.Name] = column.Name == TreatmentChoices.Route
                         && selectedTreatmentVariants.TryGetValue(item, out var variant)
                         ? variant.Route : cell.Value?.ToString() ?? "";
+            if (forPrint) values["Karencja"] = FormatWithdrawal(item, values.GetValueOrDefault("Karencja", ""));
             return values;
         }).ToList();
         return new Card(fields, rows);
@@ -829,7 +851,7 @@ internal sealed class MainForm : Form
 
     async Task PreviewCard()
     {
-        var card = CaptureTreatmentCard();
+        var card = CaptureTreatmentCard(forPrint: true);
         var file = Path.Combine(Path.GetTempPath(), $"karta-leczenia-{Guid.NewGuid():N}.html");
         await File.WriteAllTextAsync(file, CardHtmlRenderer.Render(card));
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
