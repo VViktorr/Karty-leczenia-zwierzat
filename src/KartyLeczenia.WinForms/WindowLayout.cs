@@ -12,7 +12,7 @@ internal sealed class WindowLayout(Form window, Dictionary<string, DataGridView>
     sealed record TableLayout(int RowHeight, bool MultiSelect, bool RowHeaders, DataGridViewCellBorderStyle Borders,
         ColumnLayout[] Columns);
     sealed record ColumnLayout(string Name, int Width, int Order, bool Visible,
-        ColumnTextStyle? Header = null, ColumnTextStyle? Data = null);
+        ColumnTextStyle? Header = null, ColumnTextStyle? Data = null, string? ValueOption = null);
 
     internal void Restore()
     {
@@ -51,6 +51,7 @@ internal sealed class WindowLayout(Form window, Dictionary<string, DataGridView>
                 current.Width = Math.Clamp(column.Width, current.MinimumWidth, 65536);
                 current.DisplayIndex = Math.Clamp(column.Order, 0, grid.Columns.Count - 1);
                 current.Visible = column.Visible;
+                DocumentColumnOptions.Apply(current, column.ValueOption);
                 column.Header?.Apply(grid, current, true);
                 column.Data?.Apply(grid, current, false);
             }
@@ -68,7 +69,7 @@ internal sealed class WindowLayout(Form window, Dictionary<string, DataGridView>
             return new TableLayout(grid.RowTemplate.Height, grid.MultiSelect, grid.RowHeadersVisible, grid.CellBorderStyle,
                 grid.Columns.Cast<DataGridViewColumn>()
                     .Select(column => new ColumnLayout(column.Name, column.Width, column.DisplayIndex, column.Visible,
-                        ColumnTextStyle.Get(column, true), ColumnTextStyle.Get(column, false)))
+                        ColumnTextStyle.Get(column, true), ColumnTextStyle.Get(column, false), DocumentColumnOptions.Read(column)))
                     .ToArray());
         });
         try

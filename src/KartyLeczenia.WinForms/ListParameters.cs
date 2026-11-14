@@ -118,6 +118,33 @@ internal static class ListParameters
         dataStyle.Click += (_, _) => EditStyle(false);
         bar.Controls.AddRange([headerStyle, dataStyle]);
         if (list.Items.Count > 0) list.SelectedIndex = 0;
+        var valueOptions = new Dictionary<DataGridViewColumn, string>();
+        var valueButton = new Button { Text = "Dane kolumny…", AutoSize = true };
+        void UpdateValueButton() => valueButton.Enabled = list.SelectedItem is DataGridViewColumn selected
+            && DocumentColumnOptions.Choices(selected).Length > 0;
+        list.SelectedIndexChanged += (_, _) => UpdateValueButton();
+        valueButton.Click += (_, _) =>
+        {
+            if (list.SelectedItem is not DataGridViewColumn column) return;
+            var options = DocumentColumnOptions.Choices(column);
+            using var picker = new Form
+            {
+                Text = column.HeaderText, StartPosition = FormStartPosition.CenterParent,
+                ClientSize = new Size(300, 85), FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false, MinimizeBox = false
+            };
+            var choices = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
+            choices.Items.AddRange(options);
+            string? current = valueOptions.GetValueOrDefault(column) ?? DocumentColumnOptions.Read(column);
+            choices.SelectedIndex = Math.Max(0, Array.IndexOf(options, current));
+            var apply = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom };
+            picker.Controls.AddRange([choices, apply]);
+            picker.AcceptButton = apply;
+            if (picker.ShowDialog(dialog) == DialogResult.OK && choices.SelectedItem is string value)
+                valueOptions[column] = value;
+        };
+        bar.Controls.Add(valueButton);
+        UpdateValueButton();
         var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
         var ok = new Button { Text = "OK" };
         ok.Click += (_, _) =>
@@ -139,6 +166,8 @@ internal static class ListParameters
             column.DisplayIndex = i;
             column.Visible = list.GetItemChecked(i);
         }
+        foreach (var (column, value) in valueOptions)
+            DocumentColumnOptions.Apply(column, value);
         foreach (var (key, style) in styles)
             style.Apply(grid, key.Column, key.Header);
         grid.MultiSelect = multi.Checked;

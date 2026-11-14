@@ -10,6 +10,8 @@ public sealed record DocumentLink(int Id, string Number);
 
 public sealed record DocumentSuggestion(int Id, string Number, string Payer = "", string Recipient = "", DateTime? Date = null, decimal? Gross = null, string Currency = "")
 {
+    public string ShortPayer { get; init; } = "";
+    public decimal? Net { get; init; }
     public IReadOnlyList<DocumentLink> Related { get; init; } = Array.Empty<DocumentLink>();
     public string RelationNotice { get; init; } = "";
     public string AmountText => Gross.HasValue ? "Brutto: " + Gross.Value.ToString("N2") + (string.IsNullOrWhiteSpace(Currency) ? " (waluta nieodczytana)" : " " + Currency.Trim()) : "Brutto: —";
@@ -29,24 +31,25 @@ public sealed record DocumentData(string Number, string Payer, string Recipient,
 
 public sealed class DocumentService
 {
-    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (bool Gross, bool Currency)> AmountColumns = new();
-    static async Task<(bool Gross, bool Currency)> DetectAmounts(SqlConnection con, CancellationToken token)
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (bool Gross, bool Currency, bool Net)> AmountColumns = new();
+    static async Task<(bool Gross, bool Currency, bool Net)> DetectAmounts(SqlConnection con, CancellationToken token)
     {
         string key = con.DataSource + "|" + con.Database;
         if (AmountColumns.TryGetValue(key, out var known)) return known;
         using var cmd = new SqlCommand("""
             SELECT name, TYPE_NAME(system_type_id) FROM sys.columns
-            WHERE object_id=OBJECT_ID(N'dbo.dok__Dokument') AND name IN (N'dok_WartBrutto', N'dok_Waluta')
+            WHERE object_id=OBJECT_ID(N'dbo.dok__Dokument') AND name IN (N'dok_WartBrutto', N'dok_Waluta', N'dok_WartNetto')
             """, con) { CommandTimeout = 5 };
-        bool gross = false, currency = false;
+        bool gross = false, currency = false, net = false;
         await using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
         while (await reader.ReadAsync(token).ConfigureAwait(false))
         {
             string name = reader.GetString(0), type = reader.GetString(1);
             if (name == "dok_WartBrutto" && (type is "money" or "smallmoney" or "decimal" or "numeric" or "float" or "real" or "int" or "bigint")) gross = true;
+            if (name == "dok_WartNetto" && (type is "money" or "smallmoney" or "decimal" or "numeric" or "float" or "real" or "int" or "bigint")) net = true;
             if (name == "dok_Waluta" && (type is "char" or "varchar" or "nchar" or "nvarchar")) currency = true;
         }
-        var result = (Gross: gross, Currency: currency); AmountColumns[key] = result; return result;
+        var result = (Gross: gross, Currency: currency, Net: net); AmountColumns[key] = result; return result;
     }
     static async Task<List<DocumentSuggestion>> AttachRelations(SqlConnection con, List<DocumentSuggestion> documents, int? warehouseId, CancellationToken token)
     {
@@ -132,6 +135,7 @@ public sealed class DocumentService
         string dateColumn = await DateColumn(con, token).ConfigureAwait(false);
         var amounts = await DetectAmounts(con, token).ConfigureAwait(false);
         string grossValue = amounts.Gross ? "d.dok_WartBrutto" : "CAST(NULL AS decimal(19,4))";
+        string netValue = amounts.Net ? "d.dok_WartNetto" : "CAST(NULL AS decimal(19,4))";
         string currencyValue = amounts.Currency ? "d.dok_Waluta" : "CAST(NULL AS nvarchar(3))";
         if (dateColumn.Length == 0 && (dateFrom.HasValue || dateUntil.HasValue))
             throw new InvalidOperationException("Nie rozpoznano kolumny daty dokumentu. Wybierz wszystkie lata.");
@@ -151,7 +155,8 @@ public sealed class DocumentService
         using var cmd = new SqlCommand($"""
             SELECT TOP (@limit) d.dok_Id, d.dok_NrPelny,
               COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_NazwaPelna)), N''), pl.adrh_Nazwa, N'') AS Payer,
-              COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient, {dateValue} AS DocumentDate, {grossValue} AS Gross, {currencyValue} AS Currency
+              COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient, {dateValue} AS DocumentDate, {grossValue} AS Gross, {currencyValue} AS Currency,
+              COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_Nazwa)), N''), pl.adrh_NazwaPelna, N''), {netValue}
             FROM dbo.dok__Dokument d
             LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
@@ -173,7 +178,11 @@ public sealed class DocumentService
         var found = new List<DocumentSuggestion>();
         await using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
         while (await reader.ReadAsync(token).ConfigureAwait(false)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-            reader.IsDBNull(4) ? null : reader.GetDateTime(4), reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5)), reader.IsDBNull(6) ? "" : reader.GetString(6).Trim()));
+            reader.IsDBNull(4) ? null : reader.GetDateTime(4), reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5)), reader.IsDBNull(6) ? "" : reader.GetString(6).Trim())
+        {
+            ShortPayer = reader.GetString(7),
+            Net = reader.IsDBNull(8) ? null : Convert.ToDecimal(reader.GetValue(8))
+        });
         return await AttachRelations(con, found, options.WarehouseId, token).ConfigureAwait(false);
     }
     public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null)

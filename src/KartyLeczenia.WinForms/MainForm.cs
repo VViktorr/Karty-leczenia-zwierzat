@@ -156,6 +156,7 @@ internal sealed class MainForm : Form
         Column(documents, "Data", "Date", 100, "dd.MM.yyyy");
         Column(documents, "Numer", "Number", 180);
         Column(documents, "Kontrahent", "Payer", 290);
+        documents.Columns["Payer"]!.DataPropertyName = nameof(DocumentSuggestion.ShortPayer);
         Column(documents, "Wartość brutto", "Gross", 145, "N2");
         Column(documents, "Powiązane dokumenty", "RelatedText", 300);
         documents.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0) await Run(OpenDocument); };
