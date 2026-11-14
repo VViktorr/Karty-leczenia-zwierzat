@@ -32,6 +32,66 @@ internal static class ListParameters
         var headers = new CheckBox { Text = "Nagłówki wierszy", Checked = grid.RowHeadersVisible, AutoSize = true };
         var lines = new CheckBox { Text = "Linie siatki", Checked = grid.CellBorderStyle != DataGridViewCellBorderStyle.None, AutoSize = true };
         bar.Controls.AddRange([multi, headers, lines]);
+        var styles = new Dictionary<(DataGridViewColumn Column, bool Header), ColumnTextStyle>();
+        void EditStyle(bool header)
+        {
+            if (list.SelectedItem is not DataGridViewColumn column) return;
+            var key = (column, header);
+            var inherited = header ? column.HeaderCell.InheritedStyle : column.InheritedStyle;
+            var style = styles.TryGetValue(key, out var pending) ? pending : ColumnTextStyle.Read(inherited);
+            using var editor = new Form
+            {
+                Text = $"{column.HeaderText} – {(header ? "Nagłówek" : "Dane")}",
+                StartPosition = FormStartPosition.CenterParent,
+                AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false
+            };
+            var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Padding = new Padding(10) };
+            var fontButton = new Button { AutoSize = true, Text = $"{style.Family}, {style.Size:g} pkt" };
+            fontButton.Click += (_, _) =>
+            {
+                using var initial = style.CreateFont();
+                using var picker = new FontDialog { Font = initial, FontMustExist = true };
+                if (picker.ShowDialog(editor) != DialogResult.OK) return;
+                using var chosen = picker.Font;
+                style = style with { Family = chosen.Name, Size = chosen.SizeInPoints, FontStyle = chosen.Style };
+                fontButton.Text = $"{style.Family}, {style.Size:g} pkt";
+            };
+            var colorButton = new Button { AutoSize = true, Text = "Kolor tekstu", ForeColor = Color.FromArgb(style.Argb) };
+            colorButton.Click += (_, _) =>
+            {
+                using var picker = new ColorDialog { Color = colorButton.ForeColor, FullOpen = true };
+                if (picker.ShowDialog(editor) != DialogResult.OK) return;
+                style = style with { Argb = picker.Color.ToArgb() };
+                colorButton.ForeColor = picker.Color;
+            };
+            var alignment = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+            alignment.Items.AddRange(["Do lewej", "Do środka", "Do prawej"]);
+            alignment.SelectedIndex = style.Alignment.ToString().EndsWith("Right") ? 2
+                : style.Alignment.ToString().EndsWith("Center") ? 1 : 0;
+            var accept = new Button { Text = "OK", DialogResult = DialogResult.OK };
+            var dismiss = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel };
+            panel.Controls.AddRange([fontButton, colorButton, alignment, accept, dismiss]);
+            editor.Controls.Add(panel);
+            editor.AcceptButton = accept;
+            editor.CancelButton = dismiss;
+            if (editor.ShowDialog(dialog) != DialogResult.OK) return;
+            styles[key] = style with
+            {
+                Alignment = alignment.SelectedIndex switch
+                {
+                    1 => DataGridViewContentAlignment.MiddleCenter,
+                    2 => DataGridViewContentAlignment.MiddleRight,
+                    _ => DataGridViewContentAlignment.MiddleLeft
+                }
+            };
+        }
+        var headerStyle = new Button { Text = "Wygląd nagłówka…", AutoSize = true };
+        var dataStyle = new Button { Text = "Wygląd danych…", AutoSize = true };
+        headerStyle.Click += (_, _) => EditStyle(true);
+        dataStyle.Click += (_, _) => EditStyle(false);
+        bar.Controls.AddRange([headerStyle, dataStyle]);
+        if (list.Items.Count > 0) list.SelectedIndex = 0;
         var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
         var ok = new Button { Text = "OK" };
         ok.Click += (_, _) =>
@@ -53,6 +113,8 @@ internal static class ListParameters
             column.DisplayIndex = i;
             column.Visible = list.GetItemChecked(i);
         }
+        foreach (var (key, style) in styles)
+            style.Apply(grid, key.Column, key.Header);
         grid.MultiSelect = multi.Checked;
         grid.RowHeadersVisible = headers.Checked;
         grid.CellBorderStyle = lines.Checked ? DataGridViewCellBorderStyle.Single : DataGridViewCellBorderStyle.None;
