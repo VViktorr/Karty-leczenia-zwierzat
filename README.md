@@ -1,4 +1,7 @@
-# Karty leczenia zwierząt — MAUI Windows
+# Karty leczenia zwierząt
+
+**Aktywna i domyślna gałąź projektu to [`winforms`](https://github.com/VViktorr/Karty-leczenia-zwierzat/tree/winforms). Wszystkie bieżące zmiany kierujemy na `winforms`. Gałąź `main` zawiera wcześniejszy etap projektu.**
+
 Aplikacja dla Windows 11 x64 w C# i .NET MAUI 10. Interfejs Windows korzysta z WinUI 3. Na tym etapie projekt zawiera wyłącznie platformę Windows; nie buduje Androida.
 
 ## Uruchomienie gotowej paczki
