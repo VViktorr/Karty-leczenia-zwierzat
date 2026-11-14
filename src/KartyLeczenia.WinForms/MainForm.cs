@@ -531,7 +531,7 @@ internal sealed class MainForm : Form
         };
     }
 
-    readonly PricePrintSettings pricePrintSettings = new();
+    readonly PricePrintSettings pricePrintSettings = PricePrintSettings.Load();
 
     async Task PreviewPrices(bool direct = false)
     {
