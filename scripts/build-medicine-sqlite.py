@@ -107,6 +107,7 @@ def build(workbook, repository, output):
                     pdf_path = candidates[0] if len(candidates) == 1 else None
                 db.execute("INSERT INTO variants VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                            (*values, pdf_path, withdrawal_short(values[2], values[8], values[9])))
+        db.executescript((repository / "src/KartyLeczenia.WinForms/price-withdrawal-v1.sql").read_text(encoding="utf-8"))
         assert db.execute("PRAGMA integrity_check").fetchone() == ("ok",)
         assert db.execute("PRAGMA foreign_key_check").fetchone() is None
         print(db.execute("""

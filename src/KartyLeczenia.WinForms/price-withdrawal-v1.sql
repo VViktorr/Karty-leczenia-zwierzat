@@ -1,4 +1,8 @@
-CREATE TEMP VIEW price_withdrawal_entries AS
+CREATE TABLE IF NOT EXISTS price_withdrawal_entries (
+    id INTEGER PRIMARY KEY REFERENCES variants(id),
+    compact_text TEXT NOT NULL
+);
+INSERT OR IGNORE INTO price_withdrawal_entries (id, compact_text)
 SELECT id,
        COALESCE(NULLIF(trim(withdrawal_short), ''),
            rtrim(

@@ -28,19 +28,25 @@ internal sealed class LocalCatalogue
         using var command = db.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('variants') WHERE name='withdrawal_short'";
         bool hasShortWithdrawal = Convert.ToInt64(command.ExecuteScalar()) > 0;
-        using var migrated = hasShortWithdrawal ? null : new SqliteConnection("Data Source=:memory:");
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='price_withdrawal_entries'";
+        bool hasPriceWithdrawal = Convert.ToInt64(command.ExecuteScalar()) > 0;
+        using var migrated = hasShortWithdrawal && hasPriceWithdrawal ? null : new SqliteConnection("Data Source=:memory:");
         if (migrated is not null)
         {
             migrated.Open();
             db.BackupDatabase(migrated);
-            using var migration = migrated.CreateCommand();
+            command.Connection = migrated;
+        }
+        if (!hasShortWithdrawal)
+        {
+            using var migration = command.Connection!.CreateCommand();
             using var script = typeof(LocalCatalogue).Assembly.GetManifestResourceStream("withdrawal-short-v2.sql")
                 ?? throw new InvalidOperationException("Brak skryptu skrótów karencji.");
             using var text = new StreamReader(script);
             migration.CommandText = text.ReadToEnd();
             migration.ExecuteNonQuery();
-            command.Connection = migrated;
         }
+        if (!hasPriceWithdrawal)
         using (var script = typeof(LocalCatalogue).Assembly.GetManifestResourceStream("price-withdrawal-v1.sql")
             ?? throw new InvalidOperationException("Brak definicji skrótów cennika."))
         using (var text = new StreamReader(script))
