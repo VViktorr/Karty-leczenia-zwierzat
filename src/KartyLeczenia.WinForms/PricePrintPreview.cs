@@ -48,7 +48,7 @@ internal sealed class PricePrintPreview : Form
         };
         print.Click += (_, _) =>
         {
-            try { browser.CoreWebView2.ShowPrintUI(CoreWebView2PrintDialogKind.System); }
+            try { browser.CoreWebView2.ShowPrintUI(CoreWebView2PrintDialogKind.Browser); }
             catch (Exception ex) { Report(ex); }
         };
         pdf.Click += async (_, _) =>
