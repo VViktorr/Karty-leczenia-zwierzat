@@ -46,6 +46,13 @@ internal sealed class MainForm : Form
         ConfigureExpiry();
         ConfigureCard();
         ConfigureConnection();
+        var layout = new WindowLayout(this, new()
+        {
+            ["documents"] = documents, ["prices"] = prices,
+            ["expiry"] = expiry, ["treatment"] = treatment
+        });
+        Load += (_, _) => layout.Restore();
+        FormClosed += (_, _) => layout.Save();
         tabs.SelectedIndex = connection is null ? 4 : 0;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
     }
