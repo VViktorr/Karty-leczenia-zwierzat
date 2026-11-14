@@ -215,7 +215,27 @@ internal sealed class MainForm : Form
             boldDocumentKindFont = new Font(Font, Font.Style | FontStyle.Bold);
             Disposed += (_, _) => boldDocumentKindFont.Dispose();
         }
-        button.FlatStyle = FlatStyle.Flat;
+        button.Paint += (_, e) =>
+        {
+            if (kind != value) return;
+            var bounds = button.ClientRectangle;
+            int diameter = Math.Max(2, (int)Math.Round(8 * button.DeviceDpi / 96.0));
+            diameter = Math.Min(diameter, Math.Min(bounds.Width, bounds.Height));
+            if (diameter < 2) return;
+            using var outline = new System.Drawing.Drawing2D.GraphicsPath();
+            outline.AddArc(0, 0, diameter, diameter, 180, 90);
+            outline.AddArc(bounds.Width - diameter, 0, diameter, diameter, 270, 90);
+            outline.AddArc(bounds.Width - diameter, bounds.Height - diameter, diameter, diameter, 0, 90);
+            outline.AddArc(0, bounds.Height - diameter, diameter, diameter, 90, 90);
+            outline.CloseFigure();
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.FillPath(SystemBrushes.Highlight, outline);
+            TextRenderer.DrawText(e.Graphics, button.Text, button.Font, bounds, SystemColors.HighlightText,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            if (button.Focused)
+                ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(bounds, -3, -3),
+                    SystemColors.HighlightText, SystemColors.Highlight);
+        };
         button.Font = boldDocumentKindFont;
         button.MinimumSize = button.GetPreferredSize(Size.Empty);
         button.AccessibleDescription = shortcut;
@@ -229,12 +249,7 @@ internal sealed class MainForm : Form
         {
             bool selected = value == kind;
             button.Font = selected ? boldDocumentKindFont : Font;
-            button.ForeColor = selected ? SystemColors.HighlightText : SystemColors.ControlText;
-            button.BackColor = selected ? SystemColors.Highlight : SystemColors.Control;
-            button.UseVisualStyleBackColor = false;
-            button.FlatAppearance.BorderColor = selected ? SystemColors.Highlight : SystemColors.ControlDark;
-            button.FlatAppearance.MouseOverBackColor = selected ? SystemColors.Highlight : SystemColors.ControlLight;
-            button.FlatAppearance.MouseDownBackColor = selected ? SystemColors.Highlight : SystemColors.ControlLight;
+            button.Invalidate();
         }
     }
 
