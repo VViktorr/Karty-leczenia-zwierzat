@@ -13,10 +13,11 @@ internal sealed record ColumnTextStyle(string Family, float Size, FontStyle Font
 
     static readonly ConditionalWeakTable<DataGridViewColumn, Overrides> Saved = new();
 
-    internal static ColumnTextStyle Read(DataGridViewCellStyle style)
+    internal static ColumnTextStyle Read(DataGridViewCellStyle? style)
     {
-        var font = style.Font ?? SystemFonts.DefaultFont;
-        return new(font.Name, font.SizeInPoints, font.Style, style.ForeColor.ToArgb(), style.Alignment);
+        var font = style?.Font ?? SystemFonts.DefaultFont;
+        return new(font.Name, font.SizeInPoints, font.Style, (style?.ForeColor ?? SystemColors.ControlText).ToArgb(),
+            style?.Alignment ?? DataGridViewContentAlignment.MiddleLeft);
     }
 
     internal static ColumnTextStyle? Get(DataGridViewColumn column, bool header) =>

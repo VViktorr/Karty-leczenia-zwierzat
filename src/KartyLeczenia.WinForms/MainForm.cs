@@ -602,8 +602,10 @@ internal sealed class MainForm : Form
         treatment.Rows.Clear();
         foreach (var entry in card.Rows)
         {
-            int i = treatment.Rows.Add(treatment.Columns.Cast<DataGridViewColumn>().Select(column => column is DataGridViewComboBoxColumn ? null : (object)entry.Get(column.Name)).ToArray());
-            var gridRow = treatment.Rows[i];
+            var gridRow = treatment.Rows[treatment.Rows.Add()];
+            foreach (DataGridViewCell cell in gridRow.Cells)
+                if (cell is not DataGridViewComboBoxCell && cell.OwningColumn is { } column)
+                    cell.Value = entry.Get(column.Name);
             gridRow.Tag = entry;
             var saved = rememberTreatment.Checked ? TreatmentChoices.Read(entry) : (Species: "", Route: "");
             SetTreatmentChoices(gridRow, saved.Species, saved.Route);
@@ -638,7 +640,7 @@ internal sealed class MainForm : Form
         SetTreatmentChoices(gridRow, variant.Species, variant.Route, variant, changed: true);
     }
 
-    Card Capture()
+    Card CaptureTreatmentCard()
     {
         var source = currentCard ?? throw new InvalidOperationException("Najpierw wczytaj dokument.");
         treatment.EndEdit();
@@ -649,7 +651,9 @@ internal sealed class MainForm : Form
         var rows = treatment.Rows.Cast<DataGridViewRow>().Select(item =>
         {
             var values = new Dictionary<string, string>(((TreatmentRow)item.Tag!).Values);
-            foreach (DataGridViewCell cell in item.Cells) values[cell.OwningColumn.Name] = cell.Value?.ToString() ?? "";
+            foreach (DataGridViewCell cell in item.Cells)
+                if (cell.OwningColumn is { } column)
+                    values[column.Name] = cell.Value?.ToString() ?? "";
             return values;
         }).ToList();
         return new Card(fields, rows);
@@ -657,14 +661,14 @@ internal sealed class MainForm : Form
 
     async Task SaveCard()
     {
-        var card = Capture();
+        var card = CaptureTreatmentCard();
         using var dialog = new SaveFileDialog { Filter = "Karta leczenia (*.json)|*.json", FileName = "karta-leczenia.json" };
         if (dialog.ShowDialog(this) == DialogResult.OK) await File.WriteAllTextAsync(dialog.FileName, JsonSerializer.Serialize(card));
     }
 
     async Task PreviewCard()
     {
-        var card = Capture();
+        var card = CaptureTreatmentCard();
         var file = Path.Combine(Path.GetTempPath(), $"karta-leczenia-{Guid.NewGuid():N}.html");
         await File.WriteAllTextAsync(file, CardHtmlRenderer.Render(card));
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
