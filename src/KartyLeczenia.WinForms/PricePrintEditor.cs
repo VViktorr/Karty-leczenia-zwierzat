@@ -110,8 +110,25 @@ internal sealed class PricePrintEditor : Form
         };
 
         void UpdateSample() => sample.DocumentText = Render(rows.Take(12));
-        var refresh = new Button { Text = "Odśwież próbkę", AutoSize = true };
-        refresh.Click += (_, _) => UpdateSample();
+        var refreshTimer = new System.Windows.Forms.Timer { Interval = 150 };
+        refreshTimer.Tick += (_, _) =>
+        {
+            refreshTimer.Stop();
+            UpdateSample();
+        };
+        void QueueSample()
+        {
+            refreshTimer.Stop();
+            refreshTimer.Start();
+        }
+        foreach (var box in new[] { font, orientation, format })
+            box.SelectedIndexChanged += (_, _) => QueueSample();
+        foreach (var box in new[] { size, margin, height, padding }.Concat(widths))
+            box.ValueChanged += (_, _) => QueueSample();
+        foreach (var box in new[] { number, batch, price, withdrawal, legend })
+            box.CheckedChanged += (_, _) => QueueSample();
+        FormClosed += (_, _) => refreshTimer.Stop();
+        Disposed += (_, _) => refreshTimer.Dispose();
         var print = new Button { Text = "Otwórz podgląd całego cennika", AutoSize = true, DialogResult = DialogResult.OK };
         print.Click += (_, _) =>
         {
@@ -130,7 +147,7 @@ internal sealed class PricePrintEditor : Form
             settings.Widths = widths.Select(box => box.Value).ToArray();
         };
         var close = new Button { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
-        actions.Controls.AddRange([refresh, print, close]);
+        actions.Controls.AddRange([print, close]);
         Controls.Add(sample);
         Controls.Add(options);
         Controls.Add(actions);
