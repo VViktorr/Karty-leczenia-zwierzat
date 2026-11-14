@@ -89,7 +89,7 @@ internal static class ListParameters
             editor.Controls.Add(panel);
             editor.AcceptButton = accept;
             editor.CancelButton = dismiss;
-            if (editor.ShowDialog(dialog) != DialogResult.OK) return;
+            if (DialogPlacement.Show(editor, dialog, "column-text-style") != DialogResult.OK) return;
             if (!sizeChanged && !fontChanged && !colorChanged && !alignmentChanged) return;
             var selectedAlignment = alignment.SelectedIndex switch
             {
@@ -140,7 +140,7 @@ internal static class ListParameters
             var apply = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom };
             picker.Controls.AddRange([choices, apply]);
             picker.AcceptButton = apply;
-            if (picker.ShowDialog(dialog) == DialogResult.OK && choices.SelectedItem is string value)
+            if (DialogPlacement.Show(picker, dialog, "column-value-options") == DialogResult.OK && choices.SelectedItem is string value)
                 valueOptions[column] = value;
         };
         bar.Controls.Add(valueButton);
@@ -159,7 +159,7 @@ internal static class ListParameters
         dialog.Controls.Add(bar);
         dialog.AcceptButton = ok;
         dialog.CancelButton = cancel;
-        if (dialog.ShowDialog(owner) != DialogResult.OK) return;
+        if (DialogPlacement.Show(dialog, owner, "list-parameters") != DialogResult.OK) return;
         for (int i = 0; i < list.Items.Count; i++)
         {
             var column = (DataGridViewColumn)list.Items[i]!;

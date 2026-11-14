@@ -180,7 +180,7 @@ internal sealed class PricePrintEditor : Form
             settings.Legend = legend.Checked;
             settings.Widths = widths.Select(box => box.Value).ToArray();
             using var preview = new PricePrintPreview(Render(rows), settings.Landscape, settings.Margin);
-            preview.ShowDialog(this);
+            DialogPlacement.Show(preview, this, "price-print-preview");
         };
         var close = new Button { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
         var printNow = new Button { Text = "Drukuj", AutoSize = true };

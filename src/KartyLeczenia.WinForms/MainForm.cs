@@ -515,7 +515,7 @@ internal sealed class MainForm : Form
         }
         var catalogue = await Task.Run(LocalCatalogue.Load);
         using var editor = new PricePrintEditor(pricePrintSettings, rows, prices.Columns["Gross"]!.HeaderText, catalogue);
-        editor.ShowDialog(this);
+        DialogPlacement.Show(editor, this, "price-print-settings");
     }
 
     void ConfigureExpiry()
