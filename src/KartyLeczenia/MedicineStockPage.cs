@@ -2,6 +2,7 @@ namespace KartyLeczenia.Views;
 
 public sealed class MedicineStockPage : ContentPage
 {
+    const string PrintPreferencePrefix = "PriceListPrint.";
     sealed record PriceRow(string Name, string Batch, string Price);
     readonly TableColumns priceWidths = new(GridLength.Star, 180, 140);
     readonly AppState state;
@@ -88,6 +89,7 @@ public sealed class MedicineStockPage : ContentPage
             withdrawalSource.ItemsSource = new[] { "Katalog SQLite (ChPL)", "Opis leku" }
                 .Concat(Enumerable.Range(1, 8).Select(index => $"Pole własne {index}")).ToList();
             withdrawalSource.SelectedIndex = 0;
+            RememberPrintSettings();
             var formatField = Ui.Field("Format karencji z SQLite", printWithdrawalFormat);
             void UpdateFormatVisibility() => formatField.IsVisible = printWithdrawal.IsChecked && withdrawalSource.SelectedIndex == 0;
             printWithdrawal.CheckedChanged += (_, _) => UpdateFormatVisibility();
@@ -285,7 +287,7 @@ public sealed class MedicineStockPage : ContentPage
     readonly Picker printFont = new() { ItemsSource = PrintFonts, SelectedIndex = 0, WidthRequest = 145 };
     readonly Picker printSize = new() { ItemsSource = new[] { "8", "9", "10", "11", "12" }, SelectedIndex = 1, WidthRequest = 80 };
     readonly CheckBox printNumber = new() { IsChecked = true };
-    readonly CheckBox printBatch = new();
+    readonly CheckBox printBatch = new() { IsChecked = true, IsEnabled = false };
     readonly CheckBox printPrice = new() { IsChecked = true };
     readonly CheckBox printWithdrawal = new() { IsChecked = true };
     readonly Picker printWithdrawalFormat = new() { ItemsSource = new[] { "Krótka karencja", "Pełna karencja" }, SelectedIndex = 0 };
@@ -297,6 +299,51 @@ public sealed class MedicineStockPage : ContentPage
     readonly Slider printRowPadding = new(0, 5, 0.5);
     readonly Slider[] printColumnWidths = [new(2, 20, 4), new(10, 80, 43), new(5, 45, 14),
         new(5, 45, 13), new(10, 85, 40)];
+
+    void RememberPrintSettings()
+    {
+        var preferences = Microsoft.Maui.Storage.Preferences.Default;
+        foreach (var (name, picker) in new[]
+        {
+            ("Font", printFont), ("Size", printSize), ("Orientation", printOrientation),
+            ("WithdrawalSource", withdrawalSource), ("WithdrawalFormat", printWithdrawalFormat)
+        })
+        {
+            string key = PrintPreferencePrefix + name;
+            int index = preferences.Get(key, picker.SelectedIndex);
+            if (index >= 0 && index < picker.Items.Count)
+                picker.SelectedIndex = index;
+            picker.SelectedIndexChanged += (_, _) =>
+            {
+                if (picker.SelectedIndex >= 0)
+                    preferences.Set(key, picker.SelectedIndex);
+            };
+        }
+
+        foreach (var (name, check) in new[]
+        {
+            ("Number", printNumber), ("Price", printPrice),
+            ("Withdrawal", printWithdrawal), ("Legend", printLegend)
+        })
+        {
+            string key = PrintPreferencePrefix + name;
+            check.IsChecked = preferences.Get(key, check.IsChecked);
+            check.CheckedChanged += (_, e) => preferences.Set(key, e.Value);
+        }
+
+        RememberSlider("Margin", printMargin);
+        RememberSlider("RowHeight", printRowHeight);
+        RememberSlider("RowPadding", printRowPadding);
+        for (int i = 0; i < printColumnWidths.Length; i++)
+            RememberSlider($"ColumnWidth{i}", printColumnWidths[i]);
+
+        void RememberSlider(string name, Slider slider)
+        {
+            string key = PrintPreferencePrefix + name;
+            slider.Value = Math.Clamp(preferences.Get(key, slider.Value), slider.Minimum, slider.Maximum);
+            slider.ValueChanged += (_, e) => preferences.Set(key, e.NewValue);
+        }
+    }
 
     static View PrintSliderField(string title, Slider slider)
     {
@@ -317,8 +364,8 @@ public sealed class MedicineStockPage : ContentPage
             throw new InvalidOperationException("Wybierz źródło karencji.");
         bool net = NetPrice;
         string basis = net ? "netto" : "brutto";
-        bool showNumber = printNumber.IsChecked, showBatch = printBatch.IsChecked,
-            showPrice = printPrice.IsChecked, showWithdrawal = printWithdrawal.IsChecked, showLegend = printLegend.IsChecked;
+        const bool showBatch = true;
+        bool showNumber = printNumber.IsChecked, showPrice = printPrice.IsChecked, showWithdrawal = printWithdrawal.IsChecked, showLegend = printLegend.IsChecked;
         int source = Math.Max(0, withdrawalSource.SelectedIndex);
         string font = printFont.SelectedItem as string ?? PrintFonts[0];
         string fontSize = printSize.SelectedItem as string ?? "9";
