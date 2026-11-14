@@ -109,8 +109,11 @@ public sealed class MedicineStockPage : ContentPage
             printOptions.Add(Ui.Field("Rozmiar (pt)", printSize));
             foreach (var (label, check) in new[] {
                 ("Lp.", printNumber), ("Seria", printBatch), ("Cena", printPrice),
-                ("Karencja", printWithdrawal), ("Legenda", printLegend) })
+                ("Karencja", printWithdrawal), ("Legenda", printLegend),
+                ("Drogi podania na każdej stronie", printLegendEveryPage) })
                 printOptions.Add(Ui.Field(label, check));
+            printLegendEveryPage.IsEnabled = printLegend.IsChecked;
+            printLegend.CheckedChanged += (_, e) => printLegendEveryPage.IsEnabled = e.Value;
             var layoutOptions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap };
             layoutOptions.Add(Ui.Field("Orientacja", printOrientation));
             layoutOptions.Add(PrintSliderField("Margines strony (mm)", printMargin));
@@ -133,6 +136,9 @@ public sealed class MedicineStockPage : ContentPage
             var settings = new VerticalStackLayout { Spacing = 6, Padding = 12, Children = {
                 printOptions, Ui.Note("Szerokości są proporcjami widocznych kolumn. Wysokość wiersza rośnie, gdy tekst się zawija."),
                 layoutOptions } };
+            settings.Children.Add(TypographyFields("Wszystkie nagłówki kolumn", headerTypography));
+            for (int i = 0; i < widthLabels.Length; i++)
+                settings.Children.Add(TypographyFields("Komórki · " + widthLabels[i], columnTypography[i]));
             var settingsPage = new ContentPage { Title = "Ustawienia wydruku cennika" };
             var preview = new WebView();
             settings.Children.Add(Ui.Action("Odśwież próbkę PDF", () => PreviewPrices(preview)));
@@ -293,6 +299,50 @@ public sealed class MedicineStockPage : ContentPage
     readonly Picker printWithdrawalFormat = new() { ItemsSource = new[] { "Krótka karencja", "Pełna karencja" }, SelectedIndex = 0 };
     readonly CheckBox printLegend = new() { IsChecked = true };
 
+    readonly CheckBox printLegendEveryPage = new();
+
+    sealed class PrintTypography(int defaultAlignment)
+    {
+        public Picker Font { get; } = new()
+        {
+            ItemsSource = new[] { "Z ustawień wydruku" }.Concat(PrintFonts).ToArray(), SelectedIndex = 0
+        };
+        public Picker Size { get; } = new()
+        {
+            ItemsSource = new[] { "Z ustawień wydruku", "8", "9", "10", "11", "12" }, SelectedIndex = 0
+        };
+        public Picker Alignment { get; } = new()
+        {
+            ItemsSource = new[] { "Do lewej", "Do środka", "Do prawej" }, SelectedIndex = defaultAlignment
+        };
+
+        public string Css()
+        {
+            string font = Font.SelectedIndex > 0 ? $"font-family:\"{Font.SelectedItem}\", sans-serif;" : "";
+            string size = Size.SelectedIndex > 0 ? $"font-size:{Size.SelectedItem}pt;" : "";
+            string alignment = Alignment.SelectedIndex switch { 1 => "center", 2 => "right", _ => "left" };
+            return $"{font}{size}text-align:{alignment};";
+        }
+    }
+
+    readonly PrintTypography headerTypography = new(0);
+    readonly PrintTypography[] columnTypography = [new(2), new(0), new(0), new(2), new(0)];
+
+    static View TypographyFields(string title, PrintTypography typography) => new VerticalStackLayout
+    {
+        Spacing = 4,
+        Children =
+        {
+            new Label { Text = title, FontAttributes = FontAttributes.Bold },
+            new FlexLayout
+            {
+                Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
+                Children = { Ui.Field("Czcionka", typography.Font), Ui.Field("Rozmiar (pt)", typography.Size),
+                    Ui.Field("Wyrównanie", typography.Alignment) }
+            }
+        }
+    };
+
     readonly Picker printOrientation = new() { ItemsSource = new[] { "Pozioma", "Pionowa" }, SelectedIndex = 0 };
     readonly Slider printMargin = new(4, 25, 7);
     readonly Slider printRowHeight = new(0, 18, 0);
@@ -308,6 +358,20 @@ public sealed class MedicineStockPage : ContentPage
             ("Font", printFont), ("Size", printSize), ("Orientation", printOrientation),
             ("WithdrawalSource", withdrawalSource), ("WithdrawalFormat", printWithdrawalFormat)
         })
+            RememberPicker(name, picker);
+
+        RememberTypography("Header", headerTypography);
+        for (int i = 0; i < columnTypography.Length; i++)
+            RememberTypography($"Column{i}", columnTypography[i]);
+
+        void RememberTypography(string name, PrintTypography typography)
+        {
+            RememberPicker(name + "Font", typography.Font);
+            RememberPicker(name + "Size", typography.Size);
+            RememberPicker(name + "Alignment", typography.Alignment);
+        }
+
+        void RememberPicker(string name, Picker picker)
         {
             string key = PrintPreferencePrefix + name;
             int index = preferences.Get(key, picker.SelectedIndex);
@@ -323,7 +387,7 @@ public sealed class MedicineStockPage : ContentPage
         foreach (var (name, check) in new[]
         {
             ("Number", printNumber), ("Price", printPrice),
-            ("Withdrawal", printWithdrawal), ("Legend", printLegend)
+            ("Withdrawal", printWithdrawal), ("Legend", printLegend), ("LegendEveryPage", printLegendEveryPage)
         })
         {
             string key = PrintPreferencePrefix + name;
@@ -366,6 +430,9 @@ public sealed class MedicineStockPage : ContentPage
         string basis = net ? "netto" : "brutto";
         const bool showBatch = true;
         bool showNumber = printNumber.IsChecked, showPrice = printPrice.IsChecked, showWithdrawal = printWithdrawal.IsChecked, showLegend = printLegend.IsChecked;
+        bool repeatLegend = showLegend && printLegendEveryPage.IsChecked;
+        string headerCss = headerTypography.Css();
+        var columnCss = columnTypography.Select(typography => typography.Css()).ToArray();
         int source = Math.Max(0, withdrawalSource.SelectedIndex);
         string font = printFont.SelectedItem as string ?? PrintFonts[0];
         string fontSize = printSize.SelectedItem as string ?? "9";
@@ -391,12 +458,12 @@ public sealed class MedicineStockPage : ContentPage
             if (sample is not null) rows = rows.Take(12).ToList();
             if (rows.Count == 0) throw new InvalidOperationException("Brak pozycji do wydruku.");
             string Encode(string value) => System.Net.WebUtility.HtmlEncode(value);
-            var columns = new List<(string Heading, double Weight, Func<MedicinePrice, int, string> Value, string Class)>();
-            if (showNumber) columns.Add(("Lp.", weights[0], (_, i) => (i + 1).ToString(), "price"));
-            columns.Add(("Nazwa leku", weights[1], (row, _) => row.Name, ""));
-            if (showBatch) columns.Add(("Najnowsza seria", weights[2], (row, _) => row.LatestBatch, ""));
-            if (showPrice) columns.Add(($"Cena {basis}", weights[3], (row, _) => row.Gross?.ToString("N2") ?? "—", "price"));
-            if (showWithdrawal) columns.Add(("Karencja", weights[4], (row, _) =>
+            var columns = new List<(string Heading, int Index, double Weight, Func<MedicinePrice, int, string> Value, string Class)>();
+            if (showNumber) columns.Add(("Lp.", 0, weights[0], (_, i) => (i + 1).ToString(), "price"));
+            columns.Add(("Nazwa leku", 1, weights[1], (row, _) => row.Name, ""));
+            if (showBatch) columns.Add(("Najnowsza seria", 2, weights[2], (row, _) => row.LatestBatch, ""));
+            if (showPrice) columns.Add(($"Cena {basis}", 3, weights[3], (row, _) => row.Gross?.ToString("N2") ?? "—", "price"));
+            if (showWithdrawal) columns.Add(("Karencja", 4, weights[4], (row, _) =>
             {
                 string text = catalogue is null ? row.Withdrawal : CatalogueWithdrawal(catalogue, row, shortWithdrawal);
                 return string.Join(", ", text.Split(['\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
@@ -407,8 +474,11 @@ public sealed class MedicineStockPage : ContentPage
                 $"<col style='width:{FormattableString.Invariant($"{column.Weight * 100.0 / totalWeight:0.###}")}%'>"));
             string headings = string.Concat(columns.Select(column => $"<th>{Encode(column.Heading)}</th>"));
             string body = string.Concat(rows.Select((row, index) => "<tr>" +
-                string.Concat(columns.Select(column => $"<td class='{column.Class}'>{Encode(column.Value(row, index))}</td>"))
+                string.Concat(columns.Select(column => $"<td class='{column.Class}' style='{columnCss[column.Index]}'>{Encode(column.Value(row, index))}</td>"))
                 + "</tr>"));
+            string legend = showLegend ? AdministrationRouteLegend.Html : "";
+            string legendRow = repeatLegend
+                ? $"<tr><td class=\"route-legend\" colspan=\"{columns.Count}\">{legend}</td></tr>" : "";
             string html = $$"""
                 <!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Cennik leków</title>
                 <style>
@@ -421,14 +491,15 @@ public sealed class MedicineStockPage : ContentPage
                     thead { display: table-header-group; }
                     tr { break-inside: avoid; }
                     th, td { border: 1px solid #999; padding: {{rowPadding}}mm 3px; text-align: left; vertical-align: top; }
-                    th { background: #eee; }
+                    th { background: #eee; {{headerCss}} }
+                    .route-legend { border: 0; padding: 0; height: auto; }
                     td { height: {{rowHeight}}mm; overflow-wrap: anywhere; }
                     .price { text-align: right; white-space: nowrap; }
                 </style></head><body><main class="sheet">
                 <h1>Cennik leków</h1>
                 <p>{{DateTime.Today:dd.MM.yyyy}} · {{Encode(level.ToString())}}{{(showWithdrawal ? " · Źródło karencji: " + Encode(sourceName) : "")}}</p>
-                {{(showLegend ? AdministrationRouteLegend.Html : "")}}
-                <table><colgroup>{{widths}}</colgroup><thead><tr>{{headings}}</tr></thead><tbody>{{body}}</tbody></table>
+                {{(repeatLegend ? "" : legend)}}
+                <table><colgroup>{{widths}}</colgroup><thead>{{legendRow}}<tr>{{headings}}</tr></thead><tbody>{{body}}</tbody></table>
                 </main></body></html>
                 """;
             if (sample is not null) sample.Source = new HtmlWebViewSource { Html = html };
