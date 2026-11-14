@@ -633,7 +633,7 @@ internal sealed class MainForm : Form
             if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Choose(); }
             else if (e.KeyCode == Keys.Escape) { e.SuppressKeyPress = true; popup.Close(); }
         };
-        popup.Closed += (_, _) => popup.Dispose();
+        popup.Closed += (_, _) => BeginInvoke((Action)popup.Dispose);
         int x = Math.Clamp(origin.X, screen.Left, screen.Right - list.Width - 4);
         int y = origin.Y + list.Height <= screen.Bottom ? origin.Y : Math.Max(screen.Top, origin.Y - bounds.Height - list.Height);
         popup.Show(new Point(x, y));
