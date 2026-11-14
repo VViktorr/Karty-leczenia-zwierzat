@@ -7,6 +7,7 @@ internal sealed class MainForm : Form
     readonly TabControl tabs = new() { Dock = DockStyle.Fill };
     readonly DataGridView documents = NewGrid(), prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new() { Width = 280 };
+    Font? boldDocumentKindFont;
     readonly Dictionary<DocumentSearchKinds, Button> documentKinds = new();
     readonly StatusStrip statusBar = new();
     readonly ToolStripStatusLabel status = new();
@@ -195,6 +196,13 @@ internal sealed class MainForm : Form
     Button DocumentKindButton(DocumentSearchKinds value, string label, string shortcut)
     {
         var button = Action(label, () => SelectKind(value));
+        if (boldDocumentKindFont is null)
+        {
+            boldDocumentKindFont = new Font(Font, Font.Style | FontStyle.Bold);
+            Disposed += (_, _) => boldDocumentKindFont.Dispose();
+        }
+        button.Font = boldDocumentKindFont;
+        button.MinimumSize = button.GetPreferredSize(Size.Empty);
         button.AccessibleDescription = shortcut;
         documentKinds.Add(value, button);
         return button;
@@ -205,6 +213,7 @@ internal sealed class MainForm : Form
         foreach (var (value, button) in documentKinds)
         {
             bool selected = value == kind;
+            button.Font = selected ? boldDocumentKindFont : Font;
             button.ForeColor = selected ? SystemColors.HighlightText : SystemColors.ControlText;
             button.BackColor = selected ? SystemColors.Highlight : SystemColors.Control;
             button.UseVisualStyleBackColor = !selected;
