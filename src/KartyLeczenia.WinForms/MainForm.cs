@@ -515,8 +515,7 @@ internal sealed class MainForm : Form
         }
         var catalogue = await Task.Run(LocalCatalogue.Load);
         using var editor = new PricePrintEditor(pricePrintSettings, rows, prices.Columns["Gross"]!.HeaderText, catalogue);
-        if (editor.ShowDialog(this) == DialogResult.OK)
-            await OpenPrintPreview("cennik-lekow", editor.Render(rows));
+        editor.ShowDialog(this);
     }
 
     void ConfigureExpiry()

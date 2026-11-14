@@ -163,7 +163,7 @@ internal sealed class PricePrintEditor : Form
             box.CheckedChanged += (_, _) => QueueSample();
         FormClosed += (_, _) => refreshTimer.Stop();
         Disposed += (_, _) => refreshTimer.Dispose();
-        var print = new Button { Text = "Otwórz podgląd całego cennika", AutoSize = true, DialogResult = DialogResult.OK };
+        var print = new Button { Text = "Otwórz podgląd całego cennika", AutoSize = true };
         print.Click += (_, _) =>
         {
             settings.Font = (string)font.SelectedItem!;
@@ -179,24 +179,12 @@ internal sealed class PricePrintEditor : Form
             settings.Withdrawal = withdrawal.Checked;
             settings.Legend = legend.Checked;
             settings.Widths = widths.Select(box => box.Value).ToArray();
+            using var preview = new PricePrintPreview(Render(rows), settings.Landscape, settings.Margin);
+            preview.ShowDialog(this);
         };
         var close = new Button { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
         var printNow = new Button { Text = "Drukuj", AutoSize = true };
-        printNow.Click += (_, _) =>
-        {
-            var html = Render(rows).Replace("<body>", "<body onload=\"window.print()\">", StringComparison.Ordinal);
-            var file = Path.Combine(Path.GetTempPath(), $"cennik-lekow-{Guid.NewGuid():N}.html");
-            try
-            {
-                File.WriteAllText(file, html);
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                CrashLog.Write("WinForms.PricePrint.Failed", ex);
-                MessageBox.Show(this, "Nie udało się otworzyć wydruku cennika.", Text);
-            }
-        };
+        printNow.Click += (_, _) => print.PerformClick();
         actions.Controls.AddRange([print, printNow, close]);
         Controls.Add(sample);
         Controls.Add(paper);
