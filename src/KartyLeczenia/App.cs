@@ -71,6 +71,8 @@ public sealed class AppShell : Shell
         this.SetAppThemeColor(Shell.BackgroundColorProperty, Color.FromArgb("#FFFFFF"), Color.FromArgb("#172334"));
         this.SetAppThemeColor(Shell.ForegroundColorProperty, Color.FromArgb("#0F172A"), Color.FromArgb("#F1F5F9"));
         this.SetAppThemeColor(Shell.TitleColorProperty, Color.FromArgb("#0F172A"), Color.FromArgb("#F1F5F9"));
+        this.SetAppThemeColor(Shell.TabBarTitleColorProperty, Color.FromArgb("#174EA6"), Color.FromArgb("#93C5FD"));
+        this.SetAppThemeColor(Shell.TabBarUnselectedColorProperty, Color.FromArgb("#475569"), Color.FromArgb("#CBD5E1"));
         var state = new AppState();
         var tabs = new TabBar();
         var connection = new Tab { Title = "Ustawienia", Route = "connection" };
