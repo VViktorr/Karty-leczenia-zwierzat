@@ -6,7 +6,7 @@ internal sealed class PricePrintSettings
 {
     public string Font = "Arial";
     public decimal Size = 9, Margin = 7, RowHeight = 0, Padding = 0.5m;
-    public bool Landscape = true, Number = true, Batch, Price = true, Withdrawal = true, Legend = true;
+    public bool Landscape = true, Number = true, Batch = true, Price = true, Withdrawal = true, Legend = true;
     public int WithdrawalFormat = 1;
     public bool RouteCodes = true, LegendEveryPage;
     public int[] Fonts = new int[6], Sizes = new int[6], Alignments = new int[6];
@@ -112,8 +112,7 @@ internal sealed class PricePrintEditor : Form
         var routes = Select("Oznaczenie drogi podania", ["Nazwy (domięśniowo)", "Kody (IM)"], settings.RouteCodes ? 1 : 0);
         section.SetFlowBreak(section.Controls[section.Controls.Count - 1], true);
         var number = Toggle("Lp.", settings.Number);
-        var batch = Toggle("Seria", true);
-        batch.Enabled = false;
+        var batch = Toggle("Seria", settings.Batch);
         var price = Toggle("Cena", settings.Price);
         var withdrawal = Toggle("Karencja", settings.Withdrawal);
         var legend = Toggle("Legenda", settings.Legend);
