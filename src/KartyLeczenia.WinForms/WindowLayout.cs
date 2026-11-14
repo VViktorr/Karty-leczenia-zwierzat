@@ -2,13 +2,13 @@ using System.Text.Json;
 
 namespace KartyLeczenia.Windows;
 
-internal sealed class WindowLayout(Form window, Dictionary<string, DataGridView> tables)
+internal sealed class WindowLayout(Form window, CheckBox rememberTreatment, Dictionary<string, DataGridView> tables)
 {
     static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "KartyLeczenia", "winforms-layout.json");
 
-    sealed record Layout(Rectangle Bounds, bool Maximized, Dictionary<string, TableLayout> Tables);
+    sealed record Layout(Rectangle Bounds, bool Maximized, Dictionary<string, TableLayout> Tables, bool RememberTreatment = false);
     sealed record TableLayout(int RowHeight, bool MultiSelect, bool RowHeaders, DataGridViewCellBorderStyle Borders,
         ColumnLayout[] Columns);
     sealed record ColumnLayout(string Name, int Width, int Order, bool Visible,
@@ -28,6 +28,7 @@ internal sealed class WindowLayout(Form window, Dictionary<string, DataGridView>
         }
         if (layout is null) return;
 
+        rememberTreatment.Checked = layout.RememberTreatment;
         var bounds = layout.Bounds;
         var visible = Rectangle.Intersect(bounds, Screen.FromRectangle(bounds).WorkingArea);
         if (visible.Width >= 100 && visible.Height >= 50 &&
@@ -79,7 +80,7 @@ internal sealed class WindowLayout(Form window, Dictionary<string, DataGridView>
             try
             {
                 File.WriteAllText(temporaryPath, JsonSerializer.Serialize(
-                    new Layout(bounds, window.WindowState == FormWindowState.Maximized, savedTables)));
+                    new Layout(bounds, window.WindowState == FormWindowState.Maximized, savedTables, rememberTreatment.Checked)));
                 File.Move(temporaryPath, FilePath, overwrite: true);
             }
             finally { File.Delete(temporaryPath); }

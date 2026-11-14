@@ -50,7 +50,7 @@ internal sealed class MainForm : Form
         ConfigureExpiry();
         ConfigureCard();
         ConfigureConnection();
-        var layout = new WindowLayout(this, new()
+        var layout = new WindowLayout(this, rememberTreatment, new()
         {
             ["documents"] = documents, ["prices"] = prices,
             ["expiry"] = expiry, ["treatment"] = treatment
@@ -493,13 +493,84 @@ internal sealed class MainForm : Form
         }));
     }
 
+    readonly CheckBox rememberTreatment = new() { Text = "Zapamiętuj wybory", AutoSize = true };
+    LocalCatalogue? treatmentCatalogue;
+    bool updatingTreatmentChoices;
+
+    void SetTreatmentChoices(DataGridViewRow gridRow, string species, string route,
+        LocalCatalogue.Variant? exact = null, bool changed = false)
+    {
+        if (gridRow.Tag is not TreatmentRow row || treatmentCatalogue is null) return;
+        var choices = treatmentCatalogue.ForProduct(row.Get("Symbol Subiekta"), row.Product);
+        if (choices.Count == 0) return;
+        var speciesList = choices.Select(v => v.Species).Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        species = speciesList.FirstOrDefault(item => string.Equals(item, species, StringComparison.OrdinalIgnoreCase))
+            ?? speciesList.FirstOrDefault(item => string.Equals(item, "bydło", StringComparison.OrdinalIgnoreCase))
+            ?? (speciesList.Length == 1 ? speciesList[0] : "");
+        var matching = choices.Where(v => string.Equals(v.Species, species, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var routes = matching.Select(v => v.Route).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        route = routes.FirstOrDefault(item => string.Equals(item, route, StringComparison.OrdinalIgnoreCase))
+            ?? (routes.Length == 1 ? routes[0] : "");
+        updatingTreatmentChoices = true;
+        try
+        {
+            SetCombo(TreatmentChoices.Species, speciesList, species);
+            SetCombo(TreatmentChoices.Route, routes, route);
+
+            void SetCombo(string column, string[] items, string value)
+            {
+                var cell = (DataGridViewComboBoxCell)gridRow.Cells[column];
+                cell.Value = null;
+                cell.Items.Clear();
+                cell.Items.AddRange(items);
+                cell.Value = value.Length > 0 ? value : null;
+            }
+
+            var variants = matching.Where(v => string.Equals(v.Route, route, StringComparison.OrdinalIgnoreCase)).ToArray();
+            var variant = exact ?? (variants.Length == 1 ? variants[0] : null);
+            gridRow.Cells["Dawkowanie i okres stosowania"].Value = variant?.Dose ?? "";
+            gridRow.Cells["Karencja"].Value = variant?.Withdrawal ?? "";
+            row.Set("Źródło karencji", variant?.Source ?? "", false);
+            if (changed && rememberTreatment.Checked && species.Length > 0)
+                TreatmentChoices.Save(row, species, route);
+        }
+        finally { updatingTreatmentChoices = false; }
+    }
+
     void ConfigureCard()
     {
         treatment.ReadOnly = false;
         foreach (var (title, width) in new[] { ("Produkt", 260), ("Ilość wydana", 100), ("Seria", 125),
             ("Gatunek", 115), ("Droga podania", 125), ("Dawkowanie i okres stosowania", 235), ("Karencja", 230) })
-            Column(treatment, title, title, width);
-        Page("Karta leczenia", treatment, Action("Wybierz wariant ChPL", ChooseVariant),
+        {
+            if (title is TreatmentChoices.Species or TreatmentChoices.Route)
+                treatment.Columns.Add(new DataGridViewComboBoxColumn { Name = title, HeaderText = title, Width = width });
+            else Column(treatment, title, title, width);
+        }
+        var hint = new ToolTip();
+        hint.SetToolTip(rememberTreatment, "Zapisuje gatunek i drogę podania dla leku na kolejne karty leczenia.");
+        Disposed += (_, _) => hint.Dispose();
+        treatment.CurrentCellDirtyStateChanged += (_, _) =>
+        {
+            if (treatment.IsCurrentCellDirty && treatment.CurrentCell is DataGridViewComboBoxCell)
+                treatment.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        };
+        treatment.CellValueChanged += async (_, e) =>
+        {
+            if (updatingTreatmentChoices || e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            string column = treatment.Columns[e.ColumnIndex].Name;
+            if (column is not (TreatmentChoices.Species or TreatmentChoices.Route)) return;
+            var gridRow = treatment.Rows[e.RowIndex];
+            string species = gridRow.Cells[TreatmentChoices.Species].Value?.ToString() ?? "";
+            string route = gridRow.Cells[TreatmentChoices.Route].Value?.ToString() ?? "";
+            await Run(() =>
+            {
+                SetTreatmentChoices(gridRow, species, column == TreatmentChoices.Species ? "" : route, changed: true);
+                return Task.CompletedTask;
+            });
+        };
+        Page("Karta leczenia", treatment, rememberTreatment, Action("Wybierz wariant ChPL", ChooseVariant),
             Action("Zapisz kartę JSON", SaveCard), Action("Podgląd HTML", PreviewCard));
     }
 
@@ -510,12 +581,18 @@ internal sealed class MainForm : Form
         using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var card = await service.ReadAsync(options, row.Number, 0, work.Token, row.Id);
         if (connection != options) return;
+        var catalogue = await Task.Run(LocalCatalogue.Load);
+        if (connection != options) return;
+        treatmentCatalogue = catalogue;
         currentCard = card;
         treatment.Rows.Clear();
         foreach (var entry in card.Rows)
         {
-            int i = treatment.Rows.Add(treatment.Columns.Cast<DataGridViewColumn>().Select(column => (object)entry.Get(column.Name)).ToArray());
-            treatment.Rows[i].Tag = entry;
+            int i = treatment.Rows.Add(treatment.Columns.Cast<DataGridViewColumn>().Select(column => column is DataGridViewComboBoxColumn ? null : (object)entry.Get(column.Name)).ToArray());
+            var gridRow = treatment.Rows[i];
+            gridRow.Tag = entry;
+            var saved = rememberTreatment.Checked ? TreatmentChoices.Read(entry) : (Species: "", Route: "");
+            SetTreatmentChoices(gridRow, saved.Species, saved.Route);
         }
         tabs.SelectedIndex = 3;
         status.Text = $"Pozycje karty: {card.Rows.Count}";
@@ -544,10 +621,7 @@ internal sealed class MainForm : Form
         dialog.Controls.Add(actions);
         dialog.AcceptButton = accept;
         if (dialog.ShowDialog(this) != DialogResult.OK || list.SelectedItem is not LocalCatalogue.Variant variant) return;
-        foreach (var (key, value) in new[] { ("Gatunek", variant.Species), ("Droga podania", variant.Route),
-            ("Dawkowanie i okres stosowania", variant.Dose), ("Karencja", variant.Withdrawal) })
-            gridRow.Cells[key].Value = value;
-        row.Set("Źródło karencji", variant.Source, false);
+        SetTreatmentChoices(gridRow, variant.Species, variant.Route, variant, changed: true);
     }
 
     Card Capture()
