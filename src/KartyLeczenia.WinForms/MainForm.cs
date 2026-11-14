@@ -8,7 +8,7 @@ internal sealed class MainForm : Form
     {
         Dock = DockStyle.Fill,
         DrawMode = TabDrawMode.OwnerDrawFixed,
-        Padding = new Point(30, 8)
+        Padding = new Point(30, 9)
     };
     readonly DataGridView documents = NewGrid(), prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new() { Width = 280 };
@@ -84,10 +84,10 @@ internal sealed class MainForm : Form
         bool selected = e.Index == tabs.SelectedIndex;
         var bounds = e.Bounds;
         bounds.Inflate(-1, -1);
-        if (!selected) bounds.Inflate(0, -2);
+        if (!selected) bounds.Inflate(-1, -2);
         e.Graphics.FillRectangle(SystemBrushes.Control, bounds);
 
-        using var selectedFont = selected ? new Font(tabs.Font, tabs.Font.Style | FontStyle.Bold) : null;
+        using var selectedFont = selected ? new Font(tabs.Font.FontFamily, tabs.Font.SizeInPoints + 2, tabs.Font.Style | FontStyle.Bold, GraphicsUnit.Point) : null;
         TextRenderer.DrawText(e.Graphics, tabs.TabPages[e.Index].Text, selectedFont ?? tabs.Font, bounds,
             SystemColors.ControlText,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
