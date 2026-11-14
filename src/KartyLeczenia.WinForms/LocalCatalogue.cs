@@ -30,7 +30,9 @@ internal sealed class LocalCatalogue
         bool hasShortWithdrawal = Convert.ToInt64(command.ExecuteScalar()) > 0;
         command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='price_withdrawal_entries'";
         bool hasPriceWithdrawal = Convert.ToInt64(command.ExecuteScalar()) > 0;
-        using var migrated = hasShortWithdrawal && hasPriceWithdrawal ? null : new SqliteConnection("Data Source=:memory:");
+        command.CommandText = "PRAGMA user_version";
+        bool needsWithdrawalRefresh = Convert.ToInt64(command.ExecuteScalar()) < 3 || !hasPriceWithdrawal || !hasShortWithdrawal;
+        using var migrated = !needsWithdrawalRefresh ? null : new SqliteConnection("Data Source=:memory:");
         if (migrated is not null)
         {
             migrated.Open();
@@ -46,7 +48,7 @@ internal sealed class LocalCatalogue
             migration.CommandText = text.ReadToEnd();
             migration.ExecuteNonQuery();
         }
-        if (!hasPriceWithdrawal)
+        if (needsWithdrawalRefresh)
         using (var script = typeof(LocalCatalogue).Assembly.GetManifestResourceStream("price-withdrawal-v1.sql")
             ?? throw new InvalidOperationException("Brak definicji skrótów cennika."))
         using (var text = new StreamReader(script))
