@@ -16,7 +16,7 @@ internal sealed class MainForm : Form
     (DocumentSearchKinds Kind, string Query)? displayedDocuments;
     readonly DocumentService service = new();
     readonly ConnectionSettingsStore settings = new();
-    readonly Dictionary<(DocumentSearchKinds, string), (DateTimeOffset LoadedAt, List<DocumentSuggestion> Rows, bool Truncated)> cache = new();
+    readonly Dictionary<(DocumentSearchKinds Kind, string Query), (DateTimeOffset LoadedAt, List<DocumentSuggestion> Rows, bool Truncated)> cache = new();
     ConnectionOptions? connection;
     CancellationTokenSource? searchWork;
     DocumentSearchKinds kind = DocumentSearchKinds.Invoices;
