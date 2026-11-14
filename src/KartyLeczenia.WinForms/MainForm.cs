@@ -494,7 +494,8 @@ internal sealed class MainForm : Form
             finally { loading = false; }
         }
 
-        var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices), Action("Podgląd wydruku", PreviewPrices));
+        var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices), Action("Ustawienia wydruku", () => PreviewPrices()),
+            Action("Drukuj", () => PreviewPrices(direct: true)));
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab == page && connection is not null && prices.DataSource is null)
@@ -504,7 +505,7 @@ internal sealed class MainForm : Form
 
     readonly PricePrintSettings pricePrintSettings = new();
 
-    async Task PreviewPrices()
+    async Task PreviewPrices(bool direct = false)
     {
         var rows = prices.Rows.Cast<DataGridViewRow>().Select(row => row.DataBoundItem)
             .OfType<MedicinePrice>().ToArray();
@@ -515,7 +516,12 @@ internal sealed class MainForm : Form
         }
         var catalogue = await Task.Run(LocalCatalogue.Load);
         using var editor = new PricePrintEditor(pricePrintSettings, rows, prices.Columns["Gross"]!.HeaderText, catalogue);
-        DialogPlacement.Show(editor, this, "price-print-settings");
+        if (direct)
+        {
+            using var preview = new PricePrintPreview(editor.Render(rows), pricePrintSettings.Landscape, pricePrintSettings.Margin);
+            DialogPlacement.Show(preview, this, "price-print-preview");
+        }
+        else DialogPlacement.Show(editor, this, "price-print-settings");
     }
 
     void ConfigureExpiry()

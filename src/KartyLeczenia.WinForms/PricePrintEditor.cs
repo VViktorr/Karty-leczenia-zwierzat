@@ -164,7 +164,7 @@ internal sealed class PricePrintEditor : Form
         FormClosed += (_, _) => refreshTimer.Stop();
         Disposed += (_, _) => refreshTimer.Dispose();
         var print = new Button { Text = "Otwórz podgląd całego cennika", AutoSize = true };
-        print.Click += (_, _) =>
+        void SaveSettings()
         {
             settings.Font = (string)font.SelectedItem!;
             settings.Size = size.Value;
@@ -179,6 +179,11 @@ internal sealed class PricePrintEditor : Form
             settings.Withdrawal = withdrawal.Checked;
             settings.Legend = legend.Checked;
             settings.Widths = widths.Select(box => box.Value).ToArray();
+        }
+        FormClosed += (_, _) => SaveSettings();
+        print.Click += (_, _) =>
+        {
+            SaveSettings();
             using var preview = new PricePrintPreview(Render(rows), settings.Landscape, settings.Margin);
             DialogPlacement.Show(preview, this, "price-print-preview");
         };
