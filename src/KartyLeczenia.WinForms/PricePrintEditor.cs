@@ -79,7 +79,7 @@ internal sealed class PricePrintEditor : Form
                 <style>
                 @page { size: A4 {{(orientation.SelectedIndex == 0 ? "landscape" : "portrait")}}; margin: {{margin.Value}}mm }
                 body {font: {{size.Value}}pt "{{font.SelectedItem}}", sans-serif }
-                @media screen {body {margin: {{margin.Value}}mm}}
+                @media screen {body {margin: {{margin.Value}}mm } }
                 table {width: 100%; table-layout: fixed; border-collapse: collapse}
                 thead {display: table-header-group}
                 tr {break-inside: avoid; page-break-inside: avoid}
