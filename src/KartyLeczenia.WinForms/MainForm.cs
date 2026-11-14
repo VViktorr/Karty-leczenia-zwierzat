@@ -518,6 +518,7 @@ internal sealed class MainForm : Form
     }
 
     readonly CheckBox rememberTreatment = new() { Text = "Zapamiętuj wybory", AutoSize = true };
+    readonly ComboBox routeMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 165 };
     readonly ComboBox withdrawalMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
     readonly Dictionary<DataGridViewRow, LocalCatalogue.Variant> selectedTreatmentVariants = new();
     LocalCatalogue? treatmentCatalogue;
@@ -674,7 +675,7 @@ internal sealed class MainForm : Form
             if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != TreatmentChoices.Route) return;
             if (selectedTreatmentVariants.TryGetValue(treatment.Rows[e.RowIndex], out var variant))
             {
-                e.Value = AdministrationRouteLegend.Abbreviate(variant.Route);
+                e.Value = routeMode.SelectedIndex == 0 ? variant.Route : AdministrationRouteLegend.Abbreviate(variant.Route);
                 e.FormattingApplied = true;
             }
         };
@@ -717,7 +718,10 @@ internal sealed class MainForm : Form
             foreach (var (row, variant) in selectedTreatmentVariants)
                 row.Cells["Karencja"].Value = TreatmentWithdrawal(variant);
         };
-        var page = Page("Karta leczenia", treatment, withdrawalMode,
+        routeMode.Items.AddRange(["Pełna droga podania", "Skróty dróg podania"]);
+        routeMode.SelectedIndex = 1;
+        routeMode.SelectedIndexChanged += (_, _) => treatment.InvalidateColumn(treatment.Columns[TreatmentChoices.Route]!.Index);
+        var page = Page("Karta leczenia", treatment, withdrawalMode, routeMode,
             Action("Otwórz ChPL", () =>
             {
                 if (treatment.CurrentRow is { } row && selectedTreatmentVariants.TryGetValue(row, out var variant))
