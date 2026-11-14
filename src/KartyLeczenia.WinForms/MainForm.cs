@@ -11,9 +11,12 @@ internal sealed class MainForm : Form
     Font? activeDocumentKindFont;
     readonly StatusStrip statusBar = new();
     readonly ToolStripStatusLabel status = new();
+    readonly ToolStripStatusLabel refreshDocuments = new() { IsLink = true, Visible = false };
+    CancellationTokenSource? preloadWork;
+    (DocumentSearchKinds Kind, string Query)? displayedDocuments;
     readonly DocumentService service = new();
     readonly ConnectionSettingsStore settings = new();
-    readonly Dictionary<(DocumentSearchKinds, string), (DateTimeOffset Expires, List<DocumentSuggestion> Rows)> cache = new();
+    readonly Dictionary<(DocumentSearchKinds, string), (DateTimeOffset LoadedAt, List<DocumentSuggestion> Rows, bool Truncated)> cache = new();
     ConnectionOptions? connection;
     CancellationTokenSource? searchWork;
     DocumentSearchKinds kind = DocumentSearchKinds.Invoices;
@@ -26,6 +29,15 @@ internal sealed class MainForm : Form
         MinimumSize = new Size(850, 550);
         Size = new Size(1350, 830);
         statusBar.Items.Add(status);
+        statusBar.Items.Add(new ToolStripStatusLabel { Spring = true });
+        statusBar.Items.Add(refreshDocuments);
+        refreshDocuments.Click += async (_, _) => await Run(() => Search(true));
+        tabs.SelectedIndexChanged += (_, _) => UpdateRefreshLabel();
+        FormClosed += (_, _) =>
+        {
+            preloadWork?.Cancel();
+            searchWork?.Cancel();
+        };
         Controls.Add(tabs);
         Controls.Add(statusBar);
         statusBar.BringToFront();
@@ -35,7 +47,7 @@ internal sealed class MainForm : Form
         ConfigureCard();
         ConfigureConnection();
         tabs.SelectedIndex = connection is null ? 4 : 0;
-        Shown += async (_, _) => { if (connection is not null) await Run(() => Search(false)); };
+        Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
     }
 
     static DataGridView NewGrid() => new()
@@ -133,6 +145,11 @@ internal sealed class MainForm : Form
             ListParameters.Show(this, grid);
             return true;
         }
+        if (keyData == Keys.F5 && tabs.SelectedIndex == 0)
+        {
+            _ = Run(() => Search(true));
+            return true;
+        }
         var selected = keyData switch
         {
             Keys.Alt | Keys.D1 => DocumentSearchKinds.Invoices,
@@ -158,31 +175,89 @@ internal sealed class MainForm : Form
         return Search(false);
     }
 
+    async Task LoadStartupDocuments()
+    {
+        var options = Connection();
+        await Run(() => Search(false));
+        if (IsDisposed || connection != options || searchWork is not null) return;
+
+        using var work = new CancellationTokenSource();
+        preloadWork = work;
+        try
+        {
+            foreach (var type in documentKinds.Keys)
+            {
+                work.Token.ThrowIfCancellationRequested();
+                var key = (type, "");
+                if (cache.ContainsKey(key)) continue;
+                using var request = CancellationTokenSource.CreateLinkedTokenSource(work.Token);
+                request.CancelAfter(TimeSpan.FromSeconds(25));
+                try
+                {
+                    await LoadDocumentRows(options, key, request.Token);
+                }
+                catch (OperationCanceledException) when (work.IsCancellationRequested) { throw; }
+                catch (OperationCanceledException) { }
+                catch (Microsoft.Data.SqlClient.SqlException ex)
+                {
+                    System.Diagnostics.Trace.TraceWarning("Wstępne wczytanie dokumentów ({0}): {1}", type, ex.Number);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (work.IsCancellationRequested) { }
+        finally { preloadWork = null; }
+    }
+
+    async Task LoadDocumentRows(ConnectionOptions options, (DocumentSearchKinds Kind, string Query) key, CancellationToken token)
+    {
+        var rows = await service.SearchAsync(options, key.Query, token, key.Kind, limit: 501, allowEmpty: true);
+        token.ThrowIfCancellationRequested();
+        if (cache.Count >= 32) cache.Remove(cache.MinBy(entry => entry.Value.LoadedAt).Key);
+        cache[key] = (DateTimeOffset.Now, rows.Take(500).ToList(), rows.Count > 500);
+    }
+
+    void UpdateRefreshLabel()
+    {
+        refreshDocuments.Visible = tabs.SelectedIndex == 0;
+        refreshDocuments.Text = displayedDocuments is { } key && cache.TryGetValue(key, out var entry)
+            ? $"Odśwież listę [F5] (ostatnie odświeżenie {entry.LoadedAt:HH:mm})"
+            : "Odśwież listę [F5]";
+    }
+
     async Task Search(bool refresh)
     {
         var options = Connection();
-        searchWork?.Cancel();
-        using var work = new CancellationTokenSource(TimeSpan.FromSeconds(25));
-        searchWork = work;
         var key = (kind, search.Text.Trim());
-        try
+        searchWork?.Cancel();
+        if (displayedDocuments is { } displayed && displayed.Kind != key.kind)
         {
-            if (!refresh && cache.TryGetValue(key, out var hit) && hit.Expires > DateTimeOffset.UtcNow)
-            {
-                documents.DataSource = hit.Rows;
-                status.Text = $"{key.kind} · {hit.Rows.Count} dokumentów z pamięci";
-                return;
-            }
-            status.Text = "Wczytywanie dokumentów…";
-            var rows = await service.SearchAsync(options, key.Item2, work.Token, key.kind, limit: 501, allowEmpty: true);
-            if (work.IsCancellationRequested || connection != options) return;
-            var shown = rows.Take(500).ToList();
-            if (cache.Count >= 32) cache.Clear();
-            cache[key] = (DateTimeOffset.UtcNow.AddMinutes(5), shown);
-            documents.DataSource = shown;
-            status.Text = $"{key.kind} · {shown.Count} dokumentów" + (rows.Count > shown.Count ? " · zawęź wyszukiwanie" : "");
+            documents.DataSource = null;
+            displayedDocuments = null;
+            UpdateRefreshLabel();
         }
-        finally { if (ReferenceEquals(searchWork, work)) searchWork = null; }
+
+        bool cached = !refresh && cache.TryGetValue(key, out var hit)
+            && DateTimeOffset.Now - hit.LoadedAt < TimeSpan.FromMinutes(5);
+        if (!cached)
+        {
+            preloadWork?.Cancel();
+            using var work = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+            searchWork = work;
+            try
+            {
+                status.Text = "Wczytywanie dokumentów…";
+                await LoadDocumentRows(options, key, work.Token);
+                work.Token.ThrowIfCancellationRequested();
+            }
+            finally { if (ReferenceEquals(searchWork, work)) searchWork = null; }
+        }
+
+        var result = cache[key];
+        if (!ReferenceEquals(documents.DataSource, result.Rows)) documents.DataSource = result.Rows;
+        displayedDocuments = key;
+        UpdateRefreshLabel();
+        status.Text = $"{key.kind} · {result.Rows.Count} dokumentów"
+            + (cached ? " z pamięci" : "") + (result.Truncated ? " · zawęź wyszukiwanie" : "");
     }
 
     void ConfigurePrices()
@@ -375,7 +450,10 @@ internal sealed class MainForm : Form
             if (!info.Warehouses.Any(item => item.Id == warehouse.Id)) throw new InvalidOperationException("Odśwież listę magazynów.");
             settings.Save(draft, remember.Checked);
             searchWork?.Cancel();
+            preloadWork?.Cancel();
             cache.Clear();
+            displayedDocuments = null;
+            UpdateRefreshLabel();
             documents.DataSource = prices.DataSource = expiry.DataSource = null;
             treatment.Rows.Clear();
             currentCard = null;
