@@ -28,10 +28,22 @@ internal sealed class LocalCatalogue
         using var command = db.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('variants') WHERE name='withdrawal_short'";
         bool hasShortWithdrawal = Convert.ToInt64(command.ExecuteScalar()) > 0;
-        string shortColumn = hasShortWithdrawal ? "v.withdrawal_short" : "NULL";
-        command.CommandText = $"""
+        using var migrated = hasShortWithdrawal ? null : new SqliteConnection("Data Source=:memory:");
+        if (migrated is not null)
+        {
+            migrated.Open();
+            db.BackupDatabase(migrated);
+            using var migration = migrated.CreateCommand();
+            using var script = typeof(LocalCatalogue).Assembly.GetManifestResourceStream("withdrawal-short-v2.sql")
+                ?? throw new InvalidOperationException("Brak skryptu skrótów karencji.");
+            using var text = new StreamReader(script);
+            migration.CommandText = text.ReadToEnd();
+            migration.ExecuteNonQuery();
+            command.Connection = migrated;
+        }
+        command.CommandText = """
             SELECT p.symbol,p.name,v.species,v.route,v.indication,v.dose,
-                   v.edible_tissues,v.milk,v.pdf_path,v.source,{shortColumn}
+                   v.edible_tissues,v.milk,v.pdf_path,v.source,v.withdrawal_short
             FROM products p JOIN variants v ON v.symbol=p.symbol
             WHERE COALESCE(p.decision,'') <> 'NOT_MEDICINE'
               AND COALESCE(v.scope,'') NOT LIKE '%referencyjne%'

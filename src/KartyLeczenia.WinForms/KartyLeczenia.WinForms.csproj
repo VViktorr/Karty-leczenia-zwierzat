@@ -11,6 +11,7 @@
     <ProjectReference Include="../KartyLeczenia.Core/KartyLeczenia.Core.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+    <EmbeddedResource Include="../KartyLeczenia/Resources/Raw/withdrawal-short-v2.sql" LogicalName="withdrawal-short-v2.sql" />
     <Content Include="../KartyLeczenia/Resources/Raw/medicine-catalog.sqlite" Link="medicine-catalog.sqlite" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../data/ChPL/**/*.pdf" Link="ChPL/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
