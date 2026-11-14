@@ -674,7 +674,7 @@ internal sealed class MainForm : Form
             if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != TreatmentChoices.Route) return;
             if (selectedTreatmentVariants.TryGetValue(treatment.Rows[e.RowIndex], out var variant))
             {
-                e.Value = variant.Route;
+                e.Value = AdministrationRouteLegend.Abbreviate(variant.Route);
                 e.FormattingApplied = true;
             }
         };
