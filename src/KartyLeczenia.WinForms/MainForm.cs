@@ -675,7 +675,7 @@ internal sealed class MainForm : Form
             if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != TreatmentChoices.Route) return;
             if (selectedTreatmentVariants.TryGetValue(treatment.Rows[e.RowIndex], out var variant))
             {
-                e.Value = routeMode.SelectedIndex == 0 ? variant.Route : AdministrationRouteLegend.Abbreviate(variant.Route);
+                e.Value = routeMode.SelectedIndex == 0 ? AdministrationRouteLegend.Expand(variant.Route) : AdministrationRouteLegend.Abbreviate(variant.Route);
                 e.FormattingApplied = true;
             }
         };
@@ -720,7 +720,16 @@ internal sealed class MainForm : Form
         };
         routeMode.Items.AddRange(["Pełna droga podania", "Skróty dróg podania"]);
         routeMode.SelectedIndex = 1;
-        routeMode.SelectedIndexChanged += (_, _) => treatment.InvalidateColumn(treatment.Columns[TreatmentChoices.Route]!.Index);
+        routeMode.SelectedIndexChanged += (_, _) =>
+        {
+            var column = treatment.Columns[TreatmentChoices.Route]!;
+            bool full = routeMode.SelectedIndex == 0;
+            column.DefaultCellStyle.WrapMode = full ? DataGridViewTriState.True : DataGridViewTriState.False;
+            treatment.AutoSizeRowsMode = full ? DataGridViewAutoSizeRowsMode.AllCellsExceptHeaders : DataGridViewAutoSizeRowsMode.None;
+            if (!full)
+                foreach (DataGridViewRow row in treatment.Rows) row.Height = treatment.RowTemplate.Height;
+            treatment.InvalidateColumn(column.Index);
+        };
         var page = Page("Karta leczenia", treatment, withdrawalMode, routeMode,
             Action("Otwórz ChPL", () =>
             {

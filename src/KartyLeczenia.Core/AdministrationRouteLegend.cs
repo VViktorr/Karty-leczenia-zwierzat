@@ -30,6 +30,16 @@ public static class AdministrationRouteLegend
         };
     }
 
+    public static string Expand(string route)
+    {
+        var names = Description.TrimEnd('.').Split(", ")
+            .Select(item => item.Split(" – ", 2))
+            .Where(parts => parts.Length == 2)
+            .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.OrdinalIgnoreCase);
+        return string.Join(" / ", route.Split('/', StringSplitOptions.TrimEntries)
+            .Select(part => names.GetValueOrDefault(part, part)));
+    }
+
     public const string Html = $"""
         <p style="font-size:8pt;line-height:1.2;margin:1.5mm 0;break-inside:avoid"><strong>Drogi podania</strong> · {Description}</p>
         """;
