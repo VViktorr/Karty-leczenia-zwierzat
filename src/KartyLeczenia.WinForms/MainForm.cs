@@ -71,6 +71,15 @@ internal sealed class MainForm : Form
         AllowUserToDeleteRows = false, AllowUserToOrderColumns = true, AllowUserToResizeColumns = true,
         SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, RowHeadersVisible = false,
         BackgroundColor = SystemColors.Window, GridColor = SystemColors.ControlDark,
+        EnableHeadersVisualStyles = false,
+        ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+        {
+            BackColor = SystemColors.Control,
+            ForeColor = SystemColors.ControlText,
+            SelectionBackColor = SystemColors.Control,
+            SelectionForeColor = SystemColors.ControlText,
+            Alignment = DataGridViewContentAlignment.MiddleLeft
+        },
         ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
         ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText,
         AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(244, 247, 250) }
