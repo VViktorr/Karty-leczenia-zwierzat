@@ -570,8 +570,22 @@ internal sealed class MainForm : Form
                 return Task.CompletedTask;
             });
         };
-        Page("Karta leczenia", treatment, rememberTreatment, Action("Wybierz wariant ChPL", ChooseVariant),
+        var page = Page("Karta leczenia", treatment, Action("Wybierz wariant ChPL", ChooseVariant),
             Action("Zapisz kartę JSON", SaveCard), Action("Podgląd HTML", PreviewCard));
+        var actions = page.Controls.OfType<FlowLayoutPanel>().Single();
+        var toolbar = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 1
+        };
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        page.Controls.Remove(actions);
+        actions.Dock = DockStyle.Fill;
+        actions.Margin = Padding.Empty;
+        toolbar.Controls.Add(actions, 0, 0);
+        rememberTreatment.Anchor = AnchorStyles.Right;
+        toolbar.Controls.Add(rememberTreatment, 1, 0);
+        page.Controls.Add(toolbar);
     }
 
     async Task OpenDocument()
