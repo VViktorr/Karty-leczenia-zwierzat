@@ -8,7 +8,7 @@ internal sealed class MainForm : Form
     {
         Dock = DockStyle.Fill,
         DrawMode = TabDrawMode.OwnerDrawFixed,
-        Padding = new Point(19, 8)
+        Padding = new Point(30, 8)
     };
     readonly DataGridView documents = NewGrid(), prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new() { Width = 280 };
@@ -85,17 +85,17 @@ internal sealed class MainForm : Form
         var bounds = e.Bounds;
         bounds.Inflate(-1, -1);
         if (!selected) bounds.Inflate(0, -2);
-        e.Graphics.FillRectangle(selected ? SystemBrushes.Highlight : SystemBrushes.Control, bounds);
+        e.Graphics.FillRectangle(SystemBrushes.Control, bounds);
 
         using var selectedFont = selected ? new Font(tabs.Font, tabs.Font.Style | FontStyle.Bold) : null;
         TextRenderer.DrawText(e.Graphics, tabs.TabPages[e.Index].Text, selectedFont ?? tabs.Font, bounds,
-            selected ? SystemColors.HighlightText : SystemColors.ControlText,
+            SystemColors.ControlText,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
             TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         if (selected && tabs.Focused)
         {
             bounds.Inflate(-3, -3);
-            ControlPaint.DrawFocusRectangle(e.Graphics, bounds, SystemColors.HighlightText, SystemColors.Highlight);
+            ControlPaint.DrawFocusRectangle(e.Graphics, bounds, SystemColors.ControlText, SystemColors.Control);
         }
     }
 
