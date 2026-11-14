@@ -511,19 +511,7 @@ internal sealed class MainForm : Form
             ?? speciesList.FirstOrDefault(item => string.Equals(item, "bydło", StringComparison.OrdinalIgnoreCase))
             ?? (speciesList.Length == 1 ? speciesList[0] : "");
         var matching = choices.Where(v => string.Equals(v.Species, species, StringComparison.OrdinalIgnoreCase)).ToArray();
-        var labels = new Dictionary<string, LocalCatalogue.Variant>(StringComparer.OrdinalIgnoreCase);
-        foreach (var group in matching.Distinct().GroupBy(v => v.Route, StringComparer.OrdinalIgnoreCase))
-        {
-            bool multiple = group.Skip(1).Any();
-            foreach (var option in group)
-            {
-                string label = multiple && !string.IsNullOrWhiteSpace(option.Indication)
-                    ? $"{option.Route} – {option.Indication}" : option.Route;
-                string unique = label;
-                for (int i = 2; labels.ContainsKey(unique); i++) unique = $"{label} ({i})";
-                labels.Add(unique, option);
-            }
-        }
+        var labels = TreatmentRouteOptions(matching);
         var routes = labels.Keys.ToArray();
         route = routes.FirstOrDefault(item => string.Equals(item, route, StringComparison.OrdinalIgnoreCase))
             ?? (routes.Length == 1 ? routes[0] : "");
@@ -545,6 +533,7 @@ internal sealed class MainForm : Form
             labels.TryGetValue(route, out var variant);
             if (variant is null) selectedTreatmentVariants.Remove(gridRow);
             else selectedTreatmentVariants[gridRow] = variant;
+            treatment.InvalidateCell(gridRow.Cells[TreatmentChoices.Route]);
             gridRow.Cells["Dawkowanie i okres stosowania"].Value = variant?.Dose ?? "";
             gridRow.Cells["Karencja"].Value = TreatmentWithdrawal(variant);
             row.Set("Źródło karencji", variant?.Source ?? "", false);
@@ -554,36 +543,77 @@ internal sealed class MainForm : Form
         finally { updatingTreatmentChoices = false; }
     }
 
+    static Dictionary<string, LocalCatalogue.Variant> TreatmentRouteOptions(IEnumerable<LocalCatalogue.Variant> variants)
+    {
+        var labels = new Dictionary<string, LocalCatalogue.Variant>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in variants.Distinct().GroupBy(v => v.Route, StringComparer.OrdinalIgnoreCase))
+        {
+            bool multiple = group.Skip(1).Any();
+            foreach (var option in group)
+            {
+                string label = multiple && !string.IsNullOrWhiteSpace(option.Indication)
+                    ? $"{option.Route} – {option.Indication}" : option.Route;
+                string unique = label;
+                for (int i = 2; labels.ContainsKey(unique); i++) unique = $"{label} ({i})";
+                labels.Add(unique, option);
+            }
+        }
+        return labels;
+    }
+
     Task PickTreatmentRoute(DataGridViewRow row)
     {
         var cell = (DataGridViewComboBoxCell)row.Cells[TreatmentChoices.Route];
-        if (cell.Items.Count == 0)
+        if (cell.Items.Count == 0 || row.Tag is not TreatmentRow entry || treatmentCatalogue is null)
         {
             status.Text = "Brak wariantów ChPL dla wybranego gatunku.";
             return Task.CompletedTask;
         }
-        using var dialog = new Form
+        var species = row.Cells[TreatmentChoices.Species].Value?.ToString() ?? "";
+        var variants = treatmentCatalogue.ForProduct(entry.Get("Symbol Subiekta"), entry.Product)
+            .Where(v => string.Equals(v.Species, species, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var options = TreatmentRouteOptions(variants).ToArray();
+        var list = new ListBox { HorizontalScrollbar = true, IntegralHeight = false };
+        var labels = options.Select(option => string.Join(" · ", new[]
         {
-            Text = "Wybierz wariant ChPL", StartPosition = FormStartPosition.CenterParent,
-            Size = new Size(760, 360), MinimizeBox = false, MaximizeBox = false
-        };
-        var list = new ListBox { Dock = DockStyle.Fill, HorizontalScrollbar = true };
-        list.Items.AddRange(cell.Items.Cast<object>().ToArray());
-        list.SelectedIndex = Math.Max(0, list.Items.IndexOf(cell.Value ?? ""));
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
-        var ok = new Button { Text = "Wybierz", AutoSize = true, DialogResult = DialogResult.OK };
-        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
-        actions.Controls.AddRange([ok, cancel]);
-        list.DoubleClick += (_, _) =>
+            option.Value.Route, option.Value.Species, option.Value.Indication,
+            option.Value.Dose, option.Value.Withdrawal
+        }.Where(value => !string.IsNullOrWhiteSpace(value))).ReplaceLineEndings("; ")).ToArray();
+        list.Items.AddRange(labels);
+        list.SelectedIndex = Array.FindIndex(options, option => option.Key == cell.Value as string);
+        Rectangle bounds = treatment.GetCellDisplayRectangle(cell.ColumnIndex, row.Index, true);
+        var origin = treatment.PointToScreen(new Point(bounds.Left, bounds.Bottom));
+        var screen = Screen.FromPoint(origin).WorkingArea;
+        int textWidth = labels.Select(label => TextRenderer.MeasureText(label, list.Font).Width).DefaultIfEmpty(0).Max();
+        list.Size = new Size(Math.Min(screen.Width - 12, Math.Max(bounds.Width, textWidth + 30)),
+            list.ItemHeight * Math.Clamp(labels.Length, 1, 10) + SystemInformation.HorizontalScrollBarHeight + 4);
+        var popup = new ToolStripDropDown { Padding = Padding.Empty };
+        popup.Items.Add(new ToolStripControlHost(list) { Padding = Padding.Empty, Margin = Padding.Empty });
+        void Choose()
         {
-            if (list.SelectedIndex >= 0) dialog.DialogResult = DialogResult.OK;
+            if (list.SelectedIndex < 0) return;
+            var key = options[list.SelectedIndex].Key;
+            popup.Close();
+            _ = Run(() =>
+            {
+                SetTreatmentChoices(row, species, key, changed: true);
+                return Task.CompletedTask;
+            });
+        }
+        list.MouseClick += (_, e) =>
+        {
+            if (list.IndexFromPoint(e.Location) >= 0) Choose();
         };
-        dialog.Controls.Add(list);
-        dialog.Controls.Add(actions);
-        dialog.AcceptButton = ok;
-        dialog.CancelButton = cancel;
-        if (dialog.ShowDialog(this) == DialogResult.OK && list.SelectedItem is string route)
-            SetTreatmentChoices(row, row.Cells[TreatmentChoices.Species].Value?.ToString() ?? "", route, changed: true);
+        list.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Choose(); }
+            else if (e.KeyCode == Keys.Escape) { e.SuppressKeyPress = true; popup.Close(); }
+        };
+        popup.Closed += (_, _) => popup.Dispose();
+        int x = Math.Clamp(origin.X, screen.Left, screen.Right - list.Width - 4);
+        int y = origin.Y + list.Height <= screen.Bottom ? origin.Y : Math.Max(screen.Top, origin.Y - bounds.Height - list.Height);
+        popup.Show(new Point(x, y));
+        list.Focus();
         return Task.CompletedTask;
     }
 
@@ -605,6 +635,15 @@ internal sealed class MainForm : Form
         var hint = new ToolTip();
         hint.SetToolTip(rememberTreatment, "Zapisuje gatunek i drogę podania dla leku na kolejne karty leczenia.");
         Disposed += (_, _) => hint.Dispose();
+        treatment.CellFormatting += (_, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != TreatmentChoices.Route) return;
+            if (selectedTreatmentVariants.TryGetValue(treatment.Rows[e.RowIndex], out var variant))
+            {
+                e.Value = variant.Route;
+                e.FormattingApplied = true;
+            }
+        };
         treatment.CellClick += async (_, e) =>
         {
             if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && treatment.Columns[e.ColumnIndex].Name == TreatmentChoices.Route)
