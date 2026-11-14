@@ -177,8 +177,6 @@ internal sealed class MainForm : Form
         period.Items.AddRange(["(nieokreślony)", "bieżący dzień", "bieżący tydzień", "bieżący miesiąc",
             "bieżący kwartał", "bieżący rok", "ostatnie 7 dni", "ostatnie 30 dni", "dowolny miesiąc", "dowolny okres"]);
         period.SelectedIndex = 0;
-        var periodControls = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-        periodControls.Controls.AddRange([new Label { Text = "Okres", AutoSize = true }, period, periodStart, periodEnd]);
         void UpdatePeriodControls()
         {
             periodStart.Visible = period.SelectedIndex >= 8;
@@ -194,11 +192,18 @@ internal sealed class MainForm : Form
         };
         periodStart.ValueChanged += async (_, _) => { if (connection is not null) await Run(() => Search(false)); };
         periodEnd.ValueChanged += async (_, _) => { if (connection is not null) await Run(() => Search(false)); };
-        Page("Dokumenty", documents,
+        var page = Page("Dokumenty", documents,
             DocumentKindButton(DocumentSearchKinds.Invoices, "Faktury sprzedaży", "Alt+1"),
             DocumentKindButton(DocumentSearchKinds.Receipts, "Paragony", "Alt+2"),
             DocumentKindButton(DocumentSearchKinds.WarehouseReleases, "Wydania zewnętrzne", "Alt+4"),
-            periodControls, search, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
+            new Label { Text = "Okres", AutoSize = true }, period, periodStart, periodEnd,
+            search, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
+        var toolbar = page.Controls.OfType<FlowLayoutPanel>().Single();
+        foreach (Control control in toolbar.Controls)
+        {
+            control.Anchor = AnchorStyles.None;
+            control.Margin = new Padding(3);
+        }
         UpdateDocumentKindButtons();
     }
 
@@ -210,6 +215,7 @@ internal sealed class MainForm : Form
             boldDocumentKindFont = new Font(Font, Font.Style | FontStyle.Bold);
             Disposed += (_, _) => boldDocumentKindFont.Dispose();
         }
+        button.FlatStyle = FlatStyle.Flat;
         button.Font = boldDocumentKindFont;
         button.MinimumSize = button.GetPreferredSize(Size.Empty);
         button.AccessibleDescription = shortcut;
@@ -225,7 +231,10 @@ internal sealed class MainForm : Form
             button.Font = selected ? boldDocumentKindFont : Font;
             button.ForeColor = selected ? SystemColors.HighlightText : SystemColors.ControlText;
             button.BackColor = selected ? SystemColors.Highlight : SystemColors.Control;
-            button.UseVisualStyleBackColor = !selected;
+            button.UseVisualStyleBackColor = false;
+            button.FlatAppearance.BorderColor = selected ? SystemColors.Highlight : SystemColors.ControlDark;
+            button.FlatAppearance.MouseOverBackColor = selected ? SystemColors.Highlight : SystemColors.ControlLight;
+            button.FlatAppearance.MouseDownBackColor = selected ? SystemColors.Highlight : SystemColors.ControlLight;
         }
     }
 
