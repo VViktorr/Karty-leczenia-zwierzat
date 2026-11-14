@@ -51,7 +51,11 @@ internal sealed class MainForm : Form
             ["documents"] = documents, ["prices"] = prices,
             ["expiry"] = expiry, ["treatment"] = treatment
         });
-        Load += (_, _) => layout.Restore();
+        Load += (_, _) =>
+        {
+            layout.Restore();
+            documents.Columns["DocumentType"]!.Visible = true;
+        };
         FormClosed += (_, _) => layout.Save();
         tabs.SelectedIndex = connection is null ? 4 : 0;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
@@ -120,6 +124,34 @@ internal sealed class MainForm : Form
                     if (row.Height != height) row.Height = height;
             }
             finally { applyingRowHeight = false; }
+        };
+        var stack = new Bitmap(14, 14);
+        using (var graphics = Graphics.FromImage(stack))
+        {
+            for (int offset = 4; offset >= 0; offset -= 2)
+            {
+                graphics.FillRectangle(SystemBrushes.Window, 1 + offset, 5 - offset, 7, 8);
+                graphics.DrawRectangle(SystemPens.ControlDarkDark, 1 + offset, 5 - offset, 7, 8);
+            }
+        }
+        Disposed += (_, _) => stack.Dispose();
+        var documentType = new DataGridViewImageColumn
+        {
+            Name = "DocumentType",
+            HeaderText = "R",
+            ToolTipText = "Rodzaj dokumentu – stos kartek oznacza fakturę zbiorczą",
+            Width = 30,
+            DefaultCellStyle = new DataGridViewCellStyle { NullValue = null }
+        };
+        documents.Columns.Add(documentType);
+        documents.CellFormatting += (_, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex != documentType.Index) return;
+            e.Value = kind == DocumentSearchKinds.Invoices
+                && documents.Rows[e.RowIndex].DataBoundItem is DocumentSuggestion row
+                && row.Related.Count(link => link.Number.StartsWith("WZ ", StringComparison.OrdinalIgnoreCase)) > 1
+                ? stack : null;
+            e.FormattingApplied = true;
         };
         Column(documents, "Data", "Date", 100, "dd.MM.yyyy");
         Column(documents, "Numer", "Number", 180);
@@ -192,6 +224,7 @@ internal sealed class MainForm : Form
     {
         tabs.SelectedIndex = 0;
         kind = selected;
+        documents.Columns["DocumentType"]!.Visible = kind == DocumentSearchKinds.Invoices;
         UpdateDocumentKindButtons();
         return Search(false);
     }
