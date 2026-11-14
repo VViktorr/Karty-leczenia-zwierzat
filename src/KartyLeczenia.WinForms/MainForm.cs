@@ -717,7 +717,7 @@ internal sealed class MainForm : Form
         if (documents.CurrentRow?.DataBoundItem is not DocumentSuggestion row) return;
         var options = Connection();
         using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var card = await service.ReadAsync(options, row.Number, 0, work.Token, row.Id, includeOtherItems: true);
+        var card = await service.ReadAsync(options, row.Number, 0, work.Token, row.Id);
         if (connection != options) return;
         var catalogue = await Task.Run(LocalCatalogue.Load);
         if (connection != options) return;
@@ -725,7 +725,7 @@ internal sealed class MainForm : Form
         currentCard = card;
         selectedTreatmentVariants.Clear();
         treatment.Rows.Clear();
-        foreach (var entry in card.Rows.OrderByDescending(entry => entry.Printed))
+        foreach (var entry in card.Rows)
         {
             var gridRow = treatment.Rows[treatment.Rows.Add()];
             foreach (DataGridViewCell cell in gridRow.Cells)
