@@ -13,10 +13,14 @@ internal sealed class MainForm : Form
     readonly ToolStripStatusLabel status = new();
     readonly ToolStripStatusLabel refreshDocuments = new() { IsLink = true, Visible = false };
     CancellationTokenSource? preloadWork;
-    (DocumentSearchKinds Kind, string Query)? displayedDocuments;
+    readonly ComboBox period = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 145 };
+    readonly DateTimePicker periodStart = new() { Format = DateTimePickerFormat.Short, Width = 110 };
+    readonly DateTimePicker periodEnd = new() { Format = DateTimePickerFormat.Short, Width = 110 };
+    readonly record struct DocumentListKey(DocumentSearchKinds Kind, string Query, DateTime? From, DateTime? Until);
+    DocumentListKey? displayedDocuments;
     readonly DocumentService service = new();
     readonly ConnectionSettingsStore settings = new();
-    readonly Dictionary<(DocumentSearchKinds Kind, string Query), (DateTimeOffset LoadedAt, List<DocumentSuggestion> Rows, bool Truncated)> cache = new();
+    readonly Dictionary<DocumentListKey, (DateTimeOffset LoadedAt, List<DocumentSuggestion> Rows, bool Truncated)> cache = new();
     ConnectionOptions? connection;
     CancellationTokenSource? searchWork;
     DocumentSearchKinds kind = DocumentSearchKinds.Invoices;
@@ -163,11 +167,31 @@ internal sealed class MainForm : Form
         search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await Run(() => Search(true)); } };
         activeDocumentKindFont = new Font(Font.FontFamily, Font.Size + 1, FontStyle.Bold);
         Disposed += (_, _) => activeDocumentKindFont?.Dispose();
+        period.Items.AddRange(["(nieokreślony)", "bieżący dzień", "bieżący tydzień", "bieżący miesiąc",
+            "bieżący kwartał", "bieżący rok", "ostatnie 7 dni", "ostatnie 30 dni", "dowolny miesiąc", "dowolny okres"]);
+        period.SelectedIndex = 0;
+        var periodControls = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        periodControls.Controls.AddRange([new Label { Text = "Okres", AutoSize = true }, period, periodStart, periodEnd]);
+        void UpdatePeriodControls()
+        {
+            periodStart.Visible = period.SelectedIndex >= 8;
+            periodEnd.Visible = period.SelectedIndex == 9;
+            periodStart.Format = period.SelectedIndex == 8 ? DateTimePickerFormat.Custom : DateTimePickerFormat.Short;
+            periodStart.CustomFormat = "MMMM yyyy";
+        }
+        UpdatePeriodControls();
+        period.SelectedIndexChanged += async (_, _) =>
+        {
+            UpdatePeriodControls();
+            if (connection is not null) await Run(() => Search(false));
+        };
+        periodStart.ValueChanged += async (_, _) => { if (connection is not null) await Run(() => Search(false)); };
+        periodEnd.ValueChanged += async (_, _) => { if (connection is not null) await Run(() => Search(false)); };
         Page("Dokumenty", documents,
             DocumentKindButton(DocumentSearchKinds.Invoices, "Faktury sprzedaży", "Alt+1"),
             DocumentKindButton(DocumentSearchKinds.Receipts, "Paragony", "Alt+2"),
             DocumentKindButton(DocumentSearchKinds.WarehouseReleases, "Wydania zewnętrzne", "Alt+4"),
-            search, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
+            periodControls, search, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
         UpdateDocumentKindButtons();
     }
 
@@ -230,11 +254,37 @@ internal sealed class MainForm : Form
         return Search(false);
     }
 
+    DocumentListKey DocumentKey(DocumentSearchKinds type, string query)
+    {
+        var today = DateTime.Today;
+        var week = today.AddDays(-((6 + (int)today.DayOfWeek) % 7));
+        var month = new DateTime(today.Year, today.Month, 1);
+        var quarter = new DateTime(today.Year, 1 + 3 * ((today.Month - 1) / 3), 1);
+        var year = new DateTime(today.Year, 1, 1);
+        var selectedMonth = new DateTime(periodStart.Value.Year, periodStart.Value.Month, 1);
+        (DateTime? from, DateTime? until) = period.SelectedIndex switch
+        {
+            1 => (today, today.AddDays(1)),
+            2 => (week, week.AddDays(7)),
+            3 => (month, month.AddMonths(1)),
+            4 => (quarter, quarter.AddMonths(3)),
+            5 => (year, year.AddYears(1)),
+            6 => (today.AddDays(-6), today.AddDays(1)),
+            7 => (today.AddDays(-29), today.AddDays(1)),
+            8 => (selectedMonth, selectedMonth.AddMonths(1)),
+            9 => (periodStart.Value.Date, periodEnd.Value.Date.AddDays(1)),
+            _ => ((DateTime?)null, (DateTime?)null)
+        };
+        if (from >= until) throw new InvalidOperationException("Data końcowa musi przypadać w dniu rozpoczęcia okresu lub później.");
+        return new(type, query, from, until);
+    }
+
     async Task LoadStartupDocuments()
     {
         var options = Connection();
+        int startupPeriod = period.SelectedIndex;
         await Run(() => Search(false));
-        if (IsDisposed || connection != options || searchWork is not null) return;
+        if (IsDisposed || connection != options || searchWork is not null || period.SelectedIndex != startupPeriod) return;
 
         using var work = new CancellationTokenSource();
         preloadWork = work;
@@ -243,7 +293,7 @@ internal sealed class MainForm : Form
             foreach (var type in documentKinds.Keys)
             {
                 work.Token.ThrowIfCancellationRequested();
-                var key = (type, "");
+                var key = DocumentKey(type, "");
                 if (cache.ContainsKey(key)) continue;
                 using var request = CancellationTokenSource.CreateLinkedTokenSource(work.Token);
                 request.CancelAfter(TimeSpan.FromSeconds(25));
@@ -263,9 +313,9 @@ internal sealed class MainForm : Form
         finally { preloadWork = null; }
     }
 
-    async Task LoadDocumentRows(ConnectionOptions options, (DocumentSearchKinds Kind, string Query) key, CancellationToken token)
+    async Task LoadDocumentRows(ConnectionOptions options, DocumentListKey key, CancellationToken token)
     {
-        var rows = await service.SearchAsync(options, key.Query, token, key.Kind, limit: 501, allowEmpty: true);
+        var rows = await service.SearchAsync(options, key.Query, token, key.Kind, key.From, key.Until, limit: 501, allowEmpty: true);
         token.ThrowIfCancellationRequested();
         var shown = rows.Take(500).ToList();
         if (cache.TryGetValue(key, out var previous)
@@ -273,7 +323,7 @@ internal sealed class MainForm : Form
             shown = previous.Rows;
         if (cache.Count >= 32 && !cache.ContainsKey(key))
         {
-            var oldestSearch = cache.Where(entry => entry.Key.Query.Length > 0)
+            var oldestSearch = cache
                 .MinBy(entry => entry.Value.LoadedAt);
             cache.Remove(oldestSearch.Key);
         }
@@ -291,14 +341,14 @@ internal sealed class MainForm : Form
     async Task Search(bool refresh)
     {
         var options = Connection();
-        var key = (kind, search.Text.Trim());
         searchWork?.Cancel();
+        var key = DocumentKey(kind, search.Text.Trim());
         if (cache.TryGetValue(key, out var hit))
         {
             ShowDocumentRows(key, cached: true);
             if (!refresh && DateTimeOffset.Now - hit.LoadedAt < TimeSpan.FromMinutes(5)) return;
         }
-        else if (displayedDocuments is { } displayed && displayed.Kind != key.kind)
+        else if (displayedDocuments is { } displayed && (displayed.Kind != key.Kind || displayed.From != key.From || displayed.Until != key.Until))
         {
             documents.DataSource = null;
             displayedDocuments = null;
@@ -318,7 +368,7 @@ internal sealed class MainForm : Form
         finally { if (ReferenceEquals(searchWork, work)) searchWork = null; }
     }
 
-    void ShowDocumentRows((DocumentSearchKinds Kind, string Query) key, bool cached)
+    void ShowDocumentRows(DocumentListKey key, bool cached)
     {
         var result = cache[key];
         if (!ReferenceEquals(documents.DataSource, result.Rows)) documents.DataSource = result.Rows;
