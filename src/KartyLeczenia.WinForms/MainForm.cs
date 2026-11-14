@@ -58,6 +58,7 @@ internal sealed class MainForm : Form
         Load += (_, _) =>
         {
             layout.Restore();
+            treatment.Columns["Drukuj"]!.DisplayIndex = 0;
             documents.Columns["DocumentType"]!.Visible = true;
         };
         FormClosed += (_, _) => layout.Save();
@@ -624,6 +625,10 @@ internal sealed class MainForm : Form
     void ConfigureCard()
     {
         treatment.ReadOnly = false;
+        treatment.Columns.Add(new DataGridViewCheckBoxColumn
+        {
+            Name = "Drukuj", HeaderText = "Druk", Width = 48
+        });
         foreach (var (title, width) in new[] { ("Produkt", 260), ("Ilość wydana", 100), ("Seria", 125),
             ("Gatunek", 115), ("Droga podania", 125), ("Dawkowanie i okres stosowania", 235), ("Karencja", 230) })
         {
@@ -712,7 +717,7 @@ internal sealed class MainForm : Form
         if (documents.CurrentRow?.DataBoundItem is not DocumentSuggestion row) return;
         var options = Connection();
         using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var card = await service.ReadAsync(options, row.Number, 0, work.Token, row.Id);
+        var card = await service.ReadAsync(options, row.Number, 0, work.Token, row.Id, includeOtherItems: true);
         if (connection != options) return;
         var catalogue = await Task.Run(LocalCatalogue.Load);
         if (connection != options) return;
@@ -720,12 +725,13 @@ internal sealed class MainForm : Form
         currentCard = card;
         selectedTreatmentVariants.Clear();
         treatment.Rows.Clear();
-        foreach (var entry in card.Rows)
+        foreach (var entry in card.Rows.OrderByDescending(entry => entry.Printed))
         {
             var gridRow = treatment.Rows[treatment.Rows.Add()];
             foreach (DataGridViewCell cell in gridRow.Cells)
                 if (cell is not DataGridViewComboBoxCell && cell.OwningColumn is { } column)
                     cell.Value = entry.Get(column.Name);
+            gridRow.Cells["Drukuj"].Value = entry.Printed;
             gridRow.Tag = entry;
             var saved = rememberTreatment.Checked ? TreatmentChoices.Read(entry) : (Species: "", Route: "");
             SetTreatmentChoices(gridRow, saved.Species, saved.Route);

@@ -185,7 +185,7 @@ public sealed class DocumentService
         });
         return await AttachRelations(con, found, options.WarehouseId, token).ConfigureAwait(false);
     }
-    public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null)
+    public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null, bool includeOtherItems = false)
     {
         if (string.IsNullOrWhiteSpace(documentNumber)) throw new InvalidOperationException("Wpisz pełny numer dokumentu.");
         if (withdrawalSource is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(withdrawalSource));
@@ -236,10 +236,12 @@ public sealed class DocumentService
               r.mr_Id, r.mr_Ilosc, r.mr_DoId, mag.dok_NrPelny AS NumerWz,
               COALESCE(NULLIF(LTRIM(RTRIM(zp.ob_NumerSeryjny)), ''),
                        NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), '')) AS Seria, fallback.Batch AS SuggestedSeries, fallback.Received AS SuggestedReceived,
-              zp.ob_Termin AS Waznosc, z.mr_Termin AS TerminRuchu
+              zp.ob_Termin AS Waznosc, z.mr_Termin AS TerminRuchu,
+              CAST(CASE WHEN drugGroup.grt_Id IS NULL THEN 0 ELSE 1 END AS bit) AS IsMedicine
             FROM CandidatePositions candidate
             INNER JOIN dbo.dok_Pozycja p ON p.ob_Id=candidate.ob_Id
             LEFT JOIN dbo.tw__Towar t ON t.tw_Id=p.ob_TowId
+            LEFT JOIN dbo.sl_GrupaTw drugGroup ON drugGroup.grt_Id=t.tw_IdGrupa AND drugGroup.grt_Nazwa=@drugGroup
             LEFT JOIN dbo.dok_MagRuch r ON r.mr_PozId=p.ob_Id AND r.mr_TowId=p.ob_TowId
             LEFT JOIN dbo.dok_MagRuch z ON z.mr_Id=r.mr_DoId AND z.mr_TowId=r.mr_TowId
             LEFT JOIN dbo.dok_Pozycja zp ON zp.ob_Id=z.mr_PozId
@@ -261,7 +263,7 @@ public sealed class DocumentService
             ) fallback
             WHERE (@useWz=0 OR mag.dok_NrPelny LIKE N'WZ %')
               AND (p.ob_DokMagId IS NULL OR p.ob_DokMagId = 0 OR mag.dok_MagId = @warehouseId)
-              AND t.tw_IdGrupa IN (SELECT grt_Id FROM dbo.sl_GrupaTw WHERE grt_Nazwa=@drugGroup)
+              AND (@includeOtherItems=1 OR drugGroup.grt_Id IS NOT NULL)
             ORDER BY p.ob_Id, r.mr_Id
             """, con);
         cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
@@ -269,6 +271,7 @@ public sealed class DocumentService
             || number.StartsWith("PA ", StringComparison.OrdinalIgnoreCase);
         cmd.Parameters.Add("@useWz", SqlDbType.Bit).Value = useWz;
         cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
+        cmd.Parameters.Add("@includeOtherItems", SqlDbType.Bit).Value = includeOtherItems;
         cmd.Parameters.Add("@drugGroup", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
         var deliveries = new List<DocumentDelivery>();
         await using (var reader = await cmd.ExecuteReaderAsync(token))
@@ -305,7 +308,7 @@ public sealed class DocumentService
             }
             deliveries.Add(new(new TreatmentRow(new()
             {
-                ["Drukuj"] = "True", ["Sekcja (II lub III)"] = "II", ["Produkt"] = product,
+                ["Drukuj"] = ((bool)reader["IsMedicine"]).ToString(), ["Sekcja (II lub III)"] = "II", ["Produkt"] = product,
                 ["Gatunek"] = "Bydło", ["Opis zwierząt / numer siedziby stada"] = "Bydło", ["Domyślny gatunek"] = "True",
                 ["Seria"] = series, ["Ważność"] = expiry, ["Ilość wydana"] = quantity.ToString("0.####") + " " + V("ob_Jm"),
                 ["Karencja"] = V("Karencja"), ["Rozbicie dostaw"] = note,
