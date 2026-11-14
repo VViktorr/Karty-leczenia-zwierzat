@@ -6,7 +6,9 @@ internal sealed class PricePrintSettings
 {
     internal string Font = "Arial";
     internal decimal Size = 9, Margin = 7, RowHeight = 0, Padding = 0.5m;
-    internal bool Landscape = true, Number = true, Batch, Price = true, Withdrawal = true, Short = true, Legend = true;
+    internal bool Landscape = true, Number = true, Batch, Price = true, Withdrawal = true, Legend = true;
+    internal int WithdrawalFormat = 1;
+    internal bool RouteCodes = true;
     internal decimal[] Widths = [4, 43, 14, 13, 40];
 }
 
@@ -77,7 +79,9 @@ internal sealed class PricePrintEditor : Form
         var margin = Measure("Margines (mm)", settings.Margin, 4, 25, 1);
         var height = Measure("Min. wysokość (mm)", settings.RowHeight, 0, 18, 1);
         var padding = Measure("Odstęp pionowy (mm)", settings.Padding, 0, 5, 1);
-        var format = Select("Format karencji", ["Skrót karencji", "Pełna karencja"], settings.Short ? 0 : 1);
+        var format = Select("Treść karencji", ["Pełny zapis", "Zwięźle według wariantów", "Zwięźle według gatunków"], settings.WithdrawalFormat);
+        format.Width = 210;
+        var routes = Select("Oznaczenie drogi podania", ["Nazwy (domięśniowo)", "Kody (IM)"], settings.RouteCodes ? 1 : 0);
         Section("Widoczne kolumny i legenda");
         var number = Toggle("Lp.", settings.Number);
         var batch = Toggle("Seria", settings.Batch);
@@ -123,8 +127,7 @@ internal sealed class PricePrintEditor : Form
             foreach (var row in data)
             {
                 string[] values = [(++index).ToString(), row.Name, row.LatestBatch, row.Gross?.ToString("N2") ?? "",
-                    withdrawal.Checked && format.SelectedIndex == 0
-                        ? catalogue.ShortSummary(row.Symbol, row.Name) : row.Withdrawal];
+                    withdrawal.Checked ? catalogue.PriceWithdrawal(row.Symbol, row.Name, format.SelectedIndex, routes.SelectedIndex == 1) : ""];
                 html.Append("<tr>");
                 foreach (int i in columns)
                     html.Append("<td>").Append(WebUtility.HtmlEncode(values[i]).ReplaceLineEndings("<br>")).Append("</td>");
@@ -155,7 +158,7 @@ internal sealed class PricePrintEditor : Form
             refreshTimer.Stop();
             refreshTimer.Start();
         }
-        foreach (var box in new[] { font, orientation, format })
+        foreach (var box in new[] { font, orientation, format, routes })
             box.SelectedIndexChanged += (_, _) => QueueSample();
         foreach (var box in new[] { size, margin, height, padding }.Concat(widths))
             box.ValueChanged += (_, _) => QueueSample();
@@ -172,7 +175,8 @@ internal sealed class PricePrintEditor : Form
             settings.Margin = margin.Value;
             settings.RowHeight = height.Value;
             settings.Padding = padding.Value;
-            settings.Short = format.SelectedIndex == 0;
+            settings.WithdrawalFormat = format.SelectedIndex;
+            settings.RouteCodes = routes.SelectedIndex == 1;
             settings.Number = number.Checked;
             settings.Batch = batch.Checked;
             settings.Price = price.Checked;

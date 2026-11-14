@@ -90,11 +90,28 @@ internal sealed class LocalCatalogue
         .Where(v => v.Withdrawal.Length > 0)
         .Select(v => $"{v.Species} {v.Route} · {v.Withdrawal}").Distinct());
 
-    internal string ShortSummary(string symbol, string name) => string.Join(" | ", ForProduct(symbol, name)
-        .Where(v => v.Withdrawal.Length > 0)
-        .Select(v => $"{v.Species} {v.Route} · {(string.IsNullOrWhiteSpace(v.ShortWithdrawal)
-            ? v.Withdrawal.Replace("Tkanki: ", "tk. ").Replace("Mleko: ", "ml. ")
-            : v.ShortWithdrawal)}").Distinct());
+    internal string PriceWithdrawal(string symbol, string name, int format, bool routeCodes)
+    {
+        string Route(string route) => routeCodes ? AdministrationRouteLegend.Abbreviate(route) : AdministrationRouteLegend.Expand(route);
+        var variants = ForProduct(symbol, name).Where(v => !string.IsNullOrWhiteSpace(v.Withdrawal));
+        if (format == 0)
+            return string.Join(" | ", variants.Select(v => $"{v.Species} {Route(v.Route)} · {v.Withdrawal}").Distinct());
+
+        var entries = variants.Select(v => (v.Species, Route: Route(v.Route), Text: CompactWithdrawal(v))).Distinct();
+        return format == 2
+            ? string.Join("; ", entries.GroupBy(v => v.Species).Select(group =>
+                $"{group.Key} — {string.Join(" / ", group.Select(v => $"{v.Route}: {v.Text}"))}"))
+            : string.Join("; ", entries.Select(v => $"{v.Species} {v.Route}: {v.Text}"));
+    }
+
+    static string CompactWithdrawal(Variant variant)
+    {
+        if (!string.IsNullOrWhiteSpace(variant.ShortWithdrawal)) return variant.ShortWithdrawal;
+        return variant.Withdrawal
+            .Replace("Tkanki: ", "tk. ", StringComparison.OrdinalIgnoreCase)
+            .Replace("Mleko: ", "ml. ", StringComparison.OrdinalIgnoreCase)
+            .ReplaceLineEndings(" ");
+    }
 
     internal static void OpenPdf(string path)
     {
