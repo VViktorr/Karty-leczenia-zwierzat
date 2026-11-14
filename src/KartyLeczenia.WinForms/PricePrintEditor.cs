@@ -4,12 +4,45 @@ namespace KartyLeczenia.Windows;
 
 internal sealed class PricePrintSettings
 {
-    internal string Font = "Arial";
-    internal decimal Size = 9, Margin = 7, RowHeight = 0, Padding = 0.5m;
-    internal bool Landscape = true, Number = true, Batch, Price = true, Withdrawal = true, Legend = true;
-    internal int WithdrawalFormat = 1;
-    internal bool RouteCodes = true;
-    internal decimal[] Widths = [4, 43, 14, 13, 40];
+    public string Font = "Arial";
+    public decimal Size = 9, Margin = 7, RowHeight = 0, Padding = 0.5m;
+    public bool Landscape = true, Number = true, Batch, Price = true, Withdrawal = true, Legend = true;
+    public int WithdrawalFormat = 1;
+    public bool RouteCodes = true, LegendEveryPage;
+    public int[] Fonts = new int[6], Sizes = new int[6], Alignments = new int[6];
+
+    static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "KartyLeczenia", "price-print-winforms.json");
+    static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new() { IncludeFields = true };
+
+    internal static PricePrintSettings Load()
+    {
+        try
+        {
+            if (File.Exists(FilePath))
+                return System.Text.Json.JsonSerializer.Deserialize<PricePrintSettings>(File.ReadAllText(FilePath), JsonOptions)
+                    ?? new();
+        }
+        catch (Exception ex) { CrashLog.Write("WinForms.PricePrint.Load", ex); }
+        return new();
+    }
+
+    internal void Save()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            string temporary = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllText(temporary, System.Text.Json.JsonSerializer.Serialize(this, JsonOptions));
+                File.Move(temporary, FilePath, overwrite: true);
+            }
+            finally { File.Delete(temporary); }
+        }
+        catch (Exception ex) { CrashLog.Write("WinForms.PricePrint.Save", ex); }
+    }
+    public decimal[] Widths = [4, 43, 14, 13, 40];
 }
 
 internal sealed class PricePrintEditor : Form
@@ -53,13 +86,13 @@ internal sealed class PricePrintEditor : Form
         {
             var box = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
             box.Items.AddRange(items);
-            box.SelectedIndex = index;
+            box.SelectedIndex = Math.Clamp(index, 0, items.Length - 1);
             Field(label, box);
             return box;
         }
         NumericUpDown Measure(string label, decimal value, decimal min, decimal max, int decimals = 0)
         {
-            var box = new NumericUpDown { Minimum = min, Maximum = max, Value = value, DecimalPlaces = decimals,
+            var box = new NumericUpDown { Minimum = min, Maximum = max, Value = Math.Clamp(value, min, max), DecimalPlaces = decimals,
                 Increment = decimals == 0 ? 1 : 0.5m, Width = 80 };
             Field(label, box);
             return box;
@@ -84,13 +117,36 @@ internal sealed class PricePrintEditor : Form
         var routes = Select("Oznaczenie drogi podania", ["Nazwy (domięśniowo)", "Kody (IM)"], settings.RouteCodes ? 1 : 0);
         Section("Widoczne kolumny i legenda");
         var number = Toggle("Lp.", settings.Number);
-        var batch = Toggle("Seria", settings.Batch);
+        var batch = Toggle("Seria", true);
+        batch.Enabled = false;
         var price = Toggle("Cena", settings.Price);
         var withdrawal = Toggle("Karencja", settings.Withdrawal);
         var legend = Toggle("Legenda", settings.Legend);
+        var repeatLegend = Toggle("Drogi podania na każdej stronie", settings.LegendEveryPage);
+        repeatLegend.Enabled = legend.Checked;
+        legend.CheckedChanged += (_, _) => repeatLegend.Enabled = legend.Checked;
         string[] headings = ["Lp.", "Nazwa leku", "Najnowsza seria", priceHeading, "Karencja"];
         Section("Proporcje kolumn");
         var widths = headings.Select((heading, index) => Measure("Proporcja: " + heading, settings.Widths[index], 1, 100)).ToArray();
+
+        var typography = new (ComboBox Font, ComboBox Size, ComboBox Alignment)[6];
+        for (int i = 0; i < typography.Length; i++)
+        {
+            Section(i == 0 ? "Wszystkie nagłówki kolumn" : "Komórki · " + headings[i - 1]);
+            typography[i] = (
+                Select("Czcionka", ["Domyślna", .. fonts], settings.Fonts.ElementAtOrDefault(i)),
+                Select("Rozmiar (pt)", ["Domyślny", "8", "9", "10", "11", "12"], settings.Sizes.ElementAtOrDefault(i)),
+                Select("Wyrównanie", ["Do lewej", "Do środka", "Do prawej"], settings.Alignments.ElementAtOrDefault(i)));
+        }
+
+        string TypographyCss(int index)
+        {
+            var (family, points, align) = typography[index];
+            string fontCss = family.SelectedIndex > 0 ? $"font-family:\"{family.SelectedItem}\",sans-serif;" : "";
+            string sizeCss = points.SelectedIndex > 0 ? $"font-size:{points.SelectedItem}pt;" : "";
+            string alignment = align.SelectedIndex switch { 1 => "center", 2 => "right", _ => "left" };
+            return $"{fontCss}{sizeCss}text-align:{alignment};";
+        }
 
         render = data =>
         {
@@ -113,14 +169,19 @@ internal sealed class PricePrintEditor : Form
                 tr {break-inside: avoid; page-break-inside: avoid}
                 td, th {border: 1px solid #999; padding: {{padding.Value}}mm 3px; text-align: left; vertical-align: top; word-wrap: break-word}
                 td {height: {{height.Value}}mm}
-                th {background: #eee}
+                th {background: #eee; {{TypographyCss(0)}}}
+                .route-legend {border: 0; padding: 0; height: auto}
                 </style></head><body><h2>Cennik leków</h2><p>{{DateTime.Today:dd.MM.yyyy}}</p>
                 """));
-            if (legend.Checked) html.Append(AdministrationRouteLegend.Html);
+            if (legend.Checked && !repeatLegend.Checked) html.Append(AdministrationRouteLegend.Html);
             html.Append("<table><colgroup>");
             foreach (int i in columns)
                 html.Append(FormattableString.Invariant($"<col style='width:{100 * widths[i].Value / totalWidth:0.###}%'>"));
-            html.Append("</colgroup><thead><tr>");
+            html.Append("</colgroup><thead>");
+            if (legend.Checked && repeatLegend.Checked)
+                html.Append($"<tr><td class='route-legend' colspan='{columns.Length}'>")
+                    .Append(AdministrationRouteLegend.Html).Append("</td></tr>");
+            html.Append("<tr>");
             foreach (int i in columns) html.Append("<th>").Append(WebUtility.HtmlEncode(headings[i])).Append("</th>");
             html.Append("</tr></thead><tbody>");
             int index = 0;
@@ -130,7 +191,7 @@ internal sealed class PricePrintEditor : Form
                     withdrawal.Checked ? catalogue.PriceWithdrawal(row.Symbol, row.Name, format.SelectedIndex, routes.SelectedIndex == 1) : ""];
                 html.Append("<tr>");
                 foreach (int i in columns)
-                    html.Append("<td>").Append(WebUtility.HtmlEncode(values[i]).ReplaceLineEndings("<br>")).Append("</td>");
+                    html.Append($"<td style='{TypographyCss(i + 1)}'>").Append(WebUtility.HtmlEncode(values[i]).ReplaceLineEndings("<br>")).Append("</td>");
                 html.Append("</tr>");
             }
             return html.Append("</tbody></table></body></html>").ToString();
@@ -151,6 +212,7 @@ internal sealed class PricePrintEditor : Form
         refreshTimer.Tick += (_, _) =>
         {
             refreshTimer.Stop();
+            SaveSettings();
             UpdateSample();
         };
         void QueueSample()
@@ -158,11 +220,12 @@ internal sealed class PricePrintEditor : Form
             refreshTimer.Stop();
             refreshTimer.Start();
         }
-        foreach (var box in new[] { font, orientation, format, routes })
+        foreach (var box in new[] { font, orientation, format, routes }
+            .Concat(typography.SelectMany(style => new[] { style.Font, style.Size, style.Alignment })))
             box.SelectedIndexChanged += (_, _) => QueueSample();
         foreach (var box in new[] { size, margin, height, padding }.Concat(widths))
             box.ValueChanged += (_, _) => QueueSample();
-        foreach (var box in new[] { number, batch, price, withdrawal, legend })
+        foreach (var box in new[] { number, batch, price, withdrawal, legend, repeatLegend })
             box.CheckedChanged += (_, _) => QueueSample();
         FormClosed += (_, _) => refreshTimer.Stop();
         Disposed += (_, _) => refreshTimer.Dispose();
@@ -183,6 +246,11 @@ internal sealed class PricePrintEditor : Form
             settings.Withdrawal = withdrawal.Checked;
             settings.Legend = legend.Checked;
             settings.Widths = widths.Select(box => box.Value).ToArray();
+            settings.LegendEveryPage = repeatLegend.Checked;
+            settings.Fonts = typography.Select(style => style.Font.SelectedIndex).ToArray();
+            settings.Sizes = typography.Select(style => style.Size.SelectedIndex).ToArray();
+            settings.Alignments = typography.Select(style => style.Alignment.SelectedIndex).ToArray();
+            settings.Save();
         }
         FormClosed += (_, _) => SaveSettings();
         print.Click += (_, _) =>
