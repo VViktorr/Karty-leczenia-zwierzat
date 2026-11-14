@@ -554,6 +554,39 @@ internal sealed class MainForm : Form
         finally { updatingTreatmentChoices = false; }
     }
 
+    Task PickTreatmentRoute(DataGridViewRow row)
+    {
+        var cell = (DataGridViewComboBoxCell)row.Cells[TreatmentChoices.Route];
+        if (cell.Items.Count == 0)
+        {
+            status.Text = "Brak wariantów ChPL dla wybranego gatunku.";
+            return Task.CompletedTask;
+        }
+        using var dialog = new Form
+        {
+            Text = "Wybierz wariant ChPL", StartPosition = FormStartPosition.CenterParent,
+            Size = new Size(760, 360), MinimizeBox = false, MaximizeBox = false
+        };
+        var list = new ListBox { Dock = DockStyle.Fill, HorizontalScrollbar = true };
+        list.Items.AddRange(cell.Items.Cast<object>().ToArray());
+        list.SelectedIndex = Math.Max(0, list.Items.IndexOf(cell.Value ?? ""));
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
+        var ok = new Button { Text = "Wybierz", AutoSize = true, DialogResult = DialogResult.OK };
+        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+        actions.Controls.AddRange([ok, cancel]);
+        list.DoubleClick += (_, _) =>
+        {
+            if (list.SelectedIndex >= 0) dialog.DialogResult = DialogResult.OK;
+        };
+        dialog.Controls.Add(list);
+        dialog.Controls.Add(actions);
+        dialog.AcceptButton = ok;
+        dialog.CancelButton = cancel;
+        if (dialog.ShowDialog(this) == DialogResult.OK && list.SelectedItem is string route)
+            SetTreatmentChoices(row, row.Cells[TreatmentChoices.Species].Value?.ToString() ?? "", route, changed: true);
+        return Task.CompletedTask;
+    }
+
     string TreatmentWithdrawal(LocalCatalogue.Variant? variant) =>
         variant is null ? "" : withdrawalMode.SelectedIndex == 1 && !string.IsNullOrWhiteSpace(variant.ShortWithdrawal)
             ? variant.ShortWithdrawal : variant.Withdrawal;
@@ -565,12 +598,25 @@ internal sealed class MainForm : Form
             ("Gatunek", 115), ("Droga podania", 125), ("Dawkowanie i okres stosowania", 235), ("Karencja", 230) })
         {
             if (title is TreatmentChoices.Species or TreatmentChoices.Route)
-                treatment.Columns.Add(new DataGridViewComboBoxColumn { Name = title, HeaderText = title, Width = width });
+                treatment.Columns.Add(new DataGridViewComboBoxColumn { Name = title, HeaderText = title, Width = width,
+                    ReadOnly = title == TreatmentChoices.Route });
             else Column(treatment, title, title, width);
         }
         var hint = new ToolTip();
         hint.SetToolTip(rememberTreatment, "Zapisuje gatunek i drogę podania dla leku na kolejne karty leczenia.");
         Disposed += (_, _) => hint.Dispose();
+        treatment.CellClick += async (_, e) =>
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && treatment.Columns[e.ColumnIndex].Name == TreatmentChoices.Route)
+                await Run(() => PickTreatmentRoute(treatment.Rows[e.RowIndex]));
+        };
+        treatment.KeyDown += async (_, e) =>
+        {
+            if (e.KeyCode is not (Keys.Enter or Keys.F4) || treatment.CurrentCell?.OwningColumn?.Name != TreatmentChoices.Route
+                || treatment.CurrentRow is not { } row) return;
+            e.SuppressKeyPress = true;
+            await Run(() => PickTreatmentRoute(row));
+        };
         treatment.CurrentCellDirtyStateChanged += (_, _) =>
         {
             if (treatment.IsCurrentCellDirty && treatment.CurrentCell is DataGridViewComboBoxCell)
