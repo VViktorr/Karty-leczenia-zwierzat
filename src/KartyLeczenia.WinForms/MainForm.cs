@@ -492,12 +492,48 @@ internal sealed class MainForm : Form
             finally { loading = false; }
         }
 
-        var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices));
+        var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices), Action("Podgląd wydruku", PreviewPrices));
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab == page && connection is not null && prices.DataSource is null)
                 await Run(LoadPrices);
         };
+    }
+
+    async Task PreviewPrices()
+    {
+        if (prices.Rows.Count == 0)
+        {
+            status.Text = "Wczytaj cennik przed otwarciem podglądu wydruku.";
+            return;
+        }
+
+        var columns = prices.Columns.Cast<DataGridViewColumn>().Where(column => column.Visible)
+            .OrderBy(column => column.DisplayIndex).ToArray();
+        static string Encode(string? text) => System.Net.WebUtility.HtmlEncode(text ?? "");
+        var html = new System.Text.StringBuilder("""
+            <!doctype html><html lang="pl"><meta charset="utf-8"><title>Cennik leków</title>
+            <style>
+            @page { size: A4 landscape; margin: 12mm }
+            body { font: 11pt Arial, sans-serif }
+            table { width: 100%; border-collapse: collapse }
+            th, td { border: 1px solid #aaa; padding: 4px; text-align: left }
+            th { background: #eee }
+            tr { break-inside: avoid }
+            </style><body><h1>Cennik leków</h1><table><thead><tr>
+            """);
+        foreach (var column in columns)
+            html.Append("<th>").Append(Encode(column.HeaderText)).Append("</th>");
+        html.Append("</tr></thead><tbody>");
+        foreach (DataGridViewRow row in prices.Rows)
+        {
+            html.Append("<tr>");
+            foreach (var column in columns)
+                html.Append("<td>").Append(Encode(row.Cells[column.Index].FormattedValue?.ToString())).Append("</td>");
+            html.Append("</tr>");
+        }
+        html.Append("</tbody></table></body></html>");
+        await OpenPrintPreview("cennik-lekow", html.ToString());
     }
 
     void ConfigureExpiry()
@@ -758,7 +794,7 @@ internal sealed class MainForm : Form
                     LocalCatalogue.OpenPdf(variant.Pdf);
                 return Task.CompletedTask;
             }),
-            Action("Zapisz kartę JSON", SaveCard), Action("Podgląd HTML", PreviewCard));
+            Action("Zapisz kartę JSON", SaveCard), Action("Podgląd wydruku", PreviewCard));
         var actions = page.Controls.OfType<FlowLayoutPanel>().Single();
         var toolbar = new TableLayoutPanel
         {
@@ -852,8 +888,13 @@ internal sealed class MainForm : Form
     async Task PreviewCard()
     {
         var card = CaptureTreatmentCard(forPrint: true);
-        var file = Path.Combine(Path.GetTempPath(), $"karta-leczenia-{Guid.NewGuid():N}.html");
-        await File.WriteAllTextAsync(file, CardHtmlRenderer.Render(card));
+        await OpenPrintPreview("karta-leczenia", CardHtmlRenderer.Render(card));
+    }
+
+    static async Task OpenPrintPreview(string name, string html)
+    {
+        var file = Path.Combine(Path.GetTempPath(), $"{name}-{Guid.NewGuid():N}.html");
+        await File.WriteAllTextAsync(file, html);
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
     }
 
