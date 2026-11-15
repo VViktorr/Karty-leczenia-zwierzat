@@ -19,7 +19,7 @@ jobs:
       - name: "Pobierz tylko zweryfikowane oryginalne PDF urzedowego RPL"
         shell: bash
         run: |
-          python - <<'PY'
+          cat > /tmp/partia26.py <<'PY'
           from collections import defaultdict, Counter
           from pathlib import Path
           from urllib.request import Request, urlopen
@@ -186,6 +186,8 @@ jobs:
           print("PARTIA26_RESULT",json.dumps(report,ensure_ascii=False))
           db.close()
           PY
+          python -m py_compile /tmp/partia26.py
+          python /tmp/partia26.py
       - name: "Commit tylko poprawnych PDF i zmian powiazan w SQLite"
         shell: bash
         run: |
