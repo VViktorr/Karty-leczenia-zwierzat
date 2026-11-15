@@ -1,0 +1,60 @@
+name: Jednorazowe porzadkowanie danych Subiekta w SQLite
+on:
+  push:
+    branches: [winforms]
+    paths:
+      - '.github/workflows/cleanup-sqlite-subiekt-cache.yml'
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    if: contains(github.event.head_commit.message, 'cleanup obsolete Subiekt data in medicine SQLite')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Zachowaj powiazania, usun przestarzale stany i jednostki
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3, hashlib
+          from pathlib import Path
+          dbpath=Path("src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite")
+          db=sqlite3.connect(dbpath)
+          db.execute("PRAGMA foreign_keys=ON")
+          oldcols=[r[1] for r in db.execute("PRAGMA table_info(products)")]
+          expected={"symbol","name","description","stock","unit","withdrawal_from_subiekt","rpl_id","upd_id","status","decision"}
+          assert expected <= set(oldcols),f"Nieoczekiwany schemat; przerwano: {oldcols}"
+          before={}
+          for name in ("products","variants","price_withdrawal_entries","documents","upd_search"):
+              before[name]=db.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0]
+          # Preserving symbols and reference names enables matching a current Subiekt row
+          # to the stored RPL variants; commercial prices/quantities/units come from live SQL.
+          for col in ("stock","unit","withdrawal_from_subiekt"):
+              db.execute(f"ALTER TABLE products DROP COLUMN {col}")
+          db.commit()
+          aftercols=[r[1] for r in db.execute("PRAGMA table_info(products)")]
+          assert not ({"stock","unit","withdrawal_from_subiekt"} & set(aftercols))
+          assert {"symbol","name","description","rpl_id","upd_id","status","decision"} <= set(aftercols)
+          assert all(db.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0]==n for name,n in before.items())
+          assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+          assert db.execute("PRAGMA foreign_key_check").fetchall()==[]
+          assert db.execute("SELECT COUNT(*) FROM variants WHERE pdf_path IS NOT NULL AND pdf_path NOT IN (SELECT path FROM documents)").fetchone()[0]==0
+          rows=db.execute("SELECT id,species,rpl_id,pdf_path FROM variants WHERE symbol='000000000000002061'").fetchall()
+          assert len(rows)==3 and all(r[2]=="35888" and "RPL_35888_" in (r[3] or "") for r in rows),rows
+          print("Przed i po: liczby wierszy:",before)
+          print("Pozostale kolumny products:",aftercols)
+          print("Warianty EPRECIS:",rows)
+          print("Kontrola integralnosci OK")
+          db.close()
+          PY
+      - name: Zapisz tylko SQLite (bez budowania aplikacji)
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet && exit 0
+          git commit -m 'refactor: usun przestarzale stany i jednostki Subiekta z SQLite [skip ci]'
+          git push origin HEAD:winforms
