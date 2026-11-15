@@ -1,0 +1,63 @@
+name: Etap 8 - ukryj niezgodne drogi podania
+on:
+  push:
+    branches: [winforms]
+    paths: [.github/workflows/medicine-unsafe-route-cleanup.yml]
+permissions:
+  contents: write
+jobs:
+  correct:
+    if: contains(github.event.head_commit.message, 'archive unsupported medicine routes')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Zachowaj historie, ukryj niepotwierdzone warianty w kartach i cenniku
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3
+          p='src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite'
+          db=sqlite3.connect(p)
+          db.execute('PRAGMA foreign_keys=ON')
+          targets={
+              1637:('18715','SC','ChPL nie określa'),1581:('18715','SC','ChPL nie określa'),1588:('18715','SC','ChPL nie określa'),
+              2337:('18715','SC','review'),2338:('18715','SC','review'),2339:('18715','SC','review'),
+              1390:('18561','IM','review'),1393:('18561','SC','ChPL nie określa'),2340:('18561','SC','review'),
+              510:('32411','SC','Do weryfikacji'),
+              406:('100297400','Dożwaczowo','Pozwolenie zawieszone')
+          }
+          rows={}
+          for id,(rpl,route,phrase) in targets.items():
+              row=db.execute('SELECT id,symbol,rpl_id,route,indication,dose,scope FROM variants WHERE id=?',(id,)).fetchone()
+              assert row is not None and row[2]==rpl and row[3]==route and phrase.casefold() in (row[4] or '').casefold(),(id,row)
+              assert not row[6] or 'Archiwalne' in row[6],(id,row)
+              assert 'ChPL' in (row[5] or ''),(id,row)
+              rows[id]=row
+          # For all non-suspended products, preserve at least one approved active variant.
+          for rpl in ('18715','18561','32411'):
+              good=db.execute("""SELECT COUNT(*) FROM variants
+                      WHERE rpl_id=? AND id NOT IN (1637,1581,1588,2337,2338,2339,1390,1393,2340,510)
+                      AND COALESCE(scope,'') NOT LIKE '%Archiwalne%'""",(rpl,)).fetchone()[0]
+              assert good>0,(rpl,good)
+          with db:
+              for id,row in rows.items():
+                  reason=('Archiwalne — pozwolenie zawieszone, nie oferować do podania'
+                      if id==406 else 'Archiwalne — droga podania niepotwierdzona lub niezgodna z ChPL')
+                  db.execute('UPDATE variants SET scope=? WHERE id=?',(reason,id))
+          assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          assert db.execute('PRAGMA foreign_key_check').fetchall()==[]
+          assert db.execute("SELECT COUNT(*) FROM variants WHERE id IN ("+','.join(map(str,targets))+") AND scope LIKE '%Archiwalne%'").fetchone()[0]==len(targets)
+          print('ARCHIVED_UNSUPPORTED_VARIANTS',sorted(targets))
+          print('SQLITE_OK')
+          PY
+      - name: Zapisz osobny commit
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: ukryj 11 niedopuszczonych lub zawieszonych wariantow [skip ci]'
+          git push origin HEAD:winforms
