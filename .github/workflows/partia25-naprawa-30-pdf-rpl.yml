@@ -152,7 +152,7 @@ jobs:
                       # original bytes must not be guessed; fail job and leave workspace uncommitted.
                   raise
               result["status"]="updated"
-              result["after_missing"]=sum(1 for v in active if not str(v["pdf_path"] or "").strip() or not valid(root/str(v["pdf_path"]))) - result["variants_selected"]
+              result["after_missing"]=sum(1 for v in db.execute("SELECT pdf_path FROM variants WHERE scope IS NULL OR lower(scope) NOT LIKE '%archiwal%'") if not str(v["pdf_path"] or "").strip() or not valid(root/str(v["pdf_path"])))
               assert 0<=result["after_missing"]<=result["before_missing"]-result["variants_selected"],"Niezgodna liczba pozostalych brakow"
               result["sqlite_sha_after"]=hashlib.sha256(database.read_bytes()).hexdigest()
               print("PARTIA25_RESULT",json.dumps(result,ensure_ascii=False))
