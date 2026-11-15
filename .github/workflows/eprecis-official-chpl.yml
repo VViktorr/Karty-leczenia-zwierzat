@@ -25,7 +25,8 @@ jobs:
           with urlopen(req,timeout=60) as response:
               content=response.read()
               print("Content-Type:",response.headers.get("Content-Type"),"size:",len(content))
-          if not content.startswith(b"%PDF-") or len(content)<10000:
+          print("Pierwsze bajty:",repr(content[:80]),"Znacznik PDF:",content.find(b"%PDF-"))
+          if content.find(b"%PDF-") not in range(0,1024) or len(content)<10000:
               raise RuntimeError("RPL nie zwrocil oryginalnego PDF. Nie zmieniono bazy.")
           path=Path("data/ChPL/RPL/RPL_35888_Eprecis_20_mg_ml_RPL_ChPL.pdf")
           path.parent.mkdir(parents=True,exist_ok=True)
