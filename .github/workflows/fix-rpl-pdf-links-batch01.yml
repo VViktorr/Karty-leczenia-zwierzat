@@ -1,5 +1,6 @@
 name: Uzupelnij brakujace powiazania RPL PDF - partia 01
 on:
+  workflow_dispatch:
   push:
     branches: [winforms]
     paths:
