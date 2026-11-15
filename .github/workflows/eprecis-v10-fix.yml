@@ -1,0 +1,93 @@
+name: Jednorazowa korekta EPRECIS w katalogu v10
+on:
+  push:
+    branches: [winforms]
+    paths:
+      - '.github/workflows/eprecis-v10-fix.yml'
+permissions:
+  contents: write
+jobs:
+  fix-eprecis:
+    if: github.event.head_commit.message == 'fix: correct EPRECIS 100 ML in current v10 spreadsheet'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check openpyxl==3.1.5
+      - name: Popraw jedynie EPRECIS 100 ML
+        shell: bash
+        run: |
+          python - <<'PY'
+          from openpyxl import load_workbook
+          from datetime import date
+          from pathlib import Path
+          p = Path("data/Katalog_lekow_v10_scalony_ChPL.xlsx")
+          assert p.exists(), "Brak wskazanego pliku"
+          wb = load_workbook(p)
+          product_symbol = "000000000000002061"
+          rpl = "35888"
+          url = "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/35888/characteristic"
+          mapping = {
+              "Bydło": ("63 dni", "0 godzin", ""),
+              "Kozy": ("42 dni", "0 godzin", "U kóz nie przekraczać 0,6 ml w jedno miejsce podania."),
+              "Owce": ("42 dni", "0 godzin", ""),
+          }
+          k = wb["Kartoteki"]
+          kcols = {str(c.value).strip(): c.column for c in k[1] if c.value is not None}
+          affected = []
+          for row in range(2,k.max_row+1):
+              if str(k.cell(row,kcols["Symbol Subiekta"]).value or "").strip() == product_symbol:
+                  affected.append(row)
+                  k.cell(row,kcols["ID RPL"]).value = rpl
+                  if "ID UPD" in kcols:
+                      k.cell(row,kcols["ID UPD"]).value = None # niedopasowany UPD nie może pozostać po preparacie pour-on
+                  k.cell(row,kcols["Status"]).value = "Opracowano — Eprecis 20 mg/ml, roztwór do wstrzykiwań; RPL 35888, 3 warianty"
+          assert len(affected)==1, f"Nieoczekiwana liczba kartotek EPRECIS 100 ML: {affected}"
+          ws = wb["Warianty"]
+          cols = {str(c.value).strip(): c.column for c in ws[1] if c.value is not None}
+          seen = {}
+          for row in range(2,ws.max_row+1):
+              if str(ws.cell(row,cols["Symbol Subiekta"]).value or "").strip()!=product_symbol:
+                  continue
+              species = str(ws.cell(row,cols["Gatunek"]).value or "").strip()
+              assert species in mapping, f"Nieznany gatunek w EPRECIS: {species}"
+              assert species not in seen, f"Zduplikowany gatunek: {species}"
+              seen[species]=row
+              tissues,milk,extra = mapping[species]
+              indication = "Leczenie inwazji pasożytów wewnętrznych i zewnętrznych wrażliwych na eprynomektynę, według wykazu gatunkowego ChPL."
+              route = "Podskórnie (s.c.)"
+              dose = "Jednorazowo 0,2 mg eprynomektyny/kg m.c. = 0,1 ml/10 kg masy ciała."
+              restriction = "Przy fiolce 100 ml nie przekraczać 30 wkłuć; w razie potrzeby użyć igły do odciągania. " + extra
+              entry = {
+                  "Lek":"Eprecis 20 mg/ml, roztwór do wstrzykiwań",
+                  "ID RPL":rpl,
+                  "ID UPD":None,
+                  "Wskazanie":indication,
+                  "Droga":route,
+                  "Dawkowanie":dose,
+                  "Tkanki jadalne":tissues,
+                  "Mleko":milk,
+                  "Ograniczenia podania":restriction.strip(),
+                  "Źródło urzędowe":url,
+                  "Data weryfikacji":"2026-11-15",
+                  "Zapis na kartę":f"{species} · {indication} · {route} · {dose} · Tkanki jadalne: {tissues} · Mleko: {milk} · {restriction.strip()}",
+              }
+              for field,value in entry.items():
+                  ws.cell(row,cols[field]).value = value
+          assert set(seen)==set(mapping), f"Niepełna lista wariantów: {seen}"
+          wb.save(p)
+          print("Poprawiono kartotekę",affected,"oraz warianty",seen)
+          PY
+      - name: Commit poprawionego pliku bez uruchamiania budowania
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/Katalog_lekow_v10_scalony_ChPL.xlsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: EPRECIS 100 ML 20 mg/ml i 3 warianty w v10 [skip ci]'
+          git push origin HEAD:winforms
