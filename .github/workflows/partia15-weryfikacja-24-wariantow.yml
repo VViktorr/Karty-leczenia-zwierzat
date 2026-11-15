@@ -51,8 +51,8 @@ jobs:
                 '## Warianty SQLite','']
             for x in found:
               lines+= [f"### ID {x['id']}: {x['name']} | {x['species']}",
-                 f"Symbol: {x['symbol']}; RPL: {x['rpl_id']}; droga: {x['route']}",
-                 f"Wskazanie: {x['indication']}",f"Dawka: {x['dose']}",f"Karencja: {x['withdrawal']}",
+                 f"Symbol: {x.get('symbol', '')}; RPL: {x['rpl_id']}; droga: {x['route']}",
+                 f"Wskazanie: {x['indication']}",f"Dawka: {x['dose']}",f"Karencja: {x.get('withdrawal', '')}",
                  f"PDF: {x['pdf_path']}",'']
             lines+=['## Pełny tekst urzędowej ChPL','',txt]
             (dst/f'RPL_{rpl}_weryfikacja.txt').write_text('\n'.join(lines),encoding='utf8')
