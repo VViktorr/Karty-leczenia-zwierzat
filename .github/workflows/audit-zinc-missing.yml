@@ -36,4 +36,5 @@ jobs:
               GROUP BY p.symbol ORDER BY n DESC LIMIT 5""",(key+'%',))]
             print("SIBLINGS",json.dumps({'symbol':r['symbol'],'candidate':alt},ensure_ascii=False))
           print("REPORT_END")
+          print("Audit ready")
           PY
