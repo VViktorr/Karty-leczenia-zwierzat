@@ -1,0 +1,31 @@
+name: Partia 09 - Biocan Porcilis Rispoval
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-three-vaccines-batch09
+  cancel-in-progress: false
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: Warunkowe korekty 9 wariantow trzech szczepionek
+        run: python scripts/fix-three-vaccines-batch09.py
+      - name: Zapisz SQLite i raport bez kompilacji
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite data/audyt_3_szczepionek_partia_09_ChPL.md
+          if git diff --cached --quiet; then
+            echo 'Brak zmian'
+            exit 0
+          fi
+          git commit -m 'fix: three vaccine schedules nine variants batch09 [skip ci]'
+          git pull --rebase origin winforms
+          git push origin HEAD:winforms
