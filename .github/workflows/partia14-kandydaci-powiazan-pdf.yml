@@ -1,0 +1,63 @@
+name: "Partia 14 - 10 lekow z brakujacym powiazaniem PDF"
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: false
+      - name: "Sprawdz 10 grup lekow i oryginalne PDF bez zmian"
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib, hashlib, re, json
+          root=pathlib.Path.cwd()
+          p=root/'src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite'
+          sha=hashlib.sha256(p.read_bytes()).hexdigest()
+          db=sqlite3.connect(f'file:{p}?mode=ro',uri=True)
+          db.row_factory=sqlite3.Row
+          assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          assert db.execute('PRAGMA foreign_key_check').fetchall()==[]
+          assert db.execute('SELECT count(*) FROM variants').fetchone()[0]==2944
+          rows=[dict(row) for row in db.execute('SELECT id,name,rpl_id,species,route,pdf_path,scope FROM variants ORDER BY id')]
+          active=[r for r in rows if 'archiwal' not in str(r['scope'] or '').casefold()]
+          assert len(active)==2902
+          pdf_root=root/'data/ChPL/RPL'
+          groups={}
+          for r in active:
+              rpl=str(r['rpl_id'] or '').strip()
+              if not re.fullmatch(r'\\d{4,12}',rpl): continue
+              path=str(r['pdf_path'] or '').strip()
+              file=root/path if path else None
+              if file and file.is_file() and file.read_bytes()[:5]==b'%PDF-':continue
+              matches=[x for x in pdf_root.glob(f'RPL_{rpl}_*.pdf') if x.read_bytes()[:5]==b'%PDF-']
+              if len(matches)!=1:continue
+              g=groups.setdefault(rpl,{'rpl':rpl,'name':r['name'],'path':str(matches[0].relative_to(root)),'variants':[]})
+              g['variants'].append({'id':r['id'],'species':r['species'],'route':r['route'],'old_pdf_path':r['pdf_path']})
+          # Prioritize known historically missing links, then fill with largest groups.
+          priority=['22647','17205','100225078','16704']
+          selected=sorted(groups.values(),key=lambda g:(0 if g['rpl'] in priority else 1,priority.index(g['rpl']) if g['rpl'] in priority else -len(g['variants']),g['rpl']))[:10]
+          lines=['# Partia 14 — 10 grup do naprawy powiązania ChPL PDF','','Bez zmian SQLite. Kwalifikowane są jedynie aktywne warianty z jednoznacznym numerem RPL i dokładnie jednym istniejącym PDF o poprawnym nagłówku.','','| RPL | Produkt | Liczba wariantów | Docelowy PDF |','|---|---|---:|---|']
+          for g in selected:
+              lines.append(f"| {g['rpl']} | {g['name']} | {len(g['variants'])} | {g['path']} |")
+              for x in g['variants']:
+                  lines.append(f"  - ID {x['id']}: {x['species']}, {x['route']}, poprzednia ścieżka: {x['old_pdf_path']!r}")
+          lines+=['',f'Grup możliwych do jednoznacznego dopasowania: {len(groups)}',f'Grup wybranych: {len(selected)}',f'Wariantów do zmiany w wybranych grupach: {sum(len(g["variants"]) for g in selected)}',f'SHA256 SQLite: {sha}','','Następny krok: po analizie raportu przygotować osobny ręczny workflow zmieniający tylko pdf_path i documents dla wskazanych identyfikatorów.']
+          out=root/'partia14_raport'
+          out.mkdir(exist_ok=True)
+          (out/'raport.md').write_text('\n'.join(lines)+'\n',encoding='utf8')
+          (out/'kandydaci.json').write_text(json.dumps({'sqlite_sha256':sha,'selected':selected},ensure_ascii=False,indent=2),encoding='utf8')
+          print('\n'.join(lines))
+          assert hashlib.sha256(p.read_bytes()).hexdigest()==sha
+          db.close()
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: partia14-kandydaci-pdf
+          path: partia14_raport/
+          retention-days: 7
