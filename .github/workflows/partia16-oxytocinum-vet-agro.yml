@@ -31,7 +31,7 @@ jobs:
           assert not db.execute("PRAGMA foreign_key_check").fetchall()
           assert db.execute("SELECT COUNT(*) FROM variants").fetchone()[0]==2944
           cols={r[1] for r in db.execute("PRAGMA table_info(variants)")}
-          required={"id","name","rpl_id","species","route","dose","card_text","withdrawal","pdf_path","scope"}
+          required={"id","name","rpl_id","species","route","dose","card_text","edible_tissues","milk","pdf_path","scope"}
           assert required<=cols,required-cols
           ids=list(range(2198,2216))
           rows=[dict(r) for r in db.execute("SELECT * FROM variants WHERE id BETWEEN 2198 AND 2215 ORDER BY id")]
@@ -42,7 +42,7 @@ jobs:
           assert all(not x["pdf_path"] for x in rows),"Istniejące PDF nie mogą zostać nadpisane bez analizy"
           for x in rows:
               assert re.search(r"(20\s*[–-]\s*40|5\s*[–-]\s*10)",str(x["dose"])),"Nieoczekiwana dotychczasowa dawka ID "+str(x["id"])
-          print("DANE_WEJSCIOWE",json.dumps([{"id":x["id"],"name":x["name"],"route":x["route"],"dose":x["dose"],"withdrawal":x["withdrawal"],"card_text":str(x["card_text"] or "")[:200]} for x in rows],ensure_ascii=False))
+          print("DANE_WEJSCIOWE",json.dumps([{"id":x["id"],"name":x["name"],"route":x["route"],"dose":x["dose"],"edible_tissues":x["edible_tissues"],"milk":x["milk"],"card_text":str(x["card_text"] or "")[:200]} for x in rows],ensure_ascii=False))
           # All variants concern cattle. Vet-Agro ChPL: IM/SC 10-60 IU (1-6 ml), IV reduce by 50%.
           def revised_dose(route):
               r=str(route).casefold()
@@ -72,9 +72,10 @@ jobs:
               # Ensure the new information is always explicit on the card.
               if newdose not in newcard:
                   newcard=(newcard.rstrip()+"\nDawkowanie wg ChPL Oxytocinum Vet-Agro: "+newdose).strip()
-              newwithdrawal="Bydło — tkanki jadalne: 0 dni; mleko: 0 godzin."
+              new_tissues="0 dni"
+    new_milk="0 godzin"
               changes={"name":"Oxytocinum 10 j.m./ml Vet-Agro","rpl_id":"20383","dose":newdose,
-                       "card_text":newcard,"withdrawal":newwithdrawal,"pdf_path":pdfpath}
+                       "card_text":newcard,"edible_tissues":new_tissues,"milk":new_milk,"pdf_path":pdfpath}
               if "withdrawal_short" in cols: changes["withdrawal_short"]="Tkanki: 0 dni; mleko: 0 godz."
               out.append((x,changes))
           # Update only 18 rows, preserving identifiers, symbols, species, indications and other clinical fields.
