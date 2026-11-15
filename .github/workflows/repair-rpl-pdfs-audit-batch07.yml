@@ -1,0 +1,33 @@
+name: Partia 07 - naprawa PDF RPL i audyt 10 lekow
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-rpl-pdf-batch07
+  cancel-in-progress: false
+jobs:
+  fix-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: Zainstaluj biblioteke kontroli oryginalnych PDF
+        run: python -m pip install 'pypdf>=5,<7'
+      - name: Napraw PDF i zbadaj dziesiec grup bez zmiany danych klinicznych
+        run: python scripts/repair-rpl-pdfs-audit-batch07.py
+      - name: Zapisz zweryfikowane oryginalne PDF i raport
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/ChPL/RPL/RPL_32411_Pneumospectin_RPL_ChPL.pdf data/ChPL/RPL/RPL_22647_Rispoval_IBR-Marker_Vivum_liofilizat_i_rozpus_RPL_ChPL.pdf data/audyt_RPL_PDF_szczepionki_partia_07.md
+          if git diff --cached --quiet; then
+            echo 'Brak zmian do zapisu'
+            exit 0
+          fi
+          git commit -m 'fix: official RPL PDF repair and ten-family audit batch07 [skip ci]'
+          git pull --rebase origin winforms
+          git push origin HEAD:winforms
