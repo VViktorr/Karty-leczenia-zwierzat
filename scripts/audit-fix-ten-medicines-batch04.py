@@ -38,10 +38,18 @@ DOSE_COLS=("id","symbol","name","rpl_id","upd_id","species","indication","route"
 def compact(value):
     return str(value).replace("\r"," ").replace("\n"," ") if value is not None else "(brak)"
 def main():
+    pdf_warnings=[]
     for family,(_,filename) in FAMILIES.items():
         pdf=ROOT/"data/ChPL/RPL"/filename
-        with pdf.open("rb") as f:
-            assert f.read(5)==b"%PDF-",(family,pdf)
+        is_pdf=False
+        if pdf.is_file():
+            with pdf.open("rb") as source:
+                is_pdf=source.read(5)==b"%PDF-"
+        if not is_pdf:
+            if family in ("Enrocin 5%","Enroxil 5%"):
+                raise RuntimeError(f"Cannot modify doses without valid local ChPL PDF: {pdf}")
+            pdf_warnings.append(f"{family}: dokument {pdf.relative_to(ROOT)} nie ma prawidłowego nagłówka PDF lub nie istnieje; wymaga zastąpienia urzędowym PDF")
+            print("WARNING_PDF",family,pdf)
     with sqlite3.connect(DB) as conn:
         conn.row_factory=sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
@@ -54,6 +62,7 @@ def main():
         report=["# Partia 04 — 10 leków, audyt i korekta dawki dwóch grup","",
                 "Źródła: aktualna SQLite na winforms; dla Enrocin RPL 18715 i Enroxil RPL 18561 aktualne urzędowe ChPL (pkt 3.9).",
                 "Pozostałych ośmiu leków nie zmieniano bez porównania wskazań z ChPL.",
+                *([f"UWAGA: {w}" for w in pdf_warnings] or ["Weryfikacja nagłówków PDF: bez ostrzeżeń."]),
                 ""]
         updates=[]
         all_target_ids=set()
