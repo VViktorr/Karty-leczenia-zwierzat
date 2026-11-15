@@ -72,7 +72,7 @@ jobs:
               # Ensure the new information is always explicit on the card.
               if newdose not in newcard:
                   newcard=(newcard.rstrip()+"\nDawkowanie wg ChPL Oxytocinum Vet-Agro: "+newdose).strip()
-              new_tissues="0 dni"
+          new_tissues="0 dni"
     new_milk="0 godzin"
               changes={"name":"Oxytocinum 10 j.m./ml Vet-Agro","rpl_id":"20383","dose":newdose,
                        "card_text":newcard,"edible_tissues":new_tissues,"milk":new_milk,"pdf_path":pdfpath}
