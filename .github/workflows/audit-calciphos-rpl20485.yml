@@ -1,0 +1,31 @@
+name: Audyt Calciphos RPL 20485 bez kompilacji
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-rpl20485-audit
+  cancel-in-progress: false
+jobs:
+  inspect-current-sqlite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: Odczytaj 12 rzeczywistych wariantow i zweryfikuj SQLite
+        run: python scripts/audit-dose-rpl20485.py
+      - name: Zapisz raport do repozytorium
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/audyt_Calciphos_warianty_SQLite.md
+          if git diff --cached --quiet; then
+            echo 'Raport bez zmian'
+            exit 0
+          fi
+          git commit -m 'audit: Calciphos actual indication and dosage variants [skip ci]'
+          git pull --rebase origin winforms
+          git push origin HEAD:winforms
