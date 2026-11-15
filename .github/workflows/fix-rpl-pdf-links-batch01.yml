@@ -1,0 +1,69 @@
+name: Uzupelnij brakujace powiazania RPL PDF - partia 01
+on:
+  push:
+    branches: [winforms]
+    paths:
+      - '.github/workflows/fix-rpl-pdf-links-batch01.yml'
+permissions:
+  contents: write
+jobs:
+  attach-rpl-documents:
+    if: contains(github.event.head_commit.message, 'run RPL PDF links batch 01')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Laczenie wariantow z dokumentami tego samego ID RPL
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          import hashlib
+          database=Path("src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite")
+          mapping={
+            "18835":"data/ChPL/RPL/RPL_18835_Cyclix_250_mcg_ml_roztwór_do_wstrzykiwań_dla__RPL_ChPL.pdf",
+            "20507":"data/ChPL/RPL/RPL_20507_Bioketan_RPL_ChPL.pdf",
+            "18833":"data/ChPL/RPL/RPL_18833_Buserelin_aniMedica_0_004_mg_ml_roztwór_do_ws_RPL_ChPL.pdf",
+            "17131":"data/ChPL/RPL/RPL_17131_Carofertin_RPL_ChPL.pdf",
+          }
+          for rpl,path in mapping.items():
+              pdf=Path(path)
+              assert pdf.is_file() and pdf.read_bytes()[:5]==b"%PDF-", (rpl,path)
+          conn=sqlite3.connect(database)
+          conn.execute("PRAGMA foreign_keys=ON")
+          assert conn.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+          assert conn.execute("PRAGMA foreign_key_check").fetchall()==[]
+          before_variants=conn.execute("SELECT count(*) FROM variants").fetchone()[0]
+          before_products=conn.execute("SELECT count(*) FROM products").fetchone()[0]
+          before_data=conn.execute("SELECT id,symbol,name,rpl_id,upd_id,species,indication,route,dose,edible_tissues,milk,restrictions,source,verified_at,card_text,scope,withdrawal_short FROM variants ORDER BY id").fetchall()
+          conn.execute("BEGIN IMMEDIATE")
+          counts={}
+          for rpl,path in mapping.items():
+              conn.execute("INSERT OR IGNORE INTO documents(path) VALUES(?)",(path,))
+              rows=conn.execute("SELECT id FROM variants WHERE rpl_id=? AND pdf_path IS NULL ORDER BY id",(rpl,)).fetchall()
+              assert rows, f"Brak wariantow do polaczenia dla {rpl}: przerwano"
+              assert len(rows)<=30,(rpl,len(rows))
+              conn.executemany("UPDATE variants SET pdf_path=? WHERE id=? AND rpl_id=? AND pdf_path IS NULL",[(path,row[0],rpl) for row in rows])
+              assert conn.execute("SELECT count(*) FROM variants WHERE rpl_id=? AND pdf_path=?",(rpl,path)).fetchone()[0]>=len(rows)
+              counts[rpl]=len(rows)
+          assert conn.execute("SELECT count(*) FROM variants").fetchone()[0]==before_variants
+          assert conn.execute("SELECT count(*) FROM products").fetchone()[0]==before_products
+          after_data=conn.execute("SELECT id,symbol,name,rpl_id,upd_id,species,indication,route,dose,edible_tissues,milk,restrictions,source,verified_at,card_text,scope,withdrawal_short FROM variants ORDER BY id").fetchall()
+          assert after_data==before_data, "Zmodyfikowano inne pola niz pdf_path"
+          assert conn.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+          assert conn.execute("PRAGMA foreign_key_check").fetchall()==[]
+          conn.commit()
+          print("PODLACZONE_PDF:",counts,"TOTAL",sum(counts.values()))
+          conn.close()
+          PY
+      - name: Commit zaktualizowanej bazy bez budowania programu
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet && { echo 'Brak zmian'; exit 1; }
+          git commit -m 'fix: powiazania PDF RPL dla Cyclix Bioketan Buserelin Carofertin [skip ci]'
+          git push origin HEAD:winforms
