@@ -1,0 +1,77 @@
+name: Jednorazowy audyt karencji
+on:
+  push:
+    branches: [winforms]
+    paths: [.github/workflows/audit-withdrawals-once.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sprawdz karencje w aktualnej bazie
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3,re,json,collections
+          db=sqlite3.connect('file:src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite?mode=ro',uri=True)
+          db.row_factory=sqlite3.Row
+          products={r['symbol']:dict(r) for r in db.execute('SELECT * FROM products')}
+          variants=collections.defaultdict(list)
+          for r in db.execute('SELECT * FROM variants'):
+              variants[r['symbol']].append(dict(r))
+          price={r['id']:r['compact_text'] for r in db.execute('SELECT id,compact_text FROM price_withdrawal_entries')}
+          pat=re.compile(r'weryfikac|zweryfikow|do sprawdzenia|sprawdzenia|wymaga sprawdzenia|wg\s*chpl|według\s*chpl|zgodnie\s*z\s*chpl|wg\s*ulotk|zgodnie\s*z\s*ulotk|wg\s*rpl|wg\s*upd|według\s*rpl|według\s*upd|nieustalon|do uzupełnienia|brak danych|nie podano w chpl|do potwierdzenia',re.I)
+          bad=re.compile(r'weryfikac|zweryfikow|do sprawdzenia|sprawdzenia|wg\s*chpl|według\s*chpl|zgodnie\s*z\s*chpl|wg\s*ulotk|nieustalon|do uzupełnienia|brak danych|nie podano w chpl|do potwierdzenia',re.I)
+          def classify(v):
+              t=(v.get('edible_tissues') or '').strip()
+              m=(v.get('milk') or '').strip()
+              short=(v.get('withdrawal_short') or '').strip()
+              compact=(price.get(v['id']) or '').strip()
+              # Null, blank, zero, not-applicable, and references are different situations.
+              full=[x for x in (t,m) if x]
+              solid=[x for x in full if not bad.search(x)]
+              if not full:state='NO_FULL'
+              elif not solid:state='ONLY_UNVERIFIED_FULL'
+              elif len(solid)!=len(full):state='PARTLY_UNVERIFIED_FULL'
+              else:state='FULL_POPULATED'
+              return state, bool(short),bool(compact)
+          flagged_symbols=set()
+          flagged_variant_ids=set()
+          for symbol,p in products.items():
+              if any(pat.search(str(v)) for k,v in p.items() if isinstance(v,str)):
+                  flagged_symbols.add(symbol)
+          for symbol,rows in variants.items():
+              for v in rows:
+                  if any(pat.search(str(value)) for value in v.values() if isinstance(value,str)) or pat.search(price.get(v['id']) or ''):
+                      flagged_symbols.add(symbol)
+                      flagged_variant_ids.add(v['id'])
+          selected=[v for symbol in flagged_symbols for v in variants.get(symbol,[])]
+          summary=collections.Counter(classify(v)[0] for v in selected)
+          print('RESULT_SUMMARY',json.dumps({'flagged_products':len(flagged_symbols),'flagged_variants_direct':len(flagged_variant_ids),'all_variants_of_flagged_products':len(selected),'full_status':dict(summary),'short_withdrawal':sum(classify(v)[1] for v in selected),'price_compact':sum(classify(v)[2] for v in selected),'products_without_variants':sum(not variants.get(s) for s in flagged_symbols)},ensure_ascii=False))
+          print('EXAMPLES_BEGIN')
+          example_terms=['AMPICLOX','MARBOCYL','COBACTAN','CEFQUINOR','EXCENEL','RIMADYL CATTLE','VETAXYL','GABBROVET']
+          for term in example_terms:
+              ss=[s for s,p in products.items() if term in (p.get('name') or '').upper()]
+              fl=[s for s in ss if s in flagged_symbols]
+              print('GROUP',term,'product_count',len(ss),'flagged_product_count',len(fl))
+              for s in fl[:8]:
+                  p=products[s]
+                  print('PRODUCT',json.dumps({'symbol':s,'name':p.get('name'),'status':p.get('status'),'rpl_id':p.get('rpl_id'),'variant_count':len(variants[s])},ensure_ascii=False))
+                  for v in variants[s][:10]:
+                      st,sh,co=classify(v)
+                      print('VARIANT',json.dumps({'species':v.get('species'),'route':v.get('route'),'tissues':v.get('edible_tissues'),'milk':v.get('milk'),'withdrawal_short':v.get('withdrawal_short'),'compact_text':price.get(v['id']),'state':st,'source':v.get('source'),'pdf_path':v.get('pdf_path')},ensure_ascii=False))
+          print('EXAMPLES_END')
+          print('INCOMPLETE_GROUPS_BEGIN')
+          groups=collections.defaultdict(lambda:collections.Counter())
+          for symbol in flagged_symbols:
+              pv=variants.get(symbol,[])
+              if not pv:groups[products[symbol]['name']]['NO_VARIANTS']+=1
+              elif any(classify(v)[0]!='FULL_POPULATED' for v in pv):
+                  name=products[symbol]['name']
+                  groups[name].update(classify(v)[0] for v in pv)
+          for name,counts in list(sorted(groups.items(), key=lambda t:(-sum(t[1].values()),t[0])))[:80]:
+              print('INCOMPLETE',json.dumps({'name':name,'counts':dict(counts)},ensure_ascii=False))
+          print('INCOMPLETE_GROUPS_END')
+          PY
