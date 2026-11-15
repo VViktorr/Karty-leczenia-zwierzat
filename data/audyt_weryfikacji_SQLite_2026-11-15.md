@@ -135,3 +135,18 @@ Wiersze z odwołaniami zamiast konkretnych danych, np. „wg ChPL”, albo słow
 - Zachować pełną historię wariantów; niedopuszczone i powielone warianty oznaczać jako archiwalne.
 - Nie zastępować niejasnego tekstu liczbą bez dokumentu źródłowego.
 - Oddzielać informację o statusie pozwolenia od kompletności karencji.
+
+## Priorytet po wstępnej klasyfikacji tekstów dawkowania
+
+Wśród 100 wpisów znalezionych szerokim filtrem **89 zawiera już co najmniej jedną liczbę w polu dawkowania**. Część z nich ma poprawnie podaną dawkę podstawową, a odsyła do ChPL jedynie w sprawie powtórzeń, ograniczeń lub szczegółowego schematu; nie należy usuwać takich odsyłaczy bez sprawdzenia kontekstu.
+
+**11 wpisów nie zawiera w samym polu dawki żadnej liczby** i wymaga szczególnej uwagi:
+
+| ID wariantu | Lek / grupa | Uwaga |
+|---:|---|---|
+| 1637, 2337, 1581, 2338, 1588, 2339 | Enrocin 5% — świnie | Zamiast dawki tylko odesłanie do ChPL; istnieje link do PDF |
+| 1390, 1393, 2340 | Enroxil Inj. 5% — pies lub świnie | Zamiast dawki tylko odesłanie do ChPL; istnieje link do PDF |
+| 406 | Kexxtone | Zamiast dawki tylko odesłanie do ChPL; brak powiązanego PDF w rekordzie |
+| 510 | Pneumospectin — cielęta | Oznaczenie do weryfikacji drogi SC; nie wolno dopisywać dawki bez potwierdzenia w ChPL |
+
+Te 11 pozycji ma priorytet do uzupełnienia lub archiwizacji nieprawidłowego wariantu, **nie jest to jeszcze autoryzacja dawkowania**.
