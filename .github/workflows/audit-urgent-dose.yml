@@ -32,4 +32,5 @@ jobs:
             for x in peers:
               if x['species'].strip().casefold()!=r['species'].strip().casefold():continue
               print('SAME_SPECIES',json.dumps(dict(x),ensure_ascii=False))
+          print("Inspection complete")
           PY
