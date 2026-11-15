@@ -3,7 +3,7 @@
 Źródło: `src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite` na gałęzi `winforms`.
 Raport generowany automatycznie z bazy; **nie jest potwierdzeniem klinicznym karencji ani dawkowania**.
 
-## Aktywne warianty z nieprecyzyjnym dawkowaniem: 100
+## Warianty z nieprecyzyjnym dawkowaniem w pierwotnym audycie: 100
 
 Wiersze z odwołaniami zamiast konkretnych danych, np. „wg ChPL”, albo słowami „do weryfikacji”. Warianty oznaczone jako archiwalne są pominięte.
 
@@ -150,3 +150,7 @@ Wśród 100 wpisów znalezionych szerokim filtrem **89 zawiera już co najmniej 
 | 510 | Pneumospectin — cielęta | Oznaczenie do weryfikacji drogi SC; nie wolno dopisywać dawki bez potwierdzenia w ChPL |
 
 Te 11 pozycji ma priorytet do uzupełnienia lub archiwizacji nieprawidłowego wariantu, **nie jest to jeszcze autoryzacja dawkowania**.
+
+## Aktualizacja po poprawkach z 15.11.2026
+
+**11 z tych 100 wariantów oznaczono jako archiwalne** w commicie [`2e3b1d8`](https://github.com/VViktorr/Karty-leczenia-zwierzat/commit/2e3b1d8f73143f3b7ddaae0576ed0862a0ef2eb3), ponieważ dotyczyły niepotwierdzonych/niedopuszczonych dróg podania albo zawieszonego pozwolenia. Ich dane pozostają w bazie jako historyczne, ale nie są widoczne jako aktywne warianty. **Do dalszej analizy pozostaje 89 wpisów** z wcześniejszej listy; wiele zawiera już liczbowe dawkowanie, a odsyłacz do ChPL dotyczy jedynie warunków powtarzania lub dodatkowych ograniczeń. Pełnych dawek nie zmieniano.
