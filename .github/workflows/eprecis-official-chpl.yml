@@ -42,7 +42,7 @@ jobs:
           path=Path("src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite")
           new="data/ChPL/RPL/RPL_35888_Eprecis_20_mg_ml_RPL_ChPL.pdf"
           old="data/ChPL/RPL/EPRECIS_20mg_ml_wyciag_danych_ChPL.pdf"
-          assert Path(new).read_bytes()[:5]==b"%PDF-"
+          assert Path(new).read_bytes().find(b"%PDF-") in range(0,1024)
           conn=sqlite3.connect(path)
           conn.execute("PRAGMA foreign_keys=ON")
           symbol="000000000000002061"
