@@ -31,7 +31,7 @@ jobs:
           groups={}
           for r in active:
               rpl=str(r['rpl_id'] or '').strip()
-              if not re.fullmatch(r'\\d{4,12}',rpl): continue
+              if not re.fullmatch(r'\d{4,12}',rpl): continue
               path=str(r['pdf_path'] or '').strip()
               file=root/path if path else None
               if file and file.is_file() and file.read_bytes()[:5]==b'%PDF-':continue
