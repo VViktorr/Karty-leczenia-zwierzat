@@ -1,0 +1,29 @@
+name: Szczegoly pozostalych niejednoznacznosci
+on:
+  push:
+    branches: [winforms]
+    paths: [.github/workflows/medicine-remaining-audit.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lista szesciu i trzynastu, bez edycji
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3,json
+          db=sqlite3.connect("file:src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite?mode=ro",uri=True)
+          db.row_factory=sqlite3.Row
+          for term in ('TETRADUR','PYOCTANINA','UNG.ZINCI','BAYOFLY','GEOMYCIN','CHENIDINE','ALTA-DERM','BAL - DERM','BROS METOFLOX','CHITO-DERM','CHLOROFRESH','COLD MAX'):
+              products=db.execute("SELECT symbol,name,rpl_id,upd_id,status,decision FROM products WHERE UPPER(name) LIKE ?",('%'+term.upper()+'%',)).fetchall()
+              print('SEARCH',term,'count',len(products))
+              for p in products:
+                  vs=db.execute("""SELECT id,name,rpl_id,species,indication,route,dose,edible_tissues,milk,restrictions,source,pdf_path,withdrawal_short,scope
+                                     FROM variants WHERE symbol=?""",(p['symbol'],)).fetchall()
+                  print('PRODUCT',json.dumps(dict(p),ensure_ascii=False))
+                  for v in vs:
+                      print('VARIANT',json.dumps(dict(v),ensure_ascii=False))
+          PY
