@@ -31,29 +31,25 @@ jobs:
           assert integrity=='ok' and not fk, 'Nieprawidlowa integralnosc bazy'
           rows=[dict(r) for r in db.execute('SELECT * FROM variants ORDER BY id')]
           def inactive(r):
-              # Flag and status may vary; report counts for human review.
-              for col in ('is_archived','archived','is_inactive','inactive','deleted'):
-                  if col in cols and r[col] not in (None,0,'0','',False):
-                      return True
-              for col in ('status','variant_status','state'):
-                  if col in cols and str(r[col] or '').lower().strip() in ('archiwalny','archiwalne','archived','inactive','deleted'):
-                      return True
-              return False
+              return 'archiwal' in str(r.get('scope') or '').casefold()
           active=[r for r in rows if not inactive(r)]
           def has_number(s): return bool(re.search(r'\d',str(s or '')))
           no_number=[r for r in active if not has_number(r.get('dose'))]
+          assert len(rows)==2944 and len(active)==2902 and len(no_number)==35, 'Niespodziewana zmiana stanu SQLite - porownaj z nowym audytem'
           groups=[
-            ('Febrivac Dist','Febrivac'),('IBR Marker zywy','IBR marker'),
-            ('Nerfasin','Nerfasin'),('Nobivac DHPPi','Nobivac DHPPi'),
-            ('Nobivac Tricat Trio','Nobivac Tricat'),
-            ('Oxyflex XLA','Oxyflex'),('Polocainum 5%','Polocainum'),
-            ('Pyralgivet','Pyralgivet'),('Rispoval 3','Rispoval 3'),('Wellicox','Wellicox')]
+            ('Febrivac Dist','16827'),('IBR Marker zywy','28639'),
+            ('Nerfasin','29972'),('Nobivac DHPPi','16737'),
+            ('Nobivac Tricat Trio','18939'),
+            ('Oxyflex XLA','16575'),('Polocainum 5%','20473'),
+            ('Pyralgivet','18806'),('Rispoval 3','22684'),('Wellicox','30613')]
           def matches(row, term):
-              return term.casefold() in str(row.get('name') or '').casefold()
+              return str(row.get('rpl_id') or '') == term
           def pdf_status(r):
               p=r.get('pdf_path')
               if not p: return 'brak powiazania'
-              target=root/str(p)
+              rel=pathlib.Path(str(p))
+              if rel.is_absolute() or '..' in rel.parts: return 'niebezpieczna sciezka'
+              target=root/rel
               if not target.is_file(): return 'brak pliku'
               with target.open('rb') as f: head=f.read(8)
               if not head.startswith(b'%PDF-'): return 'nieprawidlowy naglowek'
@@ -87,6 +83,7 @@ jobs:
               total_refs+=references
               issues=sum(not pdf_status(r).startswith('naglowek PDF OK') for r in rr)
               lines.append(f'| {group} | {len(rr)} | {references} | {issues} |')
+          assert total_refs==20, 'Niespodziewana liczba odeslan - wymagany ponowny audyt'
           lines+=['',f'- Odeslania w 10 grupach: **{total_refs}**',
                   '', '## 35 pozycji bez liczby — klasyfikacja wstepna','',
                   '| ID | Produkt | Gatunek | Ocena robocza |','|---:|---|---|---|']
