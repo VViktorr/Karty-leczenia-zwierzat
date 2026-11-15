@@ -1,0 +1,85 @@
+name: "Partia 12 - szesc korekt ze skanow RPL"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-partia12
+  cancel-in-progress: false
+jobs:
+  correction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: "Korekta tylko 6 potwierdzonych wariantow; bez budowania"
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib, hashlib
+          path=pathlib.Path('src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite')
+          original=path.read_bytes()
+          assert hashlib.sha256(original).hexdigest()=='809059e1931897593913ab2adf39a676d05145318e275a38ced9aff23ca70672', 'Inna SQLite niz w audycie partii 12. Zatrzymano.'
+          edits=[
+            {"id":2549,"rpl":"16827","species":"Norka","old":"1 ml po rekonstytucji od 8.–10. tyg. życia (u osobników od nieszczepionych matek wcześniej wg ChPL); przypomnienie co 12 mies.","dose":"Podskórnie 1 ml po rekonstytucji. Norki hodowlane: młode poniżej 10. tygodnia z przeciwciałami matczynymi szczepić dwukrotnie w odstępie 4–6 tygodni; po 10. tygodniu jednorazowo. Ponowne szczepienie po 6 miesiącach, następnie corocznie, miesiąc przed okresem rozrodczym. W zagrożeniu epidemią szczepienie od 6. tygodnia i powtórzenie w 10. tygodniu (ChPL RPL 16827)."},
+            {"id":2550,"rpl":"16827","species":"Fretka","old":"1 ml po rekonstytucji od 8.–10. tyg. życia; dawka przypominająca co 12 mies.","dose":"Podskórnie 1 ml po rekonstytucji. Młode z przeciwciałami matczynymi poniżej 10. tygodnia szczepić dwukrotnie w odstępie 4–6 tygodni; po 10. tygodniu jednorazowo. Szczepienie ponowić po 6 miesiącach, a następnie corocznie. W sytuacji zagrożenia epidemią możliwe szczepienie od 6. tygodnia i ponowne w 10. tygodniu (ChPL RPL 16827)."},
+            {"id":1593,"rpl":"16575","species":"Bydło","old":"Dawka wg ChPL: 1 ml/10 kg m.c. jednorazowo; nie przekraczać limitów objętości na miejsce","dose":"Domięśniowo jednorazowo 1 ml/10 kg m.c., co odpowiada 30 mg oksytetracykliny i 2 mg fluniksyny/kg m.c. Maksymalnie 15 ml produktu w jednym miejscu wstrzyknięcia. Działanie przeciwzapalne utrzymuje się przez 24–36 godzin; ewentualne dalsze leczenie przeciwzapalne zgodnie z przeciwwskazaniami i ChPL RPL 16575."},
+            {"id":1594,"rpl":"16575","species":"Bydło","old":"Dawka wg ChPL: 1 ml/10 kg m.c. jednorazowo; nie przekraczać limitów objętości na miejsce","dose":"Domięśniowo jednorazowo 1 ml/10 kg m.c., co odpowiada 30 mg oksytetracykliny i 2 mg fluniksyny/kg m.c. Maksymalnie 15 ml produktu w jednym miejscu wstrzyknięcia. Działanie przeciwzapalne utrzymuje się przez 24–36 godzin; ewentualne dalsze leczenie przeciwzapalne zgodnie z przeciwwskazaniami i ChPL RPL 16575."},
+            {"id":1994,"rpl":"20473","species":"bydło","old":"Zależnie od rodzaju znieczulenia (nasiękowe 5–20 ml, przewodowe 5–15 ml, nadtwardówkowe 5–15 ml); maks. dawka całkowita wg ChPL.","dose":"Podanie okołonerwowe: miejscowe (nasiękowe) do 5 ml, przewodowe 5–10 ml, rdzeniowe (zewnątrzoponowe: podpajęczynówkowe lub nadtwardówkowe) 5–10 ml — tylko u bydła. Podawać najmniejszą skuteczną dawkę jednorazowo lub w dawkach podzielonych, monitorując zwierzę (ChPL RPL 20473)."},
+            {"id":1995,"rpl":"20473","species":"koń","old":"Zależnie od rodzaju znieczulenia (nasiękowe 5–20 ml, przewodowe 5–15 ml, nadtwardówkowe 5–15 ml); maks. dawka całkowita wg ChPL.","dose":"Podanie okołonerwowe u koni: miejscowe (nasiękowe) do 5 ml lub przewodowe 5–10 ml. W ChPL RPL 20473 podanie rdzeniowe opisano wyłącznie dla bydła. Podawać najmniejszą skuteczną dawkę jednorazowo lub w dawkach podzielonych, monitorując zwierzę."}
+          ]
+          con=sqlite3.connect(path)
+          con.row_factory=sqlite3.Row
+          con.execute('PRAGMA foreign_keys=ON')
+          assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          assert not con.execute('PRAGMA foreign_key_check').fetchall()
+          assert con.execute('SELECT count(*) FROM variants').fetchone()[0]==2944
+          try:
+              con.execute('BEGIN IMMEDIATE')
+              for e in edits:
+                  row=con.execute('SELECT * FROM variants WHERE id=?',(e['id'],)).fetchone()
+                  assert row and str(row['rpl_id'])==e['rpl'] and row['species']==e['species'],f'Zly produkt/gatunek {e["id"]}'
+                  assert 'archiwal' not in str(row['scope'] or '').casefold(), f'Archiwalny {e["id"]}'
+                  current=row['dose'] or ''
+                  assert e['old'] in current, f'Zmienione dawkowanie {e["id"]}: {current!r}'
+                  card=row['card_text'] or ''
+                  assert e['old'] in card, f'Brak starej dawki w card_text {e["id"]}'
+                  assert card.count(e['old'])==1, f'Niejednoznaczny card_text {e["id"]}'
+                  assert current.count(e['old'])==1
+                  if e['id'] in (1593,1594):
+                      assert current.endswith('wstrzyknięcia') or current.endswith('miejsce'), f'Nieznany opis {e["id"]}'
+                  new_card=card.replace(e['old'],e['dose'],1)
+                  new_ind=row['indication']
+                  if e['id']==1995:
+                      assert new_ind=='Znieczulenie nasiękowe, przewodowe i nadtwardówkowe u bydła i koni.', 'Zmienione wskazanie konia'
+                      new_ind='Znieczulenie miejscowe (nasiękowe) i przewodowe nerwów obwodowych u koni.'
+                      new_card=new_card.replace(row['indication'],new_ind)
+                  if e['id']==1994:
+                      assert new_ind=='Znieczulenie nasiękowe, przewodowe i nadtwardówkowe u bydła i koni.', 'Zmienione wskazanie bydla'
+                      new_ind='Znieczulenie miejscowe (nasiękowe), przewodowe i rdzeniowe (zewnątrzoponowe) u bydła.'
+                      new_card=new_card.replace(row['indication'],new_ind)
+                  # Nie zmieniaj jakichkolwiek pól karencji, preparatu lub powiązań PDF.
+                  con.execute('UPDATE variants SET indication=?,dose=?,card_text=?,verified_at=? WHERE id=?',
+                     (new_ind,e['dose'],new_card,'2026-11-15',e['id']))
+              assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not con.execute('PRAGMA foreign_key_check').fetchall()
+              assert con.execute('SELECT count(*) FROM variants').fetchone()[0]==2944
+              con.commit()
+              print('Zaktualizowano warianty:',[e['id'] for e in edits])
+          except:
+              con.rollback()
+              raise
+          finally:
+              con.close()
+          PY
+      - name: "Commit szesciu poprawek SQLite"
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet && { echo 'Nie wprowadzono zmian'; exit 1; }
+          git commit -m 'fix: partia 12 Febrivac Oxyflex Polocainum wg ChPL [skip ci]'
+          git push origin HEAD:winforms
