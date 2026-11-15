@@ -48,7 +48,7 @@ jobs:
           sig_before=signature()
           def norm(s):
               raw=unicodedata.normalize("NFKD",str(s or "").casefold())
-              return re.sub(r"[^a-z0-9]+"," ",".join([])+"".join(c if (c.isalnum() and ord(c)<128) else " " for c in raw if not unicodedata.combining(c))).strip()
+              return re.sub(r"[^a-z0-9]+", " ", "".join(c for c in raw if not unicodedata.combining(c))).strip()
           def pdf_ok(p):
               return p.is_file() and p.open("rb").read(5)==b"%PDF-"
           def missing(row):
