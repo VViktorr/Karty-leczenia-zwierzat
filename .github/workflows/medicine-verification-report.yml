@@ -1,0 +1,91 @@
+name: Raport pozostalych problemow katalogu
+on:
+  push:
+    branches: [winforms]
+    paths: [.github/workflows/medicine-verification-report.yml]
+permissions:
+  contents: write
+jobs:
+  report:
+    if: contains(github.event.head_commit.message, 'generate medicine verification report')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Zapisz raport niepewnych dawek i brakujacych wariantow
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3,re,collections
+          from pathlib import Path
+          db=sqlite3.connect('file:src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite?mode=ro',uri=True)
+          db.row_factory=sqlite3.Row
+          patterns={
+            "Nieprecyzyjna dawka":r'weryfikac|do sprawdzenia|wg\s*chpl|według\s*chpl|zgodnie\s*z\s*chpl|wg\s*ulotk|zgodnie\s*z\s*ulotk|dawkowanie\s+wg|nieustalon|do uzupełnienia|brak danych',
+            "Nieprecyzyjny opis":r'weryfikac|do sprawdzenia|wg\s*chpl|według\s*chpl|zgodnie\s*z\s*chpl|wg\s*ulotk|zgodnie\s*z\s*ulotk|nieustalon|do uzupełnienia|brak danych'
+          }
+          p1=re.compile(patterns["Nieprecyzyjna dawka"],re.I)
+          p2=re.compile(patterns["Nieprecyzyjny opis"],re.I)
+          rows=db.execute("""SELECT v.id,p.symbol,p.name product_name,p.rpl_id,v.species,v.scope,
+              v.dose,v.edible_tissues,v.milk,v.withdrawal_short,v.pdf_path,v.source,
+              p.status, v.indication,v.restrictions
+              FROM variants v JOIN products p ON p.symbol=v.symbol ORDER BY p.name,v.id""").fetchall()
+          allrows=[dict(r) for r in rows]
+          flagged=[r for r in allrows if p1.search(r['dose'] or '') and 'Archiwalne' not in (r['scope'] or '')]
+          f_ids={r['id'] for r in flagged}
+          missing=db.execute("""SELECT p.symbol,p.name,p.status,p.rpl_id,p.upd_id,p.decision FROM products p
+               WHERE NOT EXISTS (SELECT 1 FROM variants v WHERE v.symbol=p.symbol)
+               AND (LOWER(COALESCE(p.status,'')) LIKE '%weryfikac%'
+                    OR LOWER(COALESCE(p.status,'')) LIKE '%nie lek%'
+                    OR LOWER(COALESCE(p.status,'')) LIKE '%nie jest lekiem%'
+                    OR LOWER(COALESCE(p.status,'')) LIKE '%niepotwierdzon%') ORDER BY p.name""").fetchall()
+          # Recent audit's thirteen named entries; other absence may be intentional.
+          focus_terms=('ALTA-DERM NF','BAL - DERM NF','BAYOFLY POUR','BROS METOFLOX 10 WP 400','CHENIDINE GEL','CHITO-DERM','CHLOROFRESH','COLD MAX 900','GEOMYCIN F')
+          focus=[dict(r) for r in missing if any(t in r['name'].upper() for t in focus_terms)]
+          lines=[
+            '# Audyt danych wymagających dalszego opracowania — 15.11.2026',
+            '',
+            'Źródło: `src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite` na gałęzi `winforms`.',
+            'Raport generowany automatycznie z bazy; **nie jest potwierdzeniem klinicznym karencji ani dawkowania**.',
+            '',
+            f'## Aktywne warianty z nieprecyzyjnym dawkowaniem: {len(flagged)}',
+            '',
+            'Wiersze z odwołaniami zamiast konkretnych danych, np. „wg ChPL”, albo słowami „do weryfikacji”. Warianty oznaczone jako archiwalne są pominięte.',
+            '',
+            '| ID wariantu | Kartoteka | Gatunek | ID RPL | Obecny tekst dawki | PDF w bazie |',
+            '|---:|---|---|---|---|---|'
+          ]
+          esc=lambda s:str(s or '').replace('|','/').replace('\n',' ').strip()
+          for r in flagged:
+            dose=esc(r['dose'])
+            lines.append(f"| {r['id']} | {esc(r['product_name'])} | {esc(r['species'])} | {esc(r['rpl_id'])} | {dose[:130]} | {'tak' if r['pdf_path'] and Path(r['pdf_path']).exists() else 'nie'} |")
+          lines.extend(['','## Kartoteki z poprzedniego audytu bez wariantów','','| Symbol Subiekta | Nazwa | Klasyfikacja | RPL / UPD |','|---|---|---|---|'])
+          for r in focus:
+            klass='Nie lek (potwierdzone)' if r['decision']=='NOT_MEDICINE' else 'Pozostaje do opracowania'
+            lines.append(f"| {esc(r['symbol'])} | {esc(r['name'])} | {klass} | {esc(r['rpl_id']) or esc(r['upd_id']) or 'brak'} |")
+          lines.extend([
+             '',
+             '## Zasady dalszych poprawek',
+             '',
+             '- Nie kopiować karencji ani dawek między różnymi drogami podania, gatunkami lub wskazaniami.',
+             '- Nie przenosić karencji z UPD innego państwa jako polskiej.',
+             '- Zachować pełną historię wariantów; niedopuszczone i powielone warianty oznaczać jako archiwalne.',
+             '- Nie zastępować niejasnego tekstu liczbą bez dokumentu źródłowego.',
+             '- Oddzielać informację o statusie pozwolenia od kompletności karencji.',
+             '',
+          ])
+          dest=Path('data/audyt_weryfikacji_SQLite_2026-11-15.md')
+          dest.write_text('\n'.join(lines),encoding='utf-8')
+          print('REPORT_CREATED',str(dest),'DOSES',len(flagged),'MISSING_FOCUS',len(focus))
+          print('DOSE_GROUPS',list(collections.Counter(r['product_name'] for r in flagged).most_common(18)))
+          PY
+      - name: Zapisz raport
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/audyt_weryfikacji_SQLite_2026-11-15.md
+          git diff --cached --quiet && exit 0
+          git commit -m 'docs: raport nieprecyzyjnego dawkowania i brakujacych wariantow [skip ci]'
+          git push origin HEAD:winforms
