@@ -74,4 +74,5 @@ jobs:
           for name,counts in list(sorted(groups.items(), key=lambda t:(-sum(t[1].values()),t[0])))[:80]:
               print('INCOMPLETE',json.dumps({'name':name,'counts':dict(counts)},ensure_ascii=False))
           print('INCOMPLETE_GROUPS_END')
+          print('Audit completed')
           PY
