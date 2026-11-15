@@ -1,0 +1,78 @@
+name: "Partia 14 - 82 powiazania PDF w osmiu grupach"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: catalog-sqlite-partia14
+  cancel-in-progress: false
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: "Podlacz zatwierdzone ChPL do 82 wariantow"
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib, hashlib, json
+          path=pathlib.Path('src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite')
+          expected='8ff118b8bb71de52d8df93b36062f66c9fcaa3b6712ba0d579765c451d27b627'
+          assert hashlib.sha256(path.read_bytes()).hexdigest()==expected,'Baza zmieniona od audytu — bez nadpisywania'
+          groups=json.loads("[[\"22647\",\"RPL_22647_Rispoval_IBR-Marker_Vivum_liofilizat_i_rozpus_RPL_ChPL.pdf\",[261,527]],[\"37324\",\"RPL_37324_Mepatar_RPL_ChPL.pdf\",[1827,1828,1829,1830,1831,1832,1833,1834,1835,1836,1837,1838,1839,1840,1841,1842]],[\"16548\",\"RPL_16548_Calcium_Borogluconatum_25_RPL_ChPL.pdf\",[1239,1240,1241,1242,1243,1244,1245,1246,1943,1944,1945,1946]],[\"19399\",\"RPL_19399_Clamoxyl_L_A_RPL_ChPL.pdf\",[1439,1440,1441,1442,1467,1468,1469,1470,2041,2042,2043,2044]],[\"48464\",\"RPL_48464_Mendotizer_RPL_ChPL.pdf\",[1058,1059,1060,1061,1062,1063,1064,1065,1066,1067,1068,1069]],[\"16580\",\"RPL_16580_Inmodulen_RPL_ChPL.pdf\",[1507,1508,1509,1510,1511,1512,1878,1880,1882,1883]],[\"18495\",\"RPL_18495_Paramectin_1_RPL_ChPL.pdf\",[166,167,168,1080,1081,1082,1184,1185,1186]],[\"19816\",\"RPL_19816_Trimerazin_RPL_ChPL.pdf\",[1382,1383,1384,1385,1386,1387,1721,1722,1723]]]")
+          assert len(groups)==8 and sum(len(x[2]) for x in groups)==82
+          con=sqlite3.connect(path)
+          con.row_factory=sqlite3.Row
+          con.execute('PRAGMA foreign_keys=ON')
+          assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          assert not con.execute('PRAGMA foreign_key_check').fetchall()
+          assert con.execute('SELECT count(*) FROM variants').fetchone()[0]==2944
+          checked=[]
+          try:
+            con.execute('BEGIN IMMEDIATE')
+            for rpl,basename,ids in groups:
+              relative='data/ChPL/RPL/'+basename
+              pdf=pathlib.Path(relative)
+              assert pdf.is_file() and pdf.read_bytes().startswith(b'%PDF-'),f'Niepoprawny PDF {rpl}'
+              assert basename.startswith('RPL_'+rpl+'_')
+              rows=con.execute('SELECT id,rpl_id,pdf_path,scope,name FROM variants WHERE id IN ('+','.join('?'*len(ids))+') ORDER BY id',ids).fetchall()
+              assert [r['id'] for r in rows]==sorted(ids),f'Niezgodne identyfikatory {rpl}'
+              for row in rows:
+                assert str(row['rpl_id'])==rpl,f'Inny RPL wariantu {row["id"]}'
+                assert row['pdf_path'] is None or str(row['pdf_path']).strip()=='',f'Istnieje powiazanie {row["id"]}'
+                assert 'archiwal' not in str(row['scope'] or '').casefold(),f'Archiwalny ID {row["id"]}'
+              con.execute('INSERT OR IGNORE INTO documents(path) VALUES (?)',(relative,))
+              for vid in ids:
+                cursor=con.execute('UPDATE variants SET pdf_path=? WHERE id=? AND rpl_id=? AND (pdf_path IS NULL OR TRIM(pdf_path)=\'\')',(relative,vid,rpl))
+                assert cursor.rowcount==1,f'Niepoprawna liczba aktualizacji {vid}'
+              checked.extend(ids)
+            assert len(checked)==82 and len(set(checked))==82
+            assert con.execute('SELECT count(*) FROM variants').fetchone()[0]==2944
+            assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+            assert not con.execute('PRAGMA foreign_key_check').fetchall()
+            for rpl,basename,ids in groups:
+              relative='data/ChPL/RPL/'+basename
+              n=con.execute('SELECT count(*) FROM variants WHERE rpl_id=? AND pdf_path=? AND id IN ('+','.join('?'*len(ids))+')',[rpl,relative,*ids]).fetchone()[0]
+              assert n==len(ids)
+            con.commit()
+            print('Pomyślnie podłączono PDF dla',len(checked),'wariantów w',len(groups),'grupach.')
+            print('Id wariantów:',sorted(checked))
+            print('Karencja, dawki i wszystkie pozostałe pola pozostawione bez zmian.')
+          except:
+            con.rollback()
+            raise
+          finally:
+            con.close()
+          PY
+      - name: "Zapisz tylko SQLite"
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet && { echo 'Nie znaleziono zmian'; exit 1; }
+          git commit -m 'fix: polacz 82 warianty z oficjalnymi PDF ChPL (partia 14) [skip ci]'
+          git push origin HEAD:winforms
