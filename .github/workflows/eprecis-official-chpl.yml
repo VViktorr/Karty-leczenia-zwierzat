@@ -1,0 +1,73 @@
+name: Wstaw oryginalna ChPL RPL EPRECIS
+on:
+  push:
+    branches: [winforms]
+    paths:
+      - '.github/workflows/eprecis-official-chpl.yml'
+permissions:
+  contents: write
+jobs:
+  replace-with-official:
+    if: contains(github.event.head_commit.message, 'replace EPRECIS summary with original RPL PDF')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Pobierz bez zmian oryginalny urzedowy plik PDF RPL 35888
+        shell: bash
+        run: |
+          python - <<'PY'
+          from urllib.request import Request,urlopen
+          from pathlib import Path
+          url="https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/35888/characteristic"
+          req=Request(url,headers={"User-Agent":"Mozilla/5.0","Accept":"application/pdf"})
+          with urlopen(req,timeout=60) as response:
+              content=response.read()
+              print("Content-Type:",response.headers.get("Content-Type"),"size:",len(content))
+          if not content.startswith(b"%PDF-") or len(content)<10000:
+              raise RuntimeError("RPL nie zwrocil oryginalnego PDF. Nie zmieniono bazy.")
+          path=Path("data/ChPL/RPL/RPL_35888_Eprecis_20_mg_ml_RPL_ChPL.pdf")
+          path.parent.mkdir(parents=True,exist_ok=True)
+          path.write_bytes(content)
+          print("Oryginalny PDF:",path,len(content))
+          PY
+      - name: Powiaz oficjalny PDF z trzema wariantami w SQLite
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          path=Path("src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite")
+          new="data/ChPL/RPL/RPL_35888_Eprecis_20_mg_ml_RPL_ChPL.pdf"
+          old="data/ChPL/RPL/EPRECIS_20mg_ml_wyciag_danych_ChPL.pdf"
+          assert Path(new).read_bytes()[:5]==b"%PDF-"
+          conn=sqlite3.connect(path)
+          conn.execute("PRAGMA foreign_keys=ON")
+          symbol="000000000000002061"
+          rows=conn.execute("SELECT id,species,rpl_id FROM variants WHERE symbol=?",(symbol,)).fetchall()
+          assert len(rows)==3 and {(sp,rpl) for _,sp,rpl in rows}=={("Bydło","35888"),("Owce","35888"),("Kozy","35888")},rows
+          with conn:
+              conn.execute("INSERT OR IGNORE INTO documents(path) VALUES (?)",(new,))
+              conn.execute("UPDATE variants SET pdf_path=? WHERE symbol=?",(new,symbol))
+              # Usun jedynie niepotrzebny wpis do wlasnego wyciagu, o ile nie istnieja inne referencje.
+              referenced=conn.execute("SELECT COUNT(*) FROM variants WHERE pdf_path=?",(old,)).fetchone()[0]
+              if not referenced:
+                  conn.execute("DELETE FROM documents WHERE path=?",(old,))
+          assert conn.execute("SELECT COUNT(*) FROM variants WHERE symbol=? AND pdf_path=?",(symbol,new)).fetchone()[0]==3
+          assert conn.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+          assert conn.execute("PRAGMA foreign_key_check").fetchall()==[]
+          conn.close()
+          oldfile=Path(old)
+          if oldfile.exists():oldfile.unlink()
+          print("Potwierdzono 3 warianty i oryginalny PDF RPL, SQLite OK")
+          PY
+      - name: Commit oficjalnego dokumentu i poprawionych referencji
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A data/ChPL/RPL/RPL_35888_Eprecis_20_mg_ml_RPL_ChPL.pdf data/ChPL/RPL/EPRECIS_20mg_ml_wyciag_danych_ChPL.pdf src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: oryginalna ChPL RPL 35888 zamiast wyciagu EPRECIS [skip ci]'
+          git push origin HEAD:winforms
