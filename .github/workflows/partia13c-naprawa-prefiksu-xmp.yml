@@ -1,0 +1,84 @@
+name: "Partia 13c - naprawa PDF po usunieciu prefiksu XMP"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-pdf-partia13c
+  cancel-in-progress: false
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: Install PyMuPDF
+        run: python -m pip install --disable-pip-version-check pymupdf
+      - name: "Sprawdz obydwa dokumenty i usun tylko nadmiarowy prefiks"
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib,json,sqlite3
+          from pathlib import Path
+          import fitz
+          root=Path.cwd()
+          dbpath=root/'src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite'
+          before=hashlib.sha256(dbpath.read_bytes()).hexdigest()
+          con=sqlite3.connect(f'file:{dbpath}?mode=ro',uri=True)
+          assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          assert not con.execute('PRAGMA foreign_key_check').fetchall()
+          items=[
+            ('32411','RPL_32411_Pneumospectin_RPL_ChPL.pdf',500,['pneumospectin','spektynomycyn','linkomycyn']),
+            ('22647','RPL_22647_Rispoval_IBR-Marker_Vivum_liofilizat_i_rozpus_RPL_ChPL.pdf',836,['rispoval','ibr','vivum'])
+          ]
+          fixes=[]
+          for number,filename,expected_offset,terms in items:
+              path=root/'data/ChPL/RPL'/filename
+              original=path.read_bytes()
+              assert original.startswith(b'<?xpacket begin='),f'Inny format pliku {number}'
+              offset=original.find(b'%PDF-')
+              assert offset==expected_offset,f'Zmieniony offset PDF {number}: {offset}'
+              assert original.count(b'%PDF-')==1,f'Niejednoznaczny naglowek PDF {number}'
+              prefix=original[:offset]
+              assert b'<?xpacket' in prefix and b'<?xpacket end=' in prefix, f'Prefiks nie stanowi kompletnego XMP {number}'
+              cleaned=original[offset:]
+              assert cleaned.startswith(b'%PDF-') and b'%%EOF' in cleaned[-2048:],f'Niekompletny dokument PDF {number}'
+              with fitz.open(stream=cleaned,filetype='pdf') as doc:
+                  assert not doc.is_encrypted
+                  assert 2<=len(doc)<=100
+                  pages=len(doc)
+                  text=' '.join(page.get_text(sort=True) for page in doc).casefold()
+                  normalized=' '.join(text.split())
+                  for term in terms:
+                      assert term in normalized, f'Brak frazy produktu {term}: {number}'
+                  assert ('charakterystyk' in normalized and 'dawkowanie' in normalized),f'Brak naglowkow ChPL {number}'
+                  # Ensure all pages render before any original file is modified.
+                  for p in doc:
+                      pix=p.get_pixmap(matrix=fitz.Matrix(.3,.3),alpha=False)
+                      assert pix.width>0 and pix.height>0
+              fixes.append((path,cleaned,{'RPL':number,'pages':pages,'removed_prefix_bytes':offset,
+                            'original_sha256':hashlib.sha256(original).hexdigest(),
+                            'result_sha256':hashlib.sha256(cleaned).hexdigest()}))
+          # Change the two originals only after BOTH pass all validation checks.
+          for path,cleaned,info in fixes:
+              path.write_bytes(cleaned)
+              with fitz.open(path) as doc:
+                  assert len(doc)==info['pages']
+          assert hashlib.sha256(dbpath.read_bytes()).hexdigest()==before,'SQLite changed'
+          assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          assert not con.execute('PRAGMA foreign_key_check').fetchall()
+          con.close()
+          print('VALIDATED_AND_REPAIRED',json.dumps([item[2] for item in fixes],ensure_ascii=False))
+          print('SQLite unchanged:',before)
+          PY
+      - name: Commit validated originals only
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- data/ChPL/RPL/RPL_32411_Pneumospectin_RPL_ChPL.pdf data/ChPL/RPL/RPL_22647_Rispoval_IBR-Marker_Vivum_liofilizat_i_rozpus_RPL_ChPL.pdf
+          git diff --cached --quiet && { echo 'No validated PDF changes'; exit 1; }
+          git commit -m 'fix: popraw format 2 urzedowych ChPL przez usuniecie XMP prefix [skip ci]'
+          git push origin HEAD:winforms
