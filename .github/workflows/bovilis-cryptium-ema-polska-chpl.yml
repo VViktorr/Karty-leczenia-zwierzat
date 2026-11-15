@@ -1,0 +1,120 @@
+name: "Bovilis Cryptium - oficjalna polska ChPL EMA 2026"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify_and_link:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+      - name: Install PyMuPDF
+        run: python -m pip install --disable-pip-version-check pymupdf
+      - name: Verify EMA Polish PDF and link only matching variants
+        shell: bash
+        run: |
+          cat > /tmp/bovilis_pl.py <<'PY'
+          from pathlib import Path
+          from urllib.request import Request,urlopen
+          import hashlib, json, re, sqlite3, unicodedata
+          import fitz
+          ROOT=Path.cwd()
+          DB=ROOT/"src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite"
+          REPORT=Path("ema_bovilis_pl_raport");REPORT.mkdir(exist_ok=True)
+          SOURCE="https://medicines.health.europa.eu/veterinary/en/documents/download/4b44e23f-de9d-4d8e-a968-546ffdb989b9"
+          DEST=ROOT/"data/ChPL/UPD/UPD_600000992040_Bovilis_Cryptium_PL_2026_ChPL.pdf"
+          IDS=[1091,1092,1093,1094,1095,1096]
+          EXPECTED="eacdcae1499788e5e6b91be8c673add00d88e200f3c1d0530d016805e43183b4"
+          result={"source":SOURCE,"target":str(DEST.relative_to(ROOT)),"status":"unverified","linked":0}
+          def norm(s):
+              u=unicodedata.normalize("NFKD",str(s).lower())
+              return re.sub(r"[^a-z0-9]+", " ", "".join(c for c in u if not unicodedata.combining(c))).strip()
+          def write_report():
+              (REPORT/"result.json").write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding="utf8")
+          try:
+              assert hashlib.sha256(DB.read_bytes()).hexdigest()==EXPECTED,"Zmieniono SQLite od ostatniej kontroli"
+              assert not DEST.exists(),"Nowy plik juz istnieje; wymagany osobny audyt"
+              request=Request(SOURCE,headers={"User-Agent":"Mozilla/5.0","Accept":"application/pdf"})
+              with urlopen(request,timeout=45) as response:
+                  assert response.status==200,"HTTP status != 200"
+                  data=response.read(12*1024*1024+1)
+              assert len(data)<12*1024*1024 and data[:5]==b"%PDF-" and b"%%EOF" in data[-4096:],"Niewlasciwy lub ucięty PDF"
+              with fitz.open(stream=data,filetype="pdf") as pdf:
+                  assert not pdf.is_encrypted and 2<=len(pdf)<=100,"Nieprawidlowa liczba stron"
+                  raw="\n".join(page.get_text(sort=True) for page in pdf)
+                  result["pages"]=len(pdf)
+              contents=norm(raw)
+              assert len(contents)>=500,"Brak czytelnej warstwy tekstowej"
+              assert "bovilis cryptium" in contents,"Nazwa produktu niepotwierdzona"
+              assert "charakterystyk" in contents and "produkt" in contents,"Brak polskiej ChPL"
+              assert "weterynaryjn" in contents,"Niepotwierdzony produkt weterynaryjny"
+              # Distinguish Polish from English-only documents using distinctive Polish words.
+              assert sum(x in contents for x in ("przeciwwskazania","wskazania","dzialania niepozadane","okres karencji","stosowanie"))>=2,"Niepotwierdzony polski jezyk ChPL"
+              db=sqlite3.connect(DB)
+              db.row_factory=sqlite3.Row
+              db.execute("PRAGMA foreign_keys=ON")
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              assert db.execute("SELECT COUNT(*) FROM variants").fetchone()[0]==2944
+              records=db.execute("SELECT id,name,rpl_id,upd_id,pdf_path,scope FROM variants WHERE id IN ("+",".join("?"*len(IDS))+") ORDER BY id",IDS).fetchall()
+              assert len(records)==6
+              for row in records:
+                  assert str(row["rpl_id"] or "")=="100490423" and str(row["upd_id"] or "")=="600000992040","Niepasujace identyfikatory"
+                  assert "bovilis cryptium" in norm(row["name"]),"Niepasujaca nazwa"
+                  assert "archiwal" not in str(row["scope"] or "").lower(),"Archiwalny wariant"
+                  old=str(row["pdf_path"] or "").strip()
+                  assert not old or not ((ROOT/old).is_file() and (ROOT/old).open("rb").read(5)==b"%PDF-"),"Nie zastępuj poprawnego PDF"
+              columns=[x[1] for x in db.execute("PRAGMA table_info(variants)") if x[1]!="pdf_path"]
+              def clinical_hash():
+                  q="SELECT "+",".join('"'+x+'"' for x in columns)+" FROM variants ORDER BY id"
+                  return hashlib.sha256(json.dumps([list(x) for x in db.execute(q)],ensure_ascii=False,default=str).encode()).hexdigest()
+              original=clinical_hash()
+              try:
+                  db.execute("BEGIN IMMEDIATE")
+                  db.execute("INSERT OR IGNORE INTO documents(path) VALUES (?)",(str(DEST.relative_to(ROOT)),))
+                  for id_ in IDS:
+                      c=db.execute("UPDATE variants SET pdf_path=? WHERE id=? AND rpl_id=? AND upd_id=?",
+                                   (str(DEST.relative_to(ROOT)),id_,"100490423","600000992040"))
+                      assert c.rowcount==1
+                  assert clinical_hash()==original,"Zmieniono dane kliniczne"
+                  assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+                  assert not db.execute("PRAGMA foreign_key_check").fetchall()
+                  DEST.write_bytes(data)
+                  db.commit()
+              except:
+                  db.rollback()
+                  DEST.unlink(missing_ok=True)
+                  raise
+              db.close()
+              result.update(status="linked",linked=6,pdf_sha256=hashlib.sha256(data).hexdigest(),
+                            sqlite_sha256=hashlib.sha256(DB.read_bytes()).hexdigest())
+          except Exception as error:
+              result["error"]=type(error).__name__+": "+str(error)
+              result["status"]="not_linked"
+          finally:
+              write_report()
+          print("BOVILIS_PL_RESULT",json.dumps(result,ensure_ascii=False))
+          
+          PY
+          python -m py_compile /tmp/bovilis_pl.py
+          python /tmp/bovilis_pl.py
+      - name: Commit confirmed PDF and SQLite links only
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite data/ChPL/UPD/
+          if git diff --cached --quiet; then
+            echo "No validated changes; database unchanged"
+            exit 0
+          fi
+          git commit -m 'fix: Bovilis Cryptium polska ChPL EMA 2026 i 6 powiazan [skip ci]'
+          git push origin HEAD:winforms
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bovilis-cryptium-polska-chpl-raport
+          path: ema_bovilis_pl_raport/
+          retention-days: 14
