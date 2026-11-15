@@ -159,14 +159,17 @@ jobs:
                   assert signature()==sig_before,"Nieoczekiwana zmiana danych klinicznych"
                   assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
                   assert not db.execute("PRAGMA foreign_key_check").fetchall()
+                  originals={dest:dest.read_bytes() if dest.exists() else None for dest,_ in new_files}
                   for dest,data in new_files:
                       dest.write_bytes(data)
                   db.commit()
               except:
                   db.rollback()
-                  for dest,_ in new_files:
-                      if dest.exists() and any(x[0]==dest for x in new_files):
-                          dest.unlink()
+                  for dest,original in locals().get("originals",{}).items():
+                      if original is None:
+                          dest.unlink(missing_ok=True)
+                      else:
+                          dest.write_bytes(original)
                   raise
           assert signature()==sig_before
           after_active=[dict(x) for x in db.execute("SELECT id,name,rpl_id,pdf_path,scope FROM variants WHERE scope IS NULL OR lower(scope) NOT LIKE '%archiwal%'")]
