@@ -45,8 +45,8 @@ def main():
             # Replace only the established withdrawal wording inside cards.
             new_card = card_text
             if card_text:
-                new_card = re.sub(r"(?i)(\\bTkanki(?: jadalne)?\\s*:\\s*)2\\s*dni\\b", r"\\g<1>1 dzień", new_card)
-                new_card = re.sub(r"(?i)(\\bMleko\\s*:\\s*)(?:zero\\s+godzin|0\\s*h(?:odzin)?)\\b", r"\\g<1>0 godzin", new_card)
+                new_card = re.sub(r"(?i)(\bTkanki(?: jadalne)?\s*:\s*)2\s*dni\b", r"\g<1>1 dzień", new_card)
+                new_card = re.sub(r"(?i)(\bMleko\s*:\s*)(?:zero\s+godzin|0\s*h(?:odzin)?)\b", r"\g<1>0 godzin", new_card)
             if (tissues, milk, short, card_text) != (TISSUES, MILK, SHORT, new_card):
                 updates += 1
             print(f"Cyclix variant {id_}: {tissues!r}, {milk!r}, {short!r} -> {TISSUES!r}, {MILK!r}, {SHORT!r}")
