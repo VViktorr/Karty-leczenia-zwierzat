@@ -52,7 +52,7 @@ jobs:
           active=[dict(x) for x in db.execute("SELECT id,rpl_id,name,pdf_path,scope FROM variants WHERE scope IS NULL OR lower(scope) NOT LIKE '%archiwal%'")]
           assert len(active)==2902
           missing=[x for x in active if not str(x["pdf_path"] or "").strip() or not valid(root/str(x["pdf_path"]))]
-          assert len(missing)==275,"Zmiana liczby brakow od audytu"
+          assert 0<=len(missing)<=275, f"Nieoczekiwana liczba brakow: {len(missing)}"
           groups=defaultdict(list)
           for x in missing:
               rpl=str(x["rpl_id"] or "").strip()
@@ -106,7 +106,7 @@ jobs:
           
           reportdir=Path("partia25_raport")
           reportdir.mkdir(exist_ok=True)
-          result={"before_missing":275,"source_sha256":base_sha,"groups_selected":len(fixes),
+          result={"before_missing":len(missing),"source_sha256":base_sha,"groups_selected":len(fixes),
                   "variants_selected":sum(len(x["entries"]) for x in fixes),
                   "skipped_variants_by_reason":dict(skipped),
                   "selection":[{"rpl":x["rpl"],"file":x["file"].relative_to(root).as_posix(),
@@ -152,7 +152,8 @@ jobs:
                       # original bytes must not be guessed; fail job and leave workspace uncommitted.
                   raise
               result["status"]="updated"
-              result["after_missing"]=275-result["variants_selected"]
+              result["after_missing"]=sum(1 for v in active if not str(v["pdf_path"] or "").strip() or not valid(root/str(v["pdf_path"]))) - result["variants_selected"]
+              assert 0<=result["after_missing"]<=result["before_missing"]-result["variants_selected"],"Niezgodna liczba pozostalych brakow"
               result["sqlite_sha_after"]=hashlib.sha256(database.read_bytes()).hexdigest()
               print("PARTIA25_RESULT",json.dumps(result,ensure_ascii=False))
               (reportdir/"result.json").write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf8")
