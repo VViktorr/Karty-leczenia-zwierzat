@@ -23,3 +23,18 @@ Wszystkie 18 wariantów SQLite mają odmienny zakres IM/SC: **20–40 j.m. (2–
 ## Bezpieczeństwo
 
 Raport jest dokumentacyjny. Workflow 15 nie zmienił SQLite. Dopuszczona następna operacja: jedynie 6 powiązań Enrofloksacyny z PDF, bez ruszania pól klinicznych.
+
+## Uzupełnienie: Oxytocinum Vet-Agro — RPL 20383 (15.11.2026)
+
+Użytkownik wskazał bezpośrednio produkt: https://vet-agro.pl/product/oxytocinum/ . Potwierdzone źródła:
+- strona producenta: https://vet-agro.pl/product/oxytocinum/
+- ChPL PDF udostępniona przez producenta (skan pięciostronicowy): https://vet-agro.pl/wp-content/uploads/2022/07/Charakterystyka-20383-20160412000000-264_W-20160720000641.pdf
+- urzędowa ulotka RPL: https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/20383/leaflet
+
+**Identyfikacja:** Oxytocinum 10 j.m./ml Vet-Agro, numer pozwolenia 1173/01, **RPL 20383**. Jest to **inny produkt** niż Oxytocinum Biowet Puławy (RPL 16987, pozwolenie 0045). Nie łączyć ich danych klinicznych.
+
+**ChPL Vet-Agro (sekcja 4.9):** krowy i klacze 10–60 j.m. (1–6 ml) domięśniowo/podskórnie; dożylnie dawka o 50% niższa; powtórzenie nie wcześniej niż po 20 minutach. **Karencja (4.11):** bydło, owce, kozy: tkanki 0 dni, mleko 0 godzin; konie, świnie: tkanki 0 dni. Producent podaje te same wartości.
+
+**Rozbieżność:** Warianty SQLite 2198–2215 nadal mają 20–40 j.m. (2–4 ml) dla IM/SC i 5–10 j.m. (0,5–1 ml) dla IV; nie są one zgodne z pełnym zakresem podanym przez Vet-Agro, ani z odrębną ChPL Biowet Puławy. Pojawienie się RPL 16987 w bazie nie jest dowodem, że wszystkie 18 wariantów należą do Biowet Puławy.
+
+**Decyzja bezpieczeństwa:** Przed zmianą `rpl_id`, `dose` i `pdf_path` dla wariantów trzeba potwierdzić konkretną kartotekę Subiekta (producent, kod EAN lub pełna nazwa i opakowanie). Nie modyfikować tych 18 wariantów hurtowo na podstawie samego stężenia. Jeśli kartoteka jest produktem Vet-Agro, przypisać jej RPL 20383 i dane z właściwej ChPL, a Biowet Puławy zachować osobno.
