@@ -20,7 +20,7 @@ PDF w repozytorium: `data/ChPL/RPL/RPL_18835_Cyclix_250_mcg_ml_roztwór_do_wstrz
 
 **Warianty do dopasowania według faktycznego wskazania:** 197–204, 219–226. Każdemu przypisać odpowiedni schemat **dopiero po odczytaniu kolumn `indication`, `route` i `dose` z aktualnej SQLite**. Nie podstawiać jednakowego schematu powtórzeń wszystkim wariantom.
 
-**Rozbieżność do ręcznej weryfikacji przed zmianą karencji:** aktualna urzędowa ChPL RPL 18835 (sekcja 3.12) podaje tkanki 1 dzień i mleko 0 godzin, podczas gdy krążą także opisy ze starszą wartością tkanek 2 dni. Nie nadpisano żadnej karencji bez ustalenia aktualnej podstawy.
+**Weryfikacja urzędowa 15.11.2026:** sekcja 3.12 aktualnej polskiej ChPL RPL 18835 podaje **tkanki jadalne: 1 dzień; mleko: 0 godzin**. Rozbieżne opracowania ze starszą wartością 2 dni nie są podstawą aktualizacji. Korektę SQLite przygotowano w `scripts/fix-cyclix-withdrawal-rpl18835.py` i `.github/workflows/cyclix-rpl18835-withdrawal.yml`; **commit dokumentacji nie oznacza wykonania aktualizacji bazy**. Po zakończonym workflow należy potwierdzić odrębny commit zmieniający SQLite i wynik kontroli integralności.
 
 ## Calciphos — RPL 20485
 
