@@ -1,0 +1,104 @@
+name: Jednorazowe porzadkowanie wariantow i karencji
+on:
+  push:
+    branches: [winforms]
+    paths:
+      - '.github/workflows/medicine-cleanup-once.yml'
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    if: contains(github.event.head_commit.message, 'start safe medicine catalog cleanup')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Etap 1 — Cefquinor DC — jasne warunki karencji mleka
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3
+          path='src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite'
+          db=sqlite3.connect(path);db.execute('PRAGMA foreign_keys=ON')
+          rows=db.execute("""SELECT v.id,v.milk,v.card_text,v.edible_tissues,v.species
+                             FROM variants v JOIN products p ON p.symbol=v.symbol
+                             WHERE v.rpl_id='35332' AND UPPER(p.name) LIKE '%CEFQUINOR%DC%'""").fetchall()
+          assert len(rows)>=1, 'Brak wariantu Cefquinor DC — nie zmieniono niczego'
+          full='1 dzień po wycieleniu, jeśli okres zasuszenia przekracza 5 tygodni; 36 dni po podaniu produktu, jeśli okres zasuszenia wynosi 5 tygodni lub mniej.'
+          short='tk. 2 dni; ml. >5 tyg. zasuszenia: 1 dzień po wycieleniu; <=5 tyg.: 36 dni po podaniu'
+          with db:
+              for id,old,card,tissues,species in rows:
+                  assert str(tissues).strip()=='2 dni',(id,tissues)
+                  assert 'Bydło' in str(species),(id,species)
+                  assert '36 dni' in str(old) and '5 tyg' in str(old),(id,old)
+                  if card and old in card:card=card.replace(old,full)
+                  else:card=(card or '')+' | Mleko: '+full
+                  db.execute('UPDATE variants SET milk=?,withdrawal_short=?,card_text=? WHERE id=?',(full,short,card,id))
+                  db.execute('INSERT OR REPLACE INTO price_withdrawal_entries(id,compact_text) VALUES (?,?)',(id,short))
+          assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          assert not db.execute('PRAGMA foreign_key_check').fetchall()
+          print('Etap 1: zmieniono warianty Cefquinor DC:',[r[0] for r in rows])
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet || git commit -m 'fix: czytelne dwie karencje mleka Cefquinor DC [skip ci]'
+          git push origin HEAD:winforms
+      - name: Etap 2 — niedopuszczona droga Excenel Fluid
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3
+          p='src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite'
+          db=sqlite3.connect(p);db.execute('PRAGMA foreign_keys=ON')
+          rows=db.execute("""SELECT id,symbol,species,route,scope FROM variants
+                     WHERE rpl_id='16868' AND UPPER(species) LIKE '%WARIANT DO WERYFIKACJI%'
+                     AND UPPER(route)='IM'""").fetchall()
+          assert len(rows)==2,('Niespodziewana liczba niedopuszczonych wariantow',rows)
+          with db:
+              for id,symbol,species,route,scope in rows:
+                  new='Archiwalne — wariant niedopuszczonej drogi podania'
+                  db.execute('UPDATE variants SET scope=? WHERE id=?',(new,id))
+          for _,symbol,_,_,_ in rows:
+              good=db.execute("""SELECT COUNT(*) FROM variants WHERE symbol=? AND species='Bydło'
+                        AND UPPER(route)='SC' AND COALESCE(scope,'') NOT LIKE '%Archiwalne%'""",(symbol,)).fetchone()[0]
+              assert good>0,('Brak prawidlowego wariantu SC',symbol)
+          assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          print('Etap 2: zachowano jako archiwalne 2 niedopuszczone warianty Excenel Fluid', [r[0] for r in rows])
+          PY
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet || git commit -m 'fix: ukryj niedopuszczone warianty Excenel Fluid IM [skip ci]'
+          git push origin HEAD:winforms
+      - name: Etap 3 — zduplikowane warianty Gabbrovet
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3
+          p='src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite'
+          db=sqlite3.connect(p);db.execute('PRAGMA foreign_keys=ON')
+          symbols=[r[0] for r in db.execute("""SELECT symbol FROM products WHERE rpl_id='40611' AND UPPER(name) LIKE 'GABBROVET SOL%' ORDER BY symbol""")]
+          assert len(symbols)==3,('Oczekiwano trzech opakowan',symbols)
+          archived=[]
+          with db:
+              for symbol in symbols:
+                  rows=db.execute('SELECT id,species,route,edible_tissues,milk,scope FROM variants WHERE symbol=? ORDER BY id',(symbol,)).fetchall()
+                  assert len(rows)==4,(symbol,rows)
+                  calves=[r for r in rows if ('cielęt' in r[1].lower() or 'nierozwinięt' in r[1].lower())]
+                  pig=[r for r in rows if 'świn' in r[1].lower()]
+                  assert len(calves)==3 and len(pig)==1,(symbol,rows)
+                  assert all(str(r[3]).strip()=='20 dni' for r in calves),(symbol,calves)
+                  assert all('doustnie' in str(r[2]).lower() for r in calves),(symbol,calves)
+                  preferred=[r for r in calves if r[1]=='Cielęta bydła z nierozwiniętą funkcją przedżołądków']
+                  assert len(preferred)==1,(symbol,calves)
+                  for row in calves:
+                      if row[0]==preferred[0][0]:continue
+                      db.execute('UPDATE variants SET scope=? WHERE id=?',('Archiwalne — scalony duplikat wariantu cieląt',row[0]))
+                      archived.append(row[0])
+          assert len(archived)==6,archived
+          assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          print('Etap 3: zachowano 1 wariant cieląt i 1 świń na opakowanie; zarchiwizowano',archived)
+          PY
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git diff --cached --quiet || git commit -m 'refactor: scal powielone warianty Gabbrovet w widokach [skip ci]'
+          git push origin HEAD:winforms
