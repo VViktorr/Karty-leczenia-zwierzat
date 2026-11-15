@@ -26,4 +26,5 @@ jobs:
                   print('PRODUCT',json.dumps(dict(p),ensure_ascii=False))
                   for v in vs:
                       print('VARIANT',json.dumps(dict(v),ensure_ascii=False))
+          print('Report complete')
           PY
