@@ -1,0 +1,167 @@
+name: "Partia 27 - audyt RPL i UPD dla 30 grup"
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: false
+      - name: "Czytnik PDF"
+        run: python -m pip install --disable-pip-version-check pymupdf
+      - name: "Sprawdz 30 grup lokalnych ChPL RPL i UPD"
+        shell: bash
+        run: |
+          cat > /tmp/partia27.py <<'PY'
+          from collections import defaultdict, Counter
+          from pathlib import Path
+          import hashlib, json, re, sqlite3, unicodedata
+          import fitz
+          
+          ROOT=Path.cwd()
+          DB=ROOT/"src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite"
+          REPORT=Path("partia27_raport")
+          REPORT.mkdir(exist_ok=True)
+          db=sqlite3.connect(f"file:{DB}?mode=ro",uri=True)
+          db.row_factory=sqlite3.Row
+          assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+          assert not db.execute("PRAGMA foreign_key_check").fetchall()
+          assert db.execute("SELECT count(*) FROM variants").fetchone()[0]==2944
+          assert "upd_id" in [col[1] for col in db.execute("PRAGMA table_info(variants)")]
+          def norm(s):
+              raw=unicodedata.normalize("NFKD",str(s or "").casefold())
+              return re.sub(r"[^a-z0-9]+"," ","".join(c for c in raw if not unicodedata.combining(c))).strip()
+          def valid_pdf(path):
+              return path.is_file() and path.open("rb").read(5)==b"%PDF-"
+          active=[dict(r) for r in db.execute("SELECT id,name,rpl_id,upd_id,pdf_path,scope FROM variants WHERE scope IS NULL OR lower(scope) NOT LIKE '%archiwal%'")]
+          assert len(active)==2902
+          missing=[r for r in active if not str(r["pdf_path"] or "").strip() or not valid_pdf(ROOT/str(r["pdf_path"]))]
+          assert len(missing)==257, f"Baza zmieniona od partii 26: liczba brakow = {len(missing)}"
+          upd_files=defaultdict(list)
+          for f in sorted((ROOT/"data/ChPL/UPD").glob("UPD_*.pdf")):
+              mat=re.match(r"UPD_(\d+)_",f.name)
+              if mat:upd_files[mat.group(1)].append(f)
+          rpl_files=defaultdict(list)
+          for f in sorted((ROOT/"data/ChPL/RPL").glob("RPL_*.pdf")):
+              mat=re.match(r"RPL_(\d+)_",f.name)
+              if mat:rpl_files[mat.group(1)].append(f)
+          docs_cache={}
+          def inspect_pdf(path):
+              if path in docs_cache:return docs_cache[path]
+              info={"path":path.relative_to(ROOT).as_posix(),"valid_header":valid_pdf(path),"pages":0,"text_chars":0,
+                    "has_chpl":False,"status":"","text":""}
+              data=path.read_bytes()
+              offset=data.find(b"%PDF-")
+              if offset!=0:
+                  info["status"]="incorrect_pdf_header" if offset>0 else "no_pdf_header"
+              if offset<0 or offset>262144:
+                  docs_cache[path]=info
+                  return info
+              try:
+                  with fitz.open(stream=data[offset:],filetype="pdf") as doc:
+                      info["pages"]=len(doc)
+                      if doc.is_encrypted or not 2<=len(doc)<=100:
+                          info["status"]="encrypted_or_unexpected_pages"
+                      else:
+                          info["text"]=norm(" ".join(p.get_text(sort=True) for p in doc))
+                          info["text_chars"]=len(info["text"])
+                          info["has_chpl"]="charakterystyk" in info["text"]
+                          if info["text_chars"]<350:info["status"]="no_text_layer"
+                          elif not info["has_chpl"]:info["status"]="no_chpl_heading"
+                          elif offset!=0:info["status"]="xml_or_other_prefix"
+                          else:info["status"]="readable_pdf"
+              except Exception as exc:
+                  info["status"]="pdf_open_error: "+type(exc).__name__
+              docs_cache[path]=info
+              return info
+          def aliases(name):
+              # Product name words that are not generic dosage/form tokens
+              bad={"roztwor","zawiesina","proszek","weterynaryjny","tabletki","tabletka","zastrzyk",
+                   "doustny","doustna","wstrzykiwan","strzykawka","mg","ml","dla","kotow","psow","bydla"}
+              return [word for word in norm(name).split() if len(word)>=5 and word not in bad and not word.isdigit()]
+          def name_in_pdf(name,text):
+              words=aliases(name)
+              if not words:return False
+              # Word-level match of primary product name, NOT merely a substring.
+              # Does not by itself authorize edits of a multi-strength or multi-formulation record.
+              return bool(re.search(r"\b"+re.escape(words[0])+r"\b",text))
+          groups=defaultdict(list)
+          for row in missing:
+              key=str(row["rpl_id"] or "").strip()
+              if not key:key="NO_RPL"
+              groups[key].append(row)
+          ordered=sorted(groups.items(),key=lambda item:(-len(item[1]),item[0]))
+          selected=ordered[:30]
+          report_rows=[]
+          counts=Counter()
+          for rpl,entries in selected:
+              result={"rpl":rpl,"ids":[r["id"] for r in entries],
+                      "names":sorted(set(str(r["name"] or "") for r in entries)),
+                      "upd_ids":sorted(set(str(r["upd_id"] or "").strip() for r in entries)),
+                      "category":"","candidate_files":[],"reasons":[]}
+              unique_upd={str(r["upd_id"] or "").strip() for r in entries if str(r["upd_id"] or "").strip()}
+              if rpl=="NO_RPL":result["reasons"].append("Brak jednoznacznego ID RPL")
+              rpl_docs=rpl_files.get(rpl,[])
+              if len(rpl_docs)==0:result["reasons"].append("Brak lokalnego PDF o wskazanym RPL")
+              if len(rpl_docs)>1:result["reasons"].append("Kilka dokumentow o tym samym RPL")
+              candidate_set={str(p):p for p in rpl_docs}
+              if len(unique_upd)==1:
+                  one=list(unique_upd)[0]
+                  exact=upd_files.get(one,[])
+                  for f in exact:candidate_set[str(f)]=f
+                  if not exact:result["reasons"].append("Brak lokalnego UPD PDF o identycznym upd_id")
+              elif len(unique_upd)>1:
+                  result["reasons"].append("W grupie wystepuje kilka upd_id; sprawdzic pojedyncze warianty")
+              else:
+                  result["reasons"].append("Brak upd_id; nie przypisywac UPD PDF po samej nazwie")
+              for file in candidate_set.values():
+                  doc=inspect_pdf(file)
+                  ok=doc["status"]=="readable_pdf" and all(name_in_pdf(r["name"],doc["text"]) for r in entries)
+                  entry={"path":doc["path"],"status":doc["status"],"pages":doc["pages"],
+                         "name_verified":ok,"text_chars":doc["text_chars"],
+                         "exact_upd_id_match":bool(re.match(r"UPD_(\d+)_",file.name) and
+                                                    len(unique_upd)==1 and re.match(r"UPD_(\d+)_",file.name).group(1) in unique_upd)}
+                  result["candidate_files"].append(entry)
+              safe=[c for c in result["candidate_files"] if c["name_verified"] and
+                    (c["path"].startswith("data/ChPL/RPL/RPL_"+rpl+"_") or c["exact_upd_id_match"])]
+              if len(safe)==1 and len(result["names"])==1:
+                  result["category"]="candidate_for_individual_clinical_review"
+              elif len(safe)>1:
+                  result["category"]="multiple_verified_candidates_review_required"
+              elif not result["candidate_files"]:
+                  result["category"]="official_document_missing"
+              else:
+                  result["category"]="document_present_but_unverified"
+              counts[result["category"]]+=len(entries)
+              report_rows.append(result)
+          
+          report={"sqlite_sha256":hashlib.sha256(DB.read_bytes()).hexdigest(),"total_active":len(active),
+                  "total_missing":len(missing),"total_groups":len(groups),"checked_groups":len(selected),
+                  "checked_variants":sum(len(x) for _,x in selected),
+                  "category_variant_counts":dict(counts),"groups":report_rows,
+                  "note":"Audyt tylko do odczytu. Nawet zgodnosc nazwy nie potwierdza mocy, postaci, rejestracji w Polsce ani aktualnosci ChPL."}
+          (REPORT/"result.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf8")
+          lines=["# Partia 27 — ocena 30 grup brakujacych powiazan ChPL",
+                 "","SQLite bez zmian. Nie dopinaj UPD po samej nazwie; zgodnosc upd_id jest konieczna.",
+                 "",f"Braki: **{len(missing)} wariantow** w {len(groups)} grupach.","",
+                 "## Wyniki dla 30 grup","",
+                 "| RPL | Nazwa | Warianty | Kategoria |","|---|---|---:|---|"]
+          for r in report_rows:
+              lines.append(f"| {r['rpl']} | {r['names'][0].replace('|','/')} | {len(r['ids'])} | {r['category']} |")
+          lines+=["","Szczegoly, kandydaci, bledy dokumentow i numery UPD: result.json."]
+          (REPORT/"result.md").write_text("\n".join(lines)+"\n",encoding="utf8")
+          print("PARTIA27_RESULT",json.dumps({"total_missing":len(missing),"checked_groups":len(selected),"checked_variants":report["checked_variants"],"category_variant_counts":dict(counts),"groups":report_rows},ensure_ascii=False))
+          db.close()
+          PY
+          python -m py_compile /tmp/partia27.py
+          python /tmp/partia27.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partia27-audyt-rpl-upd
+          path: partia27_raport/
+          retention-days: 14
