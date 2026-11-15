@@ -59,4 +59,5 @@ jobs:
             print(json.dumps({'table':table,'key':key,'symbol':symbol,'name':title,'species':species,'column':col,'categories':sorted(labels)},ensure_ascii=False))
           print('MATCHES_END')
           print('AUDIT_END')
+          print('Audit complete')
           PY
