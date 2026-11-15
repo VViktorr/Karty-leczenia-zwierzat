@@ -68,9 +68,13 @@ def main():
         all_target_ids=set()
         for family,(ids,filename) in FAMILIES.items():
             rows=[r for r in allrows if str(r["rpl_id"]) in ids]
-            assert rows and len(rows)<60,(family,"No/current variants unexpectedly missing")
+            assert len(rows)<60,(family,"Too many variants for targeted audit")
             all_target_ids.update(r["id"] for r in rows)
             report.extend([f"## {family}: {len(rows)} wariantów", "",f"Dokument: `data/ChPL/RPL/{filename}`.",""])
+            if not rows:
+                report += ["**UWAGA: brak dopasowania po wskazanym ID RPL w aktualnej bazie.**",
+                           "Nie przypisano ID ani dawkowania na podstawie samej nazwy. Do ręcznej weryfikacji.", ""]
+                print("WARNING_NO_RPL_MATCH",family,sorted(ids))
             for r in rows:
                 vid=r["id"]; species=(r["species"] or "").casefold()
                 route=(r["route"] or "").casefold()
