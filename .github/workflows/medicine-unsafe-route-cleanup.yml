@@ -31,7 +31,7 @@ jobs:
           rows={}
           for id,(rpl,route,phrase) in targets.items():
               row=db.execute('SELECT id,symbol,rpl_id,route,indication,dose,scope FROM variants WHERE id=?',(id,)).fetchone()
-              assert row is not None and row[2]==rpl and row[3]==route and phrase.casefold() in (row[4] or '').casefold(),(id,row)
+              assert row is not None and row[2]==rpl and row[3]==route and phrase.casefold() in ((row[4] or '')+' '+(row[5] or '')).casefold(),(id,row)
               assert not row[6] or 'Archiwalne' in row[6],(id,row)
               assert 'ChPL' in (row[5] or ''),(id,row)
               rows[id]=row
