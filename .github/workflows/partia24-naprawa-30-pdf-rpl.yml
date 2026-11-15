@@ -133,7 +133,11 @@ jobs:
                           assert previous and str(previous["rpl_id"])==x["rpl"]
                           assert str(previous["pdf_path"] or "").strip()==str(row["pdf_path"] or "").strip()
                           old=str(previous["pdf_path"] or "").strip()
-                          assert not old or not valid(root/old),"Nie nadpisuj istniejacego prawidlowego PDF"
+                          # Ten sam plik zostal naprawiony w tym przebiegu: przed naprawa nie byl prawidlowym PDF.
+                          if old==path:
+                              assert not x["original"].startswith(b"%PDF-"),"Nie wolno nadpisac uprzednio poprawnego PDF"
+                          else:
+                              assert not old or not valid(root/old),"Nie nadpisuj istniejacego prawidlowego PDF"
                           cur=db.execute("UPDATE variants SET pdf_path=? WHERE id=? AND rpl_id=?",(path,row["id"],x["rpl"]))
                           assert cur.rowcount==1
                   assert db.execute("SELECT COUNT(*) FROM variants").fetchone()[0]==2944
