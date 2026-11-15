@@ -19,7 +19,7 @@ jobs:
           from pathlib import Path
           import fitz,sqlite3,hashlib,json,unicodedata,re
           root=Path.cwd()
-          pdf=root/"data/ChPL/UPD/ema-combined-v6045-boviliscryptium-vnra17802-2024-12-18-pl.pdf"
+          pdf=root/"data/ChPL/UPD/UPD_600000992040_Bovilis_Cryptium_UPD_ChPL.pdf"
           dbfile=root/"src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite"
           reportdir=Path("bovilis-pdf-raport");reportdir.mkdir(exist_ok=True)
           expected_pdf="d3826ff712a18bf6d2383d1bb34de337353397bbdd7a1d966f0f0fb706e00b2e"
