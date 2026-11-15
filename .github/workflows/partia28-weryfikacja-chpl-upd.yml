@@ -38,7 +38,7 @@ jobs:
           ]
           def norm(s):
               raw=unicodedata.normalize("NFKD",str(s or "").casefold())
-              return re.sub(r"[^a-z0-9]+"," ",".join(c for c in raw if not unicodedata.combining(c))).strip()
+              return re.sub(r"[^a-z0-9]+", " ", "".join(c for c in raw if not unicodedata.combining(c))).strip()
           def valid_pdf(p):
               return p.is_file() and p.open("rb").read(5)==b"%PDF-"
           conn=sqlite3.connect(DB)
