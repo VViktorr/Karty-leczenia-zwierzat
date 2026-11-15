@@ -6,6 +6,17 @@ W tej partii poprawiono 0 wpisów bez liczbowej dawki; inne dawki i karencje poz
 UWAGA: Pneumospectin: dokument data/ChPL/RPL/RPL_32411_Pneumospectin_RPL_ChPL.pdf nie ma prawidłowego nagłówka PDF lub nie istnieje; wymaga zastąpienia urzędowym PDF
 UWAGA: Rispoval IBR Vivum: dokument data/ChPL/RPL/RPL_22647_Rispoval_IBR-Marker_Vivum_liofilizat_i_rozpus_RPL_ChPL.pdf nie ma prawidłowego nagłówka PDF lub nie istnieje; wymaga zastąpienia urzędowym PDF
 
+## Wnioski po analizie 9 wariantów pozornie wymagających uzupełnienia
+
+Wszystkie dziewięć wskazanych wariantów Enrocin/Enroxil **jest już archiwalnych**. Nie są to aktywne braki dawkowania:
+
+- **Enrocin:** ID 1637, 2337, 1581, 2338, 1588, 2339 — droga SC u świń niepotwierdzona w ChPL, zachować archiwizację.
+- **Enroxil:** ID 1390 — droga IM u psa niezgodna z ChPL; ID 1393 i 2340 — droga SC u świń niezgodna z ChPL; zachować archiwizację.
+
+Wpisów archiwalnych **nie wolno uzupełniać** dawkami pochodzącymi z innej drogi podania. W partii 04 zmieniono **0** dawek; to prawidłowe zachowanie skryptu, a nie nieudana korekta. Raport pierwotny z 15.11 wymienia te rekordy historycznie, dlatego nie należy ich ponownie liczyć jako aktywne zaległości.
+
+W dalszej kolejności: ustalić poprawne źródła PDF Pneumospectin i Rispoval IBR Vivum, sprawdzić Enrofloksacynę 10% po właściwym identyfikatorze (bez automatycznego dopasowania), a poprawki wprowadzać tylko do aktywnych wariantów.
+
 ## Enrocin 5%: 24 wariantów
 
 Dokument: `data/ChPL/RPL/RPL_18715_Enrocin_5_inj_RPL_ChPL.pdf`.
