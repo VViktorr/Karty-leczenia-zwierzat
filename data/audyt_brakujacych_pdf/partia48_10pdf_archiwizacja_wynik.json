@@ -1,0 +1,526 @@
+{
+  "partia": 48,
+  "initial_missing_active": 45,
+  "documents": [
+    {
+      "file": "data/ChPL/UPD/charakterystyka-18793-20200131000000-2169_w-20200217000339.pdf",
+      "brand": "L-Spec-VMD",
+      "sha256": "9bcc94840a3dd77596d719dbe441b9d916a5e8dac3186f6febc3d01bd8e05849",
+      "pages": 5,
+      "status": "verified_brand_in_document",
+      "text_opening": "charakterystyka produktu leczniczego weterynaryjnego 1 1. nazwa produktu leczniczego weterynaryjnego l-spec-vmd. 50 mg/ml + 100 mg/ml. roztwor do wstrzykiwan dla swin 2. sklad jakosciowy i ilosciowy substancje czynne: linkomycyna (w postaci chlorowodorku) 50 m",
+      "linked_count": 1
+    },
+    {
+      "file": "data/ChPL/UPD/ema-combined-v115-meloxidyl-vnra27546-2026-07-30-pl.pdf",
+      "brand": "Meloxidyl",
+      "sha256": "57aa9d73ce6faf8a96a22c319e20c0e3555c5957e604bda48ffdc5eb01b87904",
+      "pages": 61,
+      "status": "verified_brand_in_document",
+      "text_opening": "aneks i charakterystyka weterynaryjnego produktu leczniczego 1. nazwa weterynaryjnego produktu leczniczego meloxidyl 1.5 mg/ml zawiesina doustna dla psow 2. sklad jakosciowy i ilosciowy kazdy ml zawiera: substancja czynna: meloksykam 1.5 mg substancje pomocnic",
+      "linked_count": 2
+    },
+    {
+      "file": "data/ChPL/UPD/ema-combined-v130-startvac-vra0000288186-2026-06-05-pl.pdf",
+      "brand": "Startvac",
+      "sha256": "0fd698234d2c298436f1ac30d26b5b265fbb10160f8dec3d584975eabc7abc5e",
+      "pages": 20,
+      "status": "verified_brand_in_document",
+      "text_opening": "aneks i charakterystyka weterynaryjnego produktu leczniczego 1 1. nazwa weterynaryjnego produktu leczniczego startvac emulsja do wstrzykiwan dla bydla 2. sklad jakosciowy i ilosciowy jedna dawka (2ml) zawiera: substancje czynne: inaktywowana escherichia coli j",
+      "linked_count": 3
+    },
+    {
+      "file": "data/ChPL/UPD/ema-combined-v2555-vectra3d-vra0000334831-2026-10-23-pl (1).pdf",
+      "brand": "Vectra 3D",
+      "sha256": "e3f62b6189fc5c8c2d06187c6ca2fa33c196be9c3307722949d7566a749b853d",
+      "pages": 26,
+      "status": "verified_brand_in_document",
+      "text_opening": "aneks i charakterystyka weterynaryjnego produktu leczniczego 1 1. nazwa weterynaryjnego produktu leczniczego vectra 3d roztwor do nakrapiania dla psow 1.5 –4 kg vectra 3d roztwor do nakrapiania dla psow > 4 –10 kg vectra 3d roztwor do nakrapiania dla psow > 10",
+      "size_checks_unresolved": [
+        {
+          "id": 2727,
+          "class": "1-4"
+        }
+      ],
+      "linked_count": 4
+    },
+    {
+      "file": "data/ChPL/UPD/ema-combined-v3703-bovela-vra-0023-g-pl.pdf",
+      "brand": "Bovela",
+      "sha256": "1bdb2aa1130de5286ea2bae1aca9231117b1046f292c3ba557ce2a4e912098ab",
+      "pages": 25,
+      "status": "verified_brand_in_document",
+      "text_opening": "aneks i charakterystyka weterynaryjnego produktu leczniczego 1 1. nazwa weterynaryjnego produktu leczniczego bovela liofilizat i rozpuszczalnik do sporzadzania zawiesiny do wstrzykiwan dla bydla 2. sklad jakosciowy i ilosciowy kazda dawka (2 ml) zawiera: liofi",
+      "linked_count": 3
+    },
+    {
+      "file": "data/ChPL/UPD/ema-combined-v41-locatim-vra0000322515-2026-07-02-pl.pdf",
+      "brand": "Locatim",
+      "sha256": "dd3e43639dfdc19dca1ba1faa28009250682c6f348b7203d3eae6e9eee80c009",
+      "pages": 17,
+      "status": "verified_brand_in_document",
+      "text_opening": "aneks i charakterystyka weterynaryjnego produktu leczniczego 1 1. nazwa weterynaryjnego produktu leczniczego locatim roztwor doustny 2. sklad jakosciowy i ilosciowy substancje czynne: bydleca skoncentrowana serwatka zawierajaca swoiste immunoglobuliny g przeci",
+      "linked_count": 2
+    },
+    {
+      "file": "data/ChPL/UPD/ema-combined-v4344-exzolt-vra0017-2024-08-20-pl.pdf",
+      "brand": "Exzolt",
+      "sha256": "b8e2fa6e9905f054140b5319b30fbcafafbc92c0ccbdaf75bef8c7d3839c6be9",
+      "pages": 31,
+      "status": "verified_brand_in_document",
+      "text_opening": "aneks i charakterystyka weterynaryjnego produktu leczniczego 1 1. nazwa weterynaryjnego produktu leczniczego exzolt 10 mg/ml roztwor do podania w wodzie do picia dla kur 2. sklad jakosciowy i ilosciowy substancja czynna: kazdy ml zawiera 10 mg fluralaneru. sub",
+      "linked_count": 2
+    },
+    {
+      "file": "data/ChPL/UPD/ema-combined-v54-pirsue-wepar-2025-04-10-pl.pdf",
+      "brand": "Pirsue",
+      "sha256": "bad3ad92c1ebe1004195aa7f24344400522a65a2745c721746cc1a3f8320ea4e",
+      "pages": 17,
+      "status": "verified_brand_in_document",
+      "text_opening": "obrotu do dopuszczenie na aneks i charakterystyka produktu leczniczego weterynaryjnego pozwolenia waznego bez leczniczy produkt 1 1. nazwa produktu leczniczego weterynaryjnego pirsue 5 mg/ml roztwor dowymieniowy dla bydla 2. sklad jakosciowy i ilosciowy substa",
+      "linked_count": 2
+    },
+    {
+      "file": "data/ChPL/UPD/ema-combined-v74-proteqflute-vra0033-2022-12-20-pl.pdf",
+      "brand": "ProteqFlu-Te",
+      "sha256": "d328ea17e9b69b1259d8416755380f8e32e4ea8d0e37aae784a437039635ee1d",
+      "pages": 18,
+      "status": "verified_brand_in_document",
+      "text_opening": "aneks i charakterystyka weterynaryjnego produktu leczniczego 1 1. nazwa weterynaryjnego produktu leczniczego proteqflu-te zawiesina do wstrzykiwan 2. sklad jakosciowy i ilosciowy jedna dawka 1 ml zawiera: substancje czynne: antygen wirusa grypy szczep a/eq/ohi",
+      "linked_count": 1
+    },
+    {
+      "file": "data/ChPL/UPD/ulotka-19365-20190522000000-1794_w-20190606000623.pdf",
+      "brand": null,
+      "sha256": "a9a6f990351c64b4af0d7921066322225c8e7ac46587b6a92d107556b6d84a7e",
+      "pages": 4,
+      "status": "unassigned_paper_without_verified_catalog_product",
+      "text_opening": "b. ulotka informacyjna ulotka informacyjna tetra-delta. zawiesina dowymieniowa dla bydla 1. nazwa i adres podmiotu odpowiedzialnego oraz wytworcy odpowiedzialnego za zwolnienie serii. jesli jest inny podmiot odpowiedzialny: zoetis polska sp. z o.o. ul. postepu"
+    }
+  ],
+  "linked": [
+    {
+      "id": 494,
+      "name": "L-Spec-VMD 50 mg/ml + 100 mg/ml",
+      "symbol": "000000000000001773",
+      "subiekt": "L-SPEC-VMD 5/10 A'100 ML",
+      "pdf": "data/ChPL/UPD/charakterystyka-18793-20200131000000-2169_w-20200217000339.pdf",
+      "rpl_id": "18793",
+      "upd_id": null
+    },
+    {
+      "id": 446,
+      "name": "Meloxidyl 20 mg/ml",
+      "symbol": "000000000000001633",
+      "subiekt": "MELOXIDYL 20 MG/ML 50ML 133A5",
+      "pdf": "data/ChPL/UPD/ema-combined-v115-meloxidyl-vnra27546-2026-07-30-pl.pdf",
+      "rpl_id": "100225960",
+      "upd_id": "600000000034"
+    },
+    {
+      "id": 447,
+      "name": "Meloxidyl 20 mg/ml",
+      "symbol": "000000000000001633",
+      "subiekt": "MELOXIDYL 20 MG/ML 50ML 133A5",
+      "pdf": "data/ChPL/UPD/ema-combined-v115-meloxidyl-vnra27546-2026-07-30-pl.pdf",
+      "rpl_id": "100225960",
+      "upd_id": "600000000034"
+    },
+    {
+      "id": 101,
+      "name": "Startvac",
+      "symbol": "000000000000000424",
+      "subiekt": "STARTVAC 1 DAW EMULSJA HIPRA 64CL-1",
+      "pdf": "data/ChPL/UPD/ema-combined-v130-startvac-vra0000288186-2026-06-05-pl.pdf",
+      "rpl_id": "100206307",
+      "upd_id": "600000004174"
+    },
+    {
+      "id": 182,
+      "name": "Startvac",
+      "symbol": "000000000000000857",
+      "subiekt": "STARTVAC 5 DAW",
+      "pdf": "data/ChPL/UPD/ema-combined-v130-startvac-vra0000288186-2026-06-05-pl.pdf",
+      "rpl_id": "100206307",
+      "upd_id": "600000004174"
+    },
+    {
+      "id": 2070,
+      "name": "Startvac",
+      "symbol": "566N-2",
+      "subiekt": "STARTVAC A'25 DAW.",
+      "pdf": "data/ChPL/UPD/ema-combined-v130-startvac-vra0000288186-2026-06-05-pl.pdf",
+      "rpl_id": "100206307",
+      "upd_id": "600000004174"
+    },
+    {
+      "id": 2133,
+      "name": "VECTRA 3D DLA PSÓW >40 kg 1 pipeta",
+      "symbol": "000000000000001649",
+      "subiekt": "VECTRA 3D DLA PSÓW >40 kg 1 pipeta",
+      "pdf": "data/ChPL/UPD/ema-combined-v2555-vectra3d-vra0000334831-2026-10-23-pl (1).pdf",
+      "rpl_id": "100304850",
+      "upd_id": "600000004336"
+    },
+    {
+      "id": 2134,
+      "name": "VECTRA 3D DLA PSÓW 10-25 kg 1 pipeta",
+      "symbol": "000000000000001641",
+      "subiekt": "VECTRA 3D DLA PSÓW 10-25 kg 1 pipeta",
+      "pdf": "data/ChPL/UPD/ema-combined-v2555-vectra3d-vra0000334831-2026-10-23-pl (1).pdf",
+      "rpl_id": "100304872",
+      "upd_id": "600000000151"
+    },
+    {
+      "id": 2135,
+      "name": "VECTRA 3D DLA PSÓW 25-40 kg 1 pipeta",
+      "symbol": "000000000000001642",
+      "subiekt": "VECTRA 3D DLA PSÓW 25-40 kg 1 pipeta",
+      "pdf": "data/ChPL/UPD/ema-combined-v2555-vectra3d-vra0000334831-2026-10-23-pl (1).pdf",
+      "rpl_id": "100304910",
+      "upd_id": "600000004337"
+    },
+    {
+      "id": 2136,
+      "name": "Vectra 3D",
+      "symbol": "000000000000001640",
+      "subiekt": "VECTRA 3D DLA PSÓW 4-10 kg 1 pipeta",
+      "pdf": "data/ChPL/UPD/ema-combined-v2555-vectra3d-vra0000334831-2026-10-23-pl (1).pdf",
+      "rpl_id": "100304850",
+      "upd_id": "600000000156"
+    },
+    {
+      "id": 511,
+      "name": "Bovela",
+      "symbol": "000000000000001845",
+      "subiekt": "BOVELA 5 DAW.",
+      "pdf": "data/ChPL/UPD/ema-combined-v3703-bovela-vra-0023-g-pl.pdf",
+      "rpl_id": "100335708",
+      "upd_id": "600000000329"
+    },
+    {
+      "id": 512,
+      "name": "Bovela",
+      "symbol": "000000000000001845",
+      "subiekt": "BOVELA 5 DAW.",
+      "pdf": "data/ChPL/UPD/ema-combined-v3703-bovela-vra-0023-g-pl.pdf",
+      "rpl_id": "100335708",
+      "upd_id": "600000000329"
+    },
+    {
+      "id": 513,
+      "name": "Bovela",
+      "symbol": "000000000000001846",
+      "subiekt": "BOVELA 25 DAW.",
+      "pdf": "data/ChPL/UPD/ema-combined-v3703-bovela-vra-0023-g-pl.pdf",
+      "rpl_id": "100335708",
+      "upd_id": "600000000329"
+    },
+    {
+      "id": 2108,
+      "name": "Locatim 60 ml",
+      "symbol": "000000000000002344",
+      "subiekt": "LOCATIM 60ML",
+      "pdf": "data/ChPL/UPD/ema-combined-v41-locatim-vra0000322515-2026-07-02-pl.pdf",
+      "rpl_id": "100360528",
+      "upd_id": "600000003386"
+    },
+    {
+      "id": 2306,
+      "name": "Locatim",
+      "symbol": "000000000000002344",
+      "subiekt": "LOCATIM 60ML",
+      "pdf": "data/ChPL/UPD/ema-combined-v41-locatim-vra0000322515-2026-07-02-pl.pdf",
+      "rpl_id": "100360528",
+      "upd_id": "600000003386"
+    },
+    {
+      "id": 994,
+      "name": "Exzolt 10 mg/ml",
+      "symbol": "000003034",
+      "subiekt": "EXZOLT A'50 ML",
+      "pdf": "data/ChPL/UPD/ema-combined-v4344-exzolt-vra0017-2024-08-20-pl.pdf",
+      "rpl_id": "100402557",
+      "upd_id": "600000000062"
+    },
+    {
+      "id": 2301,
+      "name": "Exzolt 10 mg/ml",
+      "symbol": "000003343",
+      "subiekt": "EXZOLT 4 ML",
+      "pdf": "data/ChPL/UPD/ema-combined-v4344-exzolt-vra0017-2024-08-20-pl.pdf",
+      "rpl_id": "100402557",
+      "upd_id": "600000000062"
+    },
+    {
+      "id": 2312,
+      "name": "Pirsue",
+      "symbol": "000000000000002059",
+      "subiekt": "PIRSUE 10 ML M16366",
+      "pdf": "data/ChPL/UPD/ema-combined-v54-pirsue-wepar-2025-04-10-pl.pdf",
+      "rpl_id": null,
+      "upd_id": "600000000514"
+    },
+    {
+      "id": 2313,
+      "name": "Pirsue",
+      "symbol": "000002438",
+      "subiekt": "PIRSUE 10 ML M760639",
+      "pdf": "data/ChPL/UPD/ema-combined-v54-pirsue-wepar-2025-04-10-pl.pdf",
+      "rpl_id": null,
+      "upd_id": "600000000514"
+    },
+    {
+      "id": 2126,
+      "name": "PROTEQFLU-TE 1 DAW.",
+      "symbol": "000000000000000807",
+      "subiekt": "PROTEQFLU-TE 1 DAW.",
+      "pdf": "data/ChPL/UPD/ema-combined-v74-proteqflute-vra0033-2022-12-20-pl.pdf",
+      "rpl_id": "100252218",
+      "upd_id": "600000992466"
+    }
+  ],
+  "archived": [
+    {
+      "id": 73,
+      "name": "Equilis Prequenza-Te",
+      "symbol": "000000000000000259",
+      "subiekt": "EQUILIS PREQUENZA-TE A'1D",
+      "old_pdf": null,
+      "upd_id": "600000000720",
+      "rpl_id": "100253057"
+    },
+    {
+      "id": 342,
+      "name": "Porcilis ColiClos",
+      "symbol": "000000000000001359",
+      "subiekt": "PORCILIS COLICLOS 10 DAW 20ML A011B05",
+      "old_pdf": null,
+      "upd_id": "600000003319",
+      "rpl_id": "100283868"
+    },
+    {
+      "id": 917,
+      "name": "Coxevac",
+      "symbol": "000002799",
+      "subiekt": "COXEVAC 40 ML  576158",
+      "old_pdf": null,
+      "upd_id": "600000003433",
+      "rpl_id": "100258400"
+    },
+    {
+      "id": 918,
+      "name": "Coxevac",
+      "symbol": "000002799",
+      "subiekt": "COXEVAC 40 ML  576158",
+      "old_pdf": null,
+      "upd_id": "600000003433",
+      "rpl_id": "100258400"
+    },
+    {
+      "id": 1414,
+      "name": "Tetra-Delta 10 ml",
+      "symbol": "04215",
+      "subiekt": "TETRA DELTA  10 ML  7146-25A",
+      "old_pdf": null,
+      "upd_id": "600000056158",
+      "rpl_id": null
+    },
+    {
+      "id": 1417,
+      "name": "Tetra-Delta 10 ml",
+      "symbol": "04218",
+      "subiekt": "TETRA DELTA   10ML 8101-25a",
+      "old_pdf": null,
+      "upd_id": "600000056158",
+      "rpl_id": null
+    },
+    {
+      "id": 1590,
+      "name": "PregSure BVD, emulsja do wstrzykiwań",
+      "symbol": "04636",
+      "subiekt": "PREGSURE BVD 5 DAW L80894",
+      "old_pdf": null,
+      "upd_id": null,
+      "rpl_id": null
+    },
+    {
+      "id": 1892,
+      "name": "PregSure BVD, emulsja do wstrzykiwań",
+      "symbol": "05294",
+      "subiekt": "PREGSURE BVD 25 DAW. LB1270",
+      "old_pdf": null,
+      "upd_id": null,
+      "rpl_id": null
+    },
+    {
+      "id": 1893,
+      "name": "PregSure BVD, emulsja do wstrzykiwań",
+      "symbol": "05295",
+      "subiekt": "PREGSURE BVD 5 DAW.  L64432",
+      "old_pdf": null,
+      "upd_id": null,
+      "rpl_id": null
+    },
+    {
+      "id": 1894,
+      "name": "PregSure BVD, emulsja do wstrzykiwań",
+      "symbol": "05295(1)",
+      "subiekt": "PREGSURE 25 DS L81724",
+      "old_pdf": null,
+      "upd_id": null,
+      "rpl_id": null
+    },
+    {
+      "id": 1895,
+      "name": "PregSure BVD, emulsja do wstrzykiwań",
+      "symbol": "05296",
+      "subiekt": "PREGSURE BVD 5 DAW. L73787",
+      "old_pdf": null,
+      "upd_id": null,
+      "rpl_id": null
+    },
+    {
+      "id": 1959,
+      "name": "Tetra-Delta 10 ml",
+      "symbol": "0701",
+      "subiekt": "TETRA-DELTA  10 ML 2512-25",
+      "old_pdf": null,
+      "upd_id": "600000056158",
+      "rpl_id": null
+    },
+    {
+      "id": 2117,
+      "name": "ECOPORC SHIGA 50 ml",
+      "symbol": "000000000000001574",
+      "subiekt": "ECOPORC SHIGA  50 ml",
+      "old_pdf": null,
+      "upd_id": "600000004133",
+      "rpl_id": "100360936"
+    },
+    {
+      "id": 2118,
+      "name": "INGELVAC CIRCOFLEX 10D / 50D",
+      "symbol": "000002583",
+      "subiekt": "INGELVAC CIRCOFLEX 10D",
+      "old_pdf": null,
+      "upd_id": "600000003966",
+      "rpl_id": "100301201"
+    },
+    {
+      "id": 2119,
+      "name": "INGELVAC CIRCOFLEX 10D / 50D",
+      "symbol": "000000000000001227",
+      "subiekt": "INGELVAC CIRCOFLEX 50 D W309-859B",
+      "old_pdf": null,
+      "upd_id": "600000003966",
+      "rpl_id": "100301201"
+    },
+    {
+      "id": 2302,
+      "name": "Effydral Tablets",
+      "symbol": "0000003777(1)",
+      "subiekt": "EFFYDRAL A 1 TBL.",
+      "old_pdf": null,
+      "upd_id": "600000072838",
+      "rpl_id": null
+    },
+    {
+      "id": 2305,
+      "name": "Kriptazen",
+      "symbol": "000002760",
+      "subiekt": "KRIPTAZEN 980 ML roztwór",
+      "old_pdf": null,
+      "upd_id": "600000004142",
+      "rpl_id": "100417790"
+    },
+    {
+      "id": 2314,
+      "name": "Velactis",
+      "symbol": "000000000000002050",
+      "subiekt": "VELACTIS1,12MG/ML 5 ML 105A4",
+      "old_pdf": null,
+      "upd_id": "700000141165",
+      "rpl_id": null
+    },
+    {
+      "id": 2324,
+      "name": "Effydral Tablets",
+      "symbol": "0000003777(1)",
+      "subiekt": "EFFYDRAL A 1 TBL.",
+      "old_pdf": null,
+      "upd_id": "600000072838",
+      "rpl_id": null
+    },
+    {
+      "id": 2483,
+      "name": "Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate)",
+      "symbol": "02266",
+      "subiekt": "AGRISEPT 2 TAB.",
+      "old_pdf": null,
+      "upd_id": "600000053084",
+      "rpl_id": null
+    },
+    {
+      "id": 2484,
+      "name": "Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate)",
+      "symbol": "02266",
+      "subiekt": "AGRISEPT 2 TAB.",
+      "old_pdf": null,
+      "upd_id": "600000053084",
+      "rpl_id": null
+    },
+    {
+      "id": 2485,
+      "name": "Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate)",
+      "symbol": "02266",
+      "subiekt": "AGRISEPT 2 TAB.",
+      "old_pdf": null,
+      "upd_id": "600000053084",
+      "rpl_id": null
+    },
+    {
+      "id": 2515,
+      "name": "CIPER-PULVIZOO 100 mg/ml, koncentrat do sporządzania zawiesiny do oprysku na skórę",
+      "symbol": "000000000000001765",
+      "subiekt": "CIPERPULVIZOO 1 L",
+      "old_pdf": null,
+      "upd_id": "600000058891",
+      "rpl_id": null
+    },
+    {
+      "id": 2700,
+      "name": "Porcilis ColiClos",
+      "symbol": "02288",
+      "subiekt": "PORCILIS COLI A'50 ML-25 DAW.",
+      "old_pdf": null,
+      "upd_id": "600000003319",
+      "rpl_id": "100283868"
+    },
+    {
+      "id": 2727,
+      "name": "Vectra 3D",
+      "symbol": "000000000000001648",
+      "subiekt": "VECTRA 3D DLA PSÓW 1-4 kg 1 pipeta",
+      "old_pdf": null,
+      "upd_id": "600000004336",
+      "rpl_id": "100304850"
+    }
+  ],
+  "skipped_documents": [
+    {
+      "file": "data/ChPL/UPD/ulotka-19365-20190522000000-1794_w-20190606000623.pdf",
+      "brand": null,
+      "sha256": "a9a6f990351c64b4af0d7921066322225c8e7ac46587b6a92d107556b6d84a7e",
+      "pages": 4,
+      "status": "unassigned_paper_without_verified_catalog_product",
+      "text_opening": "b. ulotka informacyjna ulotka informacyjna tetra-delta. zawiesina dowymieniowa dla bydla 1. nazwa i adres podmiotu odpowiedzialnego oraz wytworcy odpowiedzialnego za zwolnienie serii. jesli jest inny podmiot odpowiedzialny: zoetis polska sp. z o.o. ul. postepu"
+    }
+  ],
+  "linked_count": 20,
+  "archived_count": 25,
+  "active_variants": 2849,
+  "remaining_missing_active": 0,
+  "protected_clinical_fields_unchanged": true,
+  "sqlite_sha256": "f0c549924ac35d0841e02701c1d31a4d9227526514bd0b8b5297d4aaed1b8f7c"
+}
