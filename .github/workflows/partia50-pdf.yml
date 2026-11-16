@@ -32,3 +32,5 @@ jobs:
           git fetch origin winforms
           git rebase origin/winforms
           git push origin HEAD:winforms
+
+# Retry with official Equilis Prequenza Te no-hyphen product spelling.
