@@ -32,3 +32,5 @@ jobs:
           git fetch origin winforms
           git rebase origin/winforms
           git push origin HEAD:winforms
+
+# Retry after document foreign-key registration fix.
