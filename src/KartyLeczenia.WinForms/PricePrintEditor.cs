@@ -1,15 +1,24 @@
 using System.Net;
+using System.Drawing.Text;
 
 namespace KartyLeczenia.Windows;
 
 internal sealed class PricePrintSettings
 {
     public string Font = "Arial";
+    public int FontWeight = 400;
+    // Store font family names rather than indices (installed fonts can change or reorder).
+    public string[] FontNames = new string[6];
+    // Zero means inherit the global size; positive values are points.
+    public decimal[] FontSizes = new decimal[6];
+    public int[] FontWeights = new int[6];
     public decimal Size = 9, Margin = 7, RowHeight = 0, Padding = 0.5m;
     public bool Landscape = true, Number = true, Batch = true, Price = true, Withdrawal = true, Legend = true;
     public int WithdrawalFormat = 1;
     public bool RouteCodes = true, LegendEveryPage;
     public int[] Fonts = new int[6], Sizes = new int[6], Alignments = new int[6];
+
+    internal static readonly string[] LegacyFonts = ["Arial", "Calibri", "Tahoma", "Segoe UI", "Times New Roman"];
 
     static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "KartyLeczenia", "price-print-winforms.json");
@@ -21,11 +30,45 @@ internal sealed class PricePrintSettings
         {
             if (File.Exists(FilePath))
                 return System.Text.Json.JsonSerializer.Deserialize<PricePrintSettings>(File.ReadAllText(FilePath), JsonOptions)
-                    ?? new();
+                    is { } loaded ? Migrate(loaded) : new();
         }
         catch (Exception ex) { CrashLog.Write("WinForms.PricePrint.Load", ex); }
         return new();
     }
+
+    static PricePrintSettings Migrate(PricePrintSettings settings)
+    {
+        settings.FontNames = Resize(settings.FontNames);
+        settings.FontSizes = Resize(settings.FontSizes);
+        settings.FontWeights = Resize(settings.FontWeights);
+        settings.Fonts = Resize(settings.Fonts);
+        settings.Sizes = Resize(settings.Sizes);
+        settings.Alignments = Resize(settings.Alignments);
+        settings.Widths = settings.Widths?.Length == 5 ? settings.Widths : [4, 43, 14, 13, 40];
+        settings.Font = string.IsNullOrWhiteSpace(settings.Font) ? "Arial" : settings.Font;
+        settings.FontWeight = NormalizeWeight(settings.FontWeight);
+        for (int i = 0; i < 6; i++)
+        {
+            // Previous versions serialized a font index in the five-item hard-coded list.
+            if (string.IsNullOrWhiteSpace(settings.FontNames[i]) && settings.Fonts[i] is >= 1 and <= 5)
+                settings.FontNames[i] = LegacyFonts[settings.Fonts[i] - 1];
+            // Previous size values were indices: 1=8, 2=9 ... 5=12.
+            if (settings.FontSizes[i] == 0 && settings.Sizes[i] is >= 1 and <= 5)
+                settings.FontSizes[i] = 7 + settings.Sizes[i];
+            settings.FontSizes[i] = Math.Clamp(settings.FontSizes[i], 0, 48);
+            settings.FontWeights[i] = settings.FontWeights[i] == 0 ? 0 : NormalizeWeight(settings.FontWeights[i]);
+        }
+        return settings;
+    }
+
+    static T[] Resize<T>(T[]? values)
+    {
+        var result = new T[6];
+        if (values is not null) Array.Copy(values, result, Math.Min(6, values.Length));
+        return result;
+    }
+
+    internal static int NormalizeWeight(int value) => value is 400 or 500 or 600 or 700 or 800 or 900 ? value : 400;
 
     internal void Save()
     {
@@ -53,10 +96,10 @@ internal sealed class PricePrintEditor : Form
     {
         Text = "Ustawienia wydruku cennika";
         StartPosition = FormStartPosition.CenterParent;
-        Size = new Size(1040, 730);
+        Size = new Size(1120, 760);
         MinimumSize = new Size(660, 480);
         AutoScaleMode = AutoScaleMode.Dpi;
-        var options = new TabControl { Dock = DockStyle.Top, Height = 132, Padding = new Point(12, 4) };
+        var options = new TabControl { Dock = DockStyle.Top, Height = 155, Padding = new Point(12, 4) };
         var sample = new WebBrowser { Dock = DockStyle.Fill, AllowWebBrowserDrop = false, ScriptErrorsSuppressed = true };
         var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
         var paper = new Label { Dock = DockStyle.Top, Height = 24, Padding = new Padding(8, 3, 0, 0) };
@@ -78,7 +121,7 @@ internal sealed class PricePrintEditor : Form
         }
         ComboBox Select(string label, string[] items, int index)
         {
-            var box = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 115 };
+            var box = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = label == "Czcionka" ? 200 : 125 };
             box.Items.AddRange(items);
             box.SelectedIndex = Math.Clamp(index, 0, items.Length - 1);
             Field(label, box);
@@ -99,9 +142,32 @@ internal sealed class PricePrintEditor : Form
         }
 
         Section("Strona");
-        string[] fonts = ["Arial", "Calibri", "Tahoma", "Segoe UI", "Times New Roman"];
-        var font = Select("Czcionka", fonts, Array.IndexOf(fonts, settings.Font));
-        var size = Measure("Rozmiar (pt)", settings.Size, 8, 12);
+        string[] fonts;
+        try
+        {
+            using var installed = new InstalledFontCollection();
+            fonts = installed.Families.Select(f => f.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Append(settings.Font)
+                .Concat(settings.FontNames?.Where(name => !string.IsNullOrWhiteSpace(name)) ?? [])
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("WinForms.PricePrint.SystemFonts", ex);
+            fonts = PricePrintSettings.LegacyFonts.Append(settings.Font)
+                .Concat(settings.FontNames?.Where(name => !string.IsNullOrWhiteSpace(name)) ?? [])
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        }
+        string[] weights = ["Domyślna", "Normalna (400)", "Średnia (500)", "Półgruba (600)", "Gruba (700)", "Bardzo gruba (800)", "Najgrubsza (900)"];
+        int[] weightValues = [0, 400, 500, 600, 700, 800, 900];
+        int WeightIndex(int value) => Math.Max(0, Array.IndexOf(weightValues, value));
+        var font = Select("Czcionka", fonts, Math.Max(0, Array.FindIndex(fonts, name => string.Equals(name, settings.Font, StringComparison.OrdinalIgnoreCase))));
+        var size = Measure("Rozmiar (pt)", settings.Size, 6, 48, 1);
+        var weight = Select("Grubość", weights[1..], Math.Max(0, WeightIndex(settings.FontWeight) - 1));
+        weight.Width = 155;
         var orientation = Select("Orientacja A4", ["Pozioma", "Pionowa"], settings.Landscape ? 0 : 1);
         var margin = Measure("Margines (mm)", settings.Margin, 4, 25, 1);
         var height = Measure("Min. wysokość (mm)", settings.RowHeight, 0, 18, 1);
@@ -125,16 +191,24 @@ internal sealed class PricePrintEditor : Form
         var widths = new NumericUpDown[headings.Length];
         var typographyFields = new Control[headings.Length + 1][];
 
-        var typography = new (ComboBox Font, ComboBox Size, ComboBox Alignment)[6];
+        var typography = new (ComboBox Font, NumericUpDown Size, ComboBox Weight, ComboBox Alignment)[6];
         for (int i = 0; i < typography.Length; i++)
         {
             int start = section.Controls.Count;
             if (i > 0)
                 widths[i - 1] = Measure("Proporcja szerokości", settings.Widths[i - 1], 1, 100);
+            string currentFont = settings.FontNames?.ElementAtOrDefault(i) ?? "";
+            var familyItems = new[] { "Domyślna", .. fonts };
+            int familyIndex = string.IsNullOrWhiteSpace(currentFont) ? 0
+                : Array.FindIndex(familyItems, name => string.Equals(name, currentFont, StringComparison.OrdinalIgnoreCase));
+            int fontWeight = settings.FontWeights?.ElementAtOrDefault(i) ?? 0;
+            decimal points = settings.FontSizes?.ElementAtOrDefault(i) ?? 0;
             typography[i] = (
-                Select("Czcionka", ["Domyślna", .. fonts], settings.Fonts.ElementAtOrDefault(i)),
-                Select("Rozmiar (pt)", ["Domyślny", "8", "9", "10", "11", "12"], settings.Sizes.ElementAtOrDefault(i)),
+                Select("Czcionka", familyItems, Math.Max(0, familyIndex)),
+                Measure("Rozmiar (pt; 0 = domyślny)", points, 0, 48, 1),
+                Select("Grubość", weights, WeightIndex(fontWeight)),
                 Select("Wyrównanie", ["Do lewej", "Do środka", "Do prawej"], settings.Alignments.ElementAtOrDefault(i)));
+            typography[i].Weight.Width = 155;
             typographyFields[i] = section.Controls.Cast<Control>().Skip(start).ToArray();
         }
         void ShowTypography()
@@ -148,13 +222,18 @@ internal sealed class PricePrintEditor : Form
         target.SelectedIndexChanged += (_, _) => ShowTypography();
         ShowTypography();
 
+        // CSS-escape quotes and backslashes in a Windows font family name.
+        static string CssFont(string family) => "\"" + family.Replace("\\", "\\\\").Replace("\"", "\\\"")
+            .Replace("\r", "").Replace("\n", "") + "\",sans-serif";
+
         string TypographyCss(int index)
         {
-            var (family, points, align) = typography[index];
-            string fontCss = family.SelectedIndex > 0 ? $"font-family:\"{family.SelectedItem}\",sans-serif;" : "";
-            string sizeCss = points.SelectedIndex > 0 ? $"font-size:{points.SelectedItem}pt;" : "";
+            var (family, points, selectedWeight, align) = typography[index];
+            string fontCss = family.SelectedIndex > 0 ? $"font-family:{CssFont((string)family.SelectedItem!)};" : "";
+            string sizeCss = points.Value > 0 ? FormattableString.Invariant($"font-size:{points.Value:0.#}pt;") : "";
+            string weightCss = selectedWeight.SelectedIndex > 0 ? $"font-weight:{weightValues[selectedWeight.SelectedIndex]};" : "";
             string alignment = align.SelectedIndex switch { 1 => "center", 2 => "right", _ => "left" };
-            return $"{fontCss}{sizeCss}text-align:{alignment};";
+            return $"{fontCss}{sizeCss}{weightCss}text-align:{alignment};";
         }
 
         render = data =>
@@ -166,7 +245,7 @@ internal sealed class PricePrintEditor : Form
                 <!doctype html><html lang="pl"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Cennik leków</title>
                 <style>
                 @page { size: A4 {{(orientation.SelectedIndex == 0 ? "landscape" : "portrait")}}; margin: {{margin.Value}}mm }
-                body {font: {{size.Value}}pt "{{font.SelectedItem}}", sans-serif }
+                body {font-family: {{CssFont((string)font.SelectedItem!)}}; font-size: {{size.Value}}pt; font-weight: {{weightValues[weight.SelectedIndex + 1]}} }
                 @media screen {
                     html {background: #ddd}
                     body {box-sizing: border-box; width: {{(orientation.SelectedIndex == 0 ? 297 : 210)}}mm;
@@ -229,10 +308,11 @@ internal sealed class PricePrintEditor : Form
             refreshTimer.Stop();
             refreshTimer.Start();
         }
-        foreach (var box in new[] { font, orientation, format, routes }
-            .Concat(typography.SelectMany(style => new[] { style.Font, style.Size, style.Alignment })))
+        foreach (var box in new[] { font, weight, orientation, format, routes }
+            .Concat(typography.SelectMany(style => new[] { style.Font, style.Weight, style.Alignment })))
             box.SelectedIndexChanged += (_, _) => QueueSample();
-        foreach (var box in new[] { size, margin, height, padding }.Concat(widths))
+        foreach (var box in new[] { size, margin, height, padding }
+            .Concat(widths).Concat(typography.Select(style => style.Size)))
             box.ValueChanged += (_, _) => QueueSample();
         foreach (var box in new[] { number, batch, price, withdrawal, legend, repeatLegend })
             box.CheckedChanged += (_, _) => QueueSample();
@@ -243,6 +323,7 @@ internal sealed class PricePrintEditor : Form
         {
             settings.Font = (string)font.SelectedItem!;
             settings.Size = size.Value;
+            settings.FontWeight = weightValues[weight.SelectedIndex + 1];
             settings.Landscape = orientation.SelectedIndex == 0;
             settings.Margin = margin.Value;
             settings.RowHeight = height.Value;
@@ -256,8 +337,13 @@ internal sealed class PricePrintEditor : Form
             settings.Legend = legend.Checked;
             settings.Widths = widths.Select(box => box.Value).ToArray();
             settings.LegendEveryPage = repeatLegend.Checked;
-            settings.Fonts = typography.Select(style => style.Font.SelectedIndex).ToArray();
-            settings.Sizes = typography.Select(style => style.Size.SelectedIndex).ToArray();
+            settings.FontNames = typography.Select(style => style.Font.SelectedIndex == 0 ? "" : (string)style.Font.SelectedItem!).ToArray();
+            settings.FontSizes = typography.Select(style => style.Size.Value).ToArray();
+            settings.FontWeights = typography.Select(style => weightValues[style.Weight.SelectedIndex]).ToArray();
+            // Compatibility placeholders. Legacy indices are cleared so changing installed
+            // Windows fonts does not restore a stale font on the next launch.
+            settings.Fonts = new int[6];
+            settings.Sizes = new int[6];
             settings.Alignments = typography.Select(style => style.Alignment.SelectedIndex).ToArray();
             settings.Save();
         }
