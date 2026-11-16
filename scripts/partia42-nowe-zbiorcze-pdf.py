@@ -44,7 +44,7 @@ def target_species_match(brand,r,block):
     # Apply species checks only if specified by the catalog.
     name=n(r["name"])+" "+n(r["subiekt"])
     if brand=="naxcel" or "bydlo" in name or "bydl" in name:
-        return ("bydlo" in block or "bydlat" in block or "cattle" in block)
+        return ("bydl" in block or "cattle" in block)
     if "kot" in name:return ("kot" in block or "kotow" in block or "cat" in block)
     if "pies" in name or "psow" in name:return ("psow" in block or "pies" in block or "dogs" in block)
     return True
