@@ -1,0 +1,20 @@
+{
+  "phase": 39,
+  "read_only": true,
+  "active_variants": 2902,
+  "all_variants": 2944,
+  "subiekt_products": 1727,
+  "available_pdf_files": 648,
+  "missing_or_flagged_variant_count": 458,
+  "unique_variant_names": 102,
+  "unique_subiekt_products": 148,
+  "status_counts": {
+    "POWIAZANIE_TECHNICZNIE_OK": 2444,
+    "BRAK_POWIAZANIA": 154,
+    "NIEZGODNY_ID_RPL_W_SCIEZCE": 292,
+    "PLIK_NIEISTNIEJE_LUB_USZKODZONY": 12
+  },
+  "sqlite_sha256": "1226d7423800ee47bb4088ab1ecae7d1fbbdbba4cb254f9dd23c929ebbdc4c2d",
+  "note": "Stan magazynowy pochodzi z zapisanej bazy katalogu, a nie z bieżącego połączenia SQL Subiekta.",
+  "limitation": "Technicznie poprawne powiązanie nie gwarantuje zgodności mocy/postaci; każda treściowa weryfikacja wymaga analizy konkretnej ChPL."
+}
