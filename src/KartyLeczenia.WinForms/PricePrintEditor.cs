@@ -198,7 +198,7 @@ internal sealed class PricePrintEditor : Form
             if (i > 0)
                 widths[i - 1] = Measure("Proporcja szerokości", settings.Widths[i - 1], 1, 100);
             string currentFont = settings.FontNames?.ElementAtOrDefault(i) ?? "";
-            var familyItems = new[] { "Domyślna", .. fonts };
+            string[] familyItems = ["Domyślna", .. fonts];
             int familyIndex = string.IsNullOrWhiteSpace(currentFont) ? 0
                 : Array.FindIndex(familyItems, name => string.Equals(name, currentFont, StringComparison.OrdinalIgnoreCase));
             int fontWeight = settings.FontWeights?.ElementAtOrDefault(i) ?? 0;
