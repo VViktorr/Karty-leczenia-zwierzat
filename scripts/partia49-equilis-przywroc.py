@@ -20,7 +20,8 @@ with fitz.open(P) as pdf:
  txt=norm(" ".join(page.get_text(sort=True) for page in pdf))
  assert len(txt)>1000
  print("EQUILIS_PDF_TEXT",json.dumps({"first_1200":txt[:1200],"matches":[txt[max(0,m.start()-90):m.end()+180] for m in list(re.finditer("equilis|prequenza|te|influenza|tetanus",txt))[:20]]},ensure_ascii=False),flush=True)
- assert "equilis prequenza-te" in txt or "equilis prequenza te" in txt, "Wrong product: Equilis Prequenza-Te not in PDF"
+ assert "equilis prequenza" in txt, "Wrong product family"
+ assert "equilis prequenza-te" not in txt and "equilis prequenza te" not in txt, "Expected only wrong Prequenza variant; stop and investigate"
  assert "charakterystyka" in txt and "przeciwwskazania" in txt, "Not a Polish ChPL"
 con=sqlite3.connect(DB)
 con.row_factory=sqlite3.Row
@@ -42,8 +43,7 @@ assert norm(r["subiekt"]).startswith("equilis prequenza-te")
 assert r["scope"]=="archiwalny" and r["pdf_path"] is None, (r["scope"],r["pdf_path"])
 try:
  con.execute("BEGIN IMMEDIATE")
- con.execute("INSERT OR IGNORE INTO documents(path) VALUES (?)",(PATH,))
- assert con.execute("UPDATE variants SET scope=NULL,pdf_path=? WHERE id=73",(PATH,)).rowcount==1
+ assert con.execute("UPDATE variants SET scope=NULL,pdf_path=NULL WHERE id=73").rowcount==1
  assert before==hash_rest(),"Clinical data unexpectedly changed"
  assert con.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
  assert not con.execute("PRAGMA foreign_key_check").fetchall()
@@ -52,7 +52,7 @@ except:
  con.rollback();raise
 report={"partia":49,"product":"Equilis Prequenza-Te","id":73,"symbol":r["symbol"],
 "subiekt":r["subiekt"],"upd_id":r["upd_id"],"rpl_id":r["rpl_id"],
-"status":"active","pdf":PATH,"pdf_pages":pages,"pdf_sha256":hashlib.sha256(P.read_bytes()).hexdigest(),
+"status":"active","pdf":None,"uploaded_file":PATH,"uploaded_document_product":"Equilis Prequenza (without -Te)", "expected_product":"Equilis Prequenza-Te","warning":"Uploaded Polish PDF is not for the -Te variant. Keep active with no PDF attachment until correct SPC is provided.","pdf_pages":pages,"pdf_sha256":hashlib.sha256(P.read_bytes()).hexdigest(),
 "other_variant_fields_unchanged":True,"sqlite_sha256":hashlib.sha256(DB.read_bytes()).hexdigest()}
 REPORT.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding="utf-8")
 print("PARTIA49",json.dumps(report,ensure_ascii=False))
