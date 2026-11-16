@@ -20,7 +20,7 @@ PDFS={
  "simparica":"data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf"
 }
 def n(s):
-    v=unicodedata.normalize("NFKD",str(s or "").lower())
+    v=unicodedata.normalize("NFKD",str(s or "").lower().replace("ł","l"))
     return re.sub(r"\s+"," ","".join(c for c in v if not unicodedata.combining(c)).replace(",",".")).strip()
 def good(rel):
     if not str(rel or "").strip():return False
