@@ -1,0 +1,32 @@
+name: Partia 51b - Velactis i Kriptazen
+on:
+  push:
+    branches: [winforms]
+    paths: ['.github/workflows/partia51b-powiaz.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'pymupdf==1.26.6'
+      - name: Zweryfikuj ChPL i przywroc Velactis oraz Kriptazen
+        run: python scripts/partia51b-velactis-kriptazen.py
+      - name: Zapisz SQLite i raport, bez kompilacji
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite data/audyt_brakujacych_pdf/partia51b_velactis_kriptazen_powiazania.json
+          git commit -m "data: reactivate Velactis and Kriptazen with Polish ChPLs [skip ci]"
+          git fetch origin winforms
+          git rebase origin/winforms
+          git push origin HEAD:winforms
