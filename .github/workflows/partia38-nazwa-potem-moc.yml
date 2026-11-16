@@ -1,0 +1,42 @@
+name: "Partia 38 - PDF wedlug nazwy, potem mocy"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-partia38
+  cancel-in-progress: false
+jobs:
+  name-then-strength:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: Install PDF parser
+        run: python -m pip install --disable-pip-version-check pymupdf
+      - name: Scan all existing ChPL by medicine name, then strength and formulation
+        run: python scripts/partia38-name-then-strength-pdf.py
+      - name: Save reviewed results and SQLite
+        shell: bash
+        run: |
+          mkdir -p data/audyt_brakujacych_pdf
+          cp partia38_raport/result.json data/audyt_brakujacych_pdf/partia38_wynik.json
+          cp partia38_raport/braki_po_partii38.csv data/audyt_brakujacych_pdf/partia38_braki.csv
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/audyt_brakujacych_pdf/partia38_wynik.json data/audyt_brakujacych_pdf/partia38_braki.csv src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          if git diff --cached --quiet; then
+            echo "No new links or report changes."
+            exit 0
+          fi
+          git commit -m 'data: partia38 ChPL nazwa moc postac i audyt PDF [skip ci]'
+          git push origin HEAD:winforms
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partia38-nazwa-i-moc
+          path: partia38_raport/
+          retention-days: 14
