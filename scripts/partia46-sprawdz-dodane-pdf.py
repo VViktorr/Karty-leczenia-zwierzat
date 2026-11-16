@@ -8,7 +8,9 @@ DB=ROOT/"src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite"
 OUT=ROOT/"data/audyt_brakujacych_pdf"
 PDF="data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf"
 p=ROOT/PDF
-assert p.is_file() and p.stat().st_size>1000 and p.open("rb").read(5)==b"%PDF-"
+assert p.is_file(), f"Missing PDF: {p}"
+print("SPUTOP_FILE",json.dumps({"size":p.stat().st_size,"first_bytes_hex":p.open("rb").read(64).hex()},ensure_ascii=False),flush=True)
+assert p.stat().st_size>1000 and p.open("rb").read(5)==b"%PDF-", "File is not recognized as a PDF"
 def norm(s):
  s=unicodedata.normalize("NFKD",str(s or "").casefold().replace("ł","l").replace(",","."))
  return " ".join("".join(c for c in s if not unicodedata.combining(c)).split())
