@@ -1,0 +1,574 @@
+{
+  "partia": 42,
+  "documents": {
+    "naxcel": {
+      "path": "data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf",
+      "pages": 33,
+      "text_chars": 42651,
+      "matches": 9
+    },
+    "metacam": {
+      "path": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "pages": 174,
+      "text_chars": 269658,
+      "matches": 92
+    },
+    "stronghold": {
+      "path": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
+      "pages": 30,
+      "text_chars": 40808,
+      "matches": 53
+    },
+    "simparica": {
+      "path": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
+      "pages": 22,
+      "text_chars": 30319,
+      "matches": 21
+    }
+  },
+  "statuses": {
+    "manual_species_or_form_not_confirmed": 3,
+    "linked": 25
+  },
+  "linked_by_brand": {
+    "v33": 15,
+    "v3991": 4,
+    "v50": 6
+  },
+  "clinical_unchanged": true,
+  "sqlite_sha256": "d88efeda2f297c6e1559aacceeb686b65f12dd902c8dc409611d7d174534924f",
+  "decisions": [
+    {
+      "id": 114,
+      "name": "Naxcel 200 mg/ml",
+      "subiekt": "NAXCEL (BYDŁO) 200 MG/ML 100 ML 5F0076",
+      "symbol": "00000000000000059(1)",
+      "rpl": "100218977",
+      "upd": "600000003436",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf",
+      "strengths": [
+        [
+          "200",
+          "mg/ml"
+        ]
+      ],
+      "status": "manual_species_or_form_not_confirmed",
+      "local_name_strength_hits": 6,
+      "form_species_hits": 0
+    },
+    {
+      "id": 124,
+      "name": "Metacam 20 mg/ml",
+      "subiekt": "METACAM BYDŁO 2% INJ. 50 ML D21014C-13",
+      "symbol": "000000000000000703",
+      "rpl": "100215855",
+      "upd": "600000004044",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "20",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 9,
+      "form_species_hits": 6
+    },
+    {
+      "id": 125,
+      "name": "Metacam 20 mg/ml",
+      "subiekt": "METACAM BYDŁO 2% INJ. 50 ML D21014C-13",
+      "symbol": "000000000000000703",
+      "rpl": "100215855",
+      "upd": "600000004044",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "20",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 9,
+      "form_species_hits": 6
+    },
+    {
+      "id": 126,
+      "name": "Metacam 20 mg/ml",
+      "subiekt": "METACAM BYDŁO 2% INJ. 50 ML D21014C-13",
+      "symbol": "000000000000000703",
+      "rpl": "100215855",
+      "upd": "600000004044",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "20",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 9,
+      "form_species_hits": 6
+    },
+    {
+      "id": 215,
+      "name": "Naxcel 200 mg/ml",
+      "subiekt": "NAXCEL (BYDŁO) 200 MG/ML 100 ML 4F1258",
+      "symbol": "000000000000000983",
+      "rpl": "100218977",
+      "upd": "600000003436",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf",
+      "strengths": [
+        [
+          "200",
+          "mg/ml"
+        ]
+      ],
+      "status": "manual_species_or_form_not_confirmed",
+      "local_name_strength_hits": 6,
+      "form_species_hits": 0
+    },
+    {
+      "id": 302,
+      "name": "Metacam 20 mg/ml",
+      "subiekt": "METACAM BYDŁO 2% INJ. 50 ML E-21017A-21",
+      "symbol": "000000000000001262",
+      "rpl": "100215855",
+      "upd": "600000004044",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "20",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 9,
+      "form_species_hits": 6
+    },
+    {
+      "id": 303,
+      "name": "Metacam 20 mg/ml",
+      "subiekt": "METACAM BYDŁO 2% INJ. 50 ML E-21017A-21",
+      "symbol": "000000000000001262",
+      "rpl": "100215855",
+      "upd": "600000004044",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "20",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 9,
+      "form_species_hits": 6
+    },
+    {
+      "id": 304,
+      "name": "Metacam 20 mg/ml",
+      "subiekt": "METACAM BYDŁO 2% INJ. 50 ML E-21017A-21",
+      "symbol": "000000000000001262",
+      "rpl": "100215855",
+      "upd": "600000004044",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "20",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 9,
+      "form_species_hits": 6
+    },
+    {
+      "id": 460,
+      "name": "Naxcel 200 mg/ml",
+      "subiekt": "NAXCEL (BYDŁO) 200 MG/ML A'100 ML",
+      "symbol": "000000000000001684",
+      "rpl": "100218977",
+      "upd": "600000003436",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf",
+      "strengths": [
+        [
+          "200",
+          "mg/ml"
+        ]
+      ],
+      "status": "manual_species_or_form_not_confirmed",
+      "local_name_strength_hits": 6,
+      "form_species_hits": 0
+    },
+    {
+      "id": 602,
+      "name": "Simparica 20 mg (EU/2/15/191)",
+      "subiekt": "SIMPARICA 20MG 5-10kg 3 TAB.",
+      "symbol": "000000000000002241",
+      "rpl": "100358477",
+      "upd": "600000000136",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
+      "strengths": [
+        [
+          "20",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 13,
+      "form_species_hits": 13
+    },
+    {
+      "id": 603,
+      "name": "Simparica 10 mg (EU/2/15/191)",
+      "subiekt": "SIMPARICA 10MG 2,5-5kg 3 TAB.",
+      "symbol": "000000000000002242",
+      "rpl": "100358477",
+      "upd": "600000000135",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
+      "strengths": [
+        [
+          "10",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 11,
+      "form_species_hits": 11
+    },
+    {
+      "id": 604,
+      "name": "Simparica 40 mg (EU/2/15/191)",
+      "subiekt": "SIMPARICA 40MG 10-20kg 3 TAB.",
+      "symbol": "000000000000002243",
+      "rpl": "100358483",
+      "upd": "600000000362",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
+      "strengths": [
+        [
+          "40",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 15,
+      "form_species_hits": 15
+    },
+    {
+      "id": 605,
+      "name": "Simparica 80 mg (EU/2/15/191)",
+      "subiekt": "SIMPARICA 80MG 20-40kg 3 TAB.",
+      "symbol": "000000000000002244",
+      "rpl": "100358490",
+      "upd": "600000001548",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
+      "strengths": [
+        [
+          "80",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 17,
+      "form_species_hits": 17
+    },
+    {
+      "id": 1569,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5% C20B02C-01",
+      "symbol": "04620",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 1570,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5% C20B02C-01",
+      "symbol": "04620",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 1571,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5% C20B02C-01",
+      "symbol": "04620",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 1572,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5% B20810-D",
+      "symbol": "04620(1)",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 1573,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5% B20810-D",
+      "symbol": "04620(1)",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 1574,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5% B20810-D",
+      "symbol": "04620(1)",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 1776,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5%  C20802C",
+      "symbol": "05220",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 1777,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5%  C20802C",
+      "symbol": "05220",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 1778,
+      "name": "Metacam 5 mg/ml",
+      "subiekt": "METACAM BYDŁO INJ. 100 ML 0,5%  C20802C",
+      "symbol": "05220",
+      "rpl": "100215826",
+      "upd": "600000001703",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
+      "strengths": [
+        [
+          "5",
+          "mg/ml"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 62,
+      "form_species_hits": 22
+    },
+    {
+      "id": 2127,
+      "name": "STRONGHOLD 15 MG (3 x 0,25 ml) PIES/KOT",
+      "subiekt": "STRONGHOLD 15 MG(3 X 0,25 ML) PIES KOT PIPETA",
+      "symbol": "0000003365",
+      "rpl": "100219020",
+      "upd": "600000003546",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
+      "strengths": [
+        [
+          "15",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 29,
+      "form_species_hits": 23
+    },
+    {
+      "id": 2128,
+      "name": "STRONGHOLD 30 MG (3 x 0,25 ml) PIES",
+      "subiekt": "STRONGHOLD 12% 30 MG(3 X 0,25 ML) F.",
+      "symbol": "0000003363",
+      "rpl": "100219037",
+      "upd": "600000000863",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
+      "strengths": [
+        [
+          "30",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 33,
+      "form_species_hits": 21
+    },
+    {
+      "id": 2129,
+      "name": "STRONGHOLD 45 MG (3 x 0,75 ml) KOT",
+      "subiekt": "STRONGHOLD 6% 45 MG(3 X 0,75 ML) N.",
+      "symbol": "0000003366",
+      "rpl": "100219043",
+      "upd": "600000000698",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
+      "strengths": [
+        [
+          "45",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 33,
+      "form_species_hits": 22
+    },
+    {
+      "id": 2130,
+      "name": "STRONGHOLD 60 MG (3 x 0,50 ml) PIES",
+      "subiekt": "STRONGHOLD 12% 60 MG(3 X 0,50 ML) B.",
+      "symbol": "0000003364",
+      "rpl": "100219050",
+      "upd": "600000001400",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
+      "strengths": [
+        [
+          "60",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 42,
+      "form_species_hits": 24
+    },
+    {
+      "id": 2131,
+      "name": "STRONGHOLD 120 MG (3 x 1,0 ml) PIES",
+      "subiekt": "STRONGHOLD 12% 120 MG(3 X 1.0ML)C.",
+      "symbol": "0000003361",
+      "rpl": "100219066",
+      "upd": "600000000562",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
+      "strengths": [
+        [
+          "120",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 45,
+      "form_species_hits": 25
+    },
+    {
+      "id": 2132,
+      "name": "STRONGHOLD 240 MG (3 x 2,0 ml) PIES",
+      "subiekt": "STRONGHOLD 12%240 MG(3 X 2.0 ML)Z.",
+      "symbol": "0000003362",
+      "rpl": "100219072",
+      "upd": "600000000563",
+      "old_pdf": null,
+      "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
+      "strengths": [
+        [
+          "240",
+          "mg"
+        ]
+      ],
+      "status": "linked",
+      "local_name_strength_hits": 48,
+      "form_species_hits": 26
+    }
+  ]
+}
