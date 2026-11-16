@@ -40,7 +40,7 @@ assert cn.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
 assert not cn.execute("PRAGMA foreign_key_check").fetchall()
 variant_paths={str(r[0]).strip().replace("\\","/").removeprefix("./") for r in cn.execute("SELECT pdf_path FROM variants WHERE pdf_path IS NOT NULL AND trim(pdf_path)<>''")}
 assert not all_paths.intersection(variant_paths),"Some proposed archival PDF is linked by a variant"
-tracked=set(run("git","ls-files","data/ChPL",cwd=ROOT,output=True).splitlines())
+tracked=set(subprocess.check_output(["git","ls-files","-z","data/ChPL"],cwd=ROOT).decode("utf-8").strip("\0").split("\0"))
 assert all_paths<=tracked
 # Confirm exact files from audit, including bytes and hash, before mutation.
 for x in unused:
