@@ -27,12 +27,14 @@
     }
   },
   "statuses": {
-    "manual_species_or_form_not_confirmed": 3,
+    "linked": 3,
     "existing_pdf_kept": 25
   },
-  "linked_by_brand": {},
+  "linked_by_brand": {
+    "v79": 3
+  },
   "clinical_unchanged": true,
-  "sqlite_sha256": "d88efeda2f297c6e1559aacceeb686b65f12dd902c8dc409611d7d174534924f",
+  "sqlite_sha256": "ebfe38e4c6ad7657b9a94fbea1a69626fca21b4645dcae984cad92a7d020eda7",
   "decisions": [
     {
       "id": 114,
@@ -49,9 +51,9 @@
           "mg/ml"
         ]
       ],
-      "status": "manual_species_or_form_not_confirmed",
+      "status": "linked",
       "local_name_strength_hits": 6,
-      "form_species_hits": 0
+      "form_species_hits": 6
     },
     {
       "id": 124,
@@ -125,9 +127,9 @@
           "mg/ml"
         ]
       ],
-      "status": "manual_species_or_form_not_confirmed",
+      "status": "linked",
       "local_name_strength_hits": 6,
-      "form_species_hits": 0
+      "form_species_hits": 6
     },
     {
       "id": 302,
@@ -201,9 +203,9 @@
           "mg/ml"
         ]
       ],
-      "status": "manual_species_or_form_not_confirmed",
+      "status": "linked",
       "local_name_strength_hits": 6,
-      "form_species_hits": 0
+      "form_species_hits": 6
     },
     {
       "id": 602,
@@ -298,7 +300,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 1570,
@@ -317,7 +319,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 1571,
@@ -336,7 +338,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 1572,
@@ -355,7 +357,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 1573,
@@ -374,7 +376,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 1574,
@@ -393,7 +395,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 1776,
@@ -412,7 +414,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 1777,
@@ -431,7 +433,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 1778,
@@ -450,7 +452,7 @@
       ],
       "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
-      "form_species_hits": 22
+      "form_species_hits": 8
     },
     {
       "id": 2127,

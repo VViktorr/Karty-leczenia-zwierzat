@@ -1,13 +1,13 @@
 ﻿ID;Nazwa wariantu;Nazwa w Subiekcie;Symbol;Status;Nowy PDF;Dopasowane moce
-114;Naxcel 200 mg/ml;NAXCEL (BYDŁO) 200 MG/ML 100 ML 5F0076;00000000000000059(1);manual_species_or_form_not_confirmed;data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf;200 mg/ml
+114;Naxcel 200 mg/ml;NAXCEL (BYDŁO) 200 MG/ML 100 ML 5F0076;00000000000000059(1);linked;data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf;200 mg/ml
 124;Metacam 20 mg/ml;METACAM BYDŁO 2% INJ. 50 ML D21014C-13;000000000000000703;existing_pdf_kept;data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf;20 mg/ml
 125;Metacam 20 mg/ml;METACAM BYDŁO 2% INJ. 50 ML D21014C-13;000000000000000703;existing_pdf_kept;data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf;20 mg/ml
 126;Metacam 20 mg/ml;METACAM BYDŁO 2% INJ. 50 ML D21014C-13;000000000000000703;existing_pdf_kept;data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf;20 mg/ml
-215;Naxcel 200 mg/ml;NAXCEL (BYDŁO) 200 MG/ML 100 ML 4F1258;000000000000000983;manual_species_or_form_not_confirmed;data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf;200 mg/ml
+215;Naxcel 200 mg/ml;NAXCEL (BYDŁO) 200 MG/ML 100 ML 4F1258;000000000000000983;linked;data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf;200 mg/ml
 302;Metacam 20 mg/ml;METACAM BYDŁO 2% INJ. 50 ML E-21017A-21;000000000000001262;existing_pdf_kept;data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf;20 mg/ml
 303;Metacam 20 mg/ml;METACAM BYDŁO 2% INJ. 50 ML E-21017A-21;000000000000001262;existing_pdf_kept;data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf;20 mg/ml
 304;Metacam 20 mg/ml;METACAM BYDŁO 2% INJ. 50 ML E-21017A-21;000000000000001262;existing_pdf_kept;data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf;20 mg/ml
-460;Naxcel 200 mg/ml;NAXCEL (BYDŁO) 200 MG/ML A'100 ML;000000000000001684;manual_species_or_form_not_confirmed;data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf;200 mg/ml
+460;Naxcel 200 mg/ml;NAXCEL (BYDŁO) 200 MG/ML A'100 ML;000000000000001684;linked;data/ChPL/UPD/ema-combined-v79-naxcel-vnra14173-2024-04-22-pl.pdf;200 mg/ml
 602;Simparica 20 mg (EU/2/15/191);SIMPARICA 20MG 5-10kg 3 TAB.;000000000000002241;existing_pdf_kept;data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf;20 mg
 603;Simparica 10 mg (EU/2/15/191);SIMPARICA 10MG 2,5-5kg 3 TAB.;000000000000002242;existing_pdf_kept;data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf;10 mg
 604;Simparica 40 mg (EU/2/15/191);SIMPARICA 40MG 10-20kg 3 TAB.;000000000000002243;existing_pdf_kept;data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf;40 mg
