@@ -39,12 +39,16 @@ db=sqlite3.connect(f"file:{DB}?mode=ro",uri=True)
 db.row_factory=sqlite3.Row
 assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
 assert not db.execute("PRAGMA foreign_key_check").fetchall()
-products={r["symbol"]:dict(r) for r in db.execute("SELECT symbol,name,stock,unit FROM products")}
+product_fields={r["name"] for r in db.execute("PRAGMA table_info(products)")}
+assert {"symbol","name"}.issubset(product_fields),product_fields
+stock_expression="p.stock" if "stock" in product_fields else "NULL"
+unit_expression="p.unit" if "unit" in product_fields else "NULL"
+products={r["symbol"]:dict(r) for r in db.execute("SELECT symbol,name FROM products")}
 variant_fields={r["name"] for r in db.execute("PRAGMA table_info(variants)")}
 assert {"symbol","name","scope","pdf_path","rpl_id","upd_id"}.issubset(variant_fields)
 # All active records; products.name is original Subiekt name. May be shared across variants.
-rows=[dict(r) for r in db.execute("""SELECT v.id AS variant_id,v.symbol,v.name AS variant_name,
- v.rpl_id,v.upd_id,v.pdf_path,v.scope,p.name AS subiekt_name,p.stock AS stored_stock,p.unit
+rows=[dict(r) for r in db.execute(f"""SELECT v.id AS variant_id,v.symbol,v.name AS variant_name,
+ v.rpl_id,v.upd_id,v.pdf_path,v.scope,p.name AS subiekt_name,{stock_expression} AS stored_stock,{unit_expression} AS unit
  FROM variants v JOIN products p ON p.symbol=v.symbol
  WHERE v.scope IS NULL OR lower(v.scope) NOT LIKE '%archiwal%'
  ORDER BY lower(v.name),v.id""")]
@@ -81,7 +85,7 @@ md=["# Partia 39 – audyt powiązań ChPL z nazwami Subiekta","",
     f"**Różne nazwy wariantów:** {report['unique_variant_names']}",
     f"**Kartoteki Subiekta:** {report['unique_subiekt_products']}",
     "",
-    "**Uwaga:** stan magazynowy to wartość utrwalona w katalogu, nie bieżący stan SQL Subiekta.",
+    "**Uwaga:** stan magazynowy jest opcjonalny; brak kolumny stock w katalogu oznacza puste pole.",
     "Audyt jest tylko do odczytu. Nie potwierdza zgodności treści dla istniejących PDF, które technicznie się otwierają.",
     "",
     "## Rozkład przyczyn",""]
