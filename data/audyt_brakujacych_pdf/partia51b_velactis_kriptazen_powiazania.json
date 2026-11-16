@@ -1,0 +1,26 @@
+{
+  "partia": "51b",
+  "updated_variants": 2,
+  "changes": [
+    {
+      "id": 2314,
+      "product": "velactis",
+      "pdf": "data/ChPL/UPD/anx_133354_pl.pdf",
+      "pages": 18,
+      "sha256": "d8008ba74a9a70b2deb75770128bdff3ce8b6c6286e7e8853bed4dba56bcfac3"
+    },
+    {
+      "id": 2305,
+      "product": "kriptazen",
+      "pdf": "data/ChPL/UPD/anx_168157_pl.pdf",
+      "pages": 24,
+      "sha256": "ca9526b812d674205ae33fa84867ec1d06c09a54e5c413454a40ab5445ef2eb1"
+    }
+  ],
+  "skipped": {
+    "path": "data/ChPL/UPD/Ulotka-44168-2020-10-23-2702_W-2021-04-14.pdf",
+    "reason": "Halofusol leaflet, not a Kriptazen ChPL"
+  },
+  "clinical_data_unchanged": true,
+  "sqlite_sha256": "223bd51e187e81358683285ac8a683a1fa8bdc726c3861406e584784ad16d5a4"
+}
