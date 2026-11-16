@@ -4,6 +4,7 @@ on:
     branches: [winforms]
     paths:
       - ".github/workflows/partia40-acticarp-audyt.yml"
+      - "scripts/partia40-acticarp-i-kandydaci.py"
   workflow_dispatch:
 permissions:
   contents: write
