@@ -91,6 +91,13 @@ print("NAME_INDEX",json.dumps({k:len(v) for k,v in indexed.items() if v},ensure_
 def evaluate(r,doc):
     text=doc["text"]
     pos=doc["positions"]
+    # Do not confuse a base brand with a different combination product.
+    if brand(r["name"])=="draxxin" and any(re.search(r"(?<!\w)draxxin\s+plus(?!\w)",text[max(0,i-30):i+90]) for i in pos):
+        return False,"different_product_draxxin_plus"
+    # Reject a document for a different RPL ID when the file includes an explicit national RPL number.
+    m=re.search(r"/RPL_(\d+)_",doc["path"])
+    if m and str(r["rpl_id"] or "").strip().lstrip("0")!=m.group(1).lstrip("0"):
+        return False,"different_rpl_id"
     strengths=strength(r["name"])
     f=formulation(r["name"])
     # A strength must be near the medicine's actual name; not elsewhere in dosage warnings.
