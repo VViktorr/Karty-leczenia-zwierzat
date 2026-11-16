@@ -899,7 +899,8 @@ internal sealed class MainForm : Form
         var clinic = ClinicSettingsStore.Load();
         var fields = new Dictionary<string, string> { ["Dokument źródłowy"] = source.Number,
             ["Właściciel i adres"] = source.Payer, ["Zakres mapowania towarów"] = source.Scope,
-            ["Lecznica i adres"] = clinic.CardText,\n            ["Lekarz i nr prawa wykonywania zawodu"] = clinic.Doctor };
+            ["Lecznica i adres"] = clinic.CardText,
+            ["Lekarz i nr prawa wykonywania zawodu"] = clinic.Doctor };
         var rows = treatment.Rows.Cast<DataGridViewRow>().Select(item =>
         {
             var values = new Dictionary<string, string>(((TreatmentRow)item.Tag!).Values);
