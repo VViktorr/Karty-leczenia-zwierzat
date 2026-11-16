@@ -10,17 +10,16 @@ PDF="data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf"
 p=ROOT/PDF
 assert p.is_file(), f"Missing PDF: {p}"
 print("SPUTOP_FILE",json.dumps({"size":p.stat().st_size,"first_bytes_hex":p.open("rb").read(64).hex()},ensure_ascii=False),flush=True)
-assert p.stat().st_size>1000 and p.open("rb").read(5)==b"%PDF-", "File is not recognized as a PDF"
-def norm(s):
- s=unicodedata.normalize("NFKD",str(s or "").casefold().replace("ł","l").replace(",","."))
- return " ".join("".join(c for c in s if not unicodedata.combining(c)).split())
-with fitz.open(p) as f:
- assert not f.is_encrypted
- pages=len(f)
- txt=norm(" ".join(pg.get_text(sort=True) for pg in f))
-assert "sputop" in txt, "Product name not found in PDF"
-assert re.search(r"10\s*mg\s*/\s*ml",txt), "Strength 10 mg/ml not confirmed"
-assert "charakterystyka" in txt and "przeciwwskazania" in txt, "Polish ChPL sections missing"
+pdf_header_ok=p.stat().st_size>1000 and p.open("rb").read(5)==b"%PDF-"
+pages=0
+name_strength_verified=False
+if pdf_header_ok:
+ with fitz.open(p) as f:
+  if not f.is_encrypted:
+   pages=len(f)
+   txt=" ".join(pg.get_text(sort=True) for pg in f).casefold()
+   name_strength_verified=("sputop" in txt and bool(re.search(r"10\s*mg\s*/\s*ml",txt)) and "charakterystyka" in txt and "przeciwwskazania" in txt)
+
 con=sqlite3.connect(f"file:{DB}?mode=ro",uri=True)
 con.row_factory=sqlite3.Row
 assert con.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
@@ -43,7 +42,7 @@ missing=[r for r in rows if not good(r["pdf_path"])]
 report={
  "partia":46,"read_only":True,"active_variants":len(rows),
  "pdf":PDF,"pdf_size_bytes":p.stat().st_size,"pdf_sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"pdf_pages":pages,
- "pdf_verified_name_strength_polish_sections":True,"sputop_valid_links":len(sputop),
+ "pdf_verified_name_strength_polish_sections":name_strength_verified,"sputop_link_rows":len(sputop),"sputop_valid_links":len(sputop) if pdf_header_ok and name_strength_verified else 0,"sputop_file_is_valid_pdf":pdf_header_ok,
  "remaining_missing_or_invalid_paths":len(missing),
  "remaining_missing_ids":[r["id"] for r in missing],
  "current_sqlite_sha256":hashlib.sha256(DB.read_bytes()).hexdigest(),
