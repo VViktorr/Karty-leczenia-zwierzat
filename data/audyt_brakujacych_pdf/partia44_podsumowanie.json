@@ -1,0 +1,28 @@
+{
+  "partia": 44,
+  "read_only": true,
+  "active_variants": 2902,
+  "missing_or_broken": 104,
+  "status_counts": {
+    "POWIAZANIE_OK": 2798,
+    "BRAK_POWIAZANIA": 92,
+    "BRAK_PLIKU_LUB_USZKODZONY_PDF": 12
+  },
+  "pdf_files": 655,
+  "readable_pdf_files": 623,
+  "unique_subiekt_symbols_missing": 54,
+  "candidate_status_counts": {
+    "BRAK_KANDYDATA": 27,
+    "SPRAWDZ_RECZNIE": 53,
+    "POTENCJALNY_ID_NAZWA_MOC": 6,
+    "POTENCJALNY_ID_NAZWA": 18
+  },
+  "priority_products": {
+    "melovem": 14,
+    "meloxidyl": 2,
+    "previcox": 1,
+    "porcilis": 6
+  },
+  "db_sha256": "4cc3982af2d5cf2a7d3db1540219a09906ce629d1086bbd1c39c0d3145b47e85",
+  "note": "All PDF suggestions are candidates only. No SQLite write; matches require section-level review of drug name, strength, form, species and aliases. Existing good links are preserved."
+}

@@ -1,0 +1,3230 @@
+{
+  "partia": 44,
+  "read_only": true,
+  "active_variants": 2902,
+  "missing_or_broken": 104,
+  "status_counts": {
+    "POWIAZANIE_OK": 2798,
+    "BRAK_POWIAZANIA": 92,
+    "BRAK_PLIKU_LUB_USZKODZONY_PDF": 12
+  },
+  "pdf_files": 655,
+  "readable_pdf_files": 623,
+  "unique_subiekt_symbols_missing": 54,
+  "candidate_status_counts": {
+    "BRAK_KANDYDATA": 27,
+    "SPRAWDZ_RECZNIE": 53,
+    "POTENCJALNY_ID_NAZWA_MOC": 6,
+    "POTENCJALNY_ID_NAZWA": 18
+  },
+  "priority_products": {
+    "melovem": 14,
+    "meloxidyl": 2,
+    "previcox": 1,
+    "porcilis": 6
+  },
+  "db_sha256": "4cc3982af2d5cf2a7d3db1540219a09906ce629d1086bbd1c39c0d3145b47e85",
+  "note": "All PDF suggestions are candidates only. No SQLite write; matches require section-level review of drug name, strength, form, species and aliases. Existing good links are preserved.",
+  "missing": [
+    {
+      "variant_id": 73,
+      "symbol": "000000000000000259",
+      "variant_name": "Equilis Prequenza-Te",
+      "rpl_id": "100253057",
+      "upd_id": "600000000720",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "EQUILIS PREQUENZA-TE A'1D",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 101,
+      "symbol": "000000000000000424",
+      "variant_name": "Startvac",
+      "rpl_id": "100206307",
+      "upd_id": "600000004174",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "STARTVAC 1 DAW EMULSJA HIPRA 64CL-1",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004174_Startvac_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004174_Startvac_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 182,
+      "symbol": "000000000000000857",
+      "variant_name": "Startvac",
+      "rpl_id": "100206307",
+      "upd_id": "600000004174",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "STARTVAC 5 DAW",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004174_Startvac_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004174_Startvac_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 227,
+      "symbol": "000000000000000995",
+      "variant_name": "Melovem",
+      "rpl_id": "100216429",
+      "upd_id": "600000004229",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  12H20-19C6",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA_MOC",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "5 mg/ml"
+          ],
+          "strengths_found": [
+            "5 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA_MOC"
+    },
+    {
+      "variant_id": 228,
+      "symbol": "000000000000000995",
+      "variant_name": "Melovem",
+      "rpl_id": "100216429",
+      "upd_id": "600000004229",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  12H20-19C6",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA_MOC",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "5 mg/ml"
+          ],
+          "strengths_found": [
+            "5 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA_MOC"
+    },
+    {
+      "variant_id": 318,
+      "symbol": "000000000000001278",
+      "variant_name": "Melovem",
+      "rpl_id": "100216429",
+      "upd_id": "600000004229",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  13F10-01C2",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA_MOC",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "5 mg/ml"
+          ],
+          "strengths_found": [
+            "5 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA_MOC"
+    },
+    {
+      "variant_id": 319,
+      "symbol": "000000000000001278",
+      "variant_name": "Melovem",
+      "rpl_id": "100216429",
+      "upd_id": "600000004229",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  13F10-01C2",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA_MOC",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "5 mg/ml"
+          ],
+          "strengths_found": [
+            "5 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA_MOC"
+    },
+    {
+      "variant_id": 342,
+      "symbol": "000000000000001359",
+      "variant_name": "Porcilis ColiClos",
+      "rpl_id": "100283868",
+      "upd_id": "600000003319",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PORCILIS COLICLOS 10 DAW 20ML A011B05",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_16919_Porcilis_Ery_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": false,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19703_Porcilis_Ery_Parvo_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19705_Porcilis_APP_zawiesina_do_wstrzykiwań_dla_świ_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000779_Porcilis_Porcoli_Diluvac_Forte_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004089_Porcilis_AR-T_DF_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 7,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 388,
+      "symbol": "000000000000001481",
+      "variant_name": "Melovem",
+      "rpl_id": "100216429",
+      "upd_id": "600000004229",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  12H20-09C6",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA_MOC",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "5 mg/ml"
+          ],
+          "strengths_found": [
+            "5 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA_MOC"
+    },
+    {
+      "variant_id": 389,
+      "symbol": "000000000000001481",
+      "variant_name": "Melovem",
+      "rpl_id": "100216429",
+      "upd_id": "600000004229",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  12H20-09C6",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA_MOC",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "5 mg/ml"
+          ],
+          "strengths_found": [
+            "5 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA_MOC"
+    },
+    {
+      "variant_id": 430,
+      "symbol": "000000000000001563",
+      "variant_name": "Melovem 30 mg/ml",
+      "rpl_id": "100359293",
+      "upd_id": "600000004346",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 30 MG/ML 50 ml  13H30-02F3",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "30 mg/ml"
+          ],
+          "strengths_found": [
+            "30 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 431,
+      "symbol": "000000000000001563",
+      "variant_name": "Melovem 30 mg/ml",
+      "rpl_id": "100359293",
+      "upd_id": "600000004346",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 30 MG/ML 50 ml  13H30-02F3",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "30 mg/ml"
+          ],
+          "strengths_found": [
+            "30 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 446,
+      "symbol": "000000000000001633",
+      "variant_name": "Meloxidyl 20 mg/ml",
+      "rpl_id": "100225960",
+      "upd_id": "600000000034",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOXIDYL 20 MG/ML 50ML 133A5",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000034_Meloxidyl_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "20 mg/ml"
+          ],
+          "strengths_found": [
+            "20 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000034_Meloxidyl_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 447,
+      "symbol": "000000000000001633",
+      "variant_name": "Meloxidyl 20 mg/ml",
+      "rpl_id": "100225960",
+      "upd_id": "600000000034",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOXIDYL 20 MG/ML 50ML 133A5",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000034_Meloxidyl_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "20 mg/ml"
+          ],
+          "strengths_found": [
+            "20 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000034_Meloxidyl_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 494,
+      "symbol": "000000000000001773",
+      "variant_name": "L-Spec-VMD 50 mg/ml + 100 mg/ml",
+      "rpl_id": "18793",
+      "upd_id": null,
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "L-SPEC-VMD 5/10 A'100 ML",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 511,
+      "symbol": "000000000000001845",
+      "variant_name": "Bovela",
+      "rpl_id": "100335708",
+      "upd_id": "600000000329",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "BOVELA 5 DAW.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000329_Bovela_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000329_Bovela_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 512,
+      "symbol": "000000000000001845",
+      "variant_name": "Bovela",
+      "rpl_id": "100335708",
+      "upd_id": "600000000329",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "BOVELA 5 DAW.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000329_Bovela_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000329_Bovela_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 513,
+      "symbol": "000000000000001846",
+      "variant_name": "Bovela",
+      "rpl_id": "100335708",
+      "upd_id": "600000000329",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "BOVELA 25 DAW.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000329_Bovela_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000329_Bovela_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 548,
+      "symbol": "000000000000001959",
+      "variant_name": "Melovem 30 mg/ml",
+      "rpl_id": "100359293",
+      "upd_id": "600000004346",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 30 MG/ML 50 ml  15G27-14F3",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "30 mg/ml"
+          ],
+          "strengths_found": [
+            "30 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 549,
+      "symbol": "000000000000001959",
+      "variant_name": "Melovem 30 mg/ml",
+      "rpl_id": "100359293",
+      "upd_id": "600000004346",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 30 MG/ML 50 ml  15G27-14F3",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "30 mg/ml"
+          ],
+          "strengths_found": [
+            "30 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 843,
+      "symbol": "000002444",
+      "variant_name": "Melovem 30 mg/ml",
+      "rpl_id": "100359293",
+      "upd_id": "600000004346",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 30 MG/ML 100 ml 18e29-01c5",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "30 mg/ml"
+          ],
+          "strengths_found": [
+            "30 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 844,
+      "symbol": "000002444",
+      "variant_name": "Melovem 30 mg/ml",
+      "rpl_id": "100359293",
+      "upd_id": "600000004346",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MELOVEM 30 MG/ML 100 ml 18e29-01c5",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "30 mg/ml"
+          ],
+          "strengths_found": [
+            "30 mg/ml"
+          ],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 883,
+      "symbol": "000002676",
+      "variant_name": "Porcilis PCV",
+      "rpl_id": "100273605",
+      "upd_id": "600000003470",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PORCILIS PCV 50 D. A'100 ML",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_16919_Porcilis_Ery_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": false,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19703_Porcilis_Ery_Parvo_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19705_Porcilis_APP_zawiesina_do_wstrzykiwań_dla_świ_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000779_Porcilis_Porcoli_Diluvac_Forte_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004089_Porcilis_AR-T_DF_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 7,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 917,
+      "symbol": "000002799",
+      "variant_name": "Coxevac",
+      "rpl_id": "100258400",
+      "upd_id": "600000003433",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COXEVAC 40 ML  576158",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003433_Coxevac_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003433_Coxevac_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 918,
+      "symbol": "000002799",
+      "variant_name": "Coxevac",
+      "rpl_id": "100258400",
+      "upd_id": "600000003433",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COXEVAC 40 ML  576158",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003433_Coxevac_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003433_Coxevac_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 994,
+      "symbol": "000003034",
+      "variant_name": "Exzolt 10 mg/ml",
+      "rpl_id": "100402557",
+      "upd_id": "600000000062",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "EXZOLT A'50 ML",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000062_Exzolt_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "10 mg/ml"
+          ],
+          "strengths_found": [
+            "10 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000062_Exzolt_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 1042,
+      "symbol": "000003220",
+      "variant_name": "Porcilis PCV",
+      "rpl_id": "100273605",
+      "upd_id": "600000003470",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PORCILIS PCV 100 D. ID A'200 ML",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_16919_Porcilis_Ery_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": false,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19703_Porcilis_Ery_Parvo_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19705_Porcilis_APP_zawiesina_do_wstrzykiwań_dla_świ_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000779_Porcilis_Porcoli_Diluvac_Forte_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004089_Porcilis_AR-T_DF_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 7,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 1173,
+      "symbol": "000003474",
+      "variant_name": "Previcox 227 mg",
+      "rpl_id": "100213141",
+      "upd_id": "600000000610",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PREVICOX 227 MG A'60 TBL.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000610_Previcox_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "227 mg"
+          ],
+          "strengths_found": [
+            "227 mg"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000610_Previcox_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 1372,
+      "symbol": "03054",
+      "variant_name": "Porcilis Porcoli DF",
+      "rpl_id": "100360770",
+      "upd_id": "600000000779",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PORCILIS PORCOLI DF A'20 ML A080B01",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000779_Porcilis_Porcoli_Diluvac_Forte_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_16919_Porcilis_Ery_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": false,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19703_Porcilis_Ery_Parvo_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19705_Porcilis_APP_zawiesina_do_wstrzykiwań_dla_świ_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004089_Porcilis_AR-T_DF_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 7,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000779_Porcilis_Porcoli_Diluvac_Forte_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 1414,
+      "symbol": "04215",
+      "variant_name": "Tetra-Delta 10 ml",
+      "rpl_id": null,
+      "upd_id": "600000056158",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "TETRA DELTA  10 ML  7146-25A",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 1417,
+      "symbol": "04218",
+      "variant_name": "Tetra-Delta 10 ml",
+      "rpl_id": null,
+      "upd_id": "600000056158",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "TETRA DELTA   10ML 8101-25a",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 1590,
+      "symbol": "04636",
+      "variant_name": "PregSure BVD, emulsja do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": null,
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PREGSURE BVD 5 DAW L80894",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 1629,
+      "symbol": "04807",
+      "variant_name": "Porcilis AR-T DF",
+      "rpl_id": "100242881",
+      "upd_id": "600000004089",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PORCILIS AR-T 20 ML",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004089_Porcilis_AR-T_DF_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_16919_Porcilis_Ery_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": false,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19703_Porcilis_Ery_Parvo_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19705_Porcilis_APP_zawiesina_do_wstrzykiwań_dla_świ_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000779_Porcilis_Porcoli_Diluvac_Forte_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 7,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004089_Porcilis_AR-T_DF_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 1892,
+      "symbol": "05294",
+      "variant_name": "PregSure BVD, emulsja do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": null,
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PREGSURE BVD 25 DAW. LB1270",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 1893,
+      "symbol": "05295",
+      "variant_name": "PregSure BVD, emulsja do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": null,
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PREGSURE BVD 5 DAW.  L64432",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 1894,
+      "symbol": "05295(1)",
+      "variant_name": "PregSure BVD, emulsja do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": null,
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PREGSURE 25 DS L81724",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 1895,
+      "symbol": "05296",
+      "variant_name": "PregSure BVD, emulsja do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": null,
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PREGSURE BVD 5 DAW. L73787",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 1959,
+      "symbol": "0701",
+      "variant_name": "Tetra-Delta 10 ml",
+      "rpl_id": null,
+      "upd_id": "600000056158",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "TETRA-DELTA  10 ML 2512-25",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2070,
+      "symbol": "566N-2",
+      "variant_name": "Startvac",
+      "rpl_id": "100206307",
+      "upd_id": "600000004174",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "STARTVAC A'25 DAW.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004174_Startvac_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004174_Startvac_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2108,
+      "symbol": "000000000000002344",
+      "variant_name": "Locatim 60 ml",
+      "rpl_id": "100360528",
+      "upd_id": "600000003386",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "LOCATIM 60ML",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003386_Locatim_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003386_Locatim_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2117,
+      "symbol": "000000000000001574",
+      "variant_name": "ECOPORC SHIGA 50 ml",
+      "rpl_id": "100360936",
+      "upd_id": "600000004133",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "ECOPORC SHIGA  50 ml",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004133_Ecoporc_Shiga_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004133_Ecoporc_Shiga_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2118,
+      "symbol": "000002583",
+      "variant_name": "INGELVAC CIRCOFLEX 10D / 50D",
+      "rpl_id": "100301201",
+      "upd_id": "600000003966",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "INGELVAC CIRCOFLEX 10D",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003966_Ingelvac_CircoFLEX_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003966_Ingelvac_CircoFLEX_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2119,
+      "symbol": "000000000000001227",
+      "variant_name": "INGELVAC CIRCOFLEX 10D / 50D",
+      "rpl_id": "100301201",
+      "upd_id": "600000003966",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "INGELVAC CIRCOFLEX 50 D W309-859B",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003966_Ingelvac_CircoFLEX_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003966_Ingelvac_CircoFLEX_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2126,
+      "symbol": "000000000000000807",
+      "variant_name": "PROTEQFLU-TE 1 DAW.",
+      "rpl_id": "100252218",
+      "upd_id": "600000992466",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PROTEQFLU-TE 1 DAW.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000992466_PROTEQFLU-TE_1_DAW_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": false,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000992466_PROTEQFLU-TE_1_DAW_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2133,
+      "symbol": "000000000000001649",
+      "variant_name": "VECTRA 3D DLA PSÓW >40 kg 1 pipeta",
+      "rpl_id": "100304850",
+      "upd_id": "600000004336",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "VECTRA 3D DLA PSÓW >40 kg 1 pipeta",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2134,
+      "symbol": "000000000000001641",
+      "variant_name": "VECTRA 3D DLA PSÓW 10-25 kg 1 pipeta",
+      "rpl_id": "100304872",
+      "upd_id": "600000000151",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "VECTRA 3D DLA PSÓW 10-25 kg 1 pipeta",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2135,
+      "symbol": "000000000000001642",
+      "variant_name": "VECTRA 3D DLA PSÓW 25-40 kg 1 pipeta",
+      "rpl_id": "100304910",
+      "upd_id": "600000004337",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "VECTRA 3D DLA PSÓW 25-40 kg 1 pipeta",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2136,
+      "symbol": "000000000000001640",
+      "variant_name": "Vectra 3D",
+      "rpl_id": "100304850",
+      "upd_id": "600000000156",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "VECTRA 3D DLA PSÓW 4-10 kg 1 pipeta",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2301,
+      "symbol": "000003343",
+      "variant_name": "Exzolt 10 mg/ml",
+      "rpl_id": "100402557",
+      "upd_id": "600000000062",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "EXZOLT 4 ML",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000062_Exzolt_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "10 mg/ml"
+          ],
+          "strengths_found": [
+            "10 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000062_Exzolt_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2302,
+      "symbol": "0000003777(1)",
+      "variant_name": "Effydral Tablets",
+      "rpl_id": null,
+      "upd_id": "600000072838",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "EFFYDRAL A 1 TBL.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2305,
+      "symbol": "000002760",
+      "variant_name": "Kriptazen",
+      "rpl_id": "100417790",
+      "upd_id": "600000004142",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "KRIPTAZEN 980 ML roztwór",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004142_Kriptazen_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004142_Kriptazen_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2306,
+      "symbol": "000000000000002344",
+      "variant_name": "Locatim",
+      "rpl_id": "100360528",
+      "upd_id": "600000003386",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "LOCATIM 60ML",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003386_Locatim_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003386_Locatim_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2312,
+      "symbol": "000000000000002059",
+      "variant_name": "Pirsue",
+      "rpl_id": null,
+      "upd_id": "600000000514",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PIRSUE 10 ML M16366",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000514_PIRSUE_10_ML_M760639_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000514_PIRSUE_10_ML_M760639_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2313,
+      "symbol": "000002438",
+      "variant_name": "Pirsue",
+      "rpl_id": null,
+      "upd_id": "600000000514",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PIRSUE 10 ML M760639",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000514_PIRSUE_10_ML_M760639_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000514_PIRSUE_10_ML_M760639_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2314,
+      "symbol": "000000000000002050",
+      "variant_name": "Velactis",
+      "rpl_id": null,
+      "upd_id": "700000141165",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "VELACTIS1,12MG/ML 5 ML 105A4",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_700000141165_VELACTIS1_12MG_ML_5_ML_105A4_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": false,
+          "strengths_from_catalog": [
+            "1.12mg/ml"
+          ],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_700000141165_VELACTIS1_12MG_ML_5_ML_105A4_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2324,
+      "symbol": "0000003777(1)",
+      "variant_name": "Effydral Tablets",
+      "rpl_id": null,
+      "upd_id": "600000072838",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "EFFYDRAL A 1 TBL.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2455,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2456,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2457,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2458,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2459,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2460,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2461,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2462,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2463,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2464,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2465,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2466,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2467,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2468,
+      "symbol": "258",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2469,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2470,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2471,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2472,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2473,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2474,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2475,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2476,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2477,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2478,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2479,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2480,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2481,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2482,
+      "symbol": "05094",
+      "variant_name": "COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań",
+      "rpl_id": null,
+      "upd_id": "600000060227",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "125 mg/ml"
+          ],
+          "strengths_found": [
+            "125 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2483,
+      "symbol": "02266",
+      "variant_name": "Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate)",
+      "rpl_id": null,
+      "upd_id": "600000053084",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "AGRISEPT 2 TAB.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2484,
+      "symbol": "02266",
+      "variant_name": "Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate)",
+      "rpl_id": null,
+      "upd_id": "600000053084",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "AGRISEPT 2 TAB.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2485,
+      "symbol": "02266",
+      "variant_name": "Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate)",
+      "rpl_id": null,
+      "upd_id": "600000053084",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "AGRISEPT 2 TAB.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2515,
+      "symbol": "000000000000001765",
+      "variant_name": "CIPER-PULVIZOO 100 mg/ml, koncentrat do sporządzania zawiesiny do oprysku na skórę",
+      "rpl_id": null,
+      "upd_id": "600000058891",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "CIPERPULVIZOO 1 L",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000058891_CIPERPULVIZOO_1_L_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": false,
+          "name_in_filename": false,
+          "strengths_from_catalog": [
+            "100 mg/ml"
+          ],
+          "strengths_found": [
+            "100 mg/ml"
+          ],
+          "official_spc": false,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000058891_CIPERPULVIZOO_1_L_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2688,
+      "symbol": "000000000000000933",
+      "variant_name": "Melovem",
+      "rpl_id": "100216429",
+      "upd_id": "600000004229",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MALOVEM 5MG/ML 100ML 11B01-01C3",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "5mg/ml"
+          ],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2689,
+      "symbol": "000000000000000933",
+      "variant_name": "Melovem",
+      "rpl_id": "100216429",
+      "upd_id": "600000004229",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "MALOVEM 5MG/ML 100ML 11B01-01C3",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+          "status": "POTENCJALNY_ID_NAZWA",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [
+            "5mg/ml"
+          ],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "recommended_status": "POTENCJALNY_ID_NAZWA"
+    },
+    {
+      "variant_id": 2700,
+      "symbol": "02288",
+      "variant_name": "Porcilis ColiClos",
+      "rpl_id": "100283868",
+      "upd_id": "600000003319",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "PORCILIS COLI A'50 ML-25 DAW.",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": true,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": false,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_16919_Porcilis_Ery_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": false,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19703_Porcilis_Ery_Parvo_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/RPL/RPL_19705_Porcilis_APP_zawiesina_do_wstrzykiwań_dla_świ_RPL_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000779_Porcilis_Porcoli_Diluvac_Forte_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        },
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000004089_Porcilis_AR-T_DF_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 7,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2727,
+      "symbol": "000000000000001648",
+      "variant_name": "Vectra 3D",
+      "rpl_id": "100304850",
+      "upd_id": "600000004336",
+      "pdf_path": null,
+      "scope": null,
+      "subiekt_name": "VECTRA 3D DLA PSÓW 1-4 kg 1 pipeta",
+      "status": "BRAK_POWIAZANIA",
+      "candidates": [
+        {
+          "pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+          "status": "SPRAWDZ_RECZNIE",
+          "id_match": false,
+          "name_in_pdf": true,
+          "name_in_filename": true,
+          "strengths_from_catalog": [],
+          "strengths_found": [],
+          "official_spc": true,
+          "potential_conflict": false
+        }
+      ],
+      "candidate_count": 1,
+      "recommended_pdf": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+      "recommended_status": "SPRAWDZ_RECZNIE"
+    },
+    {
+      "variant_id": 2800,
+      "symbol": "000000000000001279",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML  5F0348",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2801,
+      "symbol": "000000000000001279",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML  5F0348",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2802,
+      "symbol": "000000000000001279",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML  5F0348",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2803,
+      "symbol": "000000000000001279",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML  5F0348",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2804,
+      "symbol": "000000000000001279",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML  5F0348",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2805,
+      "symbol": "000000000000001279",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML  5F0348",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2820,
+      "symbol": "000000000000001135",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML 3F1022",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2821,
+      "symbol": "000000000000001135",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML 3F1022",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2822,
+      "symbol": "000000000000001135",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML 3F1022",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2823,
+      "symbol": "000000000000001135",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML 3F1022",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2824,
+      "symbol": "000000000000001135",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML 3F1022",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    },
+    {
+      "variant_id": 2825,
+      "symbol": "000000000000001135",
+      "variant_name": "Sputop Spot On 10 mg/ml",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331",
+      "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "scope": "RPL",
+      "subiekt_name": "SPOT ON 250 ML 3F1022",
+      "status": "BRAK_PLIKU_LUB_USZKODZONY_PDF",
+      "candidates": [],
+      "candidate_count": 0,
+      "recommended_pdf": "",
+      "recommended_status": "BRAK_KANDYDATA"
+    }
+  ],
+  "unreadable_pdfs": [
+    {
+      "path": "data/ChPL/RPL/RPL_14806_Natrium_chloratum_0_9_Baxter_RPL_ChPL.pdf",
+      "error": "invalid PDF header"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_16575_OXYFLEX_XLA_100_ML_126192_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_16599_Bio-Vac_ND-IB_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_16674_Levamol_10_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_16827_Febrivac_Dist_liofilizat_rozpuszczalnik_do_sp_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_16974_Cestal_Plus_Flavour_50_mg_144_mg_200_mg_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_17010_Simpanorm_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_17082_Nobilis_Salenvac_zawiesina_do_wstrzykiwań_dla_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_18295_BIOESTROWET_20_ML_061208A_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_18326_AMPICLOX_LC_66976302_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_18376_Oxyject_20_L_A_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_18379_Valbazen_10_10_g_100_ml_zawiesina_doustna_dla_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_18418_Tylbian_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_18678_Cefalexim_18_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_18793_L-Spec-VMD_RPL_ChPL.pdf",
+      "error": "invalid PDF header"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_18968_Resflor_300_16_5_mg_ml_roztwór_do_wstrzykiwań_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_19388_Endofer_20_20_g_100_ml_roztwór_do_wstrzykiwań_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_19399_Clamoxyl_L_A_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_19668_OXYJECT_10_A_100_ML_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "error": "invalid PDF header"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_20347_Clostrivax_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_20507_Bioketan_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_22121_Engemycin_Spray_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_22579_Cazitel_Plus_tabletki_dla_psów_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_25326_Pederipra_Spray_20mg_ml_zawiesina_do_natryski_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_35330_CEFQUINOR_LC_6333-21E_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_35579_Amoxy_Active_RPL_ChPL.pdf",
+      "error": "invalid PDF header"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_37409_XYLAVET_2_A_30_ML_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_43890_Dozuril_CT_RPL_ChPL.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/RPL/RPL_7089_Vitacon_RPL_ChPL.pdf",
+      "error": "invalid PDF header"
+    },
+    {
+      "path": "data/ChPL/UPD/Charakterystyka-18295-20180730000000-1397_W-20181016000243.pdf",
+      "error": "not enough extractable text"
+    },
+    {
+      "path": "data/ChPL/UPD/UPD_600000056380_COLISTIMED_4800_A_1KG_14D11-051_UPD_ChPL.pdf",
+      "error": "not enough extractable text"
+    }
+  ]
+}
