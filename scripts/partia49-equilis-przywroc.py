@@ -19,6 +19,7 @@ with fitz.open(P) as pdf:
  pages=len(pdf)
  txt=norm(" ".join(page.get_text(sort=True) for page in pdf))
  assert len(txt)>1000
+ print("EQUILIS_PDF_TEXT",json.dumps({"first_1200":txt[:1200],"matches":[txt[max(0,m.start()-90):m.end()+180] for m in list(re.finditer("equilis|prequenza|te|influenza|tetanus",txt))[:20]]},ensure_ascii=False),flush=True)
  assert "equilis prequenza-te" in txt or "equilis prequenza te" in txt, "Wrong product: Equilis Prequenza-Te not in PDF"
  assert "charakterystyka" in txt and "przeciwwskazania" in txt, "Not a Polish ChPL"
 con=sqlite3.connect(DB)
