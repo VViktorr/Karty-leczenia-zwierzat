@@ -1,0 +1,159 @@
+{
+  "partia": 43,
+  "statuses": {
+    "linked": 16
+  },
+  "pdf_paths": {
+    "librela": "data/ChPL/UPD/ema-combined-v5180-librela-vra0000340267-2026-07-02-pl.pdf",
+    "draxxin": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf",
+    "loxicom": "data/ChPL/UPD/ema-combined-v141-loxicom-vra0000340368-2026-11-03-pl.pdf"
+  },
+  "clinical_data_unchanged": true,
+  "sqlite_sha256": "4cc3982af2d5cf2a7d3db1540219a09906ce629d1086bbd1c39c0d3145b47e85",
+  "linked_variants": [
+    {
+      "id": 2120,
+      "medicine": "LIBRELA 20MG/ML A'1MLX2",
+      "subiekt": "LIBRELA 20MG/ML A'1MLX2",
+      "symbol": "000003119",
+      "brand": "librela",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v5180-librela-vra0000340267-2026-07-02-pl.pdf"
+    },
+    {
+      "id": 2121,
+      "medicine": "LIBRELA 30MG/ML A'1MLX2",
+      "subiekt": "LIBRELA 30MG/ML A'1MLX2",
+      "symbol": "000003151",
+      "brand": "librela",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v5180-librela-vra0000340267-2026-07-02-pl.pdf"
+    },
+    {
+      "id": 971,
+      "medicine": "Loxicom 20 mg/ml",
+      "subiekt": "LOXICOM 20mg/ml 100ml",
+      "symbol": "000002954",
+      "brand": "loxicom",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v141-loxicom-vra0000340368-2026-11-03-pl.pdf"
+    },
+    {
+      "id": 972,
+      "medicine": "Loxicom 20 mg/ml",
+      "subiekt": "LOXICOM 20mg/ml 100ml",
+      "symbol": "000002954",
+      "brand": "loxicom",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v141-loxicom-vra0000340368-2026-11-03-pl.pdf"
+    },
+    {
+      "id": 973,
+      "medicine": "Loxicom 20 mg/ml",
+      "subiekt": "LOXICOM 20mg/ml 100ml",
+      "symbol": "000002954",
+      "brand": "loxicom",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v141-loxicom-vra0000340368-2026-11-03-pl.pdf"
+    },
+    {
+      "id": 2122,
+      "medicine": "LOXICOM 0,5 MG/ML KOT ORAL",
+      "subiekt": "LOXICOM 0,5 MG/ML KOT ORAL",
+      "symbol": "000003368",
+      "brand": "loxicom",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v141-loxicom-vra0000340368-2026-11-03-pl.pdf"
+    },
+    {
+      "id": 2123,
+      "medicine": "LOXICOM 0,5 MG/ML KOT ORAL",
+      "subiekt": "LOXICOM 0,5 MG/ML KOT ORAL",
+      "symbol": "000003369",
+      "brand": "loxicom",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v141-loxicom-vra0000340368-2026-11-03-pl.pdf"
+    },
+    {
+      "id": 1493,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 50 ML  A583122",
+      "symbol": "04370(1)",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    },
+    {
+      "id": 1494,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 50 ML  A583122",
+      "symbol": "04370(1)",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    },
+    {
+      "id": 1495,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 50 ML  A500321",
+      "symbol": "04370(2)",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    },
+    {
+      "id": 1496,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 50 ML  A500321",
+      "symbol": "04370(2)",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    },
+    {
+      "id": 1497,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 100 ML  A035307",
+      "symbol": "04371",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    },
+    {
+      "id": 1498,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 100 ML  A035307",
+      "symbol": "04371",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    },
+    {
+      "id": 2288,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 100 ML  A035307",
+      "symbol": "04371",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    },
+    {
+      "id": 2289,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 50 ML  A500321",
+      "symbol": "04370(2)",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    },
+    {
+      "id": 2290,
+      "medicine": "Draxxin",
+      "subiekt": "DRAXXIN 50 ML  A583122",
+      "symbol": "04370(1)",
+      "brand": "draxxin",
+      "status": "linked",
+      "pdf": "data/ChPL/UPD/ema-combined-v77-draxxin-vnra19587-vnra19588-2025-04-25-pl.pdf"
+    }
+  ]
+}
