@@ -14,7 +14,7 @@ DIR=ROOT/"data/ChPL/UPD"
 OUT.mkdir(exist_ok=True)
 # URLs are directly verified Polish "Combined File of all Documents" links on official EMA product pages.
 DOWNLOADS=[
- ("Previcox","600000000610","https://medicines.health.europa.eu/veterinary/pl/documents/download/bf3d5b46-3497-495b-b434-c1df7dc9cc13","ema-combined-previcox-pl-2024-02-29.pdf",["previcox","227 mg"],[1173]),
+ ("Previcox","600000000610","https://ec.europa.eu/health/documents/community-register/2023/20231020160574/anx_160574_pl.pdf","ema-combined-previcox-pl-2024-02-29.pdf",["previcox","227 mg"],[1173]),
  ("Porcilis ColiClos","600000003319","https://medicines.health.europa.eu/veterinary/pl/documents/download/bcb9b7aa-28ce-4488-8443-a1cf5edf67b2","ema-combined-porcilis-coliclos-pl-2026-03-14.pdf",["porcilis coliclos"],[342,2700]),
  ("Vectra 3D","600000000151","https://medicines.health.europa.eu/veterinary/pl/documents/download/a14fb789-2104-4a15-8fa0-0bb8e73d6906","ema-combined-vectra-3d-pl-2026-03-13.pdf",["vectra 3d"],[]),
 ]
@@ -41,7 +41,7 @@ def verify(path,terms):
  return pages
 def download(url,dst):
  if valid_pdf(dst):return "already_exists"
- assert url.startswith("https://medicines.health.europa.eu/veterinary/pl/documents/download/")
+ assert url.startswith(("https://medicines.health.europa.eu/veterinary/pl/documents/download/","https://ec.europa.eu/health/documents/community-register/"))
  headers={"User-Agent":"Mozilla/5.0 (compatible; Veterinary-SPC-Catalog-Audit/1.0)","Accept":"application/pdf,*/*"}
  last=None
  for attempt in range(3):
@@ -49,7 +49,7 @@ def download(url,dst):
    req=urllib.request.Request(url,headers=headers)
    with urllib.request.urlopen(req,timeout=35) as response:
     final=response.geturl()
-    assert final.startswith("https://medicines.health.europa.eu/"),final
+    assert final.startswith(("https://medicines.health.europa.eu/","https://ec.europa.eu/","https://health.ec.europa.eu/")),final
     data=response.read(15_000_001)
    if len(data)>15_000_000 or not data.startswith(b"%PDF-"):raise ValueError("not a PDF or oversized")
    dst.write_bytes(data)
