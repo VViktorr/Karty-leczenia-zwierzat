@@ -20,7 +20,7 @@ assert not db.execute("PRAGMA foreign_key_check").fetchall()
 assert db.execute("SELECT COUNT(*) FROM variants").fetchone()[0]==2944
 def norm(s):
     s=unicodedata.normalize("NFKD",str(s or "").casefold())
-    return re.sub(r"[^a-z0-9]+"," ",".join([])) if False else re.sub(r"[^a-z0-9]+"," ","".join(c for c in s if not unicodedata.combining(c))).strip()
+    return re.sub(r"[^a-z0-9]+"," ","".join(c for c in s if not unicodedata.combining(c))).strip()
 def validpdf(p):
     return p.is_file() and p.open("rb").read(5)==b"%PDF-"
 def ident(v):
@@ -40,7 +40,7 @@ def equivalent_name(name,text):
     if len(words)>1 and len(words[1])>=5 and words[1] not in {"flavour","flavor","forte"}:
         if not re.search(r"\b"+re.escape(words[1])+r"\b",text):return False,"second_name_token"
     for amount,unit in strengths(name):
-        pat=re.escape(amount).replace(r"\.",r"[.,]")+r"\s*"+re.escape(unit)+(r"(?!\w)" if unit!="%" else "")
+        pat=r"\b"+re.escape(amount).replace(r"\.",r"[., ]")+r"\s*"+re.escape(unit)+(r"\b" if unit!="%" else "")
         if not re.search(pat,text):return False,"strength_mismatch"
     return True,"matched"
 
