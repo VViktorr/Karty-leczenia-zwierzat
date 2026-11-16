@@ -31,3 +31,5 @@ jobs:
           git fetch origin winforms
           git rebase origin/winforms
           git push origin HEAD:winforms
+
+# Retry to diagnose official PDF title text.
