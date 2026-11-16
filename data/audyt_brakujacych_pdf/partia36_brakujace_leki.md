@@ -1,0 +1,197 @@
+# Aktywne warianty bez prawidlowego PDF - przed partia 36
+
+193 warianty, niekoniecznie 193 rozne produkty.
+
+- Acticarp 50 mg/ml roztwór do wstrzykiwań dla bydła | ID 453 | RPL - | UPD 600000036571 | upd_portal_document_required
+- Acticarp 50 mg/ml roztwór do wstrzykiwań dla bydła | ID 454 | RPL - | UPD 600000036571 | upd_portal_document_required
+- Acticarp 50 mg/ml, roztwór do wstrzykiwań | ID 455 | RPL - | UPD 600000036571 | upd_portal_document_required
+- Acticarp 50 mg/ml roztwór do wstrzykiwań dla bydła | ID 470 | RPL - | UPD 600000036571 | upd_portal_document_required
+- Acticarp 50 mg/ml roztwór do wstrzykiwań dla bydła | ID 471 | RPL - | UPD 600000036571 | upd_portal_document_required
+- Acticarp 50 mg/ml, roztwór do wstrzykiwań | ID 472 | RPL - | UPD 600000036571 | upd_portal_document_required
+- Advocate 400 mg + 100 mg/4 ml spot-on | ID 2109 | RPL 100360209 | UPD 600000001103 | official_rpl_download
+- Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate) | ID 2483 | RPL - | UPD 600000053084 | upd_portal_document_required
+- Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate) | ID 2484 | RPL - | UPD 600000053084 | upd_portal_document_required
+- Agrisept MC Tabs 2,5 g (każda tabletka 5 g zawiera 2,5 g sodium dichloroisocyanurate) | ID 2485 | RPL - | UPD 600000053084 | upd_portal_document_required
+- Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań | ID 1535 | RPL 18295 | UPD 600000057266 | existing_rpl_document_review
+- Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań | ID 1536 | RPL 18295 | UPD 600000057266 | existing_rpl_document_review
+- Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań | ID 1537 | RPL 18295 | UPD 600000057266 | existing_rpl_document_review
+- Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań | ID 1748 | RPL 18295 | UPD 600000057266 | existing_rpl_document_review
+- Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań | ID 1749 | RPL 18295 | UPD 600000057266 | existing_rpl_document_review
+- Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań | ID 1750 | RPL 18295 | UPD 600000057266 | existing_rpl_document_review
+- Bovela | ID 511 | RPL 100335708 | UPD 600000000329 | official_rpl_download
+- Bovela | ID 512 | RPL 100335708 | UPD 600000000329 | official_rpl_download
+- Bovela | ID 513 | RPL 100335708 | UPD 600000000329 | official_rpl_download
+- BRAVECTO 112,5 MG 1 TAB. PIES 2-4,5 KG | ID 2111 | RPL 100307416 | UPD 600000003475 | official_rpl_download
+- BRAVECTO 250 MG 1 TAB. PIES 4,5-10 KG | ID 2112 | RPL 100307422 | UPD 600000000596 | official_rpl_download
+- BRAVECTO 500 MG 1 TAB. PIES 10-20 KG | ID 2113 | RPL 100307445 | UPD 600000000900 | official_rpl_download
+- BRAVECTO 1000 MG 1 TAB. PIES 20-40 KG | ID 2114 | RPL 100307451 | UPD 600000001233 | official_rpl_download
+- BRAVECTO 1400 MG 1 TAB. PIES 40-56 KG | ID 2115 | RPL 100307468 | UPD 600000001234 | official_rpl_download
+- Bravecto 250 mg spot-on solution for small dogs (>4.5–10 kg) | ID 2487 | RPL 100351794 | UPD 600000001989 | official_rpl_download
+- Bravecto 500 mg, roztwór do nakrapiania dla psów | ID 2453 | RPL 100351802 | UPD 600000002306 | official_rpl_download
+- CIPER-PULVIZOO 100 mg/ml, koncentrat do sporządzania zawiesiny do oprysku na skórę | ID 2515 | RPL - | UPD 600000058891 | upd_portal_document_required
+- Circovac | ID 921 | RPL 100301224 | UPD 600000001597 | official_rpl_download
+- Circovac | ID 922 | RPL 100301224 | UPD 600000001597 | official_rpl_download
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2455 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2456 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2457 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2458 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2459 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2460 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2461 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2462 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2463 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2464 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2465 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2466 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2467 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2468 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2469 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2470 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2471 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2472 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2473 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2474 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2475 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2476 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2477 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2478 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2479 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2480 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2481 | RPL - | UPD 600000060227 | upd_portal_document_required
+- COFFEINUM BIOVETA 125 mg/ml, roztwór do wstrzykiwań | ID 2482 | RPL - | UPD 600000060227 | upd_portal_document_required
+- Contacera 20 mg/ml | ID 834 | RPL 100291371 | UPD 600000000220 | official_rpl_download
+- Contacera 20 mg/ml | ID 835 | RPL 100291371 | UPD 600000000220 | official_rpl_download
+- Contacera 20 mg/ml | ID 836 | RPL 100291371 | UPD 600000000220 | official_rpl_download
+- CONTACERA 15MG/ML 100ML | ID 2116 | RPL 100373382 | UPD 600000001405 | official_rpl_download
+- Coxevac | ID 917 | RPL 100258400 | UPD 600000003433 | official_rpl_download
+- Coxevac | ID 918 | RPL 100258400 | UPD 600000003433 | official_rpl_download
+- Draxxin | ID 1493 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- Draxxin | ID 1494 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- Draxxin | ID 1495 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- Draxxin | ID 1496 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- Draxxin | ID 1497 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- Draxxin | ID 1498 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- Draxxin | ID 2288 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- Draxxin | ID 2289 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- Draxxin | ID 2290 | RPL 100218948 | UPD 600000004232 | official_rpl_download
+- ECOPORC SHIGA 50 ml | ID 2117 | RPL 100360936 | UPD 600000004133 | official_rpl_download
+- Effydral Tablets | ID 2302 | RPL - | UPD 600000072838 | upd_portal_document_required
+- Effydral Tablets | ID 2324 | RPL - | UPD 600000072838 | upd_portal_document_required
+- Equilis Prequenza-Te | ID 73 | RPL 100253057 | UPD 600000000720 | official_rpl_download
+- Exzolt 10 mg/ml | ID 994 | RPL 100402557 | UPD 600000000062 | official_rpl_download
+- Exzolt 10 mg/ml | ID 2301 | RPL 100402557 | UPD 600000000062 | official_rpl_download
+- INGELVAC CIRCOFLEX 10D / 50D | ID 2118 | RPL 100301201 | UPD 600000003966 | official_rpl_download
+- INGELVAC CIRCOFLEX 10D / 50D | ID 2119 | RPL 100301201 | UPD 600000003966 | official_rpl_download
+- Kriptazen 0.5 mg/ml | ID 911 | RPL 100417790 | UPD 600000004142 | official_rpl_download
+- Kriptazen | ID 2305 | RPL 100417790 | UPD 600000004142 | official_rpl_download
+- LIBRELA 20MG/ML A'1MLX2 | ID 2120 | RPL 100445940 | UPD 600000000910 | official_rpl_download
+- LIBRELA 30MG/ML A'1MLX2 | ID 2121 | RPL 100445957 | UPD 600000000383 | official_rpl_download
+- Locatim 60 ml | ID 2108 | RPL 100360528 | UPD 600000003386 | official_rpl_download
+- Locatim | ID 2306 | RPL 100360528 | UPD 600000003386 | official_rpl_download
+- LOXICOM 0,5 MG/ML KOT ORAL | ID 2122 | RPL 100134097 | UPD 600000003472 | official_rpl_download
+- LOXICOM 0,5 MG/ML KOT ORAL | ID 2123 | RPL 100134097 | UPD 600000003472 | official_rpl_download
+- Loxicom 20 mg/ml | ID 971 | RPL 100253324 | UPD 600000004200 | official_rpl_download
+- Loxicom 20 mg/ml | ID 972 | RPL 100253324 | UPD 600000004200 | official_rpl_download
+- Loxicom 20 mg/ml | ID 973 | RPL 100253324 | UPD 600000004200 | official_rpl_download
+- Melovem | ID 227 | RPL 100216429 | UPD 600000004229 | official_rpl_download
+- Melovem | ID 228 | RPL 100216429 | UPD 600000004229 | official_rpl_download
+- Melovem | ID 318 | RPL 100216429 | UPD 600000004229 | official_rpl_download
+- Melovem | ID 319 | RPL 100216429 | UPD 600000004229 | official_rpl_download
+- Melovem | ID 388 | RPL 100216429 | UPD 600000004229 | official_rpl_download
+- Melovem | ID 389 | RPL 100216429 | UPD 600000004229 | official_rpl_download
+- Melovem | ID 2688 | RPL 100216429 | UPD 600000004229 | official_rpl_download
+- Melovem | ID 2689 | RPL 100216429 | UPD 600000004229 | official_rpl_download
+- Melovem 30 mg/ml | ID 430 | RPL 100359293 | UPD 600000004346 | official_rpl_download
+- Melovem 30 mg/ml | ID 431 | RPL 100359293 | UPD 600000004346 | official_rpl_download
+- Melovem 30 mg/ml | ID 548 | RPL 100359293 | UPD 600000004346 | official_rpl_download
+- Melovem 30 mg/ml | ID 549 | RPL 100359293 | UPD 600000004346 | official_rpl_download
+- Melovem 30 mg/ml | ID 843 | RPL 100359293 | UPD 600000004346 | official_rpl_download
+- Melovem 30 mg/ml | ID 844 | RPL 100359293 | UPD 600000004346 | official_rpl_download
+- Meloxidyl 20 mg/ml | ID 446 | RPL 100225960 | UPD 600000000034 | official_rpl_download
+- Meloxidyl 20 mg/ml | ID 447 | RPL 100225960 | UPD 600000000034 | official_rpl_download
+- Metacam 5 mg/ml | ID 1569 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 5 mg/ml | ID 1570 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 5 mg/ml | ID 1571 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 5 mg/ml | ID 1572 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 5 mg/ml | ID 1573 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 5 mg/ml | ID 1574 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 5 mg/ml | ID 1776 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 5 mg/ml | ID 1777 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 5 mg/ml | ID 1778 | RPL 100215826 | UPD 600000001703 | official_rpl_download
+- Metacam 20 mg/ml | ID 124 | RPL 100215855 | UPD 600000004044 | official_rpl_download
+- Metacam 20 mg/ml | ID 125 | RPL 100215855 | UPD 600000004044 | official_rpl_download
+- Metacam 20 mg/ml | ID 126 | RPL 100215855 | UPD 600000004044 | official_rpl_download
+- Metacam 20 mg/ml | ID 302 | RPL 100215855 | UPD 600000004044 | official_rpl_download
+- Metacam 20 mg/ml | ID 303 | RPL 100215855 | UPD 600000004044 | official_rpl_download
+- Metacam 20 mg/ml | ID 304 | RPL 100215855 | UPD 600000004044 | official_rpl_download
+- Naxcel 200 mg/ml | ID 114 | RPL 100218977 | UPD 600000003436 | official_rpl_download
+- Naxcel 200 mg/ml | ID 215 | RPL 100218977 | UPD 600000003436 | official_rpl_download
+- Naxcel 200 mg/ml | ID 460 | RPL 100218977 | UPD 600000003436 | official_rpl_download
+- Pirsue 5 mg/ml, roztwór dowymieniowy | ID 568 | RPL - | UPD 600000000514 | upd_portal_document_required
+- Pirsue 5 mg/ml, roztwór dowymieniowy | ID 839 | RPL - | UPD 600000000514 | upd_portal_document_required
+- Pirsue | ID 2312 | RPL - | UPD 600000000514 | upd_portal_document_required
+- Pirsue | ID 2313 | RPL - | UPD 600000000514 | upd_portal_document_required
+- Porcilis AR-T DF | ID 1629 | RPL 100242881 | UPD 600000004089 | official_rpl_download
+- Porcilis PCV | ID 883 | RPL 100273605 | UPD 600000003470 | official_rpl_download
+- Porcilis PCV | ID 1042 | RPL 100273605 | UPD 600000003470 | official_rpl_download
+- Porcilis ColiClos | ID 342 | RPL 100283868 | UPD 600000003319 | official_rpl_download
+- Porcilis ColiClos | ID 2700 | RPL 100283868 | UPD 600000003319 | official_rpl_download
+- Porcilis Porcoli DF | ID 1372 | RPL 100360770 | UPD 600000000779 | official_rpl_download
+- PregSure BVD, emulsja do wstrzykiwań | ID 1590 | RPL - | UPD - | missing_identifiers
+- PregSure BVD, emulsja do wstrzykiwań | ID 1892 | RPL - | UPD - | missing_identifiers
+- PregSure BVD, emulsja do wstrzykiwań | ID 1893 | RPL - | UPD - | missing_identifiers
+- PregSure BVD, emulsja do wstrzykiwań | ID 1894 | RPL - | UPD - | missing_identifiers
+- PregSure BVD, emulsja do wstrzykiwań | ID 1895 | RPL - | UPD - | missing_identifiers
+- Previcox 227 mg | ID 1173 | RPL 100213141 | UPD 600000000610 | official_rpl_download
+- PROTEQFLU-TE 1 DAW. | ID 2126 | RPL 100252218 | UPD 600000992466 | official_rpl_download
+- Sileo 0,1 mg/ml (UE/2/15/181) | ID 1577 | RPL 100343850 | UPD 600000001298 | official_rpl_download
+- Simparica 10 mg (EU/2/15/191) | ID 603 | RPL 100358477 | UPD 600000000135 | official_rpl_download
+- Simparica 20 mg (EU/2/15/191) | ID 602 | RPL 100358477 | UPD 600000000136 | official_rpl_download
+- Simparica 40 mg (EU/2/15/191) | ID 604 | RPL 100358483 | UPD 600000000362 | official_rpl_download
+- Simparica 80 mg (EU/2/15/191) | ID 605 | RPL 100358490 | UPD 600000001548 | official_rpl_download
+- Simparica Trio 12 mg + 0,24 mg + 50 mg (EU/2/19/243) | ID 1034 | RPL 100427801 | UPD 600000000060 | official_rpl_download
+- Simparica Trio 48 mg + 0,96 mg + 200 mg (EU/2/19/243) | ID 1036 | RPL 100427801 | UPD 600000000298 | official_rpl_download
+- Simparica Trio 24 mg + 0,48 mg + 100 mg (EU/2/19/243) | ID 1035 | RPL 100427801 | UPD 600000003944 | official_rpl_download
+- L-Spec-VMD 50 mg/ml + 100 mg/ml | ID 494 | RPL 18793 | UPD - | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2800 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2801 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2802 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2803 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2804 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2805 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2820 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2821 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2822 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2823 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2824 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Sputop Spot On 10 mg/ml | ID 2825 | RPL 100203390 | UPD 600000084331 | official_rpl_download
+- Startvac | ID 101 | RPL 100206307 | UPD 600000004174 | official_rpl_download
+- Startvac | ID 182 | RPL 100206307 | UPD 600000004174 | official_rpl_download
+- Startvac | ID 2070 | RPL 100206307 | UPD 600000004174 | official_rpl_download
+- STRONGHOLD 15 MG (3 x 0,25 ml) PIES/KOT | ID 2127 | RPL 100219020 | UPD 600000003546 | official_rpl_download
+- STRONGHOLD 30 MG (3 x 0,25 ml) PIES | ID 2128 | RPL 100219037 | UPD 600000000863 | official_rpl_download
+- STRONGHOLD 45 MG (3 x 0,75 ml) KOT | ID 2129 | RPL 100219043 | UPD 600000000698 | official_rpl_download
+- STRONGHOLD 60 MG (3 x 0,50 ml) PIES | ID 2130 | RPL 100219050 | UPD 600000001400 | official_rpl_download
+- STRONGHOLD 120 MG (3 x 1,0 ml) PIES | ID 2131 | RPL 100219066 | UPD 600000000562 | official_rpl_download
+- STRONGHOLD 240 MG (3 x 2,0 ml) PIES | ID 2132 | RPL 100219072 | UPD 600000000563 | official_rpl_download
+- Tetra-Delta 10 ml | ID 1414 | RPL - | UPD 600000056158 | upd_portal_document_required
+- Tetra-Delta 10 ml | ID 1417 | RPL - | UPD 600000056158 | upd_portal_document_required
+- Tetra-Delta 10 ml | ID 1959 | RPL - | UPD 600000056158 | upd_portal_document_required
+- Tulaven 100 mg/ml | ID 990 | RPL 100435456 | UPD 600000000727 | official_rpl_download
+- Tulaven 100 mg/ml | ID 991 | RPL 100435456 | UPD 600000000727 | official_rpl_download
+- Tulaven 100 mg/ml | ID 992 | RPL 100435456 | UPD 600000000727 | official_rpl_download
+- Tulaven 100 mg/ml | ID 2499 | RPL 100435456 | UPD 600000000727 | official_rpl_download
+- Tulaven 100 mg/ml | ID 2500 | RPL 100435456 | UPD 600000000727 | official_rpl_download
+- Vectra 3D | ID 2136 | RPL 100304850 | UPD 600000000156 | official_rpl_download
+- VECTRA 3D DLA PSÓW >40 kg 1 pipeta | ID 2133 | RPL 100304850 | UPD 600000004336 | official_rpl_download
+- Vectra 3D | ID 2727 | RPL 100304850 | UPD 600000004336 | official_rpl_download
+- VECTRA 3D DLA PSÓW 10-25 kg 1 pipeta | ID 2134 | RPL 100304872 | UPD 600000000151 | official_rpl_download
+- VECTRA 3D DLA PSÓW 25-40 kg 1 pipeta | ID 2135 | RPL 100304910 | UPD 600000004337 | official_rpl_download
+- Velactis | ID 2314 | RPL - | UPD 700000141165 | upd_portal_document_required
+- Zactran 150 mg/ml | ID 1490 | RPL 100196247 | UPD 600000004160 | official_rpl_download
+- Zactran 150 mg/ml | ID 1491 | RPL 100196247 | UPD 600000004160 | official_rpl_download
+- Zactran 150 mg/ml | ID 1492 | RPL 100196247 | UPD 600000004160 | official_rpl_download
+- Zuprevo 180 mg/ml | ID 61 | RPL 100252069 | UPD 600000004335 | official_rpl_download
+- Zuprevo 180 mg/ml | ID 459 | RPL 100252069 | UPD 600000004335 | official_rpl_download
+- Zuprevo 180 mg/ml | ID 488 | RPL 100252069 | UPD 600000004335 | official_rpl_download
+- Zuprevo 180 mg/ml | ID 615 | RPL 100252069 | UPD 600000004335 | official_rpl_download

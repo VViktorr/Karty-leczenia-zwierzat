@@ -1,0 +1,412 @@
+{
+  "phase": 36,
+  "before_missing": 193,
+  "after_missing": 193,
+  "all_backlog_groups": 70,
+  "all_categories": {
+    "official_rpl_download": 60,
+    "upd_portal_document_required": 8,
+    "missing_identifiers": 1,
+    "existing_rpl_document_review": 1
+  },
+  "selected_groups": 10,
+  "checked_variants": 10,
+  "approved_groups": 0,
+  "new_pdf_links": 0,
+  "clinical_unchanged": true,
+  "sqlite_before_sha": "53cafa67825b5c5a4db5d8b2381977a403587579f814c68d5f27e9df140f7b3e",
+  "sqlite_after_sha": "53cafa67825b5c5a4db5d8b2381977a403587579f814c68d5f27e9df140f7b3e",
+  "outcomes": [
+    {
+      "rpl_id": "100360209",
+      "upd_id": "600000001103",
+      "ids": [
+        2109
+      ],
+      "names": [
+        "Advocate 400 mg + 100 mg/4 ml spot-on"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100360209/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100360209/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "100360770",
+      "upd_id": "600000000779",
+      "ids": [
+        1372
+      ],
+      "names": [
+        "Porcilis Porcoli DF"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100360770/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100360770/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "100360936",
+      "upd_id": "600000004133",
+      "ids": [
+        2117
+      ],
+      "names": [
+        "ECOPORC SHIGA 50 ml"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100360936/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100360936/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "100373382",
+      "upd_id": "600000001405",
+      "ids": [
+        2116
+      ],
+      "names": [
+        "CONTACERA 15MG/ML 100ML"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100373382/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100373382/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "100427801",
+      "upd_id": "600000000060",
+      "ids": [
+        1034
+      ],
+      "names": [
+        "Simparica Trio 12 mg + 0,24 mg + 50 mg (EU/2/19/243)"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100427801/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100427801/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "100427801",
+      "upd_id": "600000000298",
+      "ids": [
+        1036
+      ],
+      "names": [
+        "Simparica Trio 48 mg + 0,96 mg + 200 mg (EU/2/19/243)"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100427801/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100427801/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "100427801",
+      "upd_id": "600000003944",
+      "ids": [
+        1035
+      ],
+      "names": [
+        "Simparica Trio 24 mg + 0,48 mg + 100 mg (EU/2/19/243)"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100427801/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100427801/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "100445940",
+      "upd_id": "600000000910",
+      "ids": [
+        2120
+      ],
+      "names": [
+        "LIBRELA 20MG/ML A'1MLX2"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100445940/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100445940/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "100445957",
+      "upd_id": "600000000383",
+      "ids": [
+        2121
+      ],
+      "names": [
+        "LIBRELA 30MG/ML A'1MLX2"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/100445957/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/100445957/characteristic",
+          "status": "rejected",
+          "error_class": "HTTPError",
+          "reason": "HTTP Error 500: Internal Server Error"
+        }
+      ]
+    },
+    {
+      "rpl_id": "18793",
+      "upd_id": "",
+      "ids": [
+        494
+      ],
+      "names": [
+        "L-Spec-VMD 50 mg/ml + 100 mg/ml"
+      ],
+      "status": "manual_review",
+      "sources_attempted": [
+        {
+          "url": "https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/18793/characteristic",
+          "status": "rejected",
+          "error_class": "ValueError",
+          "reason": "response not a complete PDF"
+        },
+        {
+          "url": "https://rejestry.ezdrowie.gov.pl/api/rpl/medicinal-products/18793/characteristic",
+          "status": "rejected",
+          "error_class": "ValueError",
+          "reason": "response not a complete PDF"
+        }
+      ]
+    }
+  ],
+  "not_attempted": [
+    {
+      "rpl_id": "",
+      "upd_id": "600000060227",
+      "product_name": "coffeinum",
+      "variants": [
+        2455,
+        2456,
+        2457,
+        2458,
+        2459,
+        2460,
+        2461,
+        2462,
+        2463,
+        2464,
+        2465,
+        2466,
+        2467,
+        2468,
+        2469,
+        2470,
+        2471,
+        2472,
+        2473,
+        2474,
+        2475,
+        2476,
+        2477,
+        2478,
+        2479,
+        2480,
+        2481,
+        2482
+      ],
+      "reason": "upd_portal_document_required"
+    },
+    {
+      "rpl_id": "",
+      "upd_id": "600000036571",
+      "product_name": "acticarp",
+      "variants": [
+        453,
+        454,
+        455,
+        470,
+        471,
+        472
+      ],
+      "reason": "upd_portal_document_required"
+    },
+    {
+      "rpl_id": "",
+      "upd_id": "600000000514",
+      "product_name": "pirsue",
+      "variants": [
+        568,
+        839,
+        2312,
+        2313
+      ],
+      "reason": "upd_portal_document_required"
+    },
+    {
+      "rpl_id": "",
+      "upd_id": "600000053084",
+      "product_name": "agrisept",
+      "variants": [
+        2483,
+        2484,
+        2485
+      ],
+      "reason": "upd_portal_document_required"
+    },
+    {
+      "rpl_id": "",
+      "upd_id": "600000056158",
+      "product_name": "tetra",
+      "variants": [
+        1414,
+        1417,
+        1959
+      ],
+      "reason": "upd_portal_document_required"
+    },
+    {
+      "rpl_id": "",
+      "upd_id": "600000072838",
+      "product_name": "effydral",
+      "variants": [
+        2302,
+        2324
+      ],
+      "reason": "upd_portal_document_required"
+    },
+    {
+      "rpl_id": "",
+      "upd_id": "600000058891",
+      "product_name": "ciper",
+      "variants": [
+        2515
+      ],
+      "reason": "upd_portal_document_required"
+    },
+    {
+      "rpl_id": "",
+      "upd_id": "700000141165",
+      "product_name": "velactis",
+      "variants": [
+        2314
+      ],
+      "reason": "upd_portal_document_required"
+    },
+    {
+      "rpl_id": "",
+      "upd_id": "",
+      "product_name": "pregsure",
+      "variants": [
+        1590,
+        1892,
+        1893,
+        1894,
+        1895
+      ],
+      "reason": "missing_identifiers"
+    },
+    {
+      "rpl_id": "18295",
+      "upd_id": "600000057266",
+      "product_name": "bioestrovet",
+      "variants": [
+        1535,
+        1536,
+        1537,
+        1748,
+        1749,
+        1750
+      ],
+      "reason": "existing_rpl_document_review"
+    }
+  ]
+}
