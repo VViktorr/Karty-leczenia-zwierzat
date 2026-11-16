@@ -105,6 +105,8 @@ try:
      pass # Product is in verified unified SPC; check brand and complete formulation in report
     else:continue
    matches.append(r)
+  if matches:
+   con.execute("INSERT OR IGNORE INTO documents(path) VALUES (?)",(path,))
   for r in matches:
    assert con.execute("UPDATE variants SET pdf_path=? WHERE id=? AND (pdf_path IS NULL OR pdf_path='')",(path,r["id"])).rowcount==1,("unexpected existing broken pointer",r["id"])
    # Do not insert new documents tables; this catalog uses direct pdf_path mapping.
