@@ -38,7 +38,7 @@ jobs:
           assert db.execute("SELECT COUNT(*) FROM variants").fetchone()[0]==2944
           def norm(s):
               u=unicodedata.normalize("NFKD",str(s or "").casefold())
-              return re.sub(r"[^a-z0-9]+"," ",".join(c for c in u if not unicodedata.combining(c))).strip()
+              return re.sub(r"[^a-z0-9]+", " ", "".join(c for c in u if not unicodedata.combining(c))).strip()
           def is_pdf(p):
               return p.is_file() and p.open("rb").read(5)==b"%PDF-"
           active=[dict(r) for r in db.execute("SELECT id,name,rpl_id,upd_id,pdf_path,scope FROM variants WHERE scope IS NULL OR lower(scope) NOT LIKE '%archiwal%'")]
