@@ -32,3 +32,5 @@ jobs:
           git push origin HEAD:winforms
 
 # Diagnose Sputop PDF payload format.
+
+# Save diagnostic report for invalid Sputop PDF.
