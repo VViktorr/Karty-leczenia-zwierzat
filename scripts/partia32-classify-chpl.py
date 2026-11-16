@@ -31,11 +31,21 @@ def rootname(name):
     return next((x for x in w if len(x)>=4 and not x.isdigit()), "")
 def namecheck(name,txt):
     tokens=[x for x in norm(name).split() if len(x)>=4 and not x.isdigit()]
-    generic={"tabletki","roztwor","zawiesina","proszek","doustny","doustna","wstrzykiwan","iniekcja","kapsulki","wielkosci","opakowanie"}
+    generic={"tabletki","roztwor","zawiesina","proszek","doustny","doustna","wstrzykiwan","iniekcja","kapsulki","wielkosci","opakowanie","pasta","masc","ampulka","fiolka","szczepionka"}
     tokens=[x for x in tokens if x not in generic]
-    if not tokens: return False
+    if not tokens:return False
     if not re.search(r"\b"+re.escape(tokens[0])+r"\b",txt):return False
-    # Explicit numeric strength check is reported separately; never rely only on a shared RPL/UPD ID.
+    # Confirm another distinctive word where available.
+    if len(tokens)>1 and len(tokens[1])>=5 and tokens[1] not in ("forte","plus"):
+        if not re.search(r"\b"+re.escape(tokens[1])+r"\b",txt):return False
+    # Explicit dose/strength values must occur in the document; ignore pack sizes.
+    dose=re.search(r"(\d+(?:[,.]\d+)?)\s*(mg|mcg|ug|g|iu|j\.?m\.?|%)\s*(?:/\s*(ml|g))?",norm(name))
+    if dose:
+        amount=dose.group(1).replace(",",".")
+        unit=dose.group(2)
+        variants={amount,amount.replace(".",",")}
+        if not any(re.search(r"\b"+re.escape(v)+r"\s*"+re.escape(unit)+r"\b",txt) for v in variants):
+            return False
     return True
 
 rows=[dict(x) for x in db.execute("SELECT id,name,rpl_id,upd_id,pdf_path,scope FROM variants WHERE scope IS NULL OR lower(scope) NOT LIKE '%archiwal%'")]
