@@ -31,7 +31,7 @@ for rel in FILES:
   item["title_extract"]=content[:900]
   item["has_spc"]=("charakterystyka" in content and "przeciwwskazania" in content)
   # Match explicit product name, not just one component (Equilis Prequenza without -Te is different).
-  equilis=bool(re.search(r"\bequilis\s+prequenza\s*[-–]\s*te\b",content))
+  equilis=bool(re.search(r"\bequilis\s+prequenza(?:\s*[-–]\s*|\s+)te\b",content)) and ("tezec" in content or "tezc" in content or "tokso" in content)
   coxevac=bool(re.search(r"\bcoxevac\b",content))
   item["contains_equi_prequenza_te"]=equilis
   item["contains_coxevac"]=coxevac
@@ -47,7 +47,7 @@ def select(name):
  opts=accepted[name]
  if not opts:return None
  if name=="Equilis Prequenza-Te":
-  opts.sort(key=lambda x:(0 if "OI-Equilis-Prequenza-Te" in x["path"] else 1,x["path"]))
+  opts.sort(key=lambda x:(0 if "anx_12972_pl.pdf" in x["path"] else 1,x["path"]))
  if name=="Coxevac":
   opts.sort(key=lambda x:(0 if "anx_131897" in x["path"] else 1,x["path"]))
  return opts[0]
@@ -79,11 +79,18 @@ try:
   for id,(name,upd) in mapping.items():
    r=db.execute("SELECT id,name,upd_id,scope,pdf_path FROM variants WHERE id=?",(id,)).fetchone()
    assert r and norm(name) in norm(r["name"]) and str(r["upd_id"])==upd,(product,id,"identity mismatch")
-   assert r["pdf_path"] is None and (r["scope"] is None or "archiwal" in norm(r["scope"])), (id,"unexpected existing status/path")
+   if r["pdf_path"]:
+    assert r["pdf_path"]==path and r["scope"] is None, (id,"unexpected existing PDF/status",r["pdf_path"],r["scope"])
+   else:
+    assert r["scope"] is None or "archiwal" in norm(r["scope"]), (id,"unexpected scope",r["scope"])
   db.execute("INSERT OR IGNORE INTO documents(path) VALUES (?)",(path,))
   for id in mapping:
-   assert db.execute("UPDATE variants SET scope=NULL,pdf_path=? WHERE id=?",(path,id)).rowcount==1
-   changes.append({"id":id,"product":product,"pdf":path,"status":"active"})
+   r=db.execute("SELECT pdf_path FROM variants WHERE id=?",(id,)).fetchone()
+   if r["pdf_path"]==path:
+    changes.append({"id":id,"product":product,"pdf":path,"status":"already_linked"})
+   else:
+    assert db.execute("UPDATE variants SET scope=NULL,pdf_path=? WHERE id=?",(path,id)).rowcount==1
+    changes.append({"id":id,"product":product,"pdf":path,"status":"reactivated_and_linked"})
  assert before==protected_hash(),"Protected clinical fields changed"
  assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
  assert not db.execute("PRAGMA foreign_key_check").fetchall()
