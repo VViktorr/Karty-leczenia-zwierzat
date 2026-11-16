@@ -42,3 +42,4 @@ jobs:
           retention-days: 14
 # Recheck Naxcel species term: bydla/bydlo.
 # Diagnose exact Naxcel heading and species text.
+# Final Polish ł normalization fix for Naxcel 200 mg/ml cattle.
