@@ -1,0 +1,27 @@
+name: "Partia 38 - korekta blednego Draxxin Plus PDF"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-partia38-repair
+  cancel-in-progress: false
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: Remove only 9 incorrect Draxxin Plus PDF links; verify clinical fields
+        run: python scripts/partia38-repair-draxxin.py
+      - name: Commit safe SQLite correction
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite data/audyt_brakujacych_pdf/partia38_korekta_draxxin.json
+          git commit -m 'fix: usun bledne powiazania Draxxin z ChPL Draxxin Plus [skip ci]'
+          git push origin HEAD:winforms
