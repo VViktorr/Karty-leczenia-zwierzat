@@ -27,7 +27,8 @@ jobs:
           cp partia38_raport/braki_po_partii38.csv data/audyt_brakujacych_pdf/partia38_braki.csv
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/audyt_brakujacych_pdf/partia38_wynik.json data/audyt_brakujacych_pdf/partia38_braki.csv src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git add data/audyt_brakujacych_pdf/partia38_wynik.json src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git add -f data/audyt_brakujacych_pdf/partia38_braki.csv
           if git diff --cached --quiet; then
             echo "No new links or report changes."
             exit 0
