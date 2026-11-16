@@ -1,0 +1,118 @@
+{
+  "batch": "44b",
+  "counts": {
+    "linked": 12
+  },
+  "linked": [
+    {
+      "id": 227,
+      "medicine": "Melovem",
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  12H20-19C6",
+      "symbol": "000000000000000995",
+      "upd_id": "600000004229",
+      "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 228,
+      "medicine": "Melovem",
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  12H20-19C6",
+      "symbol": "000000000000000995",
+      "upd_id": "600000004229",
+      "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 318,
+      "medicine": "Melovem",
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  13F10-01C2",
+      "symbol": "000000000000001278",
+      "upd_id": "600000004229",
+      "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 319,
+      "medicine": "Melovem",
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  13F10-01C2",
+      "symbol": "000000000000001278",
+      "upd_id": "600000004229",
+      "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 388,
+      "medicine": "Melovem",
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  12H20-09C6",
+      "symbol": "000000000000001481",
+      "upd_id": "600000004229",
+      "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 389,
+      "medicine": "Melovem",
+      "subiekt_name": "MELOVEM 5 MG/ML 100 ml  12H20-09C6",
+      "symbol": "000000000000001481",
+      "upd_id": "600000004229",
+      "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 2688,
+      "medicine": "Melovem",
+      "subiekt_name": "MALOVEM 5MG/ML 100ML 11B01-01C3",
+      "symbol": "000000000000000933",
+      "upd_id": "600000004229",
+      "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 2689,
+      "medicine": "Melovem",
+      "subiekt_name": "MALOVEM 5MG/ML 100ML 11B01-01C3",
+      "symbol": "000000000000000933",
+      "upd_id": "600000004229",
+      "pdf": "data/ChPL/UPD/UPD_600000004229_Melovem_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 883,
+      "medicine": "Porcilis PCV",
+      "subiekt_name": "PORCILIS PCV 50 D. A'100 ML",
+      "symbol": "000002676",
+      "upd_id": "600000003470",
+      "pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 1042,
+      "medicine": "Porcilis PCV",
+      "subiekt_name": "PORCILIS PCV 100 D. ID A'200 ML",
+      "symbol": "000003220",
+      "upd_id": "600000003470",
+      "pdf": "data/ChPL/UPD/UPD_600000003470_Porcilis_PCV_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 1372,
+      "medicine": "Porcilis Porcoli DF",
+      "subiekt_name": "PORCILIS PORCOLI DF A'20 ML A080B01",
+      "symbol": "03054",
+      "upd_id": "600000000779",
+      "pdf": "data/ChPL/UPD/UPD_600000000779_Porcilis_Porcoli_Diluvac_Forte_UPD_ChPL.pdf",
+      "status": "linked"
+    },
+    {
+      "id": 1629,
+      "medicine": "Porcilis AR-T DF",
+      "subiekt_name": "PORCILIS AR-T 20 ML",
+      "symbol": "04807",
+      "upd_id": "600000004089",
+      "pdf": "data/ChPL/UPD/UPD_600000004089_Porcilis_AR-T_DF_UPD_ChPL.pdf",
+      "status": "linked"
+    }
+  ],
+  "clinical_unchanged": true,
+  "sqlite_sha256": "7919332f2253a3c123007d8a65627c73783a7dc96f9895560331d23316b9d14f"
+}
