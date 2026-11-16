@@ -1,0 +1,38 @@
+name: "Partia 43 - powiaz zbiorcze Librela Draxxin Loxicom"
+on:
+  push:
+    branches: [winforms]
+    paths: [".github/workflows/partia43-powiaz.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-partia43-attach
+  cancel-in-progress: false
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+      - name: Install PDF parser
+        run: python -m pip install --disable-pip-version-check "pymupdf>=1.24,<3"
+      - name: Verify and attach 16 product variants only
+        run: python scripts/partia43-powiaz-zbiorcze.py
+      - name: Commit verified PDF references without changing clinical data
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite data/audyt_brakujacych_pdf/partia43_powiazania_wynik.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'data: partia43 podpieto zbiorcze Librela Draxxin Loxicom [skip ci]'
+          git push origin HEAD:winforms
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partia43-powiazania
+          path: data/audyt_brakujacych_pdf/partia43_powiazania_wynik.json
+          retention-days: 14
