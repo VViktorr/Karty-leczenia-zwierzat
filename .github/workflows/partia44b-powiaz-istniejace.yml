@@ -1,0 +1,32 @@
+name: Partia 44b - bezpieczne powiazania lokalnych ChPL
+on:
+  push:
+    branches: [winforms]
+    paths: ['.github/workflows/partia44b-powiaz-istniejace.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  local-chpl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'pymupdf==1.26.6'
+      - name: Powiaz tylko sprawdzone dokumenty
+        run: python scripts/partia44b-powiaz-istniejace.py
+      - name: Zapis SQLite i raport bez kompilacji
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite data/audyt_brakujacych_pdf/partia44b_powiazania.json
+          git commit -m "data: link 12 exact-ID existing ChPL variants [skip ci]"
+          git fetch origin winforms
+          git rebase origin/winforms
+          git push origin HEAD:winforms
