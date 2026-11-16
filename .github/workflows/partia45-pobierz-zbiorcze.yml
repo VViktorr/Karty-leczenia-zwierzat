@@ -34,3 +34,5 @@ jobs:
             git rebase origin/winforms
             git push origin HEAD:winforms
           fi
+
+# Retry with European Commission Union Register Previcox PDF.
