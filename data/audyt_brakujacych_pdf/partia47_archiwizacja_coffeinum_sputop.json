@@ -1,0 +1,57 @@
+{
+  "partia": 47,
+  "operation": "archive_Coffeinum_Bioveta_without_PDF",
+  "archived_variants": 28,
+  "archived_variant_ids": [
+    2455,
+    2456,
+    2457,
+    2458,
+    2459,
+    2460,
+    2461,
+    2462,
+    2463,
+    2464,
+    2465,
+    2466,
+    2467,
+    2468,
+    2469,
+    2470,
+    2471,
+    2472,
+    2473,
+    2474,
+    2475,
+    2476,
+    2477,
+    2478,
+    2479,
+    2480,
+    2481,
+    2482
+  ],
+  "subiekt_cards": [
+    {
+      "symbol": "05094",
+      "name": "COFFEINUM NATR.BENZOICUM A'50 ML  041006"
+    },
+    {
+      "symbol": "258",
+      "name": "COFFEINUM NATR.BENZOICUM A'50 ML  03008"
+    }
+  ],
+  "coffeinum_upd_id": "600000060227",
+  "scope": "archiwalny",
+  "pdf_path": null,
+  "sputop_valid_pdf_link": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_Zoetis_ChPL_2024-03.pdf",
+  "sputop_uploaded_original": "data/ChPL/RPL/sputop-spot-on_qrd_2024.03_dec.pdf",
+  "sputop_identical": true,
+  "sputop_linked_variants": 12,
+  "protected_variant_fields_unchanged": true,
+  "active_variants": 2874,
+  "remaining_missing_active_pdf": 45,
+  "sqlite_sha256": "0d481c383c5b3a33f1e2f1491f28c1189b98efe81cb798b49ef4cd3d1740a431",
+  "note": "Only variants.scope and variants.pdf_path touched for 28 Coffeinum rows. No PDF files deleted; no data on treatment, doses, withdrawals or registration changed."
+}
