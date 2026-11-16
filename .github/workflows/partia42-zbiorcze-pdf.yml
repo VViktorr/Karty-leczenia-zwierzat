@@ -40,3 +40,4 @@ jobs:
             data/audyt_brakujacych_pdf/partia42_nowe_zbiorcze_pdf_wynik.json
             data/audyt_brakujacych_pdf/partia42_nowe_zbiorcze_pdf_nazwy_subiekt.csv
           retention-days: 14
+# Recheck Naxcel species term: bydla/bydlo.
