@@ -31,8 +31,10 @@ def pdftext(path):
 def is_chpl(s):
     head=s[:15000]
     return bool(re.search(r"charakterystyka (?:weterynaryjnego )?produktu leczniczego",head)
-     or re.search(r"charakterystyka produktu leczniczego weterynaryjnego",head)) and (
-        "przeciwwskazania" in s and ("karencji" in s or "wskazania" in s))
+     or re.search(r"charakterystyka produktu leczniczego weterynaryjnego",head)
+     or "summary of product characteristics" in head) and (
+        ("przeciwwskazania" in s and ("karencji" in s or "wskazania" in s))
+        or ("contraindications" in s and "withdrawal" in s and "indications" in s))
 def nearest_brand(s,b,limit=800):
     rex=re.compile(r"(?<![a-z0-9])"+re.escape(b)+r"(?![a-z0-9])")
     return [s[max(0,m.start()-70):m.end()+limit] for m in list(rex.finditer(s))[:100]]
@@ -71,7 +73,7 @@ text,pages=pdftext(ROOT/ACT)
 # and "Acticarp", concentration 50mg/ml, injectable form, relevant cattle indication.
 windows=name_hit(text,"acticarp")
 valid=bool(is_chpl(text) and windows
-           and any(re.search(r"50\s*mg\s*/\s*ml",w) for w in windows)
+           and any(("50 mg/ml" in w or "50mg/ml" in w) for w in windows)
            and any(("wstrzykiwan" in w or "injection" in w) for w in windows)
            and any(("bydl" in w or "cattle" in w) for w in windows)
            and not re.search(r"vetcarp",text[:1200]))
