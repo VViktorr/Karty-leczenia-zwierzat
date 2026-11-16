@@ -1,0 +1,32 @@
+name: Partia 47 - archiwizacja Coffeinum Bioveta
+on:
+  push:
+    branches: [winforms]
+    paths: ['.github/workflows/partia47-archiwizacja.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Archiwizuj Coffeinum i audytuj Sputop bez kompilacji
+        run: python scripts/partia47-archiwizuj-coffeinum.py
+      - name: Zapisz SQLite i raport na GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite data/audyt_brakujacych_pdf/partia47_archiwizacja_coffeinum_sputop.json
+          git commit -m "data: archive Coffeinum Bioveta 28 variants without PDF [skip ci]"
+          git fetch origin winforms
+          git rebase origin/winforms
+          git push origin HEAD:winforms
