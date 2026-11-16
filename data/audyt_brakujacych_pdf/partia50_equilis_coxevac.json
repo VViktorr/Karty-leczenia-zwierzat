@@ -1,0 +1,59 @@
+{
+  "partia": 50,
+  "new_files_examined": 3,
+  "documents": [
+    {
+      "path": "data/ChPL/UPD/anx_131897_pl.pdf",
+      "pages": 20,
+      "sha256": "4f48c27de73e70c0c175bee664858c6be28028bb6dd5567cb797f141a7b390ea",
+      "title_extract": "aneks i charakterystyka produktu leczniczego weterynaryjnego 1 1. nazwa produktu leczniczego weterynaryjnego coxevac zawiesina do wstrzykiwan dla bydla i koz 2. sklad jakosciowy i ilosciowy kazdy ml zawiera: substancja czynna: inaktywowana coxiella burnetti, szczep nine mile ≥ 72 jednostki qf* *jednostka qf (q fever): relatywna moc antygenu fazy i, zmierzona za pomoca elisa w porownaniu do pozycji referencyjnej. substancje pomocnicze: tiomersal ≤ 120 μg wykaz wszystkich substancji pomocniczych, patrz punkt 6.1. 3. postac farmaceutyczna zawiesina do wstrzykiwan. bialawa, opalizujaca, homogeniczna zawiesina. 4. szczegolowe dane kliniczne 4.1 docelowe gatunki zwierzat bydlo i kozy 4.2 wskazania lecznicze dla poszczegolnych docelowych gatunkow zwierzat bydlo: czynne uodparnianie bydla w celu obnizenia ryzyka stawania sie siewcami zwierzat nie zakazonych, szczepionych poza okresem ciazy (5 ra",
+      "has_spc": true,
+      "contains_equi_prequenza_te": false,
+      "contains_coxevac": true,
+      "accepted_product": "Coxevac"
+    },
+    {
+      "path": "data/ChPL/UPD/anx_12972_pl.pdf",
+      "pages": 19,
+      "sha256": "c1a6433513de27ad393830847340c182b7cfd1f1d981f53951629f76e9d63b15",
+      "title_extract": "aneks i charakterystyka produktu leczniczego weterynaryjnego 1/19 1. nazwa produktu leczniczego weterynaryjnego equilis prequenza te, zawiesina do wstrzykiwan, dla koni 2. sklad jakosciowy i ilosciowy produktu leczniczego w dawce 1 ml: substancje czynne: toksoid tezcowy i oczyszczone podjednostki hemaglutyniny wirusow grypy koni: a/equine-1/prague/1/56 100 au1 a/equine-2/newmarket/1/93 50 au a/equine-2/newmarket/2/93 50 au toksoid tezcowy 40 lf2 adiuwant: oczyszczona saponina 375 mikrogramow cholesterol 125 mikrogramow fosfatydylocholina 62,5 mikrogramow substancje pomocnicze: sladowe ilosci tiomersal sladowe ilosci formaldehydu wykaz wszystkich substancji pomocniczych, patrz punkt 6.1. 3. postac farmaceutyczna zawiesina do wstrzykiwan 4. szczegolowe dane kliniczne 4.1 docelowe gatunki zwierzat konie 4.2 wskazania do stosowania z wyszczegolnieniem docelowych gatunkow zwierzat czynne uodp",
+      "has_spc": true,
+      "contains_equi_prequenza_te": false,
+      "contains_coxevac": false,
+      "accepted_product": null,
+      "reason": "Not an unambiguous Polish SPC for requested product"
+    },
+    {
+      "path": "data/ChPL/UPD/OI-Equilis-Prequenza-Te-ema-combined-v95_equilisprequenzate-vra0019g-pl.94e71c7511cd927eb6f9e2df36154bba.pdf",
+      "pages": 4,
+      "sha256": "adc04bbbb821f5ef2362d68ff64731a90763296f8356bf91a01a510e35dff9de",
+      "title_extract": "1. nazwa weterynaryjnego produktu leczniczego equilis prequenza te zawiesina do wstrzykiwan dla koni szczepionka przeciwko grypie koni i tezcowi 2. sklad jakosciowy i ilosciowy kazda dawka (1 ml) zawiera: substancje czynne: szczepy wirusa grypy koni: a/equine-2/south africa/4/03 50 au1 a/equine-2/newmarket/2/93 50 au toksoid tezcowy 40 lf2 1 jednostki antygenowe 2 ekwiwalenty klaczkowania; odpowiednik ≥ 30 j.m./ml surowicy swinki morskiej w tescie potencji ph. eur. adiuwanty: iscom-matrix o skladzie: saponina oczyszczona 375 μg cholesterol 125 μg fosfatydylocholina 62,5 μg substancje pomocnicze: sklad jakosciowy substancji pomocniczych i pozostalych skladnikow bufor fosforanowy przejrzysta, opalizujaca zawiesina. 3.2 wskazania lecznicze dla kazdego z docelowych gatunkow zwierzat czynne uodpornianie koni od 6 miesiaca zycia przeciwko grypie koni w celu ograniczenia objawow klinicznych i s",
+      "has_spc": false,
+      "contains_equi_prequenza_te": false,
+      "contains_coxevac": false,
+      "accepted_product": null,
+      "reason": "Not an unambiguous Polish SPC for requested product"
+    }
+  ],
+  "selected_documents": {
+    "Equilis Prequenza-Te": null,
+    "Coxevac": "data/ChPL/UPD/anx_131897_pl.pdf"
+  },
+  "changes": [
+    {
+      "id": 917,
+      "product": "Coxevac",
+      "pdf": "data/ChPL/UPD/anx_131897_pl.pdf",
+      "status": "active"
+    },
+    {
+      "id": 918,
+      "product": "Coxevac",
+      "pdf": "data/ChPL/UPD/anx_131897_pl.pdf",
+      "status": "active"
+    }
+  ],
+  "updated_variants": 2,
+  "protected_clinical_fields_unchanged": true,
+  "sqlite_sha256": "d5b10a60314a42020f4f3d04a87acf374171f4d2de4a8c34d11c2a6db8d65d79"
+}
