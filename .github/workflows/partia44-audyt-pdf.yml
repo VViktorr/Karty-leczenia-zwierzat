@@ -36,3 +36,5 @@ jobs:
             git commit -m 'audit: report actual missing ChPL links after batch43 [skip ci]'
             git push origin HEAD:winforms
           fi
+
+# Repeat audited run after fixing ignored CSV staging.
