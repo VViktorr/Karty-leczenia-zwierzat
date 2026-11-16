@@ -1,0 +1,185 @@
+name: "Partia 30 - powiaz do 30 grup z polska ChPL RPL lub UPD"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-partia30
+  cancel-in-progress: false
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+      - name: Install PDF reader
+        run: python -m pip install --disable-pip-version-check pymupdf
+      - name: "Kontrola polskiej ChPL i powiazan RPL UPD w 30 grupach"
+        shell: bash
+        run: |
+          cat > /tmp/partia30.py <<'PY'
+          from pathlib import Path
+          from collections import defaultdict,Counter
+          import hashlib,json,re,sqlite3,unicodedata
+          import fitz
+          
+          ROOT=Path.cwd()
+          DB=ROOT/"src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite"
+          OUT=Path("partia30_raport")
+          OUT.mkdir(exist_ok=True)
+          EXPECTED="5df45bb003ce66be557935aa2a33d731fee87e7a09dd6abf113c1bfc2a72eb4d"
+          assert hashlib.sha256(DB.read_bytes()).hexdigest()==EXPECTED,"Zmiana SQLite od ostatniej aktualizacji - przerwij"
+          db=sqlite3.connect(DB)
+          db.row_factory=sqlite3.Row
+          db.execute("PRAGMA foreign_keys=ON")
+          assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+          assert not db.execute("PRAGMA foreign_key_check").fetchall()
+          assert db.execute("SELECT COUNT(*) FROM variants").fetchone()[0]==2944
+          def norm(s):
+              u=unicodedata.normalize("NFKD",str(s or "").casefold())
+              return re.sub(r"[^a-z0-9]+", " ", "".join(c for c in u if not unicodedata.combining(c))).strip()
+          def is_pdf(p):
+              return p.is_file() and p.open("rb").read(5)==b"%PDF-"
+          active=[dict(r) for r in db.execute("SELECT id,name,rpl_id,upd_id,pdf_path,scope FROM variants WHERE scope IS NULL OR lower(scope) NOT LIKE '%archiwal%'")]
+          assert len(active)==2902
+          missing=[r for r in active if not str(r["pdf_path"] or "").strip() or not is_pdf(ROOT/str(r["pdf_path"]))]
+          assert len(missing)==230,f"Nieoczekiwane braki: {len(missing)}"
+          upd=defaultdict(list)
+          rpl=defaultdict(list)
+          for p in sorted((ROOT/"data/ChPL/UPD").glob("UPD_*.pdf")):
+              m=re.match(r"UPD_(\d+)_",p.name)
+              if m:upd[m[1]].append(p)
+          for p in sorted((ROOT/"data/ChPL/RPL").glob("RPL_*.pdf")):
+              m=re.match(r"RPL_(\d+)_",p.name)
+              if m:rpl[m[1]].append(p)
+          groups=defaultdict(list)
+          for row in missing:
+              # Separate products with empty or shared RPL but different exact UPD identifiers.
+              groups[(str(row["rpl_id"] or "").strip(),str(row["upd_id"] or "").strip())].append(row)
+          potential=[]
+          for key,entries in groups.items():
+              rid,uid=key
+              options=[]
+              if rid and len(rpl[rid])==1:options.append(("RPL",rpl[rid][0]))
+              if uid and len(upd[uid])==1:options.append(("UPD",upd[uid][0]))
+              potential.append((key,entries,options))
+          # Grupy z partii 29 juz sprawdzone; celowo je pomijamy.
+          REVIEWED_UPD={"600000060227","600000001703","600000004232","600000004229","600000036571","600000057266","600000055842","600000090289","600000001033","600000000727","600000000514","600000004335","600000003896","600000059826","600000004160","600000004174","600000003436","600000004200","600000000220","600000000329","600000057401","600000003472","600000000034","600000003433","600000003470","600000003319","600000003966","600000001597","600000001157","600000003386"}
+          potential=[item for item in potential if item[0][1] not in REVIEWED_UPD]
+          potential.sort(key=lambda v:(0 if v[2] else 1,-len(v[1]),v[0]))
+          selected=potential[:30]
+          cache={}
+          def inspect(path):
+              if path in cache:return cache[path]
+              result={"path":path.relative_to(ROOT).as_posix(),"valid":False,"why":"","text":""}
+              if not is_pdf(path):
+                  result["why"]="bad_pdf_header"
+              else:
+                  try:
+                      with fitz.open(path) as doc:
+                          assert not doc.is_encrypted and 2<=len(doc)<=100,"invalid pages"
+                          result["pages"]=len(doc)
+                          txt=norm(" ".join(page.get_text(sort=True) for page in doc))
+                      assert len(txt)>=500,"no_extractable_text"
+                      assert "charakterystyk" in txt and "weterynaryjn" in txt and "produkt" in txt,"no_polish_chpl_header"
+                      assert sum(word in txt for word in ("wskazania","karencji","dawkowanie","przeciwwskazania","podania"))>=2,"no_polish_sections"
+                      result["valid"]=True
+                      result["text"]=txt
+                  except Exception as exc:result["why"]=type(exc).__name__+": "+str(exc)[:100]
+              cache[path]=result
+              return result
+          def product_tokens(s):
+              terms=norm(s).split()
+              bad={"roztwor","zawiesina","proszek","tabletki","emulsja","iniekcja","zawiesiny","wstrzykiwan","doustny","doustna","dla"}
+              found=[t for t in terms if len(t)>=4 and not t.isdigit() and t not in bad]
+              return found[:2]
+          def name_match(s,body):
+              words=product_tokens(s)
+              if not words:return False
+              if not re.search(r"\b"+re.escape(words[0])+r"\b",body):return False
+              if len(words)>1 and words[1].isalpha() and len(words[1])>=5:
+                  if not re.search(r"\b"+re.escape(words[1])+r"\b",body):return False
+              return True
+          cols=[x[1] for x in db.execute("PRAGMA table_info(variants)") if x[1]!="pdf_path"]
+          def digest_clinical():
+              sql="SELECT "+",".join('"'+x+'"' for x in cols)+" FROM variants ORDER BY id"
+              return hashlib.sha256(json.dumps([list(row) for row in db.execute(sql)],ensure_ascii=False,default=str).encode()).hexdigest()
+          original_clinical=digest_clinical()
+          outcomes=[]
+          fixes=[]
+          for (rid,uid),entries,options in selected:
+              info={"rpl_id":rid,"upd_id":uid,"ids":[x["id"] for x in entries],
+                    "names":sorted(set(x["name"] for x in entries)),"status":"","candidates":[]}
+              valid=[]
+              for origin,path in options:
+                  doc=inspect(path)
+                  matched=doc["valid"] and all(name_match(row["name"],doc["text"]) for row in entries)
+                  info["candidates"].append({"origin":origin,"path":doc["path"],"pages":doc.get("pages"),"polish_chpl":doc["valid"],"name_match":matched,"reason":doc["why"]})
+                  if matched:valid.append((origin,path))
+              # Prefer exact RPL document (domestic) whenever there are multiple valid options.
+              valid.sort(key=lambda it: 0 if it[0]=="RPL" else 1)
+              if valid:
+                  origin,p=valid[0]
+                  rel=p.relative_to(ROOT).as_posix()
+                  info["status"]="approved"
+                  info["selected_document"]=rel
+                  info["document_source"]=origin
+                  fixes.append((rid,uid,entries,rel))
+              else:
+                  info["status"]="not_verified"
+              outcomes.append(info)
+          
+          if fixes:
+              try:
+                  db.execute("BEGIN IMMEDIATE")
+                  for rid,uid,entries,rel in fixes:
+                      db.execute("INSERT OR IGNORE INTO documents(path) VALUES (?)",(rel,))
+                      for row in entries:
+                          old=str(row["pdf_path"] or "").strip()
+                          assert not old or not is_pdf(ROOT/old),"Nie nadpisuj poprawnego powiazania"
+                          changed=db.execute("UPDATE variants SET pdf_path=? WHERE id=? AND COALESCE(rpl_id,'')=? AND COALESCE(upd_id,'')=?",
+                                             (rel,row["id"],rid,uid))
+                          assert changed.rowcount==1,("record mismatch",row["id"])
+                  assert digest_clinical()==original_clinical,"Zmodyfikowano dane kliniczne!"
+                  assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+                  assert not db.execute("PRAGMA foreign_key_check").fetchall()
+                  db.commit()
+              except:
+                  db.rollback()
+                  raise
+          assert digest_clinical()==original_clinical
+          after=[dict(r) for r in db.execute("SELECT pdf_path FROM variants WHERE scope IS NULL OR lower(scope) NOT LIKE '%archiwal%'")]
+          remaining=sum(not str(r["pdf_path"] or "").strip() or not is_pdf(ROOT/str(r["pdf_path"])) for r in after)
+          linked=sum(len(entry[2]) for entry in fixes)
+          assert remaining==230-linked,(remaining,linked)
+          result={"status":"updated" if fixes else "no_safe_matches",
+                  "before_missing":230,"after_missing":remaining,
+                  "selected_groups":len(selected),"checked_variants":sum(len(x[1]) for x in selected),
+                  "approved_groups":len(fixes),"new_pdf_links":linked,
+                  "sqlite_before_sha256":EXPECTED,"sqlite_after_sha256":hashlib.sha256(DB.read_bytes()).hexdigest(),
+                  "clinical_unchanged":True,"outcomes":outcomes}
+          (OUT/"result.json").write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf8")
+          print("PARTIA29_RESULT",json.dumps(result,ensure_ascii=False))
+          db.close()
+          PY
+          python -m py_compile /tmp/partia30.py
+          python /tmp/partia30.py
+      - name: "Commit tylko powiazan z potwierdzona ChPL"
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          if git diff --cached --quiet; then
+            echo "Brak wystarczajaco potwierdzonych dokumentow. SQLite bez zmian."
+            exit 0
+          fi
+          git commit -m 'fix: partia 30 polskie ChPL powiazanie wariantow SQLite [skip ci]'
+          git push origin HEAD:winforms
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partia30-raport-polskich-chpl
+          path: partia30_raport/
+          retention-days: 14
