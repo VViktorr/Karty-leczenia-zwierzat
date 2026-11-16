@@ -46,3 +46,4 @@ jobs:
             data/audyt_brakujacych_pdf/partia40_kandydaci_pdf_nazwa_moc_subiekt.csv
           retention-days: 14
 # Workflow designed to run on this file's changes.
+# Verify English SPC for Acticarp on the updated checker.
