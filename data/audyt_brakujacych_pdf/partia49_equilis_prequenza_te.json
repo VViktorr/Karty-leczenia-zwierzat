@@ -1,0 +1,19 @@
+{
+  "partia": 49,
+  "product": "Equilis Prequenza-Te",
+  "id": 73,
+  "symbol": "000000000000000259",
+  "subiekt": "EQUILIS PREQUENZA-TE A'1D",
+  "upd_id": "600000000720",
+  "rpl_id": "100253057",
+  "status": "active",
+  "pdf": null,
+  "uploaded_file": "data/ChPL/UPD/anx_159755_pl.pdf",
+  "uploaded_document_product": "Equilis Prequenza (without -Te)",
+  "expected_product": "Equilis Prequenza-Te",
+  "warning": "Uploaded Polish PDF is not for the -Te variant. Keep active with no PDF attachment until correct SPC is provided.",
+  "pdf_pages": 18,
+  "pdf_sha256": "2c055c37adffee1c1f5b871cc04e5dc451d2666dd43ea9d5d5d458aaad95204a",
+  "other_variant_fields_unchanged": true,
+  "sqlite_sha256": "71c5fb8475ddea1f8b75225942e6442838f9e56c545401544e8d832bf4a5fe88"
+}
