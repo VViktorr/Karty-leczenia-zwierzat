@@ -7,6 +7,8 @@ internal sealed class PricePrintSettings
 {
     public string Font = "Arial";
     public int FontWeight = 400;
+    public string[] PageFontNames = ["", "", ""];
+    public decimal[] PageFontSizes = [10, 10, 10];
     // Store font family names rather than indices (installed fonts can change or reorder).
     public string[] FontNames = new string[6];
     // Zero means inherit the global size; positive values are points.
@@ -169,7 +171,9 @@ internal sealed class PricePrintEditor : Form
             fonts = installed.Families.Select(f => f.Name)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Append(settings.Font)
-                .Concat(settings.FontNames?.Where(name => !string.IsNullOrWhiteSpace(name)) ?? [])
+                .Concat(settings.FontNames)
+                .Concat(settings.PageFontNames ?? [])
+                .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.CurrentCultureIgnoreCase)
                 .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase).ToArray();
         }
@@ -177,7 +181,9 @@ internal sealed class PricePrintEditor : Form
         {
             CrashLog.Write("WinForms.PricePrint.SystemFonts", ex);
             fonts = PricePrintSettings.LegacyFonts.Append(settings.Font)
-                .Concat(settings.FontNames?.Where(name => !string.IsNullOrWhiteSpace(name)) ?? [])
+                .Concat(settings.FontNames)
+                .Concat(settings.PageFontNames ?? [])
+                .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.CurrentCultureIgnoreCase)
                 .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase).ToArray();
         }
@@ -192,6 +198,31 @@ internal sealed class PricePrintEditor : Form
         var margin = Measure("Margines (mm)", settings.Margin, 4, 25, 1);
         var height = Measure("Min. wysokość (mm)", settings.RowHeight, 0, 18, 1);
         var padding = Measure("Odstęp pionowy (mm)", settings.Padding, 0, 5, 1);
+        section.SetFlowBreak(section.Controls[section.Controls.Count - 1], true);
+        var pageTarget = Select("Element strony", ["Tytuł cennika", "Data", "Legenda dróg podania"], 0);
+        pageTarget.Width = 210;
+        section.SetFlowBreak(section.Controls[section.Controls.Count - 1], true);
+        var pageTypography = new (ComboBox Font, NumericUpDown Size, Control FontField, Control SizeField)[3];
+        string[] pageFontItems = ["Czcionka wydruku", .. fonts];
+        for (int i = 0; i < pageTypography.Length; i++)
+        {
+            string? savedFamily = settings.PageFontNames?.ElementAtOrDefault(i);
+            int selectedFamily = string.IsNullOrWhiteSpace(savedFamily) ? 0 :
+                Array.FindIndex(fonts, family => string.Equals(family, savedFamily, StringComparison.OrdinalIgnoreCase)) + 1;
+            var family = Select("Czcionka", pageFontItems, selectedFamily);
+            var familyField = family.Parent!;
+            decimal savedSize = settings.PageFontSizes?.ElementAtOrDefault(i) ?? 0;
+            var points = Measure("Rozmiar (pt)", savedSize > 0 ? savedSize : 10, 6, 48, 1);
+            pageTypography[i] = (family, points, familyField, points.Parent!);
+        }
+        void ShowPageTypography()
+        {
+            for (int i = 0; i < pageTypography.Length; i++)
+                pageTypography[i].FontField.Visible = pageTypography[i].SizeField.Visible = i == pageTarget.SelectedIndex;
+        }
+        pageTarget.SelectedIndexChanged += (_, _) => ShowPageTypography();
+        ShowPageTypography();
+
         Section("Treść i legenda");
         var format = Select("Treść karencji", ["Pełny zapis", "Zwięźle według wariantów", "Zwięźle według gatunków"], settings.WithdrawalFormat);
         format.Width = 185;
@@ -246,6 +277,13 @@ internal sealed class PricePrintEditor : Form
         static string CssFont(string family) => "\"" + family.Replace("\\", "\\\\").Replace("\"", "\\\"")
             .Replace("\r", "").Replace("\n", "") + "\",sans-serif";
 
+        string PageTypographyCss(int index)
+        {
+            var style = pageTypography[index];
+            string family = style.Font.SelectedIndex > 0 ? $"font-family:{CssFont((string)style.Font.SelectedItem!)};" : "";
+            return family + FormattableString.Invariant($"font-size:{style.Size.Value:0.#}pt;");
+        }
+
         string TypographyCss(int index)
         {
             var (family, points, selectedWeight, align) = typography[index];
@@ -278,17 +316,22 @@ internal sealed class PricePrintEditor : Form
                 td, th {border: 1px solid #999; padding: {{padding.Value}}mm 3px; text-align: left; vertical-align: top; word-wrap: break-word}
                 td {height: {{height.Value}}mm}
                 th {background: #eee; {{TypographyCss(0)}}}
+                .price-title { {{PageTypographyCss(0)}} }
+                .price-date { {{PageTypographyCss(1)}} }
+                .price-legend { {{PageTypographyCss(2)}} }
+                .price-legend * {font-family: inherit !important; font-size: inherit !important}
                 .route-legend {border: 0; padding: 0; height: auto}
-                </style></head><body><h2>Cennik leków</h2><p>{{DateTime.Today:dd.MM.yyyy}}</p>
+                </style></head><body><h2 class="price-title">Cennik leków</h2><p class="price-date">{{DateTime.Today:dd.MM.yyyy}}</p>
                 """));
-            if (legend.SelectedIndex == 1) html.Append(AdministrationRouteLegend.Html);
+            string legendHtml = $"<div class='price-legend'>{AdministrationRouteLegend.Html}</div>";
+            if (legend.SelectedIndex == 1) html.Append(legendHtml);
             html.Append("<table><colgroup>");
             foreach (int i in columns)
                 html.Append(FormattableString.Invariant($"<col style='width:{100 * widths[i].Value / totalWidth:0.###}%'>"));
             html.Append("</colgroup><thead>");
             if (legend.SelectedIndex == 2)
                 html.Append($"<tr><td class='route-legend' colspan='{columns.Length}'>")
-                    .Append(AdministrationRouteLegend.Html).Append("</td></tr>");
+                    .Append(legendHtml).Append("</td></tr>");
             html.Append("<tr>");
             foreach (int i in columns) html.Append("<th>").Append(WebUtility.HtmlEncode(headings[i])).Append("</th>");
             html.Append("</tr></thead><tbody>");
@@ -329,10 +372,11 @@ internal sealed class PricePrintEditor : Form
             refreshTimer.Start();
         }
         foreach (var box in new[] { font, weight, orientation, format, routes, legend }
+            .Concat(pageTypography.Select(style => style.Font))
             .Concat(typography.SelectMany(style => new[] { style.Font, style.Weight, style.Alignment })))
             box.SelectedIndexChanged += (_, _) => QueueSample();
         foreach (var box in new[] { size, margin, height, padding }
-            .Concat(widths).Concat(typography.Select(style => style.Size)))
+            .Concat(widths).Concat(pageTypography.Select(style => style.Size)).Concat(typography.Select(style => style.Size)))
             box.ValueChanged += (_, _) => QueueSample();
         foreach (var box in new[] { number, batch, price, withdrawal })
             box.CheckedChanged += (_, _) => QueueSample();
@@ -358,6 +402,8 @@ internal sealed class PricePrintEditor : Form
             settings.Widths = widths.Select(box => box.Value).ToArray();
             settings.LegendEveryPage = legend.SelectedIndex == 2;
             settings.FontNames = typography.Select(style => style.Font.SelectedIndex == 0 ? "" : (string)style.Font.SelectedItem!).ToArray();
+            settings.PageFontNames = pageTypography.Select(style => style.Font.SelectedIndex == 0 ? "" : (string)style.Font.SelectedItem!).ToArray();
+            settings.PageFontSizes = pageTypography.Select(style => style.Size.Value).ToArray();
             settings.FontSizes = typography.Select(style => style.Size.Value).ToArray();
             settings.FontWeights = typography.Select(style => weightValues[style.Weight.SelectedIndex]).ToArray();
             // Compatibility placeholders. Legacy indices are cleared so changing installed
