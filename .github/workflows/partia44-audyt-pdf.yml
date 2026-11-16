@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/audyt_brakujacych_pdf/partia44_braki_z_nazwami_subiekta.csv data/audyt_brakujacych_pdf/partia44_pelny_audyt.json data/audyt_brakujacych_pdf/partia44_podsumowanie.json
+          git add -f data/audyt_brakujacych_pdf/partia44_braki_z_nazwami_subiekta.csv data/audyt_brakujacych_pdf/partia44_pelny_audyt.json data/audyt_brakujacych_pdf/partia44_podsumowanie.json
           if ! git diff --cached --quiet; then
             git commit -m 'audit: report actual missing ChPL links after batch43 [skip ci]'
             git push origin HEAD:winforms
