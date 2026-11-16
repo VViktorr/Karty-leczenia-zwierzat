@@ -1,0 +1,170 @@
+{
+  "phase": 37,
+  "approved_pdf": {
+    "bravecto": {
+      "file": "data/ChPL/UPD/Bravecto all_134628_pl.pdf",
+      "pages": 52,
+      "sha256": "56f09300f5c48d012f728ea0017cbe210d1b7bedab4fae84ee8bea7c7de1dddf",
+      "text_chars": 85555,
+      "accepted": true
+    },
+    "bioestrovet": {
+      "file": "data/ChPL/UPD/Charakterystyka-18295-20180730000000-1397_W-20181016000243.pdf",
+      "pages": 6,
+      "sha256": "ed7c8fc294b29589c262583371360406f46c0a39230858f497e49afed06babd5",
+      "text_chars": 5,
+      "accepted": true
+    },
+    "circovac": {
+      "file": "data/ChPL/UPD/circovac_121949_pl.pdf",
+      "pages": 20,
+      "sha256": "82188412526a251f81e57540548c2fe5230d22ba78fe507651b4b0d2c6c50c0c",
+      "text_chars": 26966,
+      "accepted": true
+    },
+    "advocate": {
+      "file": "data/ChPL/UPD/ema-combined-v76-advocate-vnra19252-2025-04-03-pl.pdf",
+      "pages": 73,
+      "sha256": "c06e7c60d4e914a55f3bd0e00ac160b121e4c4a4ca8e856652c104aa0e877fb6",
+      "text_chars": 127221,
+      "accepted": true
+    },
+    "contacera": {
+      "file": "data/ChPL/UPD/UPD_600000000220_Contacera_20_mg_ml_roztwór_do_wstrzykiwań_dla_UPD_ChPL.pdf",
+      "pages": 34,
+      "sha256": "7171d7c98ce806bca380d242d1392004a3ec61ba45b28139320b27af217f8ef0",
+      "text_chars": 40777,
+      "accepted": true,
+      "also_15mg": true
+    }
+  },
+  "actions": [
+    {
+      "id": 2111,
+      "name": "BRAVECTO 112,5 MG 1 TAB. PIES 2-4,5 KG",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Bravecto all_134628_pl.pdf"
+    },
+    {
+      "id": 2112,
+      "name": "BRAVECTO 250 MG 1 TAB. PIES 4,5-10 KG",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Bravecto all_134628_pl.pdf"
+    },
+    {
+      "id": 2113,
+      "name": "BRAVECTO 500 MG 1 TAB. PIES 10-20 KG",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Bravecto all_134628_pl.pdf"
+    },
+    {
+      "id": 2114,
+      "name": "BRAVECTO 1000 MG 1 TAB. PIES 20-40 KG",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Bravecto all_134628_pl.pdf"
+    },
+    {
+      "id": 2115,
+      "name": "BRAVECTO 1400 MG 1 TAB. PIES 40-56 KG",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Bravecto all_134628_pl.pdf"
+    },
+    {
+      "id": 2487,
+      "name": "Bravecto 250 mg spot-on solution for small dogs (>4.5–10 kg)",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Bravecto all_134628_pl.pdf"
+    },
+    {
+      "id": 2453,
+      "name": "Bravecto 500 mg, roztwór do nakrapiania dla psów",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Bravecto all_134628_pl.pdf"
+    },
+    {
+      "id": 1535,
+      "name": "Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Charakterystyka-18295-20180730000000-1397_W-20181016000243.pdf"
+    },
+    {
+      "id": 1536,
+      "name": "Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Charakterystyka-18295-20180730000000-1397_W-20181016000243.pdf"
+    },
+    {
+      "id": 1537,
+      "name": "Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Charakterystyka-18295-20180730000000-1397_W-20181016000243.pdf"
+    },
+    {
+      "id": 1748,
+      "name": "Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Charakterystyka-18295-20180730000000-1397_W-20181016000243.pdf"
+    },
+    {
+      "id": 1749,
+      "name": "Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Charakterystyka-18295-20180730000000-1397_W-20181016000243.pdf"
+    },
+    {
+      "id": 1750,
+      "name": "Bioestrovet 0,25 mg/ml roztwór do wstrzykiwań",
+      "action": "linked",
+      "path": "data/ChPL/UPD/Charakterystyka-18295-20180730000000-1397_W-20181016000243.pdf"
+    },
+    {
+      "id": 921,
+      "name": "Circovac",
+      "action": "linked",
+      "path": "data/ChPL/UPD/circovac_121949_pl.pdf"
+    },
+    {
+      "id": 922,
+      "name": "Circovac",
+      "action": "linked",
+      "path": "data/ChPL/UPD/circovac_121949_pl.pdf"
+    },
+    {
+      "id": 2109,
+      "name": "Advocate 400 mg + 100 mg/4 ml spot-on",
+      "action": "linked",
+      "path": "data/ChPL/UPD/ema-combined-v76-advocate-vnra19252-2025-04-03-pl.pdf"
+    },
+    {
+      "id": 834,
+      "name": "Contacera 20 mg/ml",
+      "action": "linked",
+      "path": "data/ChPL/UPD/UPD_600000000220_Contacera_20_mg_ml_roztwór_do_wstrzykiwań_dla_UPD_ChPL.pdf"
+    },
+    {
+      "id": 835,
+      "name": "Contacera 20 mg/ml",
+      "action": "linked",
+      "path": "data/ChPL/UPD/UPD_600000000220_Contacera_20_mg_ml_roztwór_do_wstrzykiwań_dla_UPD_ChPL.pdf"
+    },
+    {
+      "id": 836,
+      "name": "Contacera 20 mg/ml",
+      "action": "linked",
+      "path": "data/ChPL/UPD/UPD_600000000220_Contacera_20_mg_ml_roztwór_do_wstrzykiwań_dla_UPD_ChPL.pdf"
+    },
+    {
+      "id": 2116,
+      "name": "CONTACERA 15MG/ML 100ML",
+      "action": "linked",
+      "path": "data/ChPL/UPD/UPD_600000000220_Contacera_20_mg_ml_roztwór_do_wstrzykiwań_dla_UPD_ChPL.pdf"
+    }
+  ],
+  "new_links": 20,
+  "existing_kept": 0,
+  "unlinked_validation": 0,
+  "clinical_unchanged": true,
+  "db_sha_before": "53cafa67825b5c5a4db5d8b2381977a403587579f814c68d5f27e9df140f7b3e",
+  "db_sha_after": "17d54cf91eb139570be2fa50b94a1ffd7feb40fe583056981bb807d904680119",
+  "remaining_null_pdf_links": 161
+}
