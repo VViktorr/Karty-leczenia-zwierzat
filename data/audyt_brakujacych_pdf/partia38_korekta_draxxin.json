@@ -1,0 +1,17 @@
+{
+  "repaired_variants": [
+    1493,
+    1494,
+    1495,
+    1496,
+    1497,
+    1498,
+    2288,
+    2289,
+    2290
+  ],
+  "wrong_pdf_removed": "data/ChPL/RPL/RPL_44053_Draxxin_Plus_RPL_ChPL.pdf",
+  "reason": "Draxxin and Draxxin Plus are different products; name-only matching was unsafe",
+  "clinical_data_unchanged": true,
+  "sqlite_sha256": "1226d7423800ee47bb4088ab1ecae7d1fbbdbba4cb254f9dd23c929ebbdc4c2d"
+}
