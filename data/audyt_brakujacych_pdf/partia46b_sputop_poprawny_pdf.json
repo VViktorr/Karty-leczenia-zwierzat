@@ -1,0 +1,111 @@
+{
+  "partia": "46b",
+  "brand": "Sputop Spot On",
+  "publisher": "Zoetis Polska",
+  "source_url": "https://www.zoetis.com.pl/_locale-assets/charakterystyki-produktow/sputop-spot-on_qrd_2024.03_dec.pdf",
+  "pdf_path": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_Zoetis_ChPL_2024-03.pdf",
+  "pdf_sha256": "12eaaecb8af5c14df33d96f345c0af4f6788ecbc9efd2829f1a0937a132ca982",
+  "pages": 16,
+  "linked": 12,
+  "clinical_unchanged": true,
+  "source_note": "Polish ChPL hosted by responsible marketing authorization holder, not downloaded from government RPL API",
+  "sqlite_sha256": "716f387e90b98d1e5f60905d8f25bcb726c537e306920a9a3348bda6ac78414b",
+  "variants": [
+    {
+      "id": 2800,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML  5F0348",
+      "symbol": "000000000000001279",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2801,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML  5F0348",
+      "symbol": "000000000000001279",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2802,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML  5F0348",
+      "symbol": "000000000000001279",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2803,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML  5F0348",
+      "symbol": "000000000000001279",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2804,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML  5F0348",
+      "symbol": "000000000000001279",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2805,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML  5F0348",
+      "symbol": "000000000000001279",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2820,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML 3F1022",
+      "symbol": "000000000000001135",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2821,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML 3F1022",
+      "symbol": "000000000000001135",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2822,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML 3F1022",
+      "symbol": "000000000000001135",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2823,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML 3F1022",
+      "symbol": "000000000000001135",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2824,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML 3F1022",
+      "symbol": "000000000000001135",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    },
+    {
+      "id": 2825,
+      "medicine": "Sputop Spot On 10 mg/ml",
+      "subiekt": "SPOT ON 250 ML 3F1022",
+      "symbol": "000000000000001135",
+      "rpl_id": "100203390",
+      "upd_id": "600000084331"
+    }
+  ]
+}
