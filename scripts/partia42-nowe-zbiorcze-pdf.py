@@ -98,6 +98,9 @@ for drug,rel in PDFS.items():
     if drug=="simparica":
         windows=[w for w in windows if not re.search(r"simparica\s+trio",w[:120])]
     documents[drug]={"path":rel,"pages":pages,"text_chars":len(s),"matches":len(matches),"windows":windows}
+    if drug=="naxcel":
+        details=[{"snippet":w[:1400],"has_bydl":("bydl" in w),"has_injection":("wstrzykiwan" in w or "injection" in w)} for w in windows if "200 mg/ml" in w][:10]
+        print("NAXCEL_CONTEXT",json.dumps(details,ensure_ascii=False))
 rows=[dict(r) for r in db.execute("""SELECT v.id,v.name,v.symbol,v.rpl_id,v.upd_id,v.pdf_path,p.name AS subiekt
  FROM variants v JOIN products p ON p.symbol=v.symbol
  WHERE v.scope IS NULL OR lower(v.scope) NOT LIKE '%archiwal%' ORDER BY v.id""")]
