@@ -2,6 +2,14 @@
   "partia": 45,
   "documents": [
     {
+      "brand": "Previcox",
+      "url": "https://ec.europa.eu/health/documents/community-register/2023/20231020160574/anx_160574_pl.pdf",
+      "path": "data/ChPL/UPD/ema-combined-previcox-pl-2024-02-29.pdf",
+      "pages": 24,
+      "sha256": "8b82c30e7c5e56bca4eb12a067e3bb8ce5a799a9e6773fee0474daddd1f91aec",
+      "result": "downloaded"
+    },
+    {
       "brand": "Melovem",
       "path": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
       "pages": 72,
@@ -11,6 +19,16 @@
   ],
   "links": [
     {
+      "brand": "Previcox",
+      "id": 1173,
+      "medicine": "Previcox 227 mg",
+      "subiekt": "PREVICOX 227 MG A'60 TBL.",
+      "symbol": "000003474",
+      "upd_id": "600000000610",
+      "pdf": "data/ChPL/UPD/ema-combined-previcox-pl-2024-02-29.pdf",
+      "status": "linked"
+    },
+    {
       "brand": "Melovem",
       "id": 430,
       "medicine": "Melovem 30 mg/ml",
@@ -18,7 +36,7 @@
       "symbol": "000000000000001563",
       "upd_id": "600000004346",
       "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
-      "status": "linked"
+      "status": "existing_kept"
     },
     {
       "brand": "Melovem",
@@ -28,7 +46,7 @@
       "symbol": "000000000000001563",
       "upd_id": "600000004346",
       "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
-      "status": "linked"
+      "status": "existing_kept"
     },
     {
       "brand": "Melovem",
@@ -38,7 +56,7 @@
       "symbol": "000000000000001959",
       "upd_id": "600000004346",
       "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
-      "status": "linked"
+      "status": "existing_kept"
     },
     {
       "brand": "Melovem",
@@ -48,7 +66,7 @@
       "symbol": "000000000000001959",
       "upd_id": "600000004346",
       "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
-      "status": "linked"
+      "status": "existing_kept"
     },
     {
       "brand": "Melovem",
@@ -58,7 +76,7 @@
       "symbol": "000002444",
       "upd_id": "600000004346",
       "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
-      "status": "linked"
+      "status": "existing_kept"
     },
     {
       "brand": "Melovem",
@@ -68,15 +86,10 @@
       "symbol": "000002444",
       "upd_id": "600000004346",
       "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
-      "status": "linked"
+      "status": "existing_kept"
     }
   ],
   "errors": [
-    {
-      "brand": "Previcox",
-      "url": "https://medicines.health.europa.eu/veterinary/pl/documents/download/bf3d5b46-3497-495b-b434-c1df7dc9cc13",
-      "error": "not a PDF or oversized"
-    },
     {
       "brand": "Porcilis ColiClos",
       "url": "https://medicines.health.europa.eu/veterinary/pl/documents/download/bcb9b7aa-28ce-4488-8443-a1cf5edf67b2",
@@ -89,10 +102,10 @@
     }
   ],
   "counts": {
-    "downloaded": 0,
-    "linked": 6,
-    "failures": 3
+    "downloaded": 1,
+    "linked": 1,
+    "failures": 2
   },
   "clinical_unchanged": true,
-  "sqlite_sha256": "3b3b8fe00be169e2b6f0dcdacff47a9c8c1f3c40e0b28cd04f3926379b8c37dc"
+  "sqlite_sha256": "3a4d154c7c1d9733642976aa1193403ebb46757e7b2cc555e55974f00cec291e"
 }
