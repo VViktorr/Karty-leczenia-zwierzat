@@ -108,10 +108,23 @@ internal sealed class PricePrintEditor : Form
         var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
         var paper = new Label { Dock = DockStyle.Top, Height = 24, Padding = new Padding(8, 3, 0, 0) };
         FlowLayoutPanel section = null!;
+        var sectionFont = new Font(options.Font, FontStyle.Bold);
+        options.Disposed += (_, _) => sectionFont.Dispose();
 
         void Section(string title)
         {
-            options.Controls.Add(new Label { Text = title, AutoSize = true, Margin = new Padding(3, 8, 3, 2) });
+            if (options.Controls.Count > 0)
+            {
+                options.Controls.Add(new Panel
+                {
+                    Size = new Size(324, 1), BackColor = SystemColors.ControlDark,
+                    Margin = new Padding(3, 8, 3, 5), AccessibleRole = AccessibleRole.Separator
+                });
+            }
+            options.Controls.Add(new Label
+            {
+                Text = title, Font = sectionFont, AutoSize = true, Margin = new Padding(3, 2, 3, 3)
+            });
             section = new FlowLayoutPanel
             {
                 Width = 324, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
