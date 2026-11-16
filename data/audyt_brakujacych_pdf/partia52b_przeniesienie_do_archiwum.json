@@ -1,0 +1,566 @@
+{
+  "batch": 52,
+  "operation": "move_unlinked_pdfs_from_winforms_to_archiwum-katalogu",
+  "source_branch": "winforms",
+  "archive_branch": "archiwum-katalogu",
+  "archive_commit": "196b9527743b05e89cf61acc270a46525821981c",
+  "archive_prefix": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16",
+  "source_sqlite_sha256": "223bd51e187e81358683285ac8a683a1fa8bdc726c3861406e584784ad16d5a4",
+  "result_sqlite_sha256": "f53622bd6720d3526177209af09c228153a4467b385c76fc118d2b1bf615d842",
+  "archived_count": 91,
+  "archived_bytes": 29321177,
+  "documents_rows_removed": 80,
+  "remaining_pdf_files": 589,
+  "all_archive_remote_hashes_verified": true,
+  "all_variant_records_unchanged": true,
+  "active_pdf_links_preserved": true,
+  "remaining_broken_variant_refs": 0,
+  "files": [
+    {
+      "from": "data/ChPL/RPL/Charakterystyka-20339-2024-03-29-4690_W-2024-04-27.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/Charakterystyka-20339-2024-03-29-4690_W-2024-04-27.pdf",
+      "sha256": "c7df43046bc0ca30038d8841b1bbb3b3826da292c563218915aa9657dd6c876a",
+      "bytes": 147697
+    },
+    {
+      "from": "data/ChPL/RPL/Prinocate_psy_PL_ulotka.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/Prinocate_psy_PL_ulotka.pdf",
+      "sha256": "c9c70008ed7cbeb80f31b1b0b2855ae7ef545e941cbc64d85fe6f86998546d4d",
+      "bytes": 358855
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_10718_Syntarpen_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_10718_Syntarpen_RPL_ChPL.pdf",
+      "sha256": "f9192140201a5733daad6528f6391d1916893cb26044d610bbdf0c3ab31c8348",
+      "bytes": 246862
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_14806_Natrium_chloratum_0_9_Baxter_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_14806_Natrium_chloratum_0_9_Baxter_RPL_ChPL.pdf",
+      "sha256": "49dfefaa6b4e345aabc9e553e4a5553cbd2e03b51b0300ea9b8d4a05d31be66c",
+      "bytes": 337991
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_16987_Oxytocinum_Biowet_Puławy_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_16987_Oxytocinum_Biowet_Puławy_RPL_ChPL.pdf",
+      "sha256": "f33958d4995a452f84f94f99569f573e14667a2e0988b7e44d42f4070f247f61",
+      "bytes": 174331
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_17207_Enrofloksacyna_10_INJ_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_17207_Enrofloksacyna_10_INJ_RPL_ChPL.pdf",
+      "sha256": "707be43ea860023a993c0bcef560cf923fa3d0050889d2630434a855fb80f33c",
+      "bytes": 240433
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_18295_BIOESTROWET_20_ML_061208A_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_18295_BIOESTROWET_20_ML_061208A_RPL_ChPL.pdf",
+      "sha256": "ed7c8fc294b29589c262583371360406f46c0a39230858f497e49afed06babd5",
+      "bytes": 1346974
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_18365_Panacur_Pasta_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_18365_Panacur_Pasta_RPL_ChPL.pdf",
+      "sha256": "36d86f1e94ef20bb7ebba017eae14963c8eefcca71348bb01ddef3061140c398",
+      "bytes": 118490
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_18793_L-Spec-VMD_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_18793_L-Spec-VMD_RPL_ChPL.pdf",
+      "sha256": "251a2596258024a2401ef69055dd085c98cf71561946ff5ce034c83c86d03cb4",
+      "bytes": 155959
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_19774_Dolpac_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_19774_Dolpac_RPL_ChPL.pdf",
+      "sha256": "3a5e253d17cda8880341b48c5ef74edccd065328824fcac7e2b17f55dd89b635",
+      "bytes": 109897
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_20316_Amoxicillinum_800_Biofaktor_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_20316_Amoxicillinum_800_Biofaktor_RPL_ChPL.pdf",
+      "sha256": "6d666337519faccbf8b797122b2065aecd78469456e77853f081c63529921e4c",
+      "bytes": 229586
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_20339_Sputop_Spot_On_RPL_ChPL.pdf",
+      "sha256": "c7df43046bc0ca30038d8841b1bbb3b3826da292c563218915aa9657dd6c876a",
+      "bytes": 147697
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_20557_Glucosum_5_et_Natrium_chloratum_0_9_2_1_Frese_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_20557_Glucosum_5_et_Natrium_chloratum_0_9_2_1_Frese_RPL_ChPL.pdf",
+      "sha256": "bba67898791c10b74b48b4e540c015c84ae4b41d6e2bd272815918635bb46282",
+      "bytes": 181363
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_20683_Neomycyna_Vet_Planet_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_20683_Neomycyna_Vet_Planet_RPL_ChPL.pdf",
+      "sha256": "e2ddde4bc1772b9a3dd86a6a861df88701133f8c8af4db961159912e0b0720a9",
+      "bytes": 187193
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_35579_Amoxy_Active_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_35579_Amoxy_Active_RPL_ChPL.pdf",
+      "sha256": "91f6357a84b0ef920e306b1ff113668d83d341b0146bbf0808a4e9107dd92ba7",
+      "bytes": 169523
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_43055_Prinocate_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_43055_Prinocate_RPL_ChPL.pdf",
+      "sha256": "ca251b3b6223dbfbdc56814a384036a7306ff0616a894bb5ba31d4393c89bb11",
+      "bytes": 615132
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_5633_Provera_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_5633_Provera_RPL_ChPL.pdf",
+      "sha256": "dec1e149884358fdf9ddc6a4026e73581fb10143622a4f1dfeb36073bbf13633",
+      "bytes": 221595
+    },
+    {
+      "from": "data/ChPL/RPL/RPL_7089_Vitacon_RPL_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/RPL_7089_Vitacon_RPL_ChPL.pdf",
+      "sha256": "6d3a5d8c22d7dcc46106a604c0ff0940487bdf0d3e2bb5bc8bb1d89055f91407",
+      "bytes": 338873
+    },
+    {
+      "from": "data/ChPL/RPL/sputop-spot-on_qrd_2024.03_dec.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/RPL/sputop-spot-on_qrd_2024.03_dec.pdf",
+      "sha256": "12eaaecb8af5c14df33d96f345c0af4f6788ecbc9efd2829f1a0937a132ca982",
+      "bytes": 211194
+    },
+    {
+      "from": "data/ChPL/UPD/OI-Equilis-Prequenza-Te-ema-combined-v95_equilisprequenzate-vra0019g-pl.94e71c7511cd927eb6f9e2df36154bba.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/OI-Equilis-Prequenza-Te-ema-combined-v95_equilisprequenzate-vra0019g-pl.94e71c7511cd927eb6f9e2df36154bba.pdf",
+      "sha256": "adc04bbbb821f5ef2362d68ff64731a90763296f8356bf91a01a510e35dff9de",
+      "bytes": 247715
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000034_Meloxidyl_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000034_Meloxidyl_UPD_ChPL.pdf",
+      "sha256": "63d048a213991a314749bbd1c2cabf8fa67509dd7ae4a277618374a4c954be4a",
+      "bytes": 787943
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000062_Exzolt_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000062_Exzolt_UPD_ChPL.pdf",
+      "sha256": "d0bfef742bd0a54da860fb3f58b488006aa80be3b39c9e35c441c91ba65ab90f",
+      "bytes": 374686
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000135_Simparica_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000135_Simparica_UPD_ChPL.pdf",
+      "sha256": "dfd1040794b960548ea57d00ae2896fe6843a577ce92e4d829cf65dd3b39961e",
+      "bytes": 454732
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000151_Vectra_3D_UPD_ChPL.pdf",
+      "sha256": "1285f76d3a922358abf9571518f0134861569833f410c7314ee2a785757ee06f",
+      "bytes": 242812
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000329_Bovela_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000329_Bovela_UPD_ChPL.pdf",
+      "sha256": "6110e36de93bbbd637af13f583d9b1650752412eb788550a8f47df98fceba745",
+      "bytes": 473395
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000362_Simparica_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000362_Simparica_UPD_ChPL.pdf",
+      "sha256": "588f4b4e8554bd569ae65721b0d2d6209989cb181a1e0c63522e5f852d36de62",
+      "bytes": 369818
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000383_Librela_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000383_Librela_UPD_ChPL.pdf",
+      "sha256": "a9b3cd2a7a1f1df454cdefbd86a22232e31e382d6902df0058ca2e406a3bceec",
+      "bytes": 478705
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000562_Stronghold_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000562_Stronghold_UPD_ChPL.pdf",
+      "sha256": "84ee9bb6b2e3c9d465d95dab968f4af06c09e34b5fb880448c916023cc2b2642",
+      "bytes": 267083
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000596_Bravecto_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000596_Bravecto_UPD_ChPL.pdf",
+      "sha256": "869bf60b68b58fb53580e7e132482922e5d4314768e9cddb5f0089d0b0f1070e",
+      "bytes": 376972
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000610_Previcox_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000610_Previcox_UPD_ChPL.pdf",
+      "sha256": "d8b3b039dee51726678bdf8ad6d23f83fcef8e74e0b99e827d648669a0b5ee7c",
+      "bytes": 196059
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000863_Stronghold_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000863_Stronghold_UPD_ChPL.pdf",
+      "sha256": "59af109ce613de003798d49109350b70a2a99ecb898c909a3dfe10cf5a95f53b",
+      "bytes": 267083
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000000900_Bravecto_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000000900_Bravecto_UPD_ChPL.pdf",
+      "sha256": "c639beb0c9f490c49625b40b41674c52d0fcf9fd890e29da4ba34ce9737965e9",
+      "bytes": 389961
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000001016_Versican_Plus_DHPPi_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000001016_Versican_Plus_DHPPi_UPD_ChPL.pdf",
+      "sha256": "81b47ff0bd35379bcd332875e3aa1f71e5cc9605907bb28687e6a341662bc96b",
+      "bytes": 611183
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000001103_Advocate_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000001103_Advocate_UPD_ChPL.pdf",
+      "sha256": "7210abeb0c6a7add5987a43a8138de903b0b505735003a2cc05dfd2ebb4f299d",
+      "bytes": 283288
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000001233_Bravecto_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000001233_Bravecto_UPD_ChPL.pdf",
+      "sha256": "57c6af5b11e12890ce54962a346f5872f0fdcc55ec0dc04ea832266c1e2bc0e4",
+      "bytes": 388932
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000001234_Bravecto_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000001234_Bravecto_UPD_ChPL.pdf",
+      "sha256": "afa9eb17ba0da9ec7590b35c33c9b240bacc915be66e7d479f09cb96ef9c9fba",
+      "bytes": 376972
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000001548_Simparica_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000001548_Simparica_UPD_ChPL.pdf",
+      "sha256": "9abe603145dec07fdc6665808d1023563bea4bbc174829382c4d1e31113a93a2",
+      "bytes": 369818
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000001597_Circovac_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000001597_Circovac_UPD_ChPL.pdf",
+      "sha256": "759415b2eef250ce1f8212dd302c1949129f67f8ca445abaca0cb485909bd975",
+      "bytes": 563951
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000001703_Metacam_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000001703_Metacam_UPD_ChPL.pdf",
+      "sha256": "b63f5643b5b8e9fc3af46f1e33917b2d3b78d549c96071acfc211244b6527f26",
+      "bytes": 290494
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000001989_Bravecto_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000001989_Bravecto_UPD_ChPL.pdf",
+      "sha256": "569911757fd85c54737cbb293e0e5da3933fd2846d6b304c2acb13059fb2bd23",
+      "bytes": 376972
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000002306_Bravecto_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000002306_Bravecto_UPD_ChPL.pdf",
+      "sha256": "8899fe33bff7e5ec1e342dfcf4e0cc105c26c500aee486118dbbe6106da45f0d",
+      "bytes": 800752
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000003319_Porcilis_ColiClos_UPD_ChPL.pdf",
+      "sha256": "4c96d7127b842a2f7a68f7c0e7df6447b59299e918d24b698ea9e03327544584",
+      "bytes": 337527
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000003386_Locatim_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000003386_Locatim_UPD_ChPL.pdf",
+      "sha256": "5b2f1bd9c5a015fa22b20a487eb350a9c44c6ce6e51a98eedc860a677887b68a",
+      "bytes": 301419
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000003433_Coxevac_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000003433_Coxevac_UPD_ChPL.pdf",
+      "sha256": "17ba9b5bd5866c7990908e6c7f76cc375acc28a66a4a8b9a6403cd8ce40b3bb7",
+      "bytes": 318363
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000003436_Naxcel_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000003436_Naxcel_UPD_ChPL.pdf",
+      "sha256": "526510ed3e56d61fa4ec19ffe2d2e7faa5c71ac83f59189d6e1e50512aed4de2",
+      "bytes": 576400
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000003463_Profender_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000003463_Profender_UPD_ChPL.pdf",
+      "sha256": "02270a6d3a2d51096c245654e56758582a7b11fc4174f55e3f57903c58fc6b18",
+      "bytes": 661917
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000003472_Loxicom_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000003472_Loxicom_UPD_ChPL.pdf",
+      "sha256": "557fe4e43cd0a371a2b707bf38603fcabcdc30a189b6d0f74933672f0713fc92",
+      "bytes": 430278
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000003475_Bravecto_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000003475_Bravecto_UPD_ChPL.pdf",
+      "sha256": "ab381f5266fcbe81a28de9c02fd00f14968d7fe01a5d211fa69e9c01301ee355",
+      "bytes": 389961
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000003966_Ingelvac_CircoFLEX_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000003966_Ingelvac_CircoFLEX_UPD_ChPL.pdf",
+      "sha256": "92aa7ba4e3deb717e83e2241eb84bdae8d74c8c1563ac2dc2fe634bf70c72edd",
+      "bytes": 268435
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000004133_Ecoporc_Shiga_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000004133_Ecoporc_Shiga_UPD_ChPL.pdf",
+      "sha256": "92286cc09b04f43b5256c23231644e9692637884c06d51d575429fca00c33b63",
+      "bytes": 272533
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000004174_Startvac_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000004174_Startvac_UPD_ChPL.pdf",
+      "sha256": "07e3c360d63362efcd36a47ac0e8242a89670d7e28d63b3738b85a9bd5e3c635",
+      "bytes": 474222
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000004200_Loxicom_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000004200_Loxicom_UPD_ChPL.pdf",
+      "sha256": "b4eaa0ba872950802642d89d7d7386e0531635ea0dfcfb9ca64de067ab83e5f1",
+      "bytes": 294014
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000004232_Draxxin_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000004232_Draxxin_UPD_ChPL.pdf",
+      "sha256": "d62be78079bb43cfc890b4e20a53af0e989b89e42fb3b98896bf22f14518f22a",
+      "bytes": 390012
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000004335_Zuprevo_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000004335_Zuprevo_UPD_ChPL.pdf",
+      "sha256": "f68b31e31bf71eb32e20860b7fa5ba06a735ea4c00d54c9dbed7f4338d2600a7",
+      "bytes": 338813
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000005467_GENTA_5_100_ML_L172_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000005467_GENTA_5_100_ML_L172_UPD_ChPL.pdf",
+      "sha256": "547e4b3fed054d8767ba95e960d99f9a3ae672d5ce8b4719ddad1a626d361b1f",
+      "bytes": 151831
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000006512_VETOFLOK_5_a_100_ml_16023906_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000006512_VETOFLOK_5_a_100_ml_16023906_UPD_ChPL.pdf",
+      "sha256": "ba774bda96f5d674d3393efb6763eafd941182a4b597ed25d3f4f3cf6f340c3b",
+      "bytes": 173923
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000010371_EGOCIN_LA_INJ_A_100_ML_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000010371_EGOCIN_LA_INJ_A_100_ML_UPD_ChPL.pdf",
+      "sha256": "56a7fa58e2d215577f00cfae6a4030f26ebf4e6c5ee1390634905a7ed2975d7d",
+      "bytes": 140840
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000014176_IDO_GENABIL_A_100_ML_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000014176_IDO_GENABIL_A_100_ML_UPD_ChPL.pdf",
+      "sha256": "c2902778b633943ca37162f6c323dc6b4ce0314d9b22d95e254c88ca3dc5d19a",
+      "bytes": 236390
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000014384_GEOMYCIN_F_A_10_CZOP_489104B_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000014384_GEOMYCIN_F_A_10_CZOP_489104B_UPD_ChPL.pdf",
+      "sha256": "b0a2895c7a256a6e292932d3364de497f6502c66945bc3d429db9a2dcf66da0d",
+      "bytes": 154774
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000027525_SIMIVET_RETARD_INJ_100_ML_6214-55_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000027525_SIMIVET_RETARD_INJ_100_ML_6214-55_UPD_ChPL.pdf",
+      "sha256": "7bcb949ce0b64b97366bd2d3d12590a6b5fdc1165a2b2b2525261d903a07d61b",
+      "bytes": 243956
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000027610_SUSTREPEN_N_INJ_100_ML_043PL_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000027610_SUSTREPEN_N_INJ_100_ML_043PL_UPD_ChPL.pdf",
+      "sha256": "f3be8a9e2e30d10d250c404d7b6b7e0cc9e2f866905611120369b101006b9c5f",
+      "bytes": 153783
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000041556_SYSTAMEX_A_500_ML_0811080_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000041556_SYSTAMEX_A_500_ML_0811080_UPD_ChPL.pdf",
+      "sha256": "ce988ae15c2ecb00ecfb3b51f9afce227194980446035e2003bd65a8531a6d65",
+      "bytes": 36108
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000041572_CLOXA_COLI_200_ML_2B8R_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000041572_CLOXA_COLI_200_ML_2B8R_UPD_ChPL.pdf",
+      "sha256": "15b2f9a2d80430cf274938c798d4e522242880896f8aade1ac4b5f53d8ad18e9",
+      "bytes": 135163
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000054697_TELMIN-TRICH_40_G_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000054697_TELMIN-TRICH_40_G_UPD_ChPL.pdf",
+      "sha256": "9851f7065204061ea81d1cf661908e1ddd8c49055a6f555d10e0ba1635fa1219",
+      "bytes": 205685
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000056031_STREPTO_25_100_ML4134-601_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000056031_STREPTO_25_100_ML4134-601_UPD_ChPL.pdf",
+      "sha256": "308b74cfa9a5a1daf242a2b6fec7868c5e1afd10bf6340d577c5340b6b19e89e",
+      "bytes": 1356179
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000056380_COLISTIMED_4800_A_1KG_14D11-051_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000056380_COLISTIMED_4800_A_1KG_14D11-051_UPD_ChPL.pdf",
+      "sha256": "cacdf017e224e53b6f45161a36f27148dbf16dca862bb6a12b73642cac4bbc72",
+      "bytes": 1463180
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000058891_CIPERPULVIZOO_1_L_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000058891_CIPERPULVIZOO_1_L_UPD_ChPL.pdf",
+      "sha256": "42c1117db3f53d38824552aabd30e40721da55b704fe48c2ce52fcd0bdad0859",
+      "bytes": 189861
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000060227_COFFEINUM_NATR_BENZOICUM_A_50_ML_041006_UPD_ChPL.pdf",
+      "sha256": "76777ec4410bab102cc0b3db5738141742116a7c0ecec2dc5ed51aa194720f1a",
+      "bytes": 98069
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000061388_BUTOX_7_5_ZAWIESINA_250_ML_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000061388_BUTOX_7_5_ZAWIESINA_250_ML_UPD_ChPL.pdf",
+      "sha256": "27afa7379fd1ab8128388fd8f2f4fe05104cba25eb00d23feca6e0bf8c1d95ab",
+      "bytes": 423963
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000062589_KUBATOL_SPREY_190_G_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000062589_KUBATOL_SPREY_190_G_UPD_ChPL.pdf",
+      "sha256": "e273fa9dcd9b1264187a8c23134eb9c3fe3f7251531bd8ecd75fff0763f2639b",
+      "bytes": 103760
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000063192_BOVILIS_LACTOVAC_C_25_ml_5_dawek_T41325_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000063192_BOVILIS_LACTOVAC_C_25_ml_5_dawek_T41325_UPD_ChPL.pdf",
+      "sha256": "60e8d43ad2b0337d8a20346db8d4422f13d9d6db75a1df49d72f2f9b15d1029c",
+      "bytes": 245079
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000065270_SUIDAN_A_1_DAW_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000065270_SUIDAN_A_1_DAW_UPD_ChPL.pdf",
+      "sha256": "b199cf6c0b5d08e74884a620d03b43361ca0d662b396af3184c1466f00a22726",
+      "bytes": 92066
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000083548_STULLMISAN_100_G_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000083548_STULLMISAN_100_G_UPD_ChPL.pdf",
+      "sha256": "59c94130ec68c972b0420d020016c45e91a35d0a2702bc46680e01aac578e6cd",
+      "bytes": 83654
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000083962_DURAMUNE_PUPPYSHOT_8_A_1_D_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000083962_DURAMUNE_PUPPYSHOT_8_A_1_D_UPD_ChPL.pdf",
+      "sha256": "9134783d2e56db4a9a65e50e0e5a7219a697a5522fc846e16d4228e383629a93",
+      "bytes": 87586
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000085959_LINKOMYCIN_F_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000085959_LINKOMYCIN_F_UPD_ChPL.pdf",
+      "sha256": "0383ecf551303456101bf360907d00f691de381ba1f7b3ab890ed32772706de4",
+      "bytes": 101438
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000086366_TIAMUTIN_10_100_ML_09PH0823_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000086366_TIAMUTIN_10_100_ML_09PH0823_UPD_ChPL.pdf",
+      "sha256": "0c46a66be81fdaf44a6c8de5bdceb4357554737a46f77f071152b879eb8c690b",
+      "bytes": 118508
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000086367_TIAMUTIN_10_PREMIX_A_1_KG_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000086367_TIAMUTIN_10_PREMIX_A_1_KG_UPD_ChPL.pdf",
+      "sha256": "9c21767b0c48fd55a2a399c05628bc62ed700ceb5273513f9219516d47043e66",
+      "bytes": 108512
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000086401_TIAMUTIN_12_5_1000_ML_T560_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000086401_TIAMUTIN_12_5_1000_ML_T560_UPD_ChPL.pdf",
+      "sha256": "645ac474d9acaf0ea09be666736d837257597496867556e0bd6f162e5890c179",
+      "bytes": 132290
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000086433_FENYLBUTAZON-20_A_100_ML_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000086433_FENYLBUTAZON-20_A_100_ML_UPD_ChPL.pdf",
+      "sha256": "929171c9a6799b2ae62cada37256b92030bfae14e63c5d167ce4432243ce47be",
+      "bytes": 114380
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_600000992466_PROTEQFLU-TE_1_DAW_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_600000992466_PROTEQFLU-TE_1_DAW_UPD_ChPL.pdf",
+      "sha256": "a4a292c854536f17fe84e44dcc9decfa8716505de70eaeb622fc7b74336f8568",
+      "bytes": 205360
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_700000116591_TETRADUR_LA-300_A_100_ML_7371-94_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_700000116591_TETRADUR_LA-300_A_100_ML_7371-94_UPD_ChPL.pdf",
+      "sha256": "76cea6e3ed5cac8f4e96c424948d1680fd76cca5dc12b7f82aa798a8fc106d95",
+      "bytes": 115724
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_700000131431_MASTIGUARD_DC_X24_CEVA_RMF032A_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_700000131431_MASTIGUARD_DC_X24_CEVA_RMF032A_UPD_ChPL.pdf",
+      "sha256": "8e57134936fc5721881a4387d679f4ff903d099abd98924ece8d0614f9d14eee",
+      "bytes": 176005
+    },
+    {
+      "from": "data/ChPL/UPD/UPD_700000141165_VELACTIS1_12MG_ML_5_ML_105A4_UPD_ChPL.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/UPD_700000141165_VELACTIS1_12MG_ML_5_ML_105A4_UPD_ChPL.pdf",
+      "sha256": "02af2d4332621ad44da136829600c3d9f691fe03cd0cadfbe95a8fd39f3de1a7",
+      "bytes": 186639
+    },
+    {
+      "from": "data/ChPL/UPD/Ulotka-18990-2025-05-23-5814_W-2025-07-16.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/Ulotka-18990-2025-05-23-5814_W-2025-07-16.pdf",
+      "sha256": "056b0e9a0d7784e150f774474b22967d938a5cbb98c2d8600e1207dbf439e7cd",
+      "bytes": 220942
+    },
+    {
+      "from": "data/ChPL/UPD/Ulotka-22651-20171026000000-936_W-20171228000712.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/Ulotka-22651-20171026000000-936_W-20171228000712.pdf",
+      "sha256": "a799738ab04a6a4bcc0621cb84749524d140e568a9ff78476fd237f715407783",
+      "bytes": 212389
+    },
+    {
+      "from": "data/ChPL/UPD/Ulotka-44168-2020-10-23-2702_W-2021-04-14.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/Ulotka-44168-2020-10-23-2702_W-2021-04-14.pdf",
+      "sha256": "f80293961f56a801f162330048f4c5edaefed34eae67347152e9099749ce01f2",
+      "bytes": 440211
+    },
+    {
+      "from": "data/ChPL/UPD/anx_159755_pl.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/anx_159755_pl.pdf",
+      "sha256": "2c055c37adffee1c1f5b871cc04e5dc451d2666dd43ea9d5d5d458aaad95204a",
+      "bytes": 391564
+    },
+    {
+      "from": "data/ChPL/UPD/ema-combined-v2011-porciliscoliclos-vra0018g-2025-02-04-pl.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/ema-combined-v2011-porciliscoliclos-vra0018g-2025-02-04-pl.pdf",
+      "sha256": "ddd777490285a57eb841e385493f6d5f457adeb1945472857900fec8ea306431",
+      "bytes": 776926
+    },
+    {
+      "from": "data/ChPL/UPD/ema-combined-v2555-vectra3d-vra0000334831-2026-10-23-pl.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/ema-combined-v2555-vectra3d-vra0000334831-2026-10-23-pl.pdf",
+      "sha256": "e3f62b6189fc5c8c2d06187c6ca2fa33c196be9c3307722949d7566a749b853d",
+      "bytes": 346140
+    },
+    {
+      "from": "data/ChPL/UPD/product-600000058891.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/product-600000058891.pdf",
+      "sha256": "5c496c6000b693d27a701e1d7d6b31ed139ebbd4b631232552630e81f73f4e0f",
+      "bytes": 63033
+    },
+    {
+      "from": "data/ChPL/UPD/ulotka-19365-20190522000000-1794_w-20190606000623.pdf",
+      "to": "data/archiwum-nieuzywanych-pdf/partia52-2026-11-16/data/ChPL/UPD/ulotka-19365-20190522000000-1794_w-20190606000623.pdf",
+      "sha256": "a9a6f990351c64b4af0d7921066322225c8e7ac46587b6a92d107556b6d84a7e",
+      "bytes": 252401
+    }
+  ]
+}
