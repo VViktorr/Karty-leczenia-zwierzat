@@ -1,0 +1,98 @@
+{
+  "partia": 45,
+  "documents": [
+    {
+      "brand": "Melovem",
+      "path": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
+      "pages": 72,
+      "sha256": "88ff6e8cffed0d14e7ecb27d90b935b9fd2f70c309e7c5464023a8d50311ab55",
+      "result": "existing_reviewed"
+    }
+  ],
+  "links": [
+    {
+      "brand": "Melovem",
+      "id": 430,
+      "medicine": "Melovem 30 mg/ml",
+      "subiekt": "MELOVEM 30 MG/ML 50 ml  13H30-02F3",
+      "symbol": "000000000000001563",
+      "upd_id": "600000004346",
+      "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
+      "status": "linked"
+    },
+    {
+      "brand": "Melovem",
+      "id": 431,
+      "medicine": "Melovem 30 mg/ml",
+      "subiekt": "MELOVEM 30 MG/ML 50 ml  13H30-02F3",
+      "symbol": "000000000000001563",
+      "upd_id": "600000004346",
+      "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
+      "status": "linked"
+    },
+    {
+      "brand": "Melovem",
+      "id": 548,
+      "medicine": "Melovem 30 mg/ml",
+      "subiekt": "MELOVEM 30 MG/ML 50 ml  15G27-14F3",
+      "symbol": "000000000000001959",
+      "upd_id": "600000004346",
+      "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
+      "status": "linked"
+    },
+    {
+      "brand": "Melovem",
+      "id": 549,
+      "medicine": "Melovem 30 mg/ml",
+      "subiekt": "MELOVEM 30 MG/ML 50 ml  15G27-14F3",
+      "symbol": "000000000000001959",
+      "upd_id": "600000004346",
+      "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
+      "status": "linked"
+    },
+    {
+      "brand": "Melovem",
+      "id": 843,
+      "medicine": "Melovem 30 mg/ml",
+      "subiekt": "MELOVEM 30 MG/ML 100 ml 18e29-01c5",
+      "symbol": "000002444",
+      "upd_id": "600000004346",
+      "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
+      "status": "linked"
+    },
+    {
+      "brand": "Melovem",
+      "id": 844,
+      "medicine": "Melovem 30 mg/ml",
+      "subiekt": "MELOVEM 30 MG/ML 100 ml 18e29-01c5",
+      "symbol": "000002444",
+      "upd_id": "600000004346",
+      "pdf": "data/ChPL/UPD/ema-combined-v000152-melovem-vnra23478-2025-12-03-pl.pdf",
+      "status": "linked"
+    }
+  ],
+  "errors": [
+    {
+      "brand": "Previcox",
+      "url": "https://medicines.health.europa.eu/veterinary/pl/documents/download/bf3d5b46-3497-495b-b434-c1df7dc9cc13",
+      "error": "not a PDF or oversized"
+    },
+    {
+      "brand": "Porcilis ColiClos",
+      "url": "https://medicines.health.europa.eu/veterinary/pl/documents/download/bcb9b7aa-28ce-4488-8443-a1cf5edf67b2",
+      "error": "not a PDF or oversized"
+    },
+    {
+      "brand": "Vectra 3D",
+      "url": "https://medicines.health.europa.eu/veterinary/pl/documents/download/a14fb789-2104-4a15-8fa0-0bb8e73d6906",
+      "error": "not a PDF or oversized"
+    }
+  ],
+  "counts": {
+    "downloaded": 0,
+    "linked": 6,
+    "failures": 3
+  },
+  "clinical_unchanged": true,
+  "sqlite_sha256": "3b3b8fe00be169e2b6f0dcdacff47a9c8c1f3c40e0b28cd04f3926379b8c37dc"
+}
