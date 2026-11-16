@@ -1,0 +1,14 @@
+{
+  "partia": "48b",
+  "variant_id": 2727,
+  "medicine": "Vectra 3D",
+  "catalog_subiekt_name": "VECTRA 3D DLA PSÓW 1-4 kg 1 pipeta",
+  "catalog_weight_class": "1-4 kg",
+  "document_authorized_weight_class": "1.5-4 kg",
+  "warning": "Catalog label 1-4 kg may include 1-1.5 kg outside the authorized SPC; do not change dosing or label without reviewing primary Subiekt data.",
+  "pdf": "data/ChPL/UPD/ema-combined-v2555-vectra3d-vra0000334831-2026-10-23-pl (1).pdf",
+  "pdf_sha256": "e3f62b6189fc5c8c2d06187c6ca2fa33c196be9c3307722949d7566a749b853d",
+  "reactivated": true,
+  "protected_clinical_fields_unchanged": true,
+  "sqlite_sha256": "c65d7c6babded592d245b84550a522001c8a135cd4c71530c7bfe69f7122dfae"
+}
