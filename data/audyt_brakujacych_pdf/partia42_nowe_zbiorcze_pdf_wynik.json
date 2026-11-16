@@ -28,13 +28,9 @@
   },
   "statuses": {
     "manual_species_or_form_not_confirmed": 3,
-    "linked": 25
+    "existing_pdf_kept": 25
   },
-  "linked_by_brand": {
-    "v33": 15,
-    "v3991": 4,
-    "v50": 6
-  },
+  "linked_by_brand": {},
   "clinical_unchanged": true,
   "sqlite_sha256": "d88efeda2f297c6e1559aacceeb686b65f12dd902c8dc409611d7d174534924f",
   "decisions": [
@@ -64,7 +60,7 @@
       "symbol": "000000000000000703",
       "rpl": "100215855",
       "upd": "600000004044",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -72,7 +68,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 9,
       "form_species_hits": 6
     },
@@ -83,7 +79,7 @@
       "symbol": "000000000000000703",
       "rpl": "100215855",
       "upd": "600000004044",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -91,7 +87,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 9,
       "form_species_hits": 6
     },
@@ -102,7 +98,7 @@
       "symbol": "000000000000000703",
       "rpl": "100215855",
       "upd": "600000004044",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -110,7 +106,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 9,
       "form_species_hits": 6
     },
@@ -140,7 +136,7 @@
       "symbol": "000000000000001262",
       "rpl": "100215855",
       "upd": "600000004044",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -148,7 +144,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 9,
       "form_species_hits": 6
     },
@@ -159,7 +155,7 @@
       "symbol": "000000000000001262",
       "rpl": "100215855",
       "upd": "600000004044",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -167,7 +163,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 9,
       "form_species_hits": 6
     },
@@ -178,7 +174,7 @@
       "symbol": "000000000000001262",
       "rpl": "100215855",
       "upd": "600000004044",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -186,7 +182,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 9,
       "form_species_hits": 6
     },
@@ -216,7 +212,7 @@
       "symbol": "000000000000002241",
       "rpl": "100358477",
       "upd": "600000000136",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
       "strengths": [
         [
@@ -224,7 +220,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 13,
       "form_species_hits": 13
     },
@@ -235,7 +231,7 @@
       "symbol": "000000000000002242",
       "rpl": "100358477",
       "upd": "600000000135",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
       "strengths": [
         [
@@ -243,7 +239,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 11,
       "form_species_hits": 11
     },
@@ -254,7 +250,7 @@
       "symbol": "000000000000002243",
       "rpl": "100358483",
       "upd": "600000000362",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
       "strengths": [
         [
@@ -262,7 +258,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 15,
       "form_species_hits": 15
     },
@@ -273,7 +269,7 @@
       "symbol": "000000000000002244",
       "rpl": "100358490",
       "upd": "600000001548",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v3991-simparica-vnra18772-2025-02-17-pl.pdf",
       "strengths": [
         [
@@ -281,7 +277,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 17,
       "form_species_hits": 17
     },
@@ -292,7 +288,7 @@
       "symbol": "04620",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -300,7 +296,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -311,7 +307,7 @@
       "symbol": "04620",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -319,7 +315,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -330,7 +326,7 @@
       "symbol": "04620",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -338,7 +334,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -349,7 +345,7 @@
       "symbol": "04620(1)",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -357,7 +353,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -368,7 +364,7 @@
       "symbol": "04620(1)",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -376,7 +372,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -387,7 +383,7 @@
       "symbol": "04620(1)",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -395,7 +391,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -406,7 +402,7 @@
       "symbol": "05220",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -414,7 +410,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -425,7 +421,7 @@
       "symbol": "05220",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -433,7 +429,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -444,7 +440,7 @@
       "symbol": "05220",
       "rpl": "100215826",
       "upd": "600000001703",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v33-metacam-vra0153-2024-10-31-pl.pdf",
       "strengths": [
         [
@@ -452,7 +448,7 @@
           "mg/ml"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 62,
       "form_species_hits": 22
     },
@@ -463,7 +459,7 @@
       "symbol": "0000003365",
       "rpl": "100219020",
       "upd": "600000003546",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "strengths": [
         [
@@ -471,7 +467,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 29,
       "form_species_hits": 23
     },
@@ -482,7 +478,7 @@
       "symbol": "0000003363",
       "rpl": "100219037",
       "upd": "600000000863",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "strengths": [
         [
@@ -490,7 +486,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 33,
       "form_species_hits": 21
     },
@@ -501,7 +497,7 @@
       "symbol": "0000003366",
       "rpl": "100219043",
       "upd": "600000000698",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "strengths": [
         [
@@ -509,7 +505,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 33,
       "form_species_hits": 22
     },
@@ -520,7 +516,7 @@
       "symbol": "0000003364",
       "rpl": "100219050",
       "upd": "600000001400",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "strengths": [
         [
@@ -528,7 +524,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 42,
       "form_species_hits": 24
     },
@@ -539,7 +535,7 @@
       "symbol": "0000003361",
       "rpl": "100219066",
       "upd": "600000000562",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "strengths": [
         [
@@ -547,7 +543,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 45,
       "form_species_hits": 25
     },
@@ -558,7 +554,7 @@
       "symbol": "0000003362",
       "rpl": "100219072",
       "upd": "600000000563",
-      "old_pdf": null,
+      "old_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "new_pdf": "data/ChPL/UPD/ema-combined-v50-stronghold-vnra18893-2025-03-05-pl.pdf",
       "strengths": [
         [
@@ -566,7 +562,7 @@
           "mg"
         ]
       ],
-      "status": "linked",
+      "status": "existing_pdf_kept",
       "local_name_strength_hits": 48,
       "form_species_hits": 26
     }
