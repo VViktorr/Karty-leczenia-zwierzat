@@ -1,0 +1,45 @@
+name: "Partia 39 - audyt PDF i nazwy kartotek Subiekta"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-partia39-audit
+  cancel-in-progress: false
+jobs:
+  read-only-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: Full read-only SQLite integrity, PDF and original Subiekt product name audit
+        run: python scripts/partia39-audyt-subiekt-pdf.py
+      - name: Confirm database was not modified
+        run: |
+          git diff --exit-code -- src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+      - name: Save readable audit and complete CSV on winforms
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/audyt_brakujacych_pdf/partia39_braki_z_nazwami_subiekta.md data/audyt_brakujacych_pdf/partia39_podsumowanie.json
+          git add -f data/audyt_brakujacych_pdf/partia39_braki_z_nazwami_subiekta.csv data/audyt_brakujacych_pdf/partia39_wszystkie_warianty_kontrola.csv
+          if git diff --cached --quiet; then
+            echo "Audit already saved."
+            exit 0
+          fi
+          git commit -m 'data: partia39 pelny audyt PDF z nazwami Subiekta [skip ci]'
+          git push origin HEAD:winforms
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partia39-audyt-nazwy-subiekta
+          path: |
+            data/audyt_brakujacych_pdf/partia39_braki_z_nazwami_subiekta.md
+            data/audyt_brakujacych_pdf/partia39_braki_z_nazwami_subiekta.csv
+            data/audyt_brakujacych_pdf/partia39_wszystkie_warianty_kontrola.csv
+            data/audyt_brakujacych_pdf/partia39_podsumowanie.json
+          retention-days: 14
