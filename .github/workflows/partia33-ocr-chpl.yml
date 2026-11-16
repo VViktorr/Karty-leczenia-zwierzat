@@ -1,0 +1,42 @@
+name: "Partia 33 - OCR skanow i polskie ChPL"
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: medicine-catalog-partia33
+  cancel-in-progress: false
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: winforms
+          persist-credentials: true
+      - name: Install PDF and Polish OCR tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-pol
+          python -m pip install --disable-pip-version-check pymupdf
+      - name: Inspect scanned documents and confirm safe links
+        run: python scripts/partia33-ocr-chpl.py
+      - name: Commit only verified PDF references
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          if git diff --cached --quiet; then
+            echo "No confirmed PDF links. SQLite unchanged."
+            exit 0
+          fi
+          git commit -m 'fix: partia33 powiazania urzedowych polskich ChPL [skip ci]'
+          git push origin HEAD:winforms
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partia33-raport-ocr-chpl
+          path: partia33_raport/
+          retention-days: 14
