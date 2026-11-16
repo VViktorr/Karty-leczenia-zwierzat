@@ -31,7 +31,7 @@ for g in GROUPS:
  if g.get("strength"):assert re.search(r"(?<!\d)5\s*mg\s*/\s*ml",txt)
  # Clinical validity of combined SPC need not be inferred merely from filename.
  if "melovem" in g["brand"]:
-  assert "charakterystyka" in txt and "przeciwwskazania" in txt
+  assert (("charakterystyka" in txt and "przeciwwskazania" in txt) or ("summary of product characteristics" in txt and "contraindications" in txt)), "SPC title/sections missing"
 db=sqlite3.connect(DB)
 db.row_factory=sqlite3.Row
 db.execute("PRAGMA foreign_keys=ON")
