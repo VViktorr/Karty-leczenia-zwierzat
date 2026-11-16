@@ -12,7 +12,7 @@ internal sealed class PricePrintSettings
     // Zero means inherit the global size; positive values are points.
     public decimal[] FontSizes = new decimal[6];
     public int[] FontWeights = new int[6];
-    public decimal Size = 9, Margin = 7, RowHeight = 0, Padding = 0.5m;
+    public decimal Size = 10, Margin = 7, RowHeight = 0, Padding = 0.5m;
     public bool Landscape = true, Number = true, Batch = true, Price = true, Withdrawal = true, Legend = true;
     public int WithdrawalFormat = 1;
     public bool RouteCodes = true, LegendEveryPage;
@@ -55,7 +55,7 @@ internal sealed class PricePrintSettings
             // Previous size values were indices: 1=8, 2=9 ... 5=12.
             if (settings.FontSizes[i] == 0 && settings.Sizes[i] is >= 1 and <= 5)
                 settings.FontSizes[i] = 7 + settings.Sizes[i];
-            settings.FontSizes[i] = Math.Clamp(settings.FontSizes[i], 0, 48);
+            settings.FontSizes[i] = settings.FontSizes[i] == 0 ? 10 : Math.Clamp(settings.FontSizes[i], 6, 48);
             settings.FontWeights[i] = settings.FontWeights[i] == 0 ? 0 : NormalizeWeight(settings.FontWeights[i]);
         }
         return settings;
@@ -97,9 +97,13 @@ internal sealed class PricePrintEditor : Form
         Text = "Ustawienia wydruku cennika";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1120, 760);
-        MinimumSize = new Size(660, 480);
+        MinimumSize = new Size(760, 480);
         AutoScaleMode = AutoScaleMode.Dpi;
-        var options = new TabControl { Dock = DockStyle.Top, Height = 155, Padding = new Point(12, 4) };
+        var options = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Left, Width = 366, Padding = new Padding(8),
+            FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true
+        };
         var sample = new WebBrowser { Dock = DockStyle.Fill, AllowWebBrowserDrop = false, ScriptErrorsSuppressed = true };
         var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
         var paper = new Label { Dock = DockStyle.Top, Height = 24, Padding = new Padding(8, 3, 0, 0) };
@@ -107,10 +111,13 @@ internal sealed class PricePrintEditor : Form
 
         void Section(string title)
         {
-            var page = new TabPage(title);
-            section = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(5) };
-            page.Controls.Add(section);
-            options.TabPages.Add(page);
+            options.Controls.Add(new Label { Text = title, AutoSize = true, Margin = new Padding(3, 8, 3, 2) });
+            section = new FlowLayoutPanel
+            {
+                Width = 324, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                MinimumSize = new Size(324, 0), MaximumSize = new Size(324, 0)
+            };
+            options.Controls.Add(section);
         }
         void Field(string label, Control control)
         {
@@ -175,19 +182,19 @@ internal sealed class PricePrintEditor : Form
         Section("Treść i legenda");
         var format = Select("Treść karencji", ["Pełny zapis", "Zwięźle według wariantów", "Zwięźle według gatunków"], settings.WithdrawalFormat);
         format.Width = 185;
-        var routes = Select("Oznaczenie drogi podania", ["Nazwy (domięśniowo)", "Kody (IM)"], settings.RouteCodes ? 1 : 0);
-        section.SetFlowBreak(section.Controls[section.Controls.Count - 1], true);
+        var routes = Select("Drogi podania", ["Pełne nazwy", "Kody (IM)"], settings.RouteCodes ? 1 : 0);
+        var legend = Select("Legenda dróg podania", ["Ukryta", "Na początku", "Na każdej stronie"],
+            !settings.Legend ? 0 : settings.LegendEveryPage ? 2 : 1);
+        Section("Widoczne kolumny");
         var number = Toggle("Lp.", settings.Number);
         var batch = Toggle("Seria", settings.Batch);
         var price = Toggle("Cena", settings.Price);
         var withdrawal = Toggle("Karencja", settings.Withdrawal);
-        var legend = Toggle("Legenda", settings.Legend);
-        var repeatLegend = Toggle("Drogi podania na każdej stronie", settings.LegendEveryPage);
-        repeatLegend.Enabled = legend.Checked;
-        legend.CheckedChanged += (_, _) => repeatLegend.Enabled = legend.Checked;
         string[] headings = ["Lp.", "Nazwa leku", "Najnowsza seria", priceHeading, "Karencja"];
         Section("Tabela");
-        var target = Select("Edytuj", ["Nagłówki kolumn", .. headings], 0);
+        var target = Select("Element tabeli", ["Nagłówki kolumn", .. headings], 0);
+        target.Width = 210;
+        section.SetFlowBreak(section.Controls[section.Controls.Count - 1], true);
         var widths = new NumericUpDown[headings.Length];
         var typographyFields = new Control[headings.Length + 1][];
 
@@ -202,10 +209,10 @@ internal sealed class PricePrintEditor : Form
             int familyIndex = string.IsNullOrWhiteSpace(currentFont) ? 0
                 : Array.FindIndex(familyItems, name => string.Equals(name, currentFont, StringComparison.OrdinalIgnoreCase));
             int fontWeight = settings.FontWeights?.ElementAtOrDefault(i) ?? 0;
-            decimal points = settings.FontSizes?.ElementAtOrDefault(i) ?? 0;
+            decimal points = settings.FontSizes[i] == 0 ? 10 : settings.FontSizes[i];
             typography[i] = (
                 Select("Czcionka", familyItems, Math.Max(0, familyIndex)),
-                Measure("Rozmiar (pt; 0 = domyślny)", points, 0, 48, 1),
+                Measure("Rozmiar (pt)", points, 6, 48, 1),
                 Select("Grubość", weights, WeightIndex(fontWeight)),
                 Select("Wyrównanie", ["Do lewej", "Do środka", "Do prawej"], settings.Alignments.ElementAtOrDefault(i)));
             typography[i].Weight.Width = 155;
@@ -261,12 +268,12 @@ internal sealed class PricePrintEditor : Form
                 .route-legend {border: 0; padding: 0; height: auto}
                 </style></head><body><h2>Cennik leków</h2><p>{{DateTime.Today:dd.MM.yyyy}}</p>
                 """));
-            if (legend.Checked && !repeatLegend.Checked) html.Append(AdministrationRouteLegend.Html);
+            if (legend.SelectedIndex == 1) html.Append(AdministrationRouteLegend.Html);
             html.Append("<table><colgroup>");
             foreach (int i in columns)
                 html.Append(FormattableString.Invariant($"<col style='width:{100 * widths[i].Value / totalWidth:0.###}%'>"));
             html.Append("</colgroup><thead>");
-            if (legend.Checked && repeatLegend.Checked)
+            if (legend.SelectedIndex == 2)
                 html.Append($"<tr><td class='route-legend' colspan='{columns.Length}'>")
                     .Append(AdministrationRouteLegend.Html).Append("</td></tr>");
             html.Append("<tr>");
@@ -308,13 +315,13 @@ internal sealed class PricePrintEditor : Form
             refreshTimer.Stop();
             refreshTimer.Start();
         }
-        foreach (var box in new[] { font, weight, orientation, format, routes }
+        foreach (var box in new[] { font, weight, orientation, format, routes, legend }
             .Concat(typography.SelectMany(style => new[] { style.Font, style.Weight, style.Alignment })))
             box.SelectedIndexChanged += (_, _) => QueueSample();
         foreach (var box in new[] { size, margin, height, padding }
             .Concat(widths).Concat(typography.Select(style => style.Size)))
             box.ValueChanged += (_, _) => QueueSample();
-        foreach (var box in new[] { number, batch, price, withdrawal, legend, repeatLegend })
+        foreach (var box in new[] { number, batch, price, withdrawal })
             box.CheckedChanged += (_, _) => QueueSample();
         FormClosed += (_, _) => refreshTimer.Stop();
         Disposed += (_, _) => refreshTimer.Dispose();
@@ -334,9 +341,9 @@ internal sealed class PricePrintEditor : Form
             settings.Batch = batch.Checked;
             settings.Price = price.Checked;
             settings.Withdrawal = withdrawal.Checked;
-            settings.Legend = legend.Checked;
+            settings.Legend = legend.SelectedIndex != 0;
             settings.Widths = widths.Select(box => box.Value).ToArray();
-            settings.LegendEveryPage = repeatLegend.Checked;
+            settings.LegendEveryPage = legend.SelectedIndex == 2;
             settings.FontNames = typography.Select(style => style.Font.SelectedIndex == 0 ? "" : (string)style.Font.SelectedItem!).ToArray();
             settings.FontSizes = typography.Select(style => style.Size.Value).ToArray();
             settings.FontWeights = typography.Select(style => weightValues[style.Weight.SelectedIndex]).ToArray();
@@ -355,11 +362,11 @@ internal sealed class PricePrintEditor : Form
             DialogPlacement.Show(preview, this, "price-print-preview");
         };
         var close = new Button { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
-        var printNow = new Button { Text = "Drukuj", AutoSize = true };
-        printNow.Click += (_, _) => print.PerformClick();
-        actions.Controls.AddRange([print, printNow, close]);
-        Controls.Add(sample);
-        Controls.Add(paper);
+        actions.Controls.AddRange([print, close]);
+        var previewPanel = new Panel { Dock = DockStyle.Fill };
+        previewPanel.Controls.Add(sample);
+        previewPanel.Controls.Add(paper);
+        Controls.Add(previewPanel);
         Controls.Add(options);
         Controls.Add(actions);
         CancelButton = close;
