@@ -899,7 +899,7 @@ internal sealed class MainForm : Form
         var clinic = ClinicSettingsStore.Load();
         var fields = new Dictionary<string, string> { ["Dokument źródłowy"] = source.Number,
             ["Właściciel i adres"] = source.Payer, ["Zakres mapowania towarów"] = source.Scope,
-            ["Nazwa i adres zakładu leczniczego dla zwierząt"] = clinic.Name + "\n" + clinic.Address };
+            ["Lecznica i adres"] = clinic.CardText,\n            ["Lekarz i nr prawa wykonywania zawodu"] = clinic.Doctor };
         var rows = treatment.Rows.Cast<DataGridViewRow>().Select(item =>
         {
             var values = new Dictionary<string, string>(((TreatmentRow)item.Tag!).Values);
