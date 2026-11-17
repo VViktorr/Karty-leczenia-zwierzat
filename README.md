@@ -64,7 +64,7 @@ ISCC.exe /DReleaseVersion=1.0.0 installer\KartyLeczenia.WinForms.iss
 
 Plik `KartyLeczenia-Setup-win-x64-v1.0.0.exe` pojawi się w głównym
 katalogu repozytorium. Użyj tego samego pliku na serwerze i stanowiskach.
-Domyślny katalog programu to `C:\Program Files\KartyLeczenia.WinForms`.
+Domyślny katalog programu to `C:\Program Files\KartyLeczenia`.
 Instalator tworzy skróty w menu Start i na pulpicie dla wszystkich użytkowników.
 Brakujący WebView2 pobiera z Microsoftu. Kreator pokazuje pasek pobierania
 i osobny pasek aktywności podczas instalowania składników. Wybór instancji,

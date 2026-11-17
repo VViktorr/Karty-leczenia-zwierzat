@@ -6,7 +6,7 @@
 AppId=pl.kartyleczenia.winforms.sql
 AppName=KartyLeczenia
 AppVersion={#ReleaseVersion}
-DefaultDirName={autopf}\KartyLeczenia.WinForms
+DefaultDirName={autopf}\KartyLeczenia
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
