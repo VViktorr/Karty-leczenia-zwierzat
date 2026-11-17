@@ -951,6 +951,8 @@ internal sealed class MainForm : Form
         {
             Name = ReferenceColumn, HeaderText = ReferenceColumn, Width = 160
         });
+        Column(treatment, "Liczba leczonych zwierząt", "Liczba zwierząt", 115);
+        Column(treatment, "Rozpoznanie", "Rozpoznanie", 215);
         Column(treatment, "Opis zwierzęcia", AnimalDescriptionColumn, 240);
         treatment.Columns[AnimalDescriptionColumn]!.ToolTipText = "Wpisz numery leczonych zwierząt lub ich opis.";
         var hint = new ToolTip();
