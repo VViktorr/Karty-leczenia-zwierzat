@@ -26,6 +26,10 @@ internal sealed class MainForm : Form
     DocumentListKey? displayedDocuments;
     readonly DocumentService service = new();
     readonly ConnectionSettingsStore settings = new();
+    readonly ConnectionSettingsStore archiveSettings = new(Path.Combine(SharedArchive.LocalDataFolder, "archive-connection.json"));
+    SharedArchive? sharedArchive;
+    bool savingTreatment;
+    int descriptionEditVersion;
     readonly Dictionary<DocumentListKey, (DateTimeOffset LoadedAt, List<DocumentSuggestion> Rows, bool Truncated)> cache = new();
     ConnectionOptions? connection;
     CancellationTokenSource? searchWork;
@@ -199,6 +203,23 @@ internal sealed class MainForm : Form
     }
 
     ConnectionOptions Connection() => connection ?? throw new InvalidOperationException("Skonfiguruj połączenie z Subiektem w Ustawieniach.");
+
+    SharedArchive Archive() => sharedArchive
+        ?? throw new InvalidOperationException("Skonfiguruj połączenie z archiwum SQL w Ustawieniach.");
+
+    static async Task<T> RunArchive<T>(Func<T> operation)
+    {
+        try { return await Task.Run(operation); }
+        catch (Microsoft.Data.SqlClient.SqlException ex)
+        {
+            string message = ex.Number switch
+            {
+                207 or 208 or 229 or 50001 => "Sprawdź, czy przygotowano tabele archiwum i nadano rolę KartyLeczeniaOperator.",
+                _ => SubiektConnectionService.FriendlyError(ex)
+            };
+            throw new InvalidOperationException("Archiwum SQL. " + message, ex);
+        }
+    }
 
     void ConfigureDocuments()
     {
@@ -1070,8 +1091,9 @@ internal sealed class MainForm : Form
             e.Value = FormatWithdrawal(treatment.Rows[e.RowIndex], text);
             e.FormattingApplied = true;
         };
-        treatment.EditingControlShowing += (_, e) =>
+        treatment.EditingControlShowing += async (_, e) =>
         {
+            int version = ++descriptionEditVersion;
             if (e.Control is not TextBox editor) return;
             editor.AutoCompleteMode = AutoCompleteMode.None;
             editor.AutoCompleteSource = AutoCompleteSource.None;
@@ -1083,8 +1105,10 @@ internal sealed class MainForm : Form
 
             try
             {
-                var suggestions = AnimalDescriptionStore.Read(card);
-                if (suggestions.Length == 0) return;
+                var archive = Archive();
+                var suggestions = await RunArchive(() => archive.ReadDescriptions(card));
+                if (IsDisposed || version != descriptionEditVersion || currentCard != card || sharedArchive != archive
+                    || treatment.EditingControl != editor || suggestions.Length == 0) return;
                 var source = new AutoCompleteStringCollection();
                 source.AddRange(suggestions);
                 editor.AutoCompleteCustomSource = source;
@@ -1094,22 +1118,26 @@ internal sealed class MainForm : Form
             catch (Exception ex)
             {
                 CrashLog.Write("WinForms.AnimalDescription.Read", ex);
-                status.Text = "Nie udało się odczytać zapisanych opisów zwierząt.";
+                if (!IsDisposed && version == descriptionEditVersion) status.Text = ex.Message;
             }
         };
-        treatment.CellEndEdit += (_, e) =>
+        treatment.CellEndEdit += async (_, e) =>
         {
+            descriptionEditVersion++;
             if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != AnimalDescriptionColumn
                 || currentCard is not { PayerId: > 0 } card) return;
             string description = treatment.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString()?.Trim() ?? "";
             if (description.Length == 0) return;
 
-            try { AnimalDescriptionStore.Save(card, description); }
-            catch (Exception ex)
+            await Run(async () =>
             {
-                CrashLog.Write("WinForms.AnimalDescription.Save", ex);
-                status.Text = "Nie udało się zapamiętać opisu zwierzęcia dla klienta.";
-            }
+                var archive = Archive();
+                await RunArchive(() =>
+                {
+                    archive.SaveDescription(card, description);
+                    return true;
+                });
+            }, "Zapis opisu zwierzęcia");
         };
         routeMode.Items.AddRange(["Pełna droga podania", "Skróty dróg podania"]);
         routeMode.SelectedIndex = 1;
@@ -1263,14 +1291,27 @@ internal sealed class MainForm : Form
         return new Card(fields, rows);
     }
 
-    Task SaveTreatmentToArchive()
+    async Task SaveTreatmentToArchive()
     {
+        if (savingTreatment) return;
+        var archive = Archive();
         var card = CaptureTreatmentCard();
         var printCard = CaptureTreatmentCard(forPrint: true);
         _ = CardHtmlRenderer.Render(printCard);
-        SavedTreatmentCardStore.Save(currentArchiveId, currentCard!, treatmentDate.Value.Date, card, printCard);
-        status.Text = "Zapisano kartę w zakładce „Zapisane karty leczenia”.";
-        return Task.CompletedTask;
+        var id = currentArchiveId;
+        var source = currentCard!;
+        var date = treatmentDate.Value.Date;
+        savingTreatment = true;
+        try
+        {
+            await RunArchive(() =>
+            {
+                archive.SaveCard(id, source, date, card, printCard);
+                return true;
+            });
+            status.Text = "Zapisano kartę we wspólnym archiwum.";
+        }
+        finally { savingTreatment = false; }
     }
 
     void ConfigureSavedCards()
@@ -1282,22 +1323,37 @@ internal sealed class MainForm : Form
         var query = new TextBox { Width = 250, PlaceholderText = "Klient lub numer dokumentu" };
         var day = new DateTimePicker { Format = DateTimePickerFormat.Short, ShowCheckBox = true, Checked = false, Width = 125 };
 
-        Task RefreshCards()
+        int refreshVersion = 0;
+
+        async Task RefreshCards()
         {
-            grid.DataSource = SavedTreatmentCardStore.Find(query.Text.Trim(), day.Checked ? day.Value.Date : null);
-            status.Text = $"Zapisane karty: {grid.Rows.Count}";
-            return Task.CompletedTask;
+            int version = ++refreshVersion;
+            grid.DataSource = null;
+            var archive = Archive();
+            var text = query.Text.Trim();
+            DateTime? date = day.Checked ? day.Value.Date : null;
+            var rows = await RunArchive(() => archive.FindCards(text, date));
+            if (IsDisposed || version != refreshVersion || sharedArchive != archive) return;
+            grid.DataSource = rows;
+            status.Text = $"Zapisane karty: {rows.Count}";
         }
 
-        Task OpenSavedCard()
+        async Task OpenSavedCard()
         {
-            if (grid.CurrentRow?.DataBoundItem is SavedTreatmentCard row)
-                OpenCardPreview(SavedTreatmentCardStore.Read(row.Id, forPrint: true), row.PayerId, row.Scope);
-            return Task.CompletedTask;
+            if (grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
+            var archive = Archive();
+            var card = await RunArchive(() => archive.ReadCard(row.Id, forPrint: true));
+            if (!IsDisposed && sharedArchive == archive)
+                OpenCardPreview(card, row.PayerId, row.Scope);
         }
 
-        Task ExportSavedCard() => grid.CurrentRow?.DataBoundItem is SavedTreatmentCard row
-            ? ExportCard(SavedTreatmentCardStore.Read(row.Id, forPrint: false)) : Task.CompletedTask;
+        async Task ExportSavedCard()
+        {
+            if (grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
+            var archive = Archive();
+            var card = await RunArchive(() => archive.ReadCard(row.Id, forPrint: false));
+            if (!IsDisposed && sharedArchive == archive) await ExportCard(card);
+        }
 
         var page = Page("Zapisane karty leczenia", grid, query,
             new Label { Text = "Data leczenia", AutoSize = true }, day,
@@ -1427,7 +1483,70 @@ internal sealed class MainForm : Form
             connection = draft;
             await SelectKind(DocumentSearchKinds.Invoices);
         }));
-        Page("Ustawienia", form);
+        var archiveConfiguration = archiveSettings.Load();
+        var archiveOptions = archiveConfiguration.Options;
+        if (archiveOptions is not null && (archiveOptions.WindowsAuthentication || archiveOptions.Password.Length > 0))
+            sharedArchive = new SharedArchive(archiveOptions);
+
+        Add("Wspólne archiwum SQL", new Label { Text = SharedArchive.DatabaseName, AutoSize = true });
+        var archiveServer = Field("Serwer archiwum SQL", archiveOptions?.Server);
+        var archiveWindows = new CheckBox { Checked = archiveOptions?.WindowsAuthentication ?? true };
+        Add("Logowanie Windows do archiwum", archiveWindows);
+        var archiveUser = Field("Użytkownik SQL archiwum", archiveOptions?.UserName);
+        var archivePassword = Field("Hasło SQL archiwum", archiveOptions?.Password, true);
+        var archiveTrust = new CheckBox { Checked = archiveOptions?.TrustCertificate ?? false };
+        Add("Zaufaj certyfikatowi serwera archiwum", archiveTrust);
+        var archiveRemember = new CheckBox { Checked = archiveConfiguration.Remembered };
+        Add("Zapamiętaj hasło archiwum", archiveRemember);
+
+        bool configuringArchive = false;
+        var saveArchiveConnection = Action("Sprawdź i zapisz połączenie z archiwum", async () =>
+        {
+            if (configuringArchive) return;
+            var draft = new ConnectionOptions(archiveServer.Text.Trim(), SharedArchive.DatabaseName,
+                archiveWindows.Checked, archiveUser.Text, archivePassword.Text, archiveTrust.Checked);
+            bool rememberPassword = archiveRemember.Checked;
+            var archive = new SharedArchive(draft);
+            configuringArchive = true;
+            try
+            {
+                await RunArchive(() => { archive.Test(); return true; });
+                archiveSettings.Save(draft, rememberPassword);
+                sharedArchive = archive;
+                status.Text = "Połączenie z archiwum SQL zapisane.";
+            }
+            finally { configuringArchive = false; }
+        });
+
+        bool importing = false;
+        Add("", saveArchiveConnection);
+        Add("", Action("Importuj lokalne karty i opisy…", async () =>
+        {
+            if (importing || configuringArchive) return;
+            var archive = Archive();
+            using var folder = new FolderBrowserDialog
+            {
+                Description = "Wybierz folder z lokalnymi plikami SQLite kart i opisów zwierząt.",
+                UseDescriptionForTitle = true,
+                SelectedPath = SharedArchive.LocalDataFolder
+            };
+            if (folder.ShowDialog(this) != DialogResult.OK) return;
+            string source = folder.SelectedPath;
+            importing = true;
+            saveArchiveConnection.Enabled = false;
+            status.Text = "Importowanie kart i opisów do archiwum SQL…";
+            try
+            {
+                var result = await RunArchive(() => archive.ImportLocalData(source));
+                status.Text = $"Dodano kart: {result.Cards}. Dodano lub odświeżono opisów: {result.Descriptions}.";
+            }
+            finally
+            {
+                importing = false;
+                saveArchiveConnection.Enabled = true;
+            }
+        }));
+        Page("Ustawienia", form).AutoScroll = true;
 
         foreach (var grid in new[] { documents, prices, expiry, treatment })
         {
