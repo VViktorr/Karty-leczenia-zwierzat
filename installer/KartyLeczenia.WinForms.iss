@@ -61,8 +61,8 @@ begin
   try
     DownloadTemporaryFile(WebView2DownloadUrl, WebView2Bootstrapper, '', nil);
   except
-    Result := 'Nie udało się pobrać WebView2 Runtime. Sprawdź połączenie z internetem.' +
-      #13#10 + GetExceptionMessage;
+    Result := 'Nie udało się pobrać WebView2 Runtime. Sprawdź połączenie z internetem.' + #13#10 +
+      GetExceptionMessage;
     Exit;
   end;
 
