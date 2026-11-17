@@ -66,7 +66,9 @@ Plik `KartyLeczenia-WinForms-Setup-win-x64-v1.0.0.exe` pojawi się w głównym
 katalogu repozytorium. Użyj tego samego pliku na serwerze i stanowiskach.
 Domyślny katalog programu to `C:\Program Files\KartyLeczenia.WinForms`.
 Instalator tworzy skróty w menu Start i na pulpicie dla wszystkich użytkowników.
-Brakujący WebView2 pobiera z Microsoftu.
+Brakujący WebView2 pobiera z Microsoftu. Kreator pokazuje pasek pobierania
+i osobny pasek aktywności podczas instalowania składników. Wybór instancji,
+logowania i hasła odbywa się w oknach dialogowych.
 
 - **Serwer → Wybierz istniejącą instancję** — w oknie konfiguracji pokażą się
   lokalne instancje SQL Server z nazwą, wersją i stanem usługi. Wybierz
@@ -83,7 +85,7 @@ Brakujący WebView2 pobiera z Microsoftu.
   akceptacji licencji pobiera SQL Server 2022 Express, jeśli brakuje instancji `KLARCHIVE`. Przygotowuje osobną bazę `KartyLeczenia`,
   port TCP `51433` i regułę zapory dla lokalnej podsieci w profilach
   prywatnym i domenowym. Podczas pierwszej konfiguracji wpisz hasło dla
-  konta SQL `KartyLeczeniaOperator` w oknie konfiguracji. Zachowaj je do
+  konta SQL `KartyLeczeniaOperator` w oknie dialogowym. Zachowaj je do
   ustawienia połączenia na stanowiskach. Instalator wyświetli adres archiwum.
 - **Stanowisko zdalne** — wklej adres wskazany w instalacji serwerowej,
   np. `SERWER,51433`, `SERWER,1433` albo `SERWER\INSTANCJA`. Sama nazwa

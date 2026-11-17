@@ -46,6 +46,8 @@ const
   WebView2Bootstrapper = 'MicrosoftEdgeWebview2Setup.exe';
   WebView2DownloadUrl = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
   SqlLicenseUrl = 'https://www.microsoft.com/useterms';
+  SqlPackage = 'SQLEXPR_x64_ENU.exe';
+  SqlDownloadUrl = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLEXPR_x64_ENU.exe';
 
 var
   RolePage: TInputOptionWizardPage;
@@ -53,6 +55,7 @@ var
   AddressPage: TInputQueryWizardPage;
   ExistingServerAddress: String;
   DownloadPage: TDownloadWizardPage;
+  ComponentProgress: TOutputMarqueeProgressWizardPage;
 
 function NeedsWebView2: Boolean;
 var
@@ -109,6 +112,9 @@ begin
 
   DownloadPage := CreateDownloadPage('Pobieranie składników',
     'Instalator pobiera brakujące składniki Microsoft.', nil);
+  DownloadPage.ShowBaseNameInsteadOfUrl := True;
+  ComponentProgress := CreateOutputMarqueeProgressPage('Przygotowywanie składników',
+    'Zaczekaj, aż instalator zakończy konfigurację.');
 end;
 
 procedure RegisterPreviousData(PreviousDataKey: Integer);
@@ -190,11 +196,38 @@ begin
     ExpandConstant('{tmp}\Configure-SharedArchive.ps1') + '"';
 end;
 
+procedure DownloadComponent(const Url, FileName: String);
+begin
+  DownloadPage.Clear;
+  DownloadPage.Add(Url, FileName, '');
+  if not WizardSilent then DownloadPage.Show;
+  try
+    DownloadPage.Download;
+  finally
+    if not WizardSilent then DownloadPage.Hide;
+  end;
+end;
+
+function RunComponent(const Params, Stage: String; var ExitCode: Integer): Boolean;
+begin
+  if not WizardSilent then
+  begin
+    ComponentProgress.SetText(Stage, '');
+    ComponentProgress.Show;
+  end;
+  try
+    if not WizardSilent then ComponentProgress.Animate;
+    Result := Exec(PowerShellPath, HelperParams + Params, '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+  finally
+    if not WizardSilent then ComponentProgress.Hide;
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ExitCode, OpenResult: Integer;
   LicenseChoice: Integer;
-  Mode: String;
+  Mode, Stage: String;
   Report: AnsiString;
   ReportPath: String;
 begin
@@ -219,6 +252,12 @@ begin
         DeleteFile(ReportPath);
       end;
 
+      if (Mode = 'Server') and not IsX64OS then
+      begin
+        Result := 'Instancja KLARCHIVE wymaga Windows x64 na procesorze Intel lub AMD.';
+        Exit;
+      end;
+
       if (Mode = 'Server') and not RegValueExists(HKLM64, 'SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL', 'KLARCHIVE') then
       begin
         repeat
@@ -234,11 +273,15 @@ begin
           Result := 'Instalacja SQL Server wymaga akceptacji warunków Microsoft.';
           Exit;
         end;
+        DownloadComponent(SqlDownloadUrl, SqlPackage);
       end;
 
       ExtractTemporaryFile('Setup-SharedArchive.sql');
-      if not Exec(PowerShellPath, HelperParams + ' -Mode ' + Mode, '',
-        SW_SHOWNORMAL, ewWaitUntilTerminated, ExitCode) then
+      if Mode = 'Server' then
+        Stage := 'Instalowanie SQL Server Express i przygotowywanie archiwum…'
+      else
+        Stage := 'Sprawdzanie instancji SQL Server i przygotowywanie archiwum…';
+      if not RunComponent(' -Mode ' + Mode, Stage, ExitCode) then
       begin
         Result := 'Nie udało się uruchomić konfiguracji serwera: ' + SysErrorMessage(ExitCode);
         Exit;
@@ -278,17 +321,9 @@ begin
 
     if NeedsWebView2 then
     begin
-      DownloadPage.Clear;
-      DownloadPage.Add(WebView2DownloadUrl, WebView2Bootstrapper, '');
-      if not WizardSilent then DownloadPage.Show;
-      try
-        DownloadPage.Download;
-      finally
-        if not WizardSilent then DownloadPage.Hide;
-      end;
-      if not Exec(PowerShellPath, HelperParams + ' -Mode WebView2 -WebView2Package "' +
-        ExpandConstant('{tmp}\') + WebView2Bootstrapper + '"', '',
-        SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+      DownloadComponent(WebView2DownloadUrl, WebView2Bootstrapper);
+      if not RunComponent(' -Mode WebView2 -WebView2Package "' +
+        ExpandConstant('{tmp}\') + WebView2Bootstrapper + '"', 'Instalowanie WebView2 Runtime…', ExitCode) then
       begin
         Result := 'Nie udało się uruchomić instalatora WebView2 Runtime: ' + SysErrorMessage(ExitCode);
         Exit;

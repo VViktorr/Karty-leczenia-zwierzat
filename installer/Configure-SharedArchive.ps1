@@ -14,6 +14,83 @@ $marker = 'HKLM:\SOFTWARE\KartyLeczenia\SharedArchive'
 $instanceNames = 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL'
 $login = 'KartyLeczeniaOperator'
 
+function Show-ArchiveDialog {
+    param(
+        [string]$Title,
+        [string]$Message,
+        [string[]]$Choices,
+        [switch]$TextInput,
+        [switch]$Password,
+        [switch]$Notice
+    )
+
+    $dialog = New-Object System.Windows.Forms.Form
+    try {
+        $dialog.Text = $Title
+        $dialog.ClientSize = [System.Drawing.Size]::new(590, 166)
+        $dialog.StartPosition = 'CenterScreen'
+        $dialog.FormBorderStyle = 'FixedDialog'
+        $dialog.MinimizeBox = $false
+        $dialog.MaximizeBox = $false
+        $dialog.TopMost = $true
+        $dialog.AutoScaleMode = 'Dpi'
+        $dialog.Font = [System.Drawing.SystemFonts]::MessageBoxFont
+
+        $description = New-Object System.Windows.Forms.Label
+        $description.SetBounds(16, 16, 558, 66)
+        $description.Text = $Message
+        $dialog.Controls.Add($description)
+
+        $field = $null
+        if ($Choices) {
+            $field = New-Object System.Windows.Forms.ComboBox
+            $field.DropDownStyle = 'DropDownList'
+            $field.Items.AddRange([object[]]$Choices)
+            $field.SelectedIndex = 0
+        } elseif ($TextInput -or $Password) {
+            $field = New-Object System.Windows.Forms.TextBox
+            $field.UseSystemPasswordChar = $Password.IsPresent
+            if ($Password) { $field.MaxLength = 128 }
+        }
+        if ($field) {
+            $field.SetBounds(16, 87, 558, 28)
+            $field.AccessibleName = $Title
+            $dialog.Controls.Add($field)
+            $dialog.ActiveControl = $field
+        }
+
+        $ok = New-Object System.Windows.Forms.Button
+        $ok.SetBounds(386, 125, 90, 28)
+        $ok.Text = 'OK'
+        $ok.DialogResult = 'OK'
+        $dialog.Controls.Add($ok)
+        $dialog.AcceptButton = $ok
+        if (!$Notice) {
+            $cancel = New-Object System.Windows.Forms.Button
+            $cancel.SetBounds(484, 125, 90, 28)
+            $cancel.Text = 'Anuluj'
+            $cancel.DialogResult = 'Cancel'
+            $dialog.Controls.Add($cancel)
+            $dialog.CancelButton = $cancel
+        }
+
+        if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+            if (!$Notice) { exit 2 }
+            return
+        }
+        if ($Choices) { return $field.SelectedIndex }
+        if ($Password) {
+            $secret = New-Object Security.SecureString
+            foreach ($character in $field.Text.ToCharArray()) { $secret.AppendChar($character) }
+            $field.Clear()
+            $secret.MakeReadOnly()
+            return $secret
+        }
+        if ($TextInput) { return $field.Text }
+    }
+    finally { $dialog.Dispose() }
+}
+
 function Assert-MicrosoftSignature([string]$Path) {
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
     if ($signature.Status -ne 'Valid' -or
@@ -46,17 +123,15 @@ function Install-ArchiveEngine {
     $media = Join-Path $PSScriptRoot 'SQLEXPR_x64_ENU.exe'
     $destination = Join-Path $PSScriptRoot 'SQLExpress'
     $serverAdmin = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    Write-Host 'Pobieranie SQL Server 2022 Express z serwera Microsoft…'
-    $ProgressPreference = 'SilentlyContinue'
-    Invoke-WebRequest -UseBasicParsing -Uri 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLEXPR_x64_ENU.exe' -OutFile $media
+    if (!(Test-Path -LiteralPath $media)) { throw 'Brakuje pobranego pakietu SQL Server Express.' }
     Assert-MicrosoftSignature $media
-    $extract = Start-Process -FilePath $media -ArgumentList "/q /x:`"$destination`"" -Wait -PassThru
+    $extract = Start-Process -FilePath $media -ArgumentList "/q /x:`"$destination`"" -Wait -PassThru -WindowStyle Hidden
     $setup = Join-Path $destination 'setup.exe'
     if ($extract.ExitCode -ne 0 -or !(Test-Path -LiteralPath $setup)) {
         throw "Nie udało się rozpakować SQL Server Express. Kod $($extract.ExitCode)."
     }
     Assert-MicrosoftSignature $setup
-    $arguments = "/QS /ACTION=Install /FEATURES=SQLENGINE /INSTANCENAME=$instance " +
+    $arguments = "/Q /ACTION=Install /FEATURES=SQLENGINE /INSTANCENAME=$instance " +
         "/IACCEPTSQLSERVERLICENSETERMS /SQLSYSADMINACCOUNTS=`"$serverAdmin`" /SQLSVCSTARTUPTYPE=Automatic " +
         '/TCPENABLED=0 /NPENABLED=0 /UpdateEnabled=True'
     # Record that this installer attempted to create the instance so it can resume after a restart.
@@ -82,7 +157,8 @@ function Set-RegistryString([string]$Path, [string]$Name, [string]$Value) {
 }
 
 function Initialize-ArchiveSqlLogin {
-    $secret = Read-Host "Ustaw hasło konta SQL $login (14–128 znaków, wielkie i małe litery, cyfra i znak specjalny)" -AsSecureString
+    $secret = Show-ArchiveDialog -Title 'Hasło operatora archiwum' -Password -Message (
+        "Ustaw hasło konta SQL $login. Użyj od 14 do 128 znaków, z wielką i małą literą, cyfrą i znakiem specjalnym.")
     $buffer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
     try {
         $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($buffer)
@@ -124,30 +200,23 @@ function Initialize-ExistingArchive {
     )
     if (!$instances.Count) { throw 'Nie znaleziono zainstalowanych instancji SQL Server.' }
 
-    Write-Host 'Instancje SQL Server na tym komputerze'
-    for ($i = 0; $i -lt $instances.Count; $i++) {
-        $item = $instances[$i]
+    $choices = foreach ($item in $instances) {
         $state = switch ("$($item.State)") {
             'Running' { 'uruchomiona' }
             'Stopped' { 'zatrzymana' }
             '' { 'brak usługi' }
             default { $item.State }
         }
-        Write-Host "[$($i + 1)] $($item.Name) | wersja $($item.Version) | $state"
+        "$($item.Name) | wersja $($item.Version) | $state"
     }
-    $choice = 0
-    $answer = Read-Host 'Podaj numer instancji lub 0, aby wrócić'
-    if (![int]::TryParse($answer, [ref]$choice) -or $choice -lt 0 -or $choice -gt $instances.Count) {
-        throw 'Wybierz numer z listy.'
-    }
-    if ($choice -eq 0) { exit 2 }
-    $selected = $instances[$choice - 1]
+    $selection = Show-ArchiveDialog -Title 'Instancje SQL Server' -Choices $choices -Message (
+        'Wybierz uruchomioną instancję SQL. Baza archiwum zostanie przygotowana po potwierdzeniu.')
+    $selected = $instances[$selection]
     if ($selected.State -ne 'Running') {
         throw 'Wybrana instancja nie działa. Uruchom ją i ponów instalację.'
     }
     $script:instance = $selected.Name
     $productVersion = Invoke-LocalSql 'master' "SELECT CONVERT(nvarchar(128), SERVERPROPERTY('ProductVersion'));"
-    Write-Host "Połączono z instancją $instance, wersja $productVersion."
     $admin = Invoke-LocalSql 'master' "SELECT IS_SRVROLEMEMBER(N'sysadmin');"
     if ($admin -ne 1) {
         throw 'Uruchom instalator z konta Windows mającego uprawnienia sysadmin na wybranej instancji.'
@@ -216,9 +285,9 @@ ELSE SELECT 2;
     $windowsOnly = (Invoke-LocalSql 'master' "SELECT CONVERT(int, SERVERPROPERTY('IsIntegratedSecurityOnly'));") -eq 1
     $useWindows = $windowsOnly
     if (!$windowsOnly) {
-        $method = Read-Host 'Dostęp do archiwum: [S] konto SQL lub [W] konto albo grupa Windows'
-        if ($method -notin 'S', 'W') { throw 'Wybierz S albo W.' }
-        $useWindows = $method -eq 'W'
+        $method = Show-ArchiveDialog -Title 'Logowanie do archiwum' -Message 'Wybierz sposób logowania na stanowiskach.' -Choices @(
+            'Login i hasło SQL', 'Konto lub grupa Windows')
+        $useWindows = $method -eq 1
     }
 
     $tcpPort = Invoke-LocalSql 'master' @'
@@ -235,13 +304,14 @@ WHERE type_desc = N'TSQL' AND state_desc = N'ONLINE' AND port > 0
         "$env:COMPUTERNAME\$instance"
     }
     if (!$tcpPort -or $tcpPort -is [DBNull]) {
-        Write-Host 'Instancja nie nasłuchuje na porcie TCP dla sieci. Administrator musi przygotować dostęp ze stanowisk.' -ForegroundColor Yellow
+        Show-ArchiveDialog -Title 'Dostęp sieciowy do SQL' -Notice -Message (
+            'Instancja nie nasłuchuje na porcie TCP w sieci. Administrator musi skonfigurować dostęp dla stanowisk.')
     }
 
     $account = $login
     if ($useWindows) {
-        if ($windowsOnly) { Write-Host 'Instancja obsługuje tylko uwierzytelnianie Windows.' }
-        $account = (Read-Host 'Wpisz konto lub grupę Windows uprawnioną do archiwum (DOMENA\nazwa)').Trim()
+        $account = (Show-ArchiveDialog -Title 'Konto lub grupa Windows' -TextInput -Message (
+            'Wpisz konto lub grupę Windows w formacie DOMENA\nazwa. Użyj konta dostępnego na stanowiskach.')).Trim()
         if (!$account -or $account.Length -gt 128 -or $account -notmatch '^[^\\]+\\[^\\]+$') {
             throw 'Podaj nazwę konta lub grupy w formacie DOMENA\nazwa.'
         }
@@ -252,9 +322,8 @@ WHERE type_desc = N'TSQL' AND state_desc = N'ONLINE' AND port > 0
         catch { throw 'Windows nie rozpoznaje wybranego konta lub grupy.' }
     }
 
-    if ((Read-Host "Utworzyć lub skonfigurować bazę KartyLeczenia na instancji $instance dla konta $account? [T/N]") -ne 'T') {
-        exit 2
-    }
+    Show-ArchiveDialog -Title 'Potwierdź konfigurację bazy' -Message (
+        "Utworzyć lub skonfigurować bazę KartyLeczenia na instancji $instance ($productVersion) dla konta $account?")
     Invoke-LocalSql 'master' "IF DB_ID(N'KartyLeczenia') IS NULL EXEC(N'CREATE DATABASE [KartyLeczenia]');" | Out-Null
     $schema = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Setup-SharedArchive.sql') -Raw -Encoding UTF8
     Invoke-LocalSql 'KartyLeczenia' $schema | Out-Null
@@ -290,8 +359,9 @@ WHERE u.name = N'$login' AND r.name = N'KartyLeczeniaOperator'
         }
     }
     Set-Content -LiteralPath (Join-Path $PSScriptRoot 'archive-server-result.txt') -Value $address -Encoding ASCII
-    Write-Host "Adres dla stanowisk: $address. Tryb logowania: $(if ($useWindows) { 'Windows' } else { 'SQL' })."
-    Read-Host 'Naciśnij Enter, aby kontynuować' | Out-Null
+    $methodName = if ($useWindows) { 'Windows' } else { 'SQL' }
+    Show-ArchiveDialog -Title 'Archiwum skonfigurowane' -Notice -Message (
+        "Adres dla stanowisk: $address. Tryb logowania: $methodName.")
 }
 
 function Initialize-Archive {
@@ -326,7 +396,6 @@ function Initialize-Archive {
     if ($restart) { Restart-Service -Name $serviceName }
     else { Start-Service -Name $serviceName }
 
-    Write-Host 'Przygotowywanie bazy i uprawnień…'
     for ($attempt = 1; $attempt -le 12; $attempt++) {
         try {
             Invoke-LocalSql 'master' 'SELECT 1;' | Out-Null
@@ -362,7 +431,6 @@ IF IS_ROLEMEMBER(N'KartyLeczeniaOperator', N'$login') <> 1
             -Direction Inbound -Action Allow -Protocol TCP -LocalPort $port -RemoteAddress LocalSubnet `
             -Profile Domain,Private -Service $serviceName | Out-Null
     }
-    Write-Host "Adres dla stanowisk zdalnych: $env:COMPUTERNAME,$port"
 }
 
 try {
@@ -380,11 +448,20 @@ try {
         $result = Start-Process -FilePath $WebView2Package -ArgumentList '/silent /install' -Wait -PassThru
         exit $result.ExitCode
     }
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    [System.Windows.Forms.Application]::EnableVisualStyles()
     if ($Mode -eq 'Existing') { Initialize-ExistingArchive }
     else { Initialize-Archive }
 }
 catch {
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    if ($Mode -ne 'WebView2') { Read-Host 'Naciśnij Enter, aby wrócić do instalatora' | Out-Null }
+    if ($Mode -ne 'WebView2') {
+        $detail = $_.Exception.Message
+        try {
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            Show-ArchiveDialog -Title 'Błąd konfiguracji SQL' -Message $detail -Notice
+        } catch { }
+    }
     exit 1
 }
