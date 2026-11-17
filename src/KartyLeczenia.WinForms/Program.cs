@@ -13,7 +13,7 @@ internal static class Program
             {
                 CrashLog.Write("WinForms.ThreadException", e.Exception);
                 MessageBox.Show($"Wystąpił błąd. Szczegóły zapisano w folderze:\n{CrashLog.Folder}",
-                    "Karty leczenia zwierząt", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    "KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
             ApplicationConfiguration.Initialize();
             Application.Run(new MainForm());
@@ -23,7 +23,7 @@ internal static class Program
         {
             CrashLog.Write("WinForms.Application.Fatal", ex);
             MessageBox.Show($"Program został zakończony. Szczegóły zapisano w folderze:\n{CrashLog.Folder}",
-                "Karty leczenia zwierząt", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                "KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

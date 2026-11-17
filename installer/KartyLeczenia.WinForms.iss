@@ -4,7 +4,7 @@
 
 [Setup]
 AppId=pl.kartyleczenia.winforms.sql
-AppName=Karty leczenia zwierząt
+AppName=KartyLeczenia
 AppVersion={#ReleaseVersion}
 DefaultDirName={autopf}\KartyLeczenia.WinForms
 PrivilegesRequired=admin
@@ -13,7 +13,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\KartyLeczenia.WinForms.exe
 SetupIconFile=..\src\KartyLeczenia\Resources\AppIcon\app-icon.ico
 OutputDir=..
-OutputBaseFilename=KartyLeczenia-WinForms-Setup-win-x64-v{#ReleaseVersion}
+OutputBaseFilename=KartyLeczenia-Setup-win-x64-v{#ReleaseVersion}
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=yes
@@ -32,12 +32,16 @@ Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Server"; S
 [UninstallDelete]
 Type: files; Name: "{app}\archive-installation.ini"
 
+[InstallDelete]
+Type: files; Name: "{commonprograms}\Karty leczenia zwierząt (SQL).lnk"
+Type: files; Name: "{commondesktop}\Karty leczenia zwierząt (SQL).lnk"
+
 [Icons]
-Name: "{commonprograms}\Karty leczenia zwierząt (SQL)"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
-Name: "{commondesktop}\Karty leczenia zwierząt (SQL)"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
+Name: "{commonprograms}\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
+Name: "{commondesktop}\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
 
 [Run]
-Filename: "{app}\KartyLeczenia.WinForms.exe"; Description: "Uruchom Karty leczenia zwierząt"; Flags: nowait postinstall skipifsilent runasoriginaluser
+Filename: "{app}\KartyLeczenia.WinForms.exe"; Description: "Uruchom KartyLeczenia"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [Code]
 const

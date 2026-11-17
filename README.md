@@ -1,4 +1,4 @@
-# Karty leczenia zwierząt
+# KartyLeczenia
 
 Aplikacja dla Windows rozwijana w **Windows Forms (WinForms)**, w C# na .NET 10, z odczytem danych z Subiekta GT i lokalnym katalogiem leków SQLite.
 
@@ -62,7 +62,7 @@ dotnet publish src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Relea
 ISCC.exe /DReleaseVersion=1.0.0 installer\KartyLeczenia.WinForms.iss
 ```
 
-Plik `KartyLeczenia-WinForms-Setup-win-x64-v1.0.0.exe` pojawi się w głównym
+Plik `KartyLeczenia-Setup-win-x64-v1.0.0.exe` pojawi się w głównym
 katalogu repozytorium. Użyj tego samego pliku na serwerze i stanowiskach.
 Domyślny katalog programu to `C:\Program Files\KartyLeczenia.WinForms`.
 Instalator tworzy skróty w menu Start i na pulpicie dla wszystkich użytkowników.
@@ -100,5 +100,5 @@ logowania i hasła odbywa się w oknach dialogowych.
 Ponowna instalacja zachowuje bazę i hasło istniejącego operatora. Odinstalowanie
 programu pozostawia instancję SQL i archiwum. W razie aktualizacji z lokalnej
 wersji użyj importu w ustawieniach. Poprzednia aplikacja instalowana w
-`%LOCALAPPDATA%` może pozostać obok nowej. Skróty nowej aplikacji mają dopisek
-**(SQL)**.
+`%LOCALAPPDATA%` może pozostać obok nowej. Skróty nowej aplikacji mają nazwę
+**KartyLeczenia**.

@@ -42,7 +42,7 @@ internal sealed class MainForm : Form
 
     internal MainForm()
     {
-        Text = "Karty leczenia zwierząt";
+        Text = "KartyLeczenia";
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(850, 550);
         Size = new Size(1350, 830);
