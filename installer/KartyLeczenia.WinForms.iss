@@ -21,6 +21,9 @@ CloseApplications=yes
 [Languages]
 Name: "polish"; MessagesFile: "compiler:Languages\Polish.isl"
 
+[Tasks]
+Name: "desktopicon"; Description: "Utwórz skrót na pulpicie"; Flags: unchecked
+
 [Files]
 Source: "Configure-SharedArchive.ps1"; Flags: dontcopy
 Source: "..\scripts\Setup-SharedArchive.sql"; Flags: dontcopy
@@ -36,9 +39,12 @@ Type: files; Name: "{app}\archive-installation.ini"
 Type: files; Name: "{commonprograms}\Karty leczenia zwierząt (SQL).lnk"
 Type: files; Name: "{commondesktop}\Karty leczenia zwierząt (SQL).lnk"
 
+Type: files; Name: "{commonprograms}\KartyLeczenia.lnk"
+Type: files; Name: "{commondesktop}\KartyLeczenia.lnk"; Tasks: not desktopicon
+
 [Icons]
-Name: "{commonprograms}\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
-Name: "{commondesktop}\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
+Name: "{commonprograms}\KartyLeczenia\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
+Name: "{commondesktop}\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\KartyLeczenia.WinForms.exe"; Description: "Uruchom KartyLeczenia"; Flags: nowait postinstall skipifsilent runasoriginaluser
