@@ -1417,112 +1417,161 @@ internal sealed class MainForm : Form
 
     void ConfigureConnection()
     {
-        var saved = settings.Load().Options;
-        if (saved is { WarehouseId: not null } && (saved.WindowsAuthentication || saved.Password.Length > 0)) connection = saved;
-        var form = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Padding = new Padding(12) };
+        var subiektConfiguration = settings.Load();
+        var saved = subiektConfiguration.Options;
+        if (saved is { WarehouseId: not null } && (saved.WindowsAuthentication || saved.Password.Length > 0))
+            connection = saved;
+
+        var sections = new TabControl { Dock = DockStyle.Fill };
+        TableLayoutPanel Section(string title)
+        {
+            var page = new TabPage(title) { AutoScroll = true };
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 2, Padding = new Padding(16)
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            page.Controls.Add(layout);
+            sections.TabPages.Add(page);
+            return layout;
+        }
+
+        var form = Section("Archiwum SQL");
         void Add(string title, Control input)
         {
             int row = form.RowCount++;
-            form.Controls.Add(new Label { Text = title, AutoSize = true, Anchor = AnchorStyles.Left }, 0, row);
+            if (title.Length > 0)
+                form.Controls.Add(new Label { Text = title, AutoSize = true, Anchor = AnchorStyles.Left }, 0, row);
             form.Controls.Add(input, 1, row);
         }
-        TextBox Field(string name, string? value, bool password = false)
+
+        Label Message(TableLayoutPanel section, string message, bool multiline = false)
         {
-            var box = new TextBox { Width = 350, Text = value ?? "", UseSystemPasswordChar = password };
+            int row = section.RowCount++;
+            var label = new Label
+            {
+                Text = message, AutoSize = true, Margin = new Padding(3, 8, 3, 8),
+                MaximumSize = multiline ? new Size(620, 0) : Size.Empty
+            };
+            section.Controls.Add(label, 0, row);
+            section.SetColumnSpan(label, 2);
+            return label;
+        }
+
+        TextBox Field(string name, string? value, string hint = "", bool password = false)
+        {
+            var box = new TextBox
+            {
+                Width = 360, Text = value ?? "", PlaceholderText = hint, UseSystemPasswordChar = password,
+                AccessibleName = name
+            };
             Add(name, box);
             return box;
         }
-        var server = Field("Serwer SQL", saved?.Server);
-        var database = Field("Baza podmiotu", saved?.Database);
-        var windows = new CheckBox { Checked = saved?.WindowsAuthentication ?? true };
-        Add("Uwierzytelnianie Windows", windows);
-        var user = Field("Użytkownik SQL", saved?.UserName);
-        var password = Field("Hasło SQL", saved?.Password, true);
-        var group = Field("Grupa towarów", saved?.DrugGroup ?? "Leki");
-        var trust = new CheckBox { Checked = saved?.TrustCertificate ?? false };
-        Add("Zaufaj certyfikatowi serwera", trust);
-        var warehouses = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 350, DisplayMember = "Name" };
-        Add("Magazyn", warehouses);
-        var clinic = ClinicSettingsStore.Load();
-        var clinicName = Field("Nazwa lecznicy", clinic.Name);
-        var clinicAddress = Field("Adres lecznicy", clinic.Address);
-        var doctor = Field("Lekarz", clinic.Doctor);
-        Add("", Action("Zapisz dane lecznicy", () =>
+
+        CheckBox Option(string title, bool value)
         {
-            ClinicSettingsStore.Save(new(clinicName.Text, clinicAddress.Text, doctor.Text));
-            status.Text = "Zapisano dane lecznicy.";
-            return Task.CompletedTask;
-        }));
-        var remember = new CheckBox { Checked = settings.Load().Remembered };
-        Add("Zapamiętaj hasło", remember);
-        ConnectionOptions Draft() => new(server.Text, database.Text, windows.Checked, user.Text, password.Text, trust.Checked, group.Text);
-        Add("", Action("Sprawdź połączenie i pobierz magazyny", async () =>
+            var box = new CheckBox { Text = title, AutoSize = true, Checked = value, Anchor = AnchorStyles.Left };
+            Add("", box);
+            return box;
+        }
+
+        ComboBox Authentication(bool useWindows)
         {
-            using var work = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            var info = await new SubiektConnectionService().TestAsync(Draft(), work.Token);
-            warehouses.DataSource = info.Warehouses.ToList();
-            status.Text = "Połączono: " + info.Company;
-        }));
-        Add("", Action("Zapisz połączenie", async () =>
+            var selector = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList, Width = 230, AccessibleName = "Logowanie"
+            };
+            selector.Items.AddRange(["Login i hasło SQL", "Konto Windows"]);
+            selector.SelectedIndex = useWindows ? 1 : 0;
+            Add("Logowanie", selector);
+            return selector;
+        }
+
+        static void BindCredentials(ComboBox authentication, TextBox user, TextBox password, CheckBox remember)
         {
-            if (warehouses.SelectedItem is not MedicineWarehouse warehouse) throw new InvalidOperationException("Wybierz magazyn.");
-            var draft = Draft() with { WarehouseId = warehouse.Id };
-            using var work = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            var info = await new SubiektConnectionService().TestAsync(draft, work.Token);
-            if (!info.Warehouses.Any(item => item.Id == warehouse.Id)) throw new InvalidOperationException("Odśwież listę magazynów.");
-            settings.Save(draft, remember.Checked);
-            searchWork?.Cancel();
-            preloadWork?.Cancel();
-            cache.Clear();
-            displayedDocuments = null;
-            UpdateRefreshLabel();
-            documents.DataSource = prices.DataSource = expiry.DataSource = null;
-            selectedTreatmentVariants.Clear();
-            excludedTreatmentRows.Clear();
-            treatment.Rows.Clear();
-            currentCard = null;
-            connection = draft;
-            await SelectKind(DocumentSearchKinds.Invoices);
-        }));
+            void Refresh()
+            {
+                user.Enabled = password.Enabled = remember.Enabled = authentication.SelectedIndex == 0;
+            }
+            authentication.SelectedIndexChanged += (_, _) => Refresh();
+            Refresh();
+        }
+
+        static void Require(TextBox field, string message)
+        {
+            if (!string.IsNullOrWhiteSpace(field.Text)) return;
+            field.Focus();
+            throw new InvalidOperationException(message);
+        }
+
         var archiveConfiguration = archiveSettings.Load();
         var archiveOptions = archiveConfiguration.Options;
         if (archiveOptions is not null && (archiveOptions.WindowsAuthentication || archiveOptions.Password.Length > 0))
             sharedArchive = new SharedArchive(archiveOptions);
 
-        Add("Wspólne archiwum SQL", new Label { Text = SharedArchive.DatabaseName, AutoSize = true });
-        var archiveServer = Field("Serwer archiwum SQL", archiveOptions?.Server ?? installedArchiveServer);
-        var archiveWindows = new CheckBox { Checked = archiveOptions?.WindowsAuthentication ?? (installedArchiveServer.Length == 0) };
-        Add("Logowanie Windows do archiwum", archiveWindows);
-        var archiveUser = Field("Użytkownik SQL archiwum", archiveOptions?.UserName ??
-            (installedArchiveServer.Length > 0 ? "KartyLeczeniaOperator" : null));
-        var archivePassword = Field("Hasło SQL archiwum", archiveOptions?.Password, true);
-        var archiveTrust = new CheckBox { Checked = archiveOptions?.TrustCertificate ?? false };
-        Add("Zaufaj certyfikatowi serwera archiwum", archiveTrust);
-        var archiveRemember = new CheckBox { Checked = archiveConfiguration.Remembered };
-        Add("Zapamiętaj hasło archiwum", archiveRemember);
-
-        bool configuringArchive = false;
-        var saveArchiveConnection = Action("Sprawdź i zapisz połączenie z archiwum", async () =>
+        Message(form, installedArchiveServer.Length > 0
+            ? "Adres archiwum pochodzi z instalatora. Przy logowaniu SQL użyj hasła operatora ustawionego na serwerze."
+            : "Wpisz adres komputera z bazą KartyLeczenia oraz dane logowania do archiwum.", multiline: true);
+        var archiveServer = Field("Serwer archiwum", archiveOptions?.Server ?? installedArchiveServer, "np. SERWER,51433");
+        var archiveAuthentication = Authentication(archiveOptions?.WindowsAuthentication ?? false);
+        var archiveUser = Field("Login SQL", archiveOptions?.UserName ?? "KartyLeczeniaOperator");
+        var archivePassword = Field("Hasło SQL", archiveOptions?.Password, password: true);
+        var archiveRemember = Option("Zapamiętaj hasło na tym koncie Windows", archiveConfiguration.Remembered);
+        BindCredentials(archiveAuthentication, archiveUser, archivePassword, archiveRemember);
+        var archiveTrust = Option("Zaufaj certyfikatowi znanego serwera archiwum", archiveOptions?.TrustCertificate ?? false);
+        var archiveResult = Message(form, archiveConfiguration.Warning ?? (sharedArchive is null
+            ? "Stan: połączenie nie zostało skonfigurowane."
+            : "Stan: wczytano zapisane ustawienia."), multiline: true);
+        var archiveForm = form;
+        bool configuringArchive = false, importing = false;
+        Button? importButton = null;
+        var saveArchiveConnection = Action("Sprawdź i zapisz", async () =>
         {
-            if (configuringArchive) return;
-            var draft = new ConnectionOptions(archiveServer.Text.Trim(), SharedArchive.DatabaseName,
-                archiveWindows.Checked, archiveUser.Text, archivePassword.Text, archiveTrust.Checked);
-            bool rememberPassword = archiveRemember.Checked;
-            var archive = new SharedArchive(draft);
+            if (configuringArchive || importing) return;
             configuringArchive = true;
             try
             {
+                Require(archiveServer, "Wpisz adres serwera archiwum.");
+                bool windows = archiveAuthentication.SelectedIndex == 1;
+                if (!windows)
+                {
+                    Require(archiveUser, "Wpisz login SQL archiwum.");
+                    Require(archivePassword, "Wpisz hasło SQL operatora archiwum.");
+                }
+                var draft = new ConnectionOptions(archiveServer.Text.Trim(), SharedArchive.DatabaseName,
+                    windows, archiveUser.Text, archivePassword.Text, archiveTrust.Checked);
+                bool rememberPassword = !windows && archiveRemember.Checked;
+                var archive = new SharedArchive(draft);
+                archiveResult.Text = "Sprawdzanie połączenia z archiwum…";
+                archiveForm.Enabled = false;
                 await RunArchive(() => { archive.Test(); return true; });
                 archiveSettings.Save(draft, rememberPassword);
                 sharedArchive = archive;
-                status.Text = "Połączenie z archiwum SQL zapisane.";
+                importButton!.Enabled = true;
+                archiveResult.Text = status.Text = $"Połączono z archiwum na {draft.Server}. Ustawienia zapisane.";
             }
-            finally { configuringArchive = false; }
+            catch (Exception ex)
+            {
+                archiveResult.Text = ex.Message;
+                throw;
+            }
+            finally
+            {
+                archiveForm.Enabled = true;
+                configuringArchive = false;
+            }
         });
-
-        bool importing = false;
         Add("", saveArchiveConnection);
-        Add("", Action("Importuj lokalne karty i opisy…", async () =>
+        archivePassword.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode != Keys.Enter) return;
+            e.SuppressKeyPress = true;
+            saveArchiveConnection.PerformClick();
+        };
+        importButton = Action("Importuj lokalne karty i opisy…", async () =>
         {
             if (importing || configuringArchive) return;
             var archive = Archive();
@@ -1535,20 +1584,157 @@ internal sealed class MainForm : Form
             if (folder.ShowDialog(this) != DialogResult.OK) return;
             string source = folder.SelectedPath;
             importing = true;
-            saveArchiveConnection.Enabled = false;
-            status.Text = "Importowanie kart i opisów do archiwum SQL…";
+            archiveForm.Enabled = false;
+            archiveResult.Text = "Importowanie kart i opisów do archiwum SQL…";
             try
             {
                 var result = await RunArchive(() => archive.ImportLocalData(source));
-                status.Text = $"Dodano kart: {result.Cards}. Dodano lub odświeżono opisów: {result.Descriptions}.";
+                archiveResult.Text = status.Text = $"Dodano kart: {result.Cards}. Dodano lub odświeżono opisów: {result.Descriptions}.";
+            }
+            catch (Exception ex)
+            {
+                archiveResult.Text = ex.Message;
+                throw;
             }
             finally
             {
                 importing = false;
-                saveArchiveConnection.Enabled = true;
+                archiveForm.Enabled = true;
             }
+        });
+        importButton.Enabled = sharedArchive is not null;
+        Add("", importButton);
+
+        form = Section("Subiekt GT");
+        var subiektForm = form;
+        Message(form, "Sprawdź połączenie, wybierz magazyn i zapisz ustawienia. Użyj konta z dostępem do odczytu.", multiline: true);
+        var server = Field("Serwer Subiekta", saved?.Server, @"np. SERWER\INSERTGT");
+        var database = Field("Baza podmiotu", saved?.Database);
+        var auth = Authentication(saved?.WindowsAuthentication ?? true);
+        var user = Field("Login SQL", saved?.UserName);
+        var password = Field("Hasło SQL", saved?.Password, password: true);
+        var remember = Option("Zapamiętaj hasło na tym koncie Windows", subiektConfiguration.Remembered);
+        BindCredentials(auth, user, password, remember);
+        var trust = Option("Zaufaj certyfikatowi znanego serwera Subiekta", saved?.TrustCertificate ?? false);
+        var group = Field("Grupa towarów", saved?.DrugGroup ?? "Leki");
+        var warehouses = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList, Width = 360, DisplayMember = nameof(MedicineWarehouse.Name),
+            AccessibleName = "Magazyn", Enabled = false
+        };
+        Add("Magazyn", warehouses);
+        var subiektResult = Message(form, subiektConfiguration.Warning ?? (connection is null
+            ? "Stan: połączenie nie zostało skonfigurowane."
+            : "Stan: wczytano zapisane ustawienia."), multiline: true);
+
+        ConnectionOptions Draft()
+        {
+            Require(server, "Wpisz adres serwera Subiekta.");
+            Require(database, "Wpisz nazwę bazy podmiotu.");
+            bool windows = auth.SelectedIndex == 1;
+            if (!windows)
+            {
+                Require(user, "Wpisz login SQL do Subiekta.");
+                Require(password, "Wpisz hasło SQL do Subiekta.");
+            }
+            return new(server.Text.Trim(), database.Text.Trim(), windows, user.Text, password.Text, trust.Checked, group.Text.Trim());
+        }
+
+        Button? saveSubiekt = null;
+        void ClearWarehouseList()
+        {
+            warehouses.DataSource = null;
+            warehouses.Enabled = false;
+            saveSubiekt!.Enabled = false;
+            subiektResult.Text = "Sprawdź połączenie, aby pobrać magazyny dla tych ustawień.";
+        }
+
+        Add("", Action("Sprawdź i pobierz magazyny", async () =>
+        {
+            ConnectionOptions draft;
+            try { draft = Draft(); }
+            catch (InvalidOperationException ex)
+            {
+                subiektResult.Text = ex.Message;
+                throw;
+            }
+            int? previous = (warehouses.SelectedItem as MedicineWarehouse)?.Id;
+            if (previous is null && connection is { } current &&
+                current.Server.Equals(draft.Server, StringComparison.OrdinalIgnoreCase) &&
+                current.Database.Equals(draft.Database, StringComparison.OrdinalIgnoreCase))
+                previous = current.WarehouseId;
+            ClearWarehouseList();
+            subiektForm.Enabled = false;
+            subiektResult.Text = "Sprawdzanie połączenia z Subiektem…";
+            try
+            {
+                using var work = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                var info = await new SubiektConnectionService().TestAsync(draft, work.Token);
+                var items = info.Warehouses.ToList();
+                warehouses.DataSource = items;
+                if (items.Count != 1) warehouses.SelectedIndex = items.FindIndex(item => item.Id == previous);
+                warehouses.Enabled = items.Count > 0;
+                saveSubiekt!.Enabled = warehouses.SelectedIndex >= 0;
+                subiektResult.Text = items.Count == 0
+                    ? $"Połączono z {info.Company}. Brak dostępnych magazynów."
+                    : $"Połączono z {info.Company}. Wybierz magazyn i zapisz.";
+            }
+            catch (Exception ex)
+            {
+                subiektResult.Text = SubiektConnectionService.FriendlyError(ex);
+                throw;
+            }
+            finally { subiektForm.Enabled = true; }
         }));
-        Page("Ustawienia", form).AutoScroll = true;
+
+        saveSubiekt = Action("Zapisz połączenie z Subiektem", async () =>
+        {
+            if (warehouses.SelectedItem is not MedicineWarehouse warehouse) return;
+            var draft = Draft() with { WarehouseId = warehouse.Id };
+            settings.Save(draft, !draft.WindowsAuthentication && remember.Checked);
+            searchWork?.Cancel();
+            preloadWork?.Cancel();
+            cache.Clear();
+            displayedDocuments = null;
+            UpdateRefreshLabel();
+            documents.DataSource = prices.DataSource = expiry.DataSource = null;
+            selectedTreatmentVariants.Clear();
+            excludedTreatmentRows.Clear();
+            treatment.Rows.Clear();
+            currentCard = null;
+            connection = draft;
+            subiektResult.Text = $"Zapisano połączenie. Magazyn: {warehouse.Name}.";
+            await SelectKind(DocumentSearchKinds.Invoices);
+        });
+        saveSubiekt.Enabled = false;
+        Add("", saveSubiekt);
+        warehouses.SelectedIndexChanged += (_, _) => saveSubiekt.Enabled = warehouses.SelectedIndex >= 0;
+        foreach (var input in new[] { server, database, user, password, group })
+            input.TextChanged += (_, _) => ClearWarehouseList();
+        auth.SelectedIndexChanged += (_, _) => ClearWarehouseList();
+        trust.CheckedChanged += (_, _) => ClearWarehouseList();
+
+        form = Section("Dane lecznicy");
+        var clinic = ClinicSettingsStore.Load();
+        var clinicName = Field("Nazwa lecznicy", clinic.Name);
+        var clinicAddress = Field("Adres lecznicy", clinic.Address);
+        var doctor = Field("Lekarz", clinic.Doctor);
+        Add("", Action("Zapisz dane lecznicy", () =>
+        {
+            ClinicSettingsStore.Save(new(clinicName.Text, clinicAddress.Text, doctor.Text));
+            status.Text = "Zapisano dane lecznicy.";
+            return Task.CompletedTask;
+        }));
+        var settingsPage = Page("Ustawienia", sections);
+        if (sharedArchive is not null && connection is null) sections.SelectedIndex = 1;
+        Shown += (_, _) =>
+        {
+            if (tabs.SelectedTab == settingsPage && sections.SelectedIndex == 0 && sharedArchive is null)
+            {
+                if (archiveServer.TextLength == 0) archiveServer.Focus();
+                else if (archivePassword.Enabled) archivePassword.Focus();
+            }
+        };
 
         foreach (var grid in new[] { documents, prices, expiry, treatment })
         {

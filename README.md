@@ -34,7 +34,7 @@ Katalog leków pozostaje lokalnym plikiem SQLite dostarczanym z programem.
    Na przykład dla istniejącego użytkownika bazy `operator_archiwum`:
    `ALTER ROLE KartyLeczeniaOperator ADD MEMBER [operator_archiwum];`.
    Konto aplikacji potrzebuje dostępu sieciowego do instancji i uprawnień tej roli.
-3. Na każdym stanowisku w sekcji **Wspólne archiwum SQL** w **Ustawieniach**
+3. Na każdym stanowisku w zakładce **Ustawienia → Archiwum SQL**
    podaj adres instancji archiwum, wybierz uwierzytelnianie i zapisz połączenie.
    W ustawieniach Subiekta użyj tej samej nazwy serwera i bazy podmiotu na każdym
    stanowisku. Program wykorzystuje te nazwy do przypisywania opisów i płatników.
@@ -75,9 +75,8 @@ Brakujący WebView2 pobiera z Microsoftu.
   konta SQL `KartyLeczeniaOperator` w oknie konfiguracji. Zachowaj je do
   ustawienia połączenia na stanowiskach. Instalator wyświetli adres archiwum.
 - **Stanowisko zdalne** — podaj nazwę komputera serwera lub jego adres IPv4.
-  Po otwarciu programu adres i login pojawią się w **Ustawienia → Wspólne
-  archiwum SQL**. Wpisz hasło operatora i wybierz **Sprawdź i zapisz połączenie
-  z archiwum**. Połączenie używa szyfrowania i domyślnie weryfikuje certyfikat.
+  Po otwarciu programu adres i login pojawią się w **Ustawienia → Archiwum SQL**. Wpisz
+  hasło operatora i wybierz **Sprawdź i zapisz**. Połączenie używa szyfrowania i domyślnie weryfikuje certyfikat.
   Jeżeli dedykowana instancja korzysta z certyfikatu własnego, możesz jawnie
   zaznaczyć **Zaufaj certyfikatowi serwera archiwum** po sprawdzeniu adresu
   prywatnego serwera. Dane Subiekta ustawiasz osobno.
