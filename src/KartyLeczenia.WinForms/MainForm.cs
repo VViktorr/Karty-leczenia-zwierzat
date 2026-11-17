@@ -655,6 +655,7 @@ internal sealed class MainForm : Form
     bool updatingTreatmentChoices;
     const string ReferenceColumn = "Zamiennik produktu";
     const string AnimalDescriptionColumn = "Numery zwierząt";
+    const string IndicationColumn = "Wskazanie z ChPL";
     readonly ComboBox cardSpeciesGroup = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 145 };
     readonly Dictionary<DataGridViewRow, bool> excludedTreatmentRows = new();
 
@@ -926,6 +927,41 @@ internal sealed class MainForm : Form
             .Split(['\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
     }
 
+    void ShowTreatmentIndication(DataGridViewRow row)
+    {
+        if (!selectedTreatmentVariants.TryGetValue(row, out var variant))
+        {
+            status.Text = "Wybierz gatunek i drogę podania w tym wierszu, aby zobaczyć wskazanie z ChPL.";
+            return;
+        }
+
+        using var dialog = new Form
+        {
+            Text = IndicationColumn, StartPosition = FormStartPosition.CenterParent,
+            AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 260), MinimumSize = new Size(360, 190)
+        };
+        var heading = new Label
+        {
+            Text = $"{variant.Species} · {variant.Route}", Dock = DockStyle.Top,
+            AutoSize = true, Padding = new Padding(8)
+        };
+        var indication = new TextBox
+        {
+            Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
+            Text = string.IsNullOrWhiteSpace(variant.Indication)
+                ? "Brak zapisanego wskazania dla wybranego wariantu."
+                : variant.Indication.ReplaceLineEndings(Environment.NewLine)
+        };
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(4) };
+        var close = new Button { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
+        actions.Controls.Add(close);
+        dialog.Controls.Add(indication);
+        dialog.Controls.Add(heading);
+        dialog.Controls.Add(actions);
+        dialog.CancelButton = close;
+        dialog.ShowDialog(this);
+    }
+
     void ConfigureCard()
     {
         treatment.DataError += (_, e) =>
@@ -953,6 +989,11 @@ internal sealed class MainForm : Form
         });
         Column(treatment, "Liczba leczonych zwierząt", "Liczba zwierząt", 115);
         Column(treatment, "Rozpoznanie", "Rozpoznanie", 215);
+        treatment.Columns.Add(new DataGridViewButtonColumn
+        {
+            Name = IndicationColumn, HeaderText = IndicationColumn, Width = 170,
+            Text = "Pokaż wskazanie z ChPL", UseColumnTextForButtonValue = true
+        });
         Column(treatment, "Opis zwierzęcia", AnimalDescriptionColumn, 240);
         treatment.Columns[AnimalDescriptionColumn]!.ToolTipText = "Wpisz numery leczonych zwierząt lub ich opis.";
         var hint = new ToolTip();
@@ -974,10 +1015,14 @@ internal sealed class MainForm : Form
         };
         treatment.CellContentClick += async (_, e) =>
         {
-            if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != ReferenceColumn) return;
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            string column = treatment.Columns[e.ColumnIndex].Name;
+            if (column is not (ReferenceColumn or IndicationColumn)) return;
             await Run(() =>
             {
-                PickTreatmentReference(treatment.Rows[e.RowIndex]);
+                var row = treatment.Rows[e.RowIndex];
+                if (column == ReferenceColumn) PickTreatmentReference(row);
+                else ShowTreatmentIndication(row);
                 return Task.CompletedTask;
             });
         };
@@ -1186,7 +1231,7 @@ internal sealed class MainForm : Form
         {
             var values = new Dictionary<string, string>(((TreatmentRow)item.Tag!).Values);
             foreach (DataGridViewCell cell in item.Cells)
-                if (cell.OwningColumn is { } column)
+                if (cell.OwningColumn is { } column && column.Name != IndicationColumn)
                     values[column.Name] = column.Name == TreatmentChoices.Route
                         && selectedTreatmentVariants.TryGetValue(item, out var variant)
                         ? variant.Route : cell.Value?.ToString() ?? "";
