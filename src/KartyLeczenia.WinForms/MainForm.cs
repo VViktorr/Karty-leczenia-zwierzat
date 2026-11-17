@@ -653,7 +653,7 @@ internal sealed class MainForm : Form
     readonly Dictionary<DataGridViewRow, LocalCatalogue.Variant> selectedTreatmentVariants = new();
     LocalCatalogue? treatmentCatalogue;
     bool updatingTreatmentChoices;
-    const string ReferenceColumn = "W zamian";
+    const string ReferenceColumn = "Zamiennik produktu";
 
     sealed record TreatmentReference(string Symbol, string Name)
     {
@@ -677,24 +677,51 @@ internal sealed class MainForm : Form
             .Select(item => new TreatmentReference(item.Symbol, item.Name)).ToArray();
         using var dialog = new Form
         {
-            Text = "W zamian – źródło danych ChPL", StartPosition = FormStartPosition.CenterParent,
+            Text = ReferenceColumn, StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false,
-            AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 128)
+            AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 340)
         };
-        var layout = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(8) };
-        var label = new Label { Text = "Wybierz preparat, którego dane mają posłużyć jako źródło na karcie.", AutoSize = true };
-        var picker = new ComboBox
-        {
-            Width = 530, DropDownStyle = ComboBoxStyle.DropDownList,
-            AutoCompleteMode = AutoCompleteMode.SuggestAppend, AutoCompleteSource = AutoCompleteSource.ListItems
-        };
-        picker.Items.Add("Preparat z dokumentu");
-        picker.Items.AddRange(products);
-        picker.SelectedIndex = cell.Tag is TreatmentReference current ? Array.IndexOf(products, current) + 1 : 0;
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(8), ColumnCount = 1, RowCount = 3 };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        var filter = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Wpisz nazwę lub symbol produktu" };
+        var picker = new ListBox { Dock = DockStyle.Fill, HorizontalScrollbar = true };
         var apply = new Button { Text = "Wybierz", AutoSize = true, DialogResult = DialogResult.OK };
         var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
-        layout.Controls.AddRange([label, picker, apply, cancel]);
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
+        actions.Controls.AddRange([apply, cancel]);
+        layout.Controls.Add(filter, 0, 0);
+        layout.Controls.Add(picker, 0, 1);
+        layout.Controls.Add(actions, 0, 2);
         dialog.Controls.Add(layout);
+
+        void FilterProducts()
+        {
+            var words = filter.Text.Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var selected = picker.SelectedItem as TreatmentReference ?? cell.Tag as TreatmentReference;
+            picker.BeginUpdate();
+            try
+            {
+                picker.Items.Clear();
+                if (words.Length == 0) picker.Items.Add("Preparat z dokumentu");
+                picker.Items.AddRange(products.Where(product => words.All(word =>
+                    product.Name.Contains(word, StringComparison.OrdinalIgnoreCase)
+                    || product.Symbol.Contains(word, StringComparison.OrdinalIgnoreCase))).ToArray());
+                int index = selected is null ? -1 : picker.Items.IndexOf(selected);
+                picker.SelectedIndex = index >= 0 ? index : picker.Items.Count > 0 ? 0 : -1;
+            }
+            finally { picker.EndUpdate(); }
+        }
+        picker.SelectedIndexChanged += (_, _) => apply.Enabled = picker.SelectedIndex >= 0;
+        picker.MouseDoubleClick += (_, e) =>
+        {
+            if (picker.IndexFromPoint(e.Location) >= 0) apply.PerformClick();
+        };
+        filter.TextChanged += (_, _) => FilterProducts();
+        FilterProducts();
+        apply.Enabled = picker.SelectedIndex >= 0;
         dialog.AcceptButton = apply;
         dialog.CancelButton = cancel;
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
@@ -860,7 +887,7 @@ internal sealed class MainForm : Form
         }
         treatment.Columns.Add(new DataGridViewButtonColumn
         {
-            Name = ReferenceColumn, HeaderText = ReferenceColumn, Width = 140
+            Name = ReferenceColumn, HeaderText = ReferenceColumn, Width = 160
         });
         var hint = new ToolTip();
         hint.SetToolTip(rememberTreatment, "Zapisuje gatunek i drogę podania dla leku na kolejne karty leczenia.");
