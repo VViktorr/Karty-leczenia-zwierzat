@@ -101,11 +101,11 @@ function Assert-MicrosoftSignature([string]$Path) {
 
 function Invoke-LocalSql([string]$Database, [string]$Sql) {
     $builder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder
-    $builder.DataSource = if ($instance -eq 'MSSQLSERVER') { 'lpc:localhost' } else { "lpc:localhost\$instance" }
-    $builder.InitialCatalog = $Database
-    $builder.IntegratedSecurity = $true
-    $builder.ConnectTimeout = 3
-    $connection = New-Object System.Data.SqlClient.SqlConnection $builder.ConnectionString
+    $builder['Data Source'] = if ($instance -eq 'MSSQLSERVER') { 'lpc:localhost' } else { "lpc:localhost\$instance" }
+    $builder['Initial Catalog'] = $Database
+    $builder['Integrated Security'] = $true
+    $builder['Connect Timeout'] = 3
+    $connection = New-Object System.Data.SqlClient.SqlConnection $builder.psbase.ConnectionString
     try {
         $connection.Open()
         $command = $connection.CreateCommand()
