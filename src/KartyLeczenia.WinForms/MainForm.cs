@@ -10,7 +10,8 @@ internal sealed class MainForm : Form
         DrawMode = TabDrawMode.OwnerDrawFixed,
         Padding = new Point(30, 9)
     };
-    readonly DataGridView documents = NewGrid(), prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
+    readonly DocumentGrid documents = NewGrid<DocumentGrid>();
+    readonly DataGridView prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new();
     Font? boldDocumentKindFont;
     readonly Dictionary<DocumentSearchKinds, Button> documentKinds = new();
@@ -102,7 +103,30 @@ internal sealed class MainForm : Form
         }
     }
 
-    static DataGridView NewGrid() => new()
+    sealed class DocumentGrid : DataGridView
+    {
+        public DocumentGrid() { }
+
+        internal event EventHandler? OpenRequested;
+
+        protected override bool ProcessDialogKey(Keys keyData)
+            => TryOpen(keyData) || base.ProcessDialogKey(keyData);
+
+        protected override bool ProcessDataGridViewKey(KeyEventArgs e)
+            => TryOpen(e.KeyData) || base.ProcessDataGridViewKey(e);
+
+        bool TryOpen(Keys keyData)
+        {
+            if (keyData != Keys.Enter) return false;
+            if (CurrentRow?.DataBoundItem is DocumentSuggestion)
+                OpenRequested?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+    }
+
+    static DataGridView NewGrid() => NewGrid<DataGridView>();
+
+    static T NewGrid<T>() where T : DataGridView, new() => new T()
     {
         Dock = DockStyle.Fill, AutoGenerateColumns = false, ReadOnly = true, AllowUserToAddRows = false,
         AllowUserToDeleteRows = false, AllowUserToOrderColumns = true, AllowUserToResizeColumns = true,
@@ -223,6 +247,7 @@ internal sealed class MainForm : Form
         documents.Columns["Payer"]!.DataPropertyName = nameof(DocumentSuggestion.ShortPayer);
         Column(documents, "Wartość brutto", "Gross", 145, "N2");
         Column(documents, "Powiązane dokumenty", "RelatedText", 300);
+        documents.OpenRequested += async (_, _) => await Run(OpenDocument);
         documents.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0) await Run(OpenDocument); };
         documentSearchTimer.Tick += async (_, _) =>
         {
