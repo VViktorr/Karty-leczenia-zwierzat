@@ -27,7 +27,10 @@ public sealed record DocumentSuggestion(int Id, string Number, string Payer = ""
     }
 }
 
-public sealed record DocumentData(string Number, string Payer, string Recipient, List<TreatmentRow> Rows, string Scope);
+public sealed record DocumentData(string Number, string Payer, string Recipient, List<TreatmentRow> Rows, string Scope)
+{
+    public int? PayerId { get; init; }
+}
 
 public sealed class DocumentService
 {
@@ -192,7 +195,7 @@ public sealed class DocumentService
         await using var con = new SqlConnection(options.BuildConnectionString());
         await con.OpenAsync(token);
         using var head = new SqlCommand("""
-            SELECT d.dok_Id, d.dok_NrPelny,
+            SELECT d.dok_Id, d.dok_NrPelny, d.dok_PlatnikId,
               pl.adrh_NazwaPelna AS PN, pl.adrh_Nazwa AS PS, pl.adrh_Adres AS PA,
               pl.adrh_Kod AS PK, pl.adrh_Miejscowosc AS PM,
               od.adrh_NazwaPelna AS ONa, od.adrh_Nazwa AS OS, od.adrh_Adres AS OA,
@@ -205,13 +208,14 @@ public sealed class DocumentService
         head.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         head.Parameters.Add("@number", SqlDbType.NVarChar, 100).Value = documentNumber.Trim();
         head.Parameters.Add("@documentId", SqlDbType.Int).Value = (object?)documentId ?? DBNull.Value;
-        int id; string number; string payer; string recipient;
+        int id; int? payerId; string number; string payer; string recipient;
         await using (var reader = await head.ExecuteReaderAsync(token))
         {
             if (!await reader.ReadAsync(token)) throw new InvalidOperationException("Nie znaleziono dokumentu.");
             string V(string n) => reader[n] is DBNull ? "" : reader[n].ToString() ?? "";
             string N(string full, string shortName) => string.IsNullOrWhiteSpace(V(full)) ? V(shortName) : V(full);
             id = Convert.ToInt32(reader["dok_Id"]); number = V("dok_NrPelny");
+            payerId = reader["dok_PlatnikId"] is DBNull ? null : Convert.ToInt32(reader["dok_PlatnikId"]);
             payer = N("PN", "PS") + "\n" + V("PA") + "\n" + V("PK") + " " + V("PM");
             recipient = N("ONa", "OS") + "\n" + V("OA") + "\n" + V("OKo") + " " + V("OM");
             if (await reader.ReadAsync(token)) throw new InvalidOperationException("Numer dokumentu nie jest jednoznaczny.");
@@ -319,7 +323,10 @@ public sealed class DocumentService
         }
         if (useWz && deliveries.Count == 0)
             throw new InvalidOperationException("Nie znaleziono pozycji leków na WZ powiązanych z tym dokumentem w wybranym magazynie.");
-        return new(number, payer, recipient, DocumentRowMerger.Merge(deliveries), options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant());
+        return new(number, payer, recipient, DocumentRowMerger.Merge(deliveries), options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant())
+        {
+            PayerId = payerId
+        };
     }
 }
 

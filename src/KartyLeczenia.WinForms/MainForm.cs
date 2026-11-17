@@ -654,6 +654,7 @@ internal sealed class MainForm : Form
     LocalCatalogue? treatmentCatalogue;
     bool updatingTreatmentChoices;
     const string ReferenceColumn = "Zamiennik produktu";
+    const string AnimalDescriptionColumn = "Numery zwierząt";
     readonly ComboBox cardSpeciesGroup = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 145 };
     readonly Dictionary<DataGridViewRow, bool> excludedTreatmentRows = new();
 
@@ -950,6 +951,8 @@ internal sealed class MainForm : Form
         {
             Name = ReferenceColumn, HeaderText = ReferenceColumn, Width = 160
         });
+        Column(treatment, "Opis zwierzęcia", AnimalDescriptionColumn, 240);
+        treatment.Columns[AnimalDescriptionColumn]!.ToolTipText = "Wpisz numery leczonych zwierząt lub ich opis.";
         var hint = new ToolTip();
         hint.SetToolTip(rememberTreatment, "Zapisuje gatunek i drogę podania dla leku na kolejne karty leczenia.");
         Disposed += (_, _) => hint.Dispose();
@@ -1019,8 +1022,44 @@ internal sealed class MainForm : Form
         };
         treatment.EditingControlShowing += (_, e) =>
         {
-            if (e.Control is TextBox editor && treatment.CurrentCell is { OwningColumn.Name: "Karencja" } cell)
+            if (e.Control is not TextBox editor) return;
+            editor.AutoCompleteMode = AutoCompleteMode.None;
+            editor.AutoCompleteSource = AutoCompleteSource.None;
+            editor.AutoCompleteCustomSource = null;
+            if (treatment.CurrentCell is { OwningColumn.Name: "Karencja" } cell)
                 editor.Text = cell.Value?.ToString() ?? "";
+            if (treatment.CurrentCell?.OwningColumn?.Name != AnimalDescriptionColumn
+                || currentCard is not { PayerId: > 0 } card) return;
+
+            try
+            {
+                var suggestions = AnimalDescriptionStore.Read(card);
+                if (suggestions.Length == 0) return;
+                var source = new AutoCompleteStringCollection();
+                source.AddRange(suggestions);
+                editor.AutoCompleteCustomSource = source;
+                editor.AutoCompleteSource = AutoCompleteSource.CustomSource;
+                editor.AutoCompleteMode = AutoCompleteMode.Suggest;
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write("WinForms.AnimalDescription.Read", ex);
+                status.Text = "Nie udało się odczytać zapisanych opisów zwierząt.";
+            }
+        };
+        treatment.CellEndEdit += (_, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != AnimalDescriptionColumn
+                || currentCard is not { PayerId: > 0 } card) return;
+            string description = treatment.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString()?.Trim() ?? "";
+            if (description.Length == 0) return;
+
+            try { AnimalDescriptionStore.Save(card, description); }
+            catch (Exception ex)
+            {
+                CrashLog.Write("WinForms.AnimalDescription.Save", ex);
+                status.Text = "Nie udało się zapamiętać opisu zwierzęcia dla klienta.";
+            }
         };
         routeMode.Items.AddRange(["Pełna droga podania", "Skróty dróg podania"]);
         routeMode.SelectedIndex = 1;
