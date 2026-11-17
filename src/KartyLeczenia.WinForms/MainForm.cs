@@ -32,6 +32,8 @@ internal sealed class MainForm : Form
     readonly System.Windows.Forms.Timer documentSearchTimer = new() { Interval = 350 };
     DocumentSearchKinds kind = DocumentSearchKinds.Invoices;
     DocumentData? currentCard;
+    Guid currentArchiveId;
+    readonly DateTimePicker treatmentDate = new() { Format = DateTimePickerFormat.Short, Width = 110 };
 
     internal MainForm()
     {
@@ -66,6 +68,7 @@ internal sealed class MainForm : Form
         ConfigureExpiry();
         ConfigureCard();
         ConfigureConnection();
+        ConfigureSavedCards();
         var layout = new WindowLayout(this, rememberTreatment, new()
         {
             ["documents"] = documents, ["prices"] = prices,
@@ -1125,6 +1128,7 @@ internal sealed class MainForm : Form
         cardSpeciesGroup.SelectedIndexChanged += (_, _) => ApplyCardSpeciesGroup();
         var page = Page("Karta leczenia", treatment,
             new Label { Text = "Gatunek", AutoSize = true, Anchor = AnchorStyles.Left }, cardSpeciesGroup, withdrawalMode, routeMode,
+            new Label { Text = "Data leczenia", AutoSize = true, Anchor = AnchorStyles.Left }, treatmentDate,
             Action("Otwórz ChPL", () =>
             {
                 var row = treatment.CurrentRow;
@@ -1153,7 +1157,8 @@ internal sealed class MainForm : Form
                         : "Wybierz gatunek i drogę podania, aby otworzyć właściwą ChPL.";
                 return Task.CompletedTask;
             }),
-            Action("Zapisz kartę JSON", SaveCard), Action("Podgląd wydruku", PreviewCard));
+            Action("Zapisz kartę", SaveTreatmentToArchive), Action("Eksportuj JSON", SaveCard),
+            Action("Podgląd wydruku", PreviewCard));
         var actions = page.Controls.OfType<FlowLayoutPanel>().Single();
         var toolbar = new TableLayoutPanel
         {
@@ -1194,6 +1199,8 @@ internal sealed class MainForm : Form
         if (connection != options) return;
         treatmentCatalogue = catalogue;
         currentCard = card;
+        currentArchiveId = Guid.NewGuid();
+        treatmentDate.Value = DateTime.Today;
         selectedTreatmentVariants.Clear();
         excludedTreatmentRows.Clear();
         treatment.Rows.Clear();
@@ -1221,10 +1228,11 @@ internal sealed class MainForm : Form
     Card CaptureTreatmentCard(bool forPrint = false)
     {
         var source = currentCard ?? throw new InvalidOperationException("Najpierw wczytaj dokument.");
-        treatment.EndEdit();
+        if (!treatment.EndEdit()) throw new InvalidOperationException("Zakończ edycję bieżącej pozycji karty.");
         var clinic = ClinicSettingsStore.Load();
         var fields = new Dictionary<string, string> { ["Dokument źródłowy"] = source.Number,
             ["Właściciel i adres"] = source.Payer, ["Zakres mapowania towarów"] = source.Scope,
+            ["Wykonanie — data i godzina"] = treatmentDate.Value.ToString("dd.MM.yyyy"),
             ["Lecznica i adres"] = clinic.CardText,
             ["Lekarz i nr prawa wykonywania zawodu"] = clinic.Doctor };
         var rows = treatment.Rows.Cast<DataGridViewRow>().Select(item =>
@@ -1255,9 +1263,67 @@ internal sealed class MainForm : Form
         return new Card(fields, rows);
     }
 
-    async Task SaveCard()
+    Task SaveTreatmentToArchive()
     {
         var card = CaptureTreatmentCard();
+        var printCard = CaptureTreatmentCard(forPrint: true);
+        _ = CardHtmlRenderer.Render(printCard);
+        SavedTreatmentCardStore.Save(currentArchiveId, currentCard!, treatmentDate.Value.Date, card, printCard);
+        status.Text = "Zapisano kartę w zakładce „Zapisane karty leczenia”.";
+        return Task.CompletedTask;
+    }
+
+    void ConfigureSavedCards()
+    {
+        var grid = NewGrid();
+        Column(grid, "Data leczenia", nameof(SavedTreatmentCard.Date), 115, "dd.MM.yyyy");
+        Column(grid, "Klient", nameof(SavedTreatmentCard.Client), 350);
+        Column(grid, "Dokument", nameof(SavedTreatmentCard.Document), 180);
+        var query = new TextBox { Width = 250, PlaceholderText = "Klient lub numer dokumentu" };
+        var day = new DateTimePicker { Format = DateTimePickerFormat.Short, ShowCheckBox = true, Checked = false, Width = 125 };
+
+        Task RefreshCards()
+        {
+            grid.DataSource = SavedTreatmentCardStore.Find(query.Text.Trim(), day.Checked ? day.Value.Date : null);
+            status.Text = $"Zapisane karty: {grid.Rows.Count}";
+            return Task.CompletedTask;
+        }
+
+        async Task OpenSavedCard()
+        {
+            if (grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
+            var card = SavedTreatmentCardStore.Read(row.Id, forPrint: true);
+            await OpenPrintPreview("zapisana-karta-leczenia", CardHtmlRenderer.Render(card));
+        }
+
+        Task ExportSavedCard() => grid.CurrentRow?.DataBoundItem is SavedTreatmentCard row
+            ? ExportCard(SavedTreatmentCardStore.Read(row.Id, forPrint: false)) : Task.CompletedTask;
+
+        var page = Page("Zapisane karty leczenia", grid, query,
+            new Label { Text = "Data leczenia", AutoSize = true }, day,
+            Action("Szukaj", RefreshCards), Action("Otwórz / drukuj", OpenSavedCard),
+            Action("Eksportuj JSON", ExportSavedCard));
+        tabs.SelectedIndexChanged += async (_, _) =>
+        {
+            if (tabs.SelectedTab == page) await Run(RefreshCards);
+        };
+        query.KeyDown += async (_, e) =>
+        {
+            if (e.KeyCode != Keys.Enter) return;
+            e.SuppressKeyPress = true;
+            await Run(RefreshCards);
+        };
+        day.ValueChanged += async (_, _) => await Run(RefreshCards);
+        grid.CellDoubleClick += async (_, e) =>
+        {
+            if (e.RowIndex >= 0) await Run(OpenSavedCard);
+        };
+    }
+
+    Task SaveCard() => ExportCard(CaptureTreatmentCard());
+
+    async Task ExportCard(Card card)
+    {
         using var dialog = new SaveFileDialog { Filter = "Karta leczenia (*.json)|*.json", FileName = "karta-leczenia.json" };
         if (dialog.ShowDialog(this) == DialogResult.OK) await File.WriteAllTextAsync(dialog.FileName, JsonSerializer.Serialize(card));
     }
