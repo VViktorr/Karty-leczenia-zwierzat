@@ -13,6 +13,7 @@ $port = 51433
 $marker = 'HKLM:\SOFTWARE\KartyLeczenia\SharedArchive'
 $instanceNames = 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL'
 $login = 'KartyLeczeniaOperator'
+$databaseUser = 'KartyLeczeniaOperatorUser'
 
 function Show-ArchiveDialog {
     param(
@@ -205,8 +206,8 @@ SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 CREATE LOGIN [$login] WITH PASSWORD='$escaped', CHECK_POLICY=OFF, CHECK_EXPIRATION=OFF, DEFAULT_DATABASE=[KartyLeczenia];
 USE [KartyLeczenia];
-EXEC(N'CREATE USER [$login] FOR LOGIN [$login];');
-EXEC(N'ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER [$login];');
+EXEC(N'CREATE USER [$databaseUser] FOR LOGIN [$login];');
+EXEC(N'ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER [$databaseUser];');
 COMMIT;
 "@
         try { Invoke-LocalSql 'master' $sql | Out-Null }
@@ -395,7 +396,7 @@ SELECT COUNT(*) FROM sys.database_role_members m
 JOIN sys.database_principals u ON u.principal_id = m.member_principal_id
 JOIN sys.database_principals r ON r.principal_id = m.role_principal_id
 JOIN sys.sql_logins s ON s.sid = u.sid
-WHERE u.name = N'$login' AND r.name = N'KartyLeczeniaOperator'
+WHERE u.type = N'S' AND r.name = N'KartyLeczeniaOperator'
     AND s.name = N'$login' AND s.is_disabled = 0;
 "@
             if ($mapped -ne 1) { throw 'Istniejący login SQL nie jest aktywnym kontem tego archiwum. Wybierz konto Windows lub skonfiguruj login z administratorem.' }
@@ -465,9 +466,22 @@ function Initialize-Archive {
         Initialize-ArchiveSqlLogin
     }
     Invoke-LocalSql 'KartyLeczenia' @"
-IF USER_ID(N'$login') IS NULL CREATE USER [$login] FOR LOGIN [$login];
-IF IS_ROLEMEMBER(N'KartyLeczeniaOperator', N'$login') <> 1
-    ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER [$login];
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+DECLARE @member sysname;
+SELECT @member = name FROM sys.database_principals
+WHERE sid = SUSER_SID(N'$login') AND type = N'S' AND principal_id > 4;
+IF @member IS NULL
+BEGIN
+    EXEC(N'CREATE USER [$databaseUser] FOR LOGIN [$login];');
+    SET @member = N'$databaseUser';
+END;
+IF ISNULL(IS_ROLEMEMBER(N'KartyLeczeniaOperator', @member), 0) <> 1
+BEGIN
+    DECLARE @grant nvarchar(512) = N'ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER ' + QUOTENAME(@member);
+    EXEC(@grant);
+END;
+COMMIT;
 "@ | Out-Null
 
     $rule = 'KartyLeczenia-SQL-Archive'
