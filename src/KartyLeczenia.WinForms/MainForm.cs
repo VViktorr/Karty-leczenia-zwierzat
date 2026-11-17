@@ -42,7 +42,7 @@ internal sealed class MainForm : Form
     Guid currentArchiveId;
     readonly DateTimePicker treatmentDate = new() { Format = DateTimePickerFormat.Short, Width = 110 };
 
-    internal MainForm()
+    internal MainForm(bool openSettings = false)
     {
         Text = "KartyLeczenia";
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -88,7 +88,7 @@ internal sealed class MainForm : Form
             documents.Columns["DocumentType"]!.Visible = true;
         };
         FormClosed += (_, _) => layout.Save();
-        tabs.SelectedIndex = connection is null || (sharedArchive is null && installedArchiveServer.Length > 0) ? 4 : 0;
+        tabs.SelectedIndex = openSettings || connection is null || (sharedArchive is null && installedArchiveServer.Length > 0) ? 4 : 0;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
     }
 
@@ -1527,6 +1527,7 @@ internal sealed class MainForm : Form
         var archiveResult = Message(form, archiveConfiguration.Warning ?? (sharedArchive is null
             ? "Stan: połączenie nie zostało skonfigurowane."
             : "Stan: wczytano zapisane ustawienia."), multiline: true);
+        var archiveClinicStatus = Message(form, "", multiline: true);
         var archiveForm = form;
         bool configuringArchive = false, importing = false;
         Button? importButton = null;
@@ -1830,7 +1831,15 @@ internal sealed class MainForm : Form
         var clinicName = Field("Nazwa lecznicy", localClinic.Name);
         var clinicAddress = Field("Adres lecznicy", localClinic.Address);
         var doctor = Field("Lekarz", localClinic.Doctor);
-        var clinicResult = Message(form, "Po połączeniu z archiwum dane lecznicy będą wspólne dla stanowisk.", multiline: true);
+        var clinicResult = Message(form, "Połącz się w zakładce „Archiwum SQL”, aby pobrać wspólne dane lecznicy.", multiline: true);
+
+        void SetClinicStatus(string message, bool reportInStatusBar = false)
+        {
+            clinicResult.Text = archiveClinicStatus.Text = message;
+            if (reportInStatusBar) status.Text = message;
+        }
+
+        ClinicSettings ClinicDraft() => new(clinicName.Text, clinicAddress.Text, doctor.Text);
 
         void ShowClinic(ClinicSettings clinic)
         {
@@ -1842,15 +1851,16 @@ internal sealed class MainForm : Form
         void ReportClinicError(Exception ex)
         {
             string message = ex is Microsoft.Data.SqlClient.SqlException { Number: 207 or 208 or 229 }
-                ? "Zaktualizuj bazę archiwum, ponownie uruchamiając instalator w trybie serwerowym."
+                ? "Sprawdź, czy aktualny instalator w trybie Serwer dodał tabelę danych lecznicy na tej instancji i przyznał do niej dostęp operatorowi."
                 : SubiektConnectionService.FriendlyError(ex);
-            clinicResult.Text = status.Text = $"Dane lecznicy: {message}";
+            CrashLog.Write("WinForms.Clinic.SyncFailed", ex);
+            SetClinicStatus($"Dane lecznicy — {sharedArchive?.Server}: {message}", reportInStatusBar: true);
         }
 
         async Task RefreshClinic(SharedArchive archive)
         {
             clinicForm.Enabled = false;
-            clinicResult.Text = "Pobieranie danych lecznicy z archiwum…";
+            SetClinicStatus($"Pobieranie danych lecznicy z {archive.Server}…");
             var initial = localClinic;
             if (sharedClinic is null) ShowClinic(initial);
             try
@@ -1858,8 +1868,10 @@ internal sealed class MainForm : Form
                 var clinic = await Task.Run(() => archive.LoadClinic(initial));
                 if (IsDisposed || sharedArchive != archive) return;
                 sharedClinic = clinic;
-                ShowClinic(clinic);
-                clinicResult.Text = "Wczytano wspólne dane lecznicy.";
+                ShowClinic(clinic ?? initial);
+                SetClinicStatus(clinic is null || clinic == new ClinicSettings()
+                    ? $"Archiwum na {archive.Server} nie zawiera danych lecznicy. Uzupełnij pola i zapisz je w zakładce „Dane lecznicy”."
+                    : $"Wczytano dane lecznicy z archiwum na {archive.Server}.");
             }
             catch (Exception ex)
             {
@@ -1874,12 +1886,12 @@ internal sealed class MainForm : Form
 
         Add("", Action("Zapisz dane lecznicy", async () =>
         {
-            var clinic = new ClinicSettings(clinicName.Text, clinicAddress.Text, doctor.Text);
+            var clinic = ClinicDraft();
             if (sharedArchive is not { } archive)
             {
                 ClinicSettingsStore.Save(clinic);
                 localClinic = clinic;
-                clinicResult.Text = status.Text = "Zapisano dane na tym stanowisku. Połącz się z archiwum, aby je udostępnić.";
+                SetClinicStatus("Zapisano dane lokalnie. Połącz się w zakładce „Archiwum SQL”, aby udostępnić je stanowiskom.", reportInStatusBar: true);
                 return;
             }
 
@@ -1889,7 +1901,7 @@ internal sealed class MainForm : Form
                 await Task.Run(() => archive.SaveClinic(clinic));
                 if (IsDisposed || sharedArchive != archive) return;
                 sharedClinic = clinic;
-                clinicResult.Text = status.Text = "Zapisano wspólne dane lecznicy w archiwum.";
+                SetClinicStatus($"Zapisano wspólne dane lecznicy w bazie {SharedArchive.DatabaseName} na {archive.Server}.", reportInStatusBar: true);
             }
             catch (Exception ex)
             {
@@ -1901,6 +1913,12 @@ internal sealed class MainForm : Form
             }
         }));
         Add("", Action("Pobierz dane z archiwum", () => RefreshClinic(Archive())));
+        sections.SelectedIndexChanged += async (_, _) =>
+        {
+            if (sections.SelectedTab == clinicForm.Parent && clinicForm.Enabled &&
+                sharedArchive is { } archive && ClinicDraft() == (sharedClinic ?? localClinic))
+                await RefreshClinic(archive);
+        };
         Shown += async (_, _) =>
         {
             if (sharedArchive is { } archive) await RefreshClinic(archive);

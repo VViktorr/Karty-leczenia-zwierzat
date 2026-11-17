@@ -13,6 +13,7 @@ internal sealed record SavedTreatmentCard(string Id, DateTime Date, string Clien
 internal sealed class SharedArchive(ConnectionOptions options)
 {
     internal const string DatabaseName = "KartyLeczenia";
+    internal string Server => options.Server;
     internal static string LocalDataFolder => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), DatabaseName);
 
@@ -44,7 +45,7 @@ internal sealed class SharedArchive(ConnectionOptions options)
         command.ExecuteNonQuery();
     }
 
-    internal ClinicSettings LoadClinic(ClinicSettings local)
+    internal ClinicSettings? LoadClinic(ClinicSettings local)
     {
         using var db = Open();
         using var transaction = db.BeginTransaction();
@@ -52,10 +53,10 @@ internal sealed class SharedArchive(ConnectionOptions options)
             !string.IsNullOrWhiteSpace(local.Doctor))
             WriteClinic(db, transaction, local, replaceExisting: false);
 
-        ClinicSettings clinic;
+        ClinicSettings? clinic;
         using (var command = Command(db, "SELECT name, address, doctor FROM dbo.clinic_settings WHERE id = 1;", transaction))
         using (var reader = command.ExecuteReader())
-            clinic = reader.Read() ? new(reader.GetString(0), reader.GetString(1), reader.GetString(2)) : new();
+            clinic = reader.Read() ? new(reader.GetString(0), reader.GetString(1), reader.GetString(2)) : null;
 
         transaction.Commit();
         return clinic;

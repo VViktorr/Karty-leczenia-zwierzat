@@ -42,8 +42,12 @@ Type: files; Name: "{commondesktop}\Karty leczenia zwierząt (SQL).lnk"
 Type: files; Name: "{commonprograms}\KartyLeczenia.lnk"
 Type: files; Name: "{commondesktop}\KartyLeczenia.lnk"; Tasks: not desktopicon
 
+[Dirs]
+Name: "{commonprograms}\KartyLeczenia"
+
 [Icons]
 Name: "{commonprograms}\KartyLeczenia\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
+Name: "{commonprograms}\KartyLeczenia\Ustawienia KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; Parameters: "--settings"; WorkingDir: "{app}"
 Name: "{commondesktop}\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]

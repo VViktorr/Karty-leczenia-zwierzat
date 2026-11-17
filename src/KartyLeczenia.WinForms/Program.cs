@@ -3,7 +3,7 @@ namespace KartyLeczenia.Windows;
 internal static class Program
 {
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         CrashLog.Initialize();
         try
@@ -16,7 +16,7 @@ internal static class Program
                     "KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
             ApplicationConfiguration.Initialize();
-            Application.Run(new MainForm());
+            Application.Run(new MainForm(args.Contains("--settings", StringComparer.OrdinalIgnoreCase)));
             CrashLog.Write("WinForms.Application.Exit");
         }
         catch (Exception ex)
