@@ -1,6 +1,6 @@
 ﻿param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Server', 'WebView2')]
+    [ValidateSet('Server', 'Existing', 'WebView2')]
     [string]$Mode,
 
     [string]$WebView2Package
@@ -24,7 +24,7 @@ function Assert-MicrosoftSignature([string]$Path) {
 
 function Invoke-LocalSql([string]$Database, [string]$Sql) {
     $builder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder
-    $builder.DataSource = "lpc:localhost\$instance"
+    $builder.DataSource = if ($instance -eq 'MSSQLSERVER') { 'lpc:localhost' } else { "lpc:localhost\$instance" }
     $builder.InitialCatalog = $Database
     $builder.IntegratedSecurity = $true
     $builder.ConnectTimeout = 3
@@ -81,6 +81,219 @@ function Set-RegistryString([string]$Path, [string]$Name, [string]$Value) {
     return $true
 }
 
+function Initialize-ArchiveSqlLogin {
+    $secret = Read-Host "Ustaw hasło konta SQL $login (14–128 znaków, wielkie i małe litery, cyfra i znak specjalny)" -AsSecureString
+    $buffer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+    try {
+        $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($buffer)
+        if ($password.Length -lt 14 -or $password.Length -gt 128) {
+            throw 'Hasło musi mieć od 14 do 128 znaków. Uruchom instalator ponownie.'
+        }
+        $escaped = $password.Replace("'", "''")
+        $sql = @"
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+CREATE LOGIN [$login] WITH PASSWORD=N'$escaped', CHECK_POLICY=ON, DEFAULT_DATABASE=[KartyLeczenia];
+CREATE USER [$login] FOR LOGIN [$login];
+ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER [$login];
+COMMIT;
+"@
+        try { Invoke-LocalSql 'KartyLeczenia' $sql | Out-Null }
+        catch { throw 'SQL Server odrzucił utworzenie konta. Sprawdź wymagania hasła i uruchom instalator ponownie.' }
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($buffer)
+        $secret.Dispose()
+        Remove-Variable password, escaped, sql -ErrorAction SilentlyContinue
+    }
+}
+
+function Initialize-ExistingArchive {
+    # Only Database Engine instance registrations are considered.
+    $registered = Get-Item -LiteralPath $instanceNames -ErrorAction SilentlyContinue
+    if (!$registered) { throw 'Nie znaleziono zainstalowanych instancji SQL Server.' }
+    $instances = @(
+        foreach ($name in ($registered.GetValueNames() | Sort-Object)) {
+            $id = $registered.GetValue($name)
+            $service = if ($name -eq 'MSSQLSERVER') { 'MSSQLSERVER' } else { 'MSSQL$' + $name }
+            $status = Get-Service -Name $service -ErrorAction SilentlyContinue
+            $setup = Get-ItemProperty -LiteralPath "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$id\Setup" -ErrorAction SilentlyContinue
+            $version = if ($setup.PatchLevel) { $setup.PatchLevel } elseif ($setup.Version) { $setup.Version } else { 'nieustalona' }
+            [pscustomobject]@{ Name = $name; State = $status.Status; Version = $version }
+        }
+    )
+    if (!$instances.Count) { throw 'Nie znaleziono zainstalowanych instancji SQL Server.' }
+
+    Write-Host 'Instancje SQL Server na tym komputerze'
+    for ($i = 0; $i -lt $instances.Count; $i++) {
+        $item = $instances[$i]
+        $state = switch ("$($item.State)") {
+            'Running' { 'uruchomiona' }
+            'Stopped' { 'zatrzymana' }
+            '' { 'brak usługi' }
+            default { $item.State }
+        }
+        Write-Host "[$($i + 1)] $($item.Name) | wersja $($item.Version) | $state"
+    }
+    $choice = 0
+    $answer = Read-Host 'Podaj numer instancji lub 0, aby wrócić'
+    if (![int]::TryParse($answer, [ref]$choice) -or $choice -lt 0 -or $choice -gt $instances.Count) {
+        throw 'Wybierz numer z listy.'
+    }
+    if ($choice -eq 0) { exit 2 }
+    $selected = $instances[$choice - 1]
+    if ($selected.State -ne 'Running') {
+        throw 'Wybrana instancja nie działa. Uruchom ją i ponów instalację.'
+    }
+    $script:instance = $selected.Name
+    $productVersion = Invoke-LocalSql 'master' "SELECT CONVERT(nvarchar(128), SERVERPROPERTY('ProductVersion'));"
+    Write-Host "Połączono z instancją $instance, wersja $productVersion."
+    $admin = Invoke-LocalSql 'master' "SELECT IS_SRVROLEMEMBER(N'sysadmin');"
+    if ($admin -ne 1) {
+        throw 'Uruchom instalator z konta Windows mającego uprawnienia sysadmin na wybranej instancji.'
+    }
+
+    $databaseState = Invoke-LocalSql 'master' @'
+SELECT CASE WHEN DB_ID(N'KartyLeczenia') IS NULL THEN 0
+            WHEN CONVERT(nvarchar(32), DATABASEPROPERTYEX(N'KartyLeczenia', 'Status')) = N'ONLINE'
+             AND CONVERT(nvarchar(32), DATABASEPROPERTYEX(N'KartyLeczenia', 'Updateability')) = N'READ_WRITE' THEN 1
+            ELSE 2 END;
+'@
+    if ($databaseState -eq 2) { throw 'Istniejąca baza KartyLeczenia musi być dostępna do odczytu i zapisu.' }
+    if ($databaseState -eq 1) {
+        $schemaState = Invoke-LocalSql 'KartyLeczenia' @'
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE is_ms_shipped = 0)
+    SELECT 0;
+ELSE IF OBJECT_ID(N'dbo.treatment_cards', N'U') IS NOT NULL
+    AND OBJECT_ID(N'dbo.animal_descriptions', N'U') IS NOT NULL
+    AND NOT EXISTS (
+        SELECT 1 FROM (VALUES
+            (N'dbo.treatment_cards', N'id', N'uniqueidentifier'),
+            (N'dbo.treatment_cards', N'archive_order', N'bigint'),
+            (N'dbo.treatment_cards', N'source_scope', N'nvarchar'),
+            (N'dbo.treatment_cards', N'payer_id', N'int'),
+            (N'dbo.treatment_cards', N'client', N'nvarchar'),
+            (N'dbo.treatment_cards', N'document', N'nvarchar'),
+            (N'dbo.treatment_cards', N'treatment_date', N'date'),
+            (N'dbo.treatment_cards', N'search_text', N'nvarchar'),
+            (N'dbo.treatment_cards', N'card_json', N'nvarchar'),
+            (N'dbo.treatment_cards', N'print_json', N'nvarchar'),
+            (N'dbo.animal_descriptions', N'description_key', N'binary'),
+            (N'dbo.animal_descriptions', N'source_scope', N'nvarchar'),
+            (N'dbo.animal_descriptions', N'payer_id', N'int'),
+            (N'dbo.animal_descriptions', N'description', N'nvarchar'),
+            (N'dbo.animal_descriptions', N'last_used', N'bigint')
+        ) expected(table_name, column_name, type_name)
+        WHERE NOT EXISTS (
+            SELECT 1 FROM sys.columns c
+            WHERE c.object_id = OBJECT_ID(expected.table_name, N'U')
+                AND c.name = expected.column_name AND TYPE_NAME(c.system_type_id) = expected.type_name
+                AND (expected.type_name <> N'nvarchar' OR c.max_length = -1)
+                AND (expected.column_name <> N'description_key' OR c.max_length = 32)
+                AND (expected.column_name <> N'archive_order' OR c.is_identity = 1)
+        )
+    )
+    AND EXISTS (
+        SELECT 1 FROM sys.key_constraints k
+        JOIN sys.index_columns ic ON ic.object_id = k.parent_object_id AND ic.index_id = k.unique_index_id
+        JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+        WHERE k.parent_object_id = OBJECT_ID(N'dbo.treatment_cards') AND k.type = N'PK' AND c.name = N'id'
+          AND ic.key_ordinal = 1
+    )
+    AND EXISTS (
+        SELECT 1 FROM sys.key_constraints k
+        JOIN sys.index_columns ic ON ic.object_id = k.parent_object_id AND ic.index_id = k.unique_index_id
+        JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+        WHERE k.parent_object_id = OBJECT_ID(N'dbo.animal_descriptions') AND k.type = N'PK' AND c.name = N'description_key'
+          AND ic.key_ordinal = 1
+    )
+    SELECT 1;
+ELSE SELECT 2;
+'@
+        if ($schemaState -eq 2) { throw 'Istniejąca baza KartyLeczenia ma inną strukturę. Nie została zmieniona.' }
+    }
+
+    $windowsOnly = (Invoke-LocalSql 'master' "SELECT CONVERT(int, SERVERPROPERTY('IsIntegratedSecurityOnly'));") -eq 1
+    $useWindows = $windowsOnly
+    if (!$windowsOnly) {
+        $method = Read-Host 'Dostęp do archiwum: [S] konto SQL lub [W] konto albo grupa Windows'
+        if ($method -notin 'S', 'W') { throw 'Wybierz S albo W.' }
+        $useWindows = $method -eq 'W'
+    }
+
+    $tcpPort = Invoke-LocalSql 'master' @'
+SELECT MIN(port)
+FROM sys.dm_tcp_listener_states
+WHERE type_desc = N'TSQL' AND state_desc = N'ONLINE' AND port > 0
+    AND ip_address NOT IN (N'127.0.0.1', N'::1');
+'@
+    $address = if ($tcpPort -and $tcpPort -isnot [DBNull]) {
+        "$env:COMPUTERNAME,$tcpPort"
+    } elseif ($instance -eq 'MSSQLSERVER') {
+        "$env:COMPUTERNAME,1433"
+    } else {
+        "$env:COMPUTERNAME\$instance"
+    }
+    if (!$tcpPort -or $tcpPort -is [DBNull]) {
+        Write-Host 'Instancja nie nasłuchuje na porcie TCP dla sieci. Administrator musi przygotować dostęp ze stanowisk.' -ForegroundColor Yellow
+    }
+
+    $account = $login
+    if ($useWindows) {
+        if ($windowsOnly) { Write-Host 'Instancja obsługuje tylko uwierzytelnianie Windows.' }
+        $account = (Read-Host 'Wpisz konto lub grupę Windows uprawnioną do archiwum (DOMENA\nazwa)').Trim()
+        if (!$account -or $account.Length -gt 128 -or $account -notmatch '^[^\\]+\\[^\\]+$') {
+            throw 'Podaj nazwę konta lub grupy w formacie DOMENA\nazwa.'
+        }
+        try {
+            $ntAccount = New-Object Security.Principal.NTAccount $account
+            $null = $ntAccount.Translate([Security.Principal.SecurityIdentifier])
+        }
+        catch { throw 'Windows nie rozpoznaje wybranego konta lub grupy.' }
+    }
+
+    if ((Read-Host "Utworzyć lub skonfigurować bazę KartyLeczenia na instancji $instance dla konta $account? [T/N]") -ne 'T') {
+        exit 2
+    }
+    Invoke-LocalSql 'master' "IF DB_ID(N'KartyLeczenia') IS NULL EXEC(N'CREATE DATABASE [KartyLeczenia]');" | Out-Null
+    $schema = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Setup-SharedArchive.sql') -Raw -Encoding UTF8
+    Invoke-LocalSql 'KartyLeczenia' $schema | Out-Null
+
+    $literal = $account.Replace("'", "''")
+    $identifier = '[' + $account.Replace(']', ']]') + ']'
+    if ($useWindows) {
+        Invoke-LocalSql 'KartyLeczenia' @"
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+IF SUSER_ID(N'$literal') IS NULL CREATE LOGIN $identifier FROM WINDOWS;
+IF USER_ID(N'$literal') IS NULL CREATE USER $identifier FOR LOGIN $identifier;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'$literal' AND sid = SUSER_SID(N'$literal'))
+    THROW 50002, N'Konto bazy jest już przypisane do innego loginu.', 1;
+IF ISNULL(IS_ROLEMEMBER(N'KartyLeczeniaOperator', N'$literal'), 0) <> 1
+    ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER $identifier;
+COMMIT;
+"@ | Out-Null
+    } else {
+        $existingLogin = Invoke-LocalSql 'master' "SELECT COUNT(*) FROM sys.server_principals WHERE name = N'$login';"
+        if ($existingLogin -eq 1) {
+            $mapped = Invoke-LocalSql 'KartyLeczenia' @"
+SELECT COUNT(*) FROM sys.database_role_members m
+JOIN sys.database_principals u ON u.principal_id = m.member_principal_id
+JOIN sys.database_principals r ON r.principal_id = m.role_principal_id
+JOIN sys.sql_logins s ON s.sid = u.sid
+WHERE u.name = N'$login' AND r.name = N'KartyLeczeniaOperator'
+    AND s.name = N'$login' AND s.is_disabled = 0;
+"@
+            if ($mapped -ne 1) { throw 'Istniejący login SQL nie jest aktywnym kontem tego archiwum. Wybierz konto Windows lub skonfiguruj login z administratorem.' }
+        } else {
+            Initialize-ArchiveSqlLogin
+        }
+    }
+    Set-Content -LiteralPath (Join-Path $PSScriptRoot 'archive-server-result.txt') -Value $address -Encoding ASCII
+    Write-Host "Adres dla stanowisk: $address. Tryb logowania: $(if ($useWindows) { 'Windows' } else { 'SQL' })."
+    Read-Host 'Naciśnij Enter, aby kontynuować' | Out-Null
+}
+
 function Initialize-Archive {
     if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
         throw 'Instalacja serwerowa wymaga 64-bitowego Windows na procesorze Intel lub AMD.'
@@ -133,23 +346,7 @@ function Initialize-Archive {
     Invoke-LocalSql 'KartyLeczenia' $schema | Out-Null
 
     if ((Invoke-LocalSql 'master' "SELECT COUNT(*) FROM sys.sql_logins WHERE name = N'$login';") -eq 0) {
-        $secret = Read-Host "Ustaw hasło konta SQL $login (14–128 znaków, wielkie i małe litery, cyfra i znak specjalny)" -AsSecureString
-        $buffer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
-        try {
-            $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($buffer)
-            if ($password.Length -lt 14 -or $password.Length -gt 128) {
-                throw 'Hasło musi mieć od 14 do 128 znaków. Uruchom instalator ponownie.'
-            }
-            $escaped = $password.Replace("'", "''")
-            $sql = "CREATE LOGIN [$login] WITH PASSWORD=N'$escaped', CHECK_POLICY=ON, DEFAULT_DATABASE=[KartyLeczenia];"
-            try { Invoke-LocalSql 'master' $sql | Out-Null }
-            catch { throw 'SQL Server odrzucił utworzenie konta. Sprawdź wymagania hasła i uruchom instalator ponownie.' }
-        }
-        finally {
-            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($buffer)
-            $secret.Dispose()
-            Remove-Variable password, escaped, sql -ErrorAction SilentlyContinue
-        }
+        Initialize-ArchiveSqlLogin
     }
     Invoke-LocalSql 'KartyLeczenia' @"
 IF USER_ID(N'$login') IS NULL CREATE USER [$login] FOR LOGIN [$login];
@@ -172,10 +369,11 @@ try {
         $result = Start-Process -FilePath $WebView2Package -ArgumentList '/silent /install' -Wait -PassThru
         exit $result.ExitCode
     }
-    Initialize-Archive
+    if ($Mode -eq 'Existing') { Initialize-ExistingArchive }
+    else { Initialize-Archive }
 }
 catch {
     Write-Host $_.Exception.Message -ForegroundColor Red
-    if ($Mode -eq 'Server') { Read-Host 'Naciśnij Enter, aby wrócić do instalatora' | Out-Null }
+    if ($Mode -ne 'WebView2') { Read-Host 'Naciśnij Enter, aby wrócić do instalatora' | Out-Null }
     exit 1
 }

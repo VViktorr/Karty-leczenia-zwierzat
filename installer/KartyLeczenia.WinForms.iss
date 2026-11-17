@@ -49,7 +49,9 @@ const
 
 var
   RolePage: TInputOptionWizardPage;
+  ServerPage: TInputOptionWizardPage;
   AddressPage: TInputQueryWizardPage;
+  ExistingServerAddress: String;
   DownloadPage: TDownloadWizardPage;
 
 function NeedsWebView2: Boolean;
@@ -63,9 +65,18 @@ end;
 function ArchiveServer(Param: String): String;
 begin
   if RolePage.SelectedValueIndex = 0 then
-    Result := GetComputerNameString + ',' + ArchivePort
+  begin
+    if ServerPage.SelectedValueIndex = 0 then
+      Result := ExistingServerAddress
+    else
+      Result := GetComputerNameString + ',' + ArchivePort;
+  end
   else
-    Result := Trim(AddressPage.Values[0]) + ',' + ArchivePort;
+  begin
+    Result := Trim(AddressPage.Values[0]);
+    if (Pos(',', Result) = 0) and (Pos('\', Result) = 0) then
+      Result := Result + ',' + ArchivePort;
+  end;
 end;
 
 procedure InitializeWizard;
@@ -79,9 +90,18 @@ begin
   else
     RolePage.SelectedValueIndex := 1;
 
-  AddressPage := CreateInputQueryPage(RolePage.ID, 'Serwer archiwum',
-    'Podaj nazwę komputera lub adres IPv4.',
-    'Wpisz adres komputera, na którym wykonano instalację serwerową.');
+  ServerPage := CreateInputOptionPage(RolePage.ID, 'Instancja SQL Server', 'Wybierz, gdzie zapisać archiwum',
+    'W trybie istniejącej instancji jej nazwa, wersja i stan pojawią się przed utworzeniem bazy.', True, False);
+  ServerPage.Add('Wybierz istniejącą instancję na tym komputerze');
+  ServerPage.Add('Zainstaluj lub użyj osobnej instancji KLARCHIVE');
+  if GetPreviousData('ArchiveEngine', '') = 'existing' then
+    ServerPage.SelectedValueIndex := 0
+  else
+    ServerPage.SelectedValueIndex := 1;
+
+  AddressPage := CreateInputQueryPage(ServerPage.ID, 'Serwer archiwum',
+    'Podaj adres wyświetlony po instalacji serwerowej.',
+    'Przykład: SERWER,51433 lub SERWER\INSTANCJA. Sama nazwa lub adres IPv4 użyje portu 51433.');
   AddressPage.Add('Nazwa lub adres serwera:', False);
   AddressPage.Values[0] := ExpandConstant('{param:ARCHIVESERVER|}');
   if AddressPage.Values[0] = '' then
@@ -94,7 +114,13 @@ end;
 procedure RegisterPreviousData(PreviousDataKey: Integer);
 begin
   if RolePage.SelectedValueIndex = 0 then
-    SetPreviousData(PreviousDataKey, 'ArchiveRole', 'server')
+  begin
+    SetPreviousData(PreviousDataKey, 'ArchiveRole', 'server');
+    if ServerPage.SelectedValueIndex = 0 then
+      SetPreviousData(PreviousDataKey, 'ArchiveEngine', 'existing')
+    else
+      SetPreviousData(PreviousDataKey, 'ArchiveEngine', 'dedicated');
+  end
   else
   begin
     SetPreviousData(PreviousDataKey, 'ArchiveRole', 'client');
@@ -104,29 +130,51 @@ end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  Result := (PageID = AddressPage.ID) and (RolePage.SelectedValueIndex = 0);
+  Result := ((PageID = AddressPage.ID) and (RolePage.SelectedValueIndex = 0)) or
+    ((PageID = ServerPage.ID) and (RolePage.SelectedValueIndex <> 0));
 end;
 
-function ValidHost(const Host: String): Boolean;
+function ValidAddress(const Address: String): Boolean;
 var
-  I: Integer;
+  I, CommaAt, SlashAt, StopAt, Port: Integer;
+  NumericPort: String;
 begin
   Result := False;
-  if (Length(Host) = 0) or (Length(Host) > 253) then Exit;
-  for I := 1 to Length(Host) do
-    if not ((Host[I] >= 'a') and (Host[I] <= 'z')) and
-       not ((Host[I] >= 'A') and (Host[I] <= 'Z')) and
-       not ((Host[I] >= '0') and (Host[I] <= '9')) and
-       (Host[I] <> '.') and (Host[I] <> '-') then Exit;
+  if (Length(Address) = 0) or (Length(Address) > 270) then Exit;
+  CommaAt := Pos(',', Address);
+  SlashAt := Pos('\', Address);
+  StopAt := Length(Address) + 1;
+  if CommaAt > 0 then
+  begin
+    NumericPort := Copy(Address, CommaAt + 1, Length(Address));
+    if (Length(NumericPort) = 0) or (Length(NumericPort) > 5) then Exit;
+    for I := 1 to Length(NumericPort) do
+      if (NumericPort[I] < '0') or (NumericPort[I] > '9') then Exit;
+    Port := StrToInt(NumericPort);
+    if (Port < 1) or (Port > 65535) then Exit;
+    StopAt := CommaAt;
+  end;
+  if SlashAt > 0 then
+  begin
+    if (SlashAt >= StopAt - 1) or (StopAt - SlashAt > 17) then Exit;
+    if Pos('\', Copy(Address, SlashAt + 1, Length(Address))) > 0 then Exit;
+  end;
+  if (StopAt = 1) or (SlashAt = 1) then Exit;
+  for I := 1 to StopAt - 1 do
+    if not ((Address[I] >= 'a') and (Address[I] <= 'z')) and
+       not ((Address[I] >= 'A') and (Address[I] <= 'Z')) and
+       not ((Address[I] >= '0') and (Address[I] <= '9')) and
+       (Address[I] <> '.') and (Address[I] <> '-') and (Address[I] <> '_') and
+       (I <> SlashAt) then Exit;
   Result := True;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
-  if (CurPageID = AddressPage.ID) and not ValidHost(Trim(AddressPage.Values[0])) then
+  if (CurPageID = AddressPage.ID) and not ValidAddress(Trim(AddressPage.Values[0])) then
   begin
-    MsgBox('Wpisz nazwę komputera lub adres IPv4 serwera archiwum.', mbError, MB_OK);
+    MsgBox('Wpisz poprawny adres archiwum, np. SERWER,51433 lub SERWER\INSTANCJA.', mbError, MB_OK);
     Result := False;
   end;
 end;
@@ -146,6 +194,9 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ExitCode, OpenResult: Integer;
   LicenseChoice: Integer;
+  Mode: String;
+  Report: AnsiString;
+  ReportPath: String;
 begin
   Result := '';
 
@@ -159,7 +210,16 @@ begin
         Exit;
       end;
 
-      if not RegValueExists(HKLM64, 'SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL', 'KLARCHIVE') then
+      Mode := 'Server';
+      ReportPath := ExpandConstant('{tmp}\archive-server-result.txt');
+      if ServerPage.SelectedValueIndex = 0 then
+      begin
+        Mode := 'Existing';
+        ExistingServerAddress := '';
+        DeleteFile(ReportPath);
+      end;
+
+      if (Mode = 'Server') and not RegValueExists(HKLM64, 'SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL', 'KLARCHIVE') then
       begin
         repeat
           LicenseChoice := MsgBox('Instalator pobierze i zainstaluje Microsoft SQL Server 2022 Express.' + #13#10 +
@@ -177,7 +237,7 @@ begin
       end;
 
       ExtractTemporaryFile('Setup-SharedArchive.sql');
-      if not Exec(PowerShellPath, HelperParams + ' -Mode Server', '',
+      if not Exec(PowerShellPath, HelperParams + ' -Mode ' + Mode, '',
         SW_SHOWNORMAL, ewWaitUntilTerminated, ExitCode) then
       begin
         Result := 'Nie udało się uruchomić konfiguracji serwera: ' + SysErrorMessage(ExitCode);
@@ -189,13 +249,28 @@ begin
         Result := 'SQL Server wymaga ponownego uruchomienia komputera. Potem ponownie uruchom instalator.';
         Exit;
       end;
+      if ExitCode = 2 then
+      begin
+        Result := 'Anulowano wybór istniejącej instancji SQL.';
+        Exit;
+      end;
       if ExitCode <> 0 then
       begin
         Result := 'Konfiguracja serwera archiwum zakończyła się błędem. Szczegóły wyświetlono w oknie konfiguracji.';
         Exit;
       end;
+      if Mode = 'Existing' then
+      begin
+        if LoadStringFromFile(ReportPath, Report) then
+          ExistingServerAddress := Trim(String(Report));
+        if not ValidAddress(ExistingServerAddress) then
+        begin
+          Result := 'Nie udało się odczytać adresu skonfigurowanej instancji.';
+          Exit;
+        end;
+      end;
     end
-    else if not ValidHost(Trim(AddressPage.Values[0])) then
+    else if not ValidAddress(Trim(AddressPage.Values[0])) then
     begin
       Result := 'Podaj adres serwera archiwum. Przy instalacji cichej użyj /ARCHIVESERVER=nazwa-serwera.';
       Exit;
@@ -236,5 +311,5 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if (CurPageID = wpFinished) and (RolePage.SelectedValueIndex = 0) then
     WizardForm.FinishedLabel.Caption := 'Serwer archiwum jest gotowy. Adres dla stanowisk: ' +
-      ArchiveServer('') + #13#10 + 'Konto SQL: KartyLeczeniaOperator.';
+      ArchiveServer('') + #13#10 + 'Użyj trybu logowania wybranego podczas konfiguracji SQL.';
 end;

@@ -68,15 +68,29 @@ Domyślny katalog programu to `C:\Program Files\KartyLeczenia.WinForms`.
 Instalator tworzy skróty w menu Start i na pulpicie dla wszystkich użytkowników.
 Brakujący WebView2 pobiera z Microsoftu.
 
-- **Serwer** — po akceptacji licencji pobiera SQL Server 2022 Express, jeśli
-  brakuje instancji `KLARCHIVE`. Przygotowuje osobną bazę `KartyLeczenia`,
+- **Serwer → Wybierz istniejącą instancję** — w oknie konfiguracji pokażą się
+  lokalne instancje SQL Server z nazwą, wersją i stanem usługi. Wybierz
+  uruchomioną instancję, do której Twoje konto Windows ma uprawnienia
+  administratora SQL (`sysadmin`). Po potwierdzeniu instalator utworzy
+  osobną bazę `KartyLeczenia` albo użyje dotychczasowego archiwum o zgodnej
+  strukturze. W instancji z logowaniem mieszanym można wybrać konto SQL lub
+  konto albo grupę Windows. Instancja z logowaniem Windows wymaga konta lub
+  grupy rozpoznawanej także na stanowiskach. Kreator nie zmienia trybu
+  uwierzytelniania, usług, portów ani reguł zapory istniejącej instancji.
+  Jeśli instancja nie udostępnia SQL po TCP w sieci, jej administrator
+  przygotowuje dostęp ze stanowisk osobno.
+- **Serwer → Zainstaluj lub użyj osobnej instancji KLARCHIVE** — po
+  akceptacji licencji pobiera SQL Server 2022 Express, jeśli brakuje instancji `KLARCHIVE`. Przygotowuje osobną bazę `KartyLeczenia`,
   port TCP `51433` i regułę zapory dla lokalnej podsieci w profilach
   prywatnym i domenowym. Podczas pierwszej konfiguracji wpisz hasło dla
   konta SQL `KartyLeczeniaOperator` w oknie konfiguracji. Zachowaj je do
   ustawienia połączenia na stanowiskach. Instalator wyświetli adres archiwum.
-- **Stanowisko zdalne** — podaj nazwę komputera serwera lub jego adres IPv4.
-  Po otwarciu programu adres i login pojawią się w **Ustawienia → Archiwum SQL**. Wpisz
-  hasło operatora i wybierz **Sprawdź i zapisz**. Połączenie używa szyfrowania i domyślnie weryfikuje certyfikat.
+- **Stanowisko zdalne** — wklej adres wskazany w instalacji serwerowej,
+  np. `SERWER,51433`, `SERWER,1433` albo `SERWER\INSTANCJA`. Sama nazwa
+  komputera lub adres IPv4 oznacza port `51433`. Po otwarciu programu
+  adres pojawi się w **Ustawienia → Archiwum SQL**. Wybierz metodę
+  logowania ustawioną na serwerze. Dla logowania SQL wpisz hasło operatora,
+  a następnie wybierz **Sprawdź i zapisz**. Połączenie używa szyfrowania i domyślnie weryfikuje certyfikat.
   Jeżeli dedykowana instancja korzysta z certyfikatu własnego, możesz jawnie
   zaznaczyć **Zaufaj certyfikatowi serwera archiwum** po sprawdzeniu adresu
   prywatnego serwera. Dane Subiekta ustawiasz osobno.
