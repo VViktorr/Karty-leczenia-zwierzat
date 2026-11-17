@@ -60,14 +60,13 @@ public static class CardHtmlRenderer
                 if (species.Length > 0 && !description.Contains(species, StringComparison.OrdinalIgnoreCase)) description += "\n" + species;
                 string animalNumbers = (row.GetValueOrDefault("Numery zwierząt") ?? "").Trim();
                 if (animalNumbers.Length > 0) description = (description.Trim() + "\n" + animalNumbers).Trim();
-                string expiry = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Ważność")) ? "" : "<br><small>Ważność: " + V("Ważność") + "</small>";
                 string notes = string.Join("\n", (row.GetValueOrDefault("Zalecenia / uwagi") ?? "").Split('\n')
                     .Where(line => !System.Text.RegularExpressions.Regex.IsMatch(line,
                         @"^\s*WZ\s+.+?, poz\. ID \d+, ruch ID \d*: .*; seria: .*; ważność: .+",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
                     .Replace("Sprawdź / uzupełnij serię i ważność.", "", StringComparison.OrdinalIgnoreCase).Trim();
                 string route = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Droga podania")) ? "" : "<br>" + V("Droga podania");
-                html.Append($"<tr><td class='lp'>{++index}</td><td>{E(description)}</td><td>{V("Liczba zwierząt")}</td><td>{V("Rozpoznanie")}</td><td>{V("Produkt")}</td><td>{V("Seria")}{expiry}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
+                html.Append($"<tr><td class='lp'>{++index}</td><td>{E(description)}</td><td>{V("Liczba zwierząt")}</td><td>{V("Rozpoznanie")}</td><td>{V("Produkt")}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
             }
             for (; index < minimum; index++) html.Append("<tr class='empty'>" + string.Concat(Enumerable.Repeat("<td>&nbsp;</td>", 9)) + "</tr>");
         }
