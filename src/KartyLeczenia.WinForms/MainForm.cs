@@ -28,6 +28,7 @@ internal sealed class MainForm : Form
     readonly Dictionary<DocumentListKey, (DateTimeOffset LoadedAt, List<DocumentSuggestion> Rows, bool Truncated)> cache = new();
     ConnectionOptions? connection;
     CancellationTokenSource? searchWork;
+    readonly System.Windows.Forms.Timer documentSearchTimer = new() { Interval = 350 };
     DocumentSearchKinds kind = DocumentSearchKinds.Invoices;
     DocumentData? currentCard;
 
@@ -50,10 +51,12 @@ internal sealed class MainForm : Form
         };
         FormClosed += (_, _) =>
         {
+            documentSearchTimer.Stop();
             CrashLog.Write("WinForms.MainWindow.Closed");
             preloadWork?.Cancel();
             searchWork?.Cancel();
         };
+        Disposed += (_, _) => documentSearchTimer.Dispose();
         Controls.Add(tabs);
         Controls.Add(statusBar);
         statusBar.BringToFront();
@@ -221,6 +224,19 @@ internal sealed class MainForm : Form
         Column(documents, "Wartość brutto", "Gross", 145, "N2");
         Column(documents, "Powiązane dokumenty", "RelatedText", 300);
         documents.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0) await Run(OpenDocument); };
+        documentSearchTimer.Tick += async (_, _) =>
+        {
+            documentSearchTimer.Stop();
+            if (connection is not null) await Run(() => Search(false));
+        };
+        search.TextChanged += (_, _) =>
+        {
+            documentSearchTimer.Stop();
+            if (connection is null) return;
+
+            searchWork?.Cancel();
+            documentSearchTimer.Start();
+        };
         search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await Run(() => Search(true)); } };
         period.Items.AddRange(["(nieokreślony)", "bieżący dzień", "bieżący tydzień", "bieżący miesiąc",
             "bieżący kwartał", "bieżący rok", "ostatnie 7 dni", "ostatnie 30 dni", "dowolny miesiąc", "dowolny okres"]);
@@ -428,6 +444,7 @@ internal sealed class MainForm : Form
 
     async Task Search(bool refresh)
     {
+        documentSearchTimer.Stop();
         var options = Connection();
         searchWork?.Cancel();
         var key = DocumentKey(kind, search.Text.Trim());
