@@ -27,7 +27,10 @@ Source: "..\scripts\Setup-SharedArchive.sql"; Flags: dontcopy
 Source: "..\publish-winforms\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [INI]
-Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Server"; String: "{code:ArchiveServer}"; Flags: uninsdeletesection uninsdeleteempty
+Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Server"; String: "{code:ArchiveServer}"
+
+[UninstallDelete]
+Type: files; Name: "{app}\archive-installation.ini"
 
 [Icons]
 Name: "{commonprograms}\Karty leczenia zwierząt (SQL)"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"
