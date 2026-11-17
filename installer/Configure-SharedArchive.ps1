@@ -192,24 +192,24 @@ function Set-RegistryString([string]$Path, [string]$Name, [string]$Value) {
 
 function Initialize-ArchiveSqlLogin {
     $secret = Show-ArchiveDialog -Title 'Hasło operatora archiwum' -Password -Message (
-        "Ustaw hasło konta SQL $login. Użyj od 14 do 128 znaków, z wielką i małą literą, cyfrą i znakiem specjalnym.")
+        "Ustaw hasło konta SQL $login. Wpisz dokładnie sześć cyfr (0–9).")
     $buffer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
     try {
         $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($buffer)
-        if ($password.Length -lt 14 -or $password.Length -gt 128) {
-            throw 'Hasło musi mieć od 14 do 128 znaków. Uruchom instalator ponownie.'
+        if ($password -notmatch '\A[0-9]{6}\z') {
+            throw 'Hasło musi składać się z dokładnie sześciu cyfr (0–9). Uruchom instalator ponownie.'
         }
         $escaped = $password.Replace("'", "''")
         $sql = @"
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
-CREATE LOGIN [$login] WITH PASSWORD=N'$escaped', CHECK_POLICY=ON, DEFAULT_DATABASE=[KartyLeczenia];
+CREATE LOGIN [$login] WITH PASSWORD=N'$escaped', CHECK_POLICY=OFF, CHECK_EXPIRATION=OFF, DEFAULT_DATABASE=[KartyLeczenia];
 CREATE USER [$login] FOR LOGIN [$login];
 ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER [$login];
 COMMIT;
 "@
         try { Invoke-LocalSql 'KartyLeczenia' $sql | Out-Null }
-        catch { throw 'SQL Server odrzucił utworzenie konta. Sprawdź wymagania hasła i uruchom instalator ponownie.' }
+        catch { throw 'SQL Server odrzucił utworzenie konta operatora archiwum. Sprawdź uprawnienia i dostępność bazy.' }
     }
     finally {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($buffer)

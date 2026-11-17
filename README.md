@@ -86,7 +86,7 @@ logowania i hasła odbywa się w oknach dialogowych.
   akceptacji licencji pobiera SQL Server 2025 Express, jeśli brakuje instancji `KLARCHIVE`. Przygotowuje osobną bazę `KartyLeczenia`,
   port TCP `51433` i regułę zapory dla lokalnej podsieci w profilach
   prywatnym i domenowym. Podczas pierwszej konfiguracji wpisz hasło dla
-  konta SQL `KartyLeczeniaOperator` w oknie dialogowym. Zachowaj je do
+  konta SQL `KartyLeczeniaOperator` w oknie dialogowym (dokładnie sześć cyfr). Zachowaj je do
   ustawienia połączenia na stanowiskach. Instalator wyświetli adres archiwum.
   Jeśli instalacja nowego SQL Server zatrzyma się z błędem ODBC 17 lub 18 (1706),
   kreator pokaże instrukcję Microsoft i pozwoli otworzyć dziennik instalacji.
