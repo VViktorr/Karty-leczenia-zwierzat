@@ -28,6 +28,8 @@ internal sealed class MainForm : Form
     readonly ConnectionSettingsStore settings = new();
     readonly ConnectionSettingsStore archiveSettings = new(Path.Combine(SharedArchive.LocalDataFolder, "archive-connection.json"));
     SharedArchive? sharedArchive;
+    ClinicSettings localClinic = ClinicSettingsStore.Load();
+    ClinicSettings? sharedClinic;
     readonly string installedArchiveServer = SharedArchive.ReadInstalledServer();
     bool savingTreatment;
     int descriptionEditVersion;
@@ -1258,7 +1260,7 @@ internal sealed class MainForm : Form
     {
         var source = currentCard ?? throw new InvalidOperationException("Najpierw wczytaj dokument.");
         if (!treatment.EndEdit()) throw new InvalidOperationException("Zakończ edycję bieżącej pozycji karty.");
-        var clinic = ClinicSettingsStore.Load();
+        var clinic = sharedClinic ?? localClinic;
         var fields = new Dictionary<string, string> { ["Dokument źródłowy"] = source.Number,
             ["Właściciel i adres"] = source.Payer, ["Zakres mapowania towarów"] = source.Scope,
             ["Wykonanie — data i godzina"] = treatmentDate.Value.ToString("dd.MM.yyyy"),
@@ -1528,6 +1530,7 @@ internal sealed class MainForm : Form
         var archiveForm = form;
         bool configuringArchive = false, importing = false;
         Button? importButton = null;
+        Func<SharedArchive, Task>? refreshClinic = null;
         var saveArchiveConnection = Action("Sprawdź i zapisz", async () =>
         {
             if (configuringArchive || importing) return;
@@ -1550,8 +1553,10 @@ internal sealed class MainForm : Form
                 await RunArchive(() => { archive.Test(); return true; });
                 archiveSettings.Save(draft, rememberPassword);
                 sharedArchive = archive;
+                sharedClinic = null;
                 importButton!.Enabled = true;
                 archiveResult.Text = status.Text = $"Połączono z archiwum na {draft.Server}. Ustawienia zapisane.";
+                await refreshClinic!(archive);
             }
             catch (Exception ex)
             {
@@ -1821,16 +1826,85 @@ internal sealed class MainForm : Form
         };
 
         form = Section("Dane lecznicy");
-        var clinic = ClinicSettingsStore.Load();
-        var clinicName = Field("Nazwa lecznicy", clinic.Name);
-        var clinicAddress = Field("Adres lecznicy", clinic.Address);
-        var doctor = Field("Lekarz", clinic.Doctor);
-        Add("", Action("Zapisz dane lecznicy", () =>
+        var clinicForm = form;
+        var clinicName = Field("Nazwa lecznicy", localClinic.Name);
+        var clinicAddress = Field("Adres lecznicy", localClinic.Address);
+        var doctor = Field("Lekarz", localClinic.Doctor);
+        var clinicResult = Message(form, "Po połączeniu z archiwum dane lecznicy będą wspólne dla stanowisk.", multiline: true);
+
+        void ShowClinic(ClinicSettings clinic)
         {
-            ClinicSettingsStore.Save(new(clinicName.Text, clinicAddress.Text, doctor.Text));
-            status.Text = "Zapisano dane lecznicy.";
-            return Task.CompletedTask;
+            clinicName.Text = clinic.Name;
+            clinicAddress.Text = clinic.Address;
+            doctor.Text = clinic.Doctor;
+        }
+
+        void ReportClinicError(Exception ex)
+        {
+            string message = ex is Microsoft.Data.SqlClient.SqlException { Number: 207 or 208 or 229 }
+                ? "Zaktualizuj bazę archiwum, ponownie uruchamiając instalator w trybie serwerowym."
+                : SubiektConnectionService.FriendlyError(ex);
+            clinicResult.Text = status.Text = $"Dane lecznicy: {message}";
+        }
+
+        async Task RefreshClinic(SharedArchive archive)
+        {
+            clinicForm.Enabled = false;
+            clinicResult.Text = "Pobieranie danych lecznicy z archiwum…";
+            var initial = localClinic;
+            if (sharedClinic is null) ShowClinic(initial);
+            try
+            {
+                var clinic = await Task.Run(() => archive.LoadClinic(initial));
+                if (IsDisposed || sharedArchive != archive) return;
+                sharedClinic = clinic;
+                ShowClinic(clinic);
+                clinicResult.Text = "Wczytano wspólne dane lecznicy.";
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed && sharedArchive == archive) ReportClinicError(ex);
+            }
+            finally
+            {
+                if (!IsDisposed && sharedArchive == archive) clinicForm.Enabled = true;
+            }
+        }
+        refreshClinic = RefreshClinic;
+
+        Add("", Action("Zapisz dane lecznicy", async () =>
+        {
+            var clinic = new ClinicSettings(clinicName.Text, clinicAddress.Text, doctor.Text);
+            if (sharedArchive is not { } archive)
+            {
+                ClinicSettingsStore.Save(clinic);
+                localClinic = clinic;
+                clinicResult.Text = status.Text = "Zapisano dane na tym stanowisku. Połącz się z archiwum, aby je udostępnić.";
+                return;
+            }
+
+            clinicForm.Enabled = false;
+            try
+            {
+                await Task.Run(() => archive.SaveClinic(clinic));
+                if (IsDisposed || sharedArchive != archive) return;
+                sharedClinic = clinic;
+                clinicResult.Text = status.Text = "Zapisano wspólne dane lecznicy w archiwum.";
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed && sharedArchive == archive) ReportClinicError(ex);
+            }
+            finally
+            {
+                if (!IsDisposed && sharedArchive == archive) clinicForm.Enabled = true;
+            }
         }));
+        Add("", Action("Pobierz dane z archiwum", () => RefreshClinic(Archive())));
+        Shown += async (_, _) =>
+        {
+            if (sharedArchive is { } archive) await RefreshClinic(archive);
+        };
         var settingsPage = Page("Ustawienia", sections);
         if (sharedArchive is not null && connection is null) sections.SelectedIndex = 1;
         Shown += (_, _) =>

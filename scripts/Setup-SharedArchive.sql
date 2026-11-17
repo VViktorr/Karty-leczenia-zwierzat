@@ -34,10 +34,21 @@ BEGIN
     CREATE INDEX IX_animal_descriptions_payer ON dbo.animal_descriptions (payer_id, last_used DESC);
 END;
 
+IF OBJECT_ID(N'dbo.clinic_settings', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.clinic_settings (
+        id tinyint NOT NULL PRIMARY KEY CHECK (id = 1),
+        name nvarchar(max) NOT NULL,
+        address nvarchar(max) NOT NULL,
+        doctor nvarchar(max) NOT NULL
+    );
+END;
+
 IF DATABASE_PRINCIPAL_ID(N'KartyLeczeniaOperator') IS NULL
     CREATE ROLE KartyLeczeniaOperator AUTHORIZATION dbo;
 
 GRANT SELECT, INSERT, UPDATE ON dbo.treatment_cards TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.animal_descriptions TO KartyLeczeniaOperator;
+GRANT SELECT, INSERT, UPDATE ON dbo.clinic_settings TO KartyLeczeniaOperator;
 
 COMMIT TRANSACTION;

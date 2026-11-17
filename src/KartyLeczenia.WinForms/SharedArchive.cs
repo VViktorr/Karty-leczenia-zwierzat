@@ -44,6 +44,49 @@ internal sealed class SharedArchive(ConnectionOptions options)
         command.ExecuteNonQuery();
     }
 
+    internal ClinicSettings LoadClinic(ClinicSettings local)
+    {
+        using var db = Open();
+        using var transaction = db.BeginTransaction();
+        if (!string.IsNullOrWhiteSpace(local.Name) || !string.IsNullOrWhiteSpace(local.Address) ||
+            !string.IsNullOrWhiteSpace(local.Doctor))
+            WriteClinic(db, transaction, local, replaceExisting: false);
+
+        ClinicSettings clinic;
+        using (var command = Command(db, "SELECT name, address, doctor FROM dbo.clinic_settings WHERE id = 1;", transaction))
+        using (var reader = command.ExecuteReader())
+            clinic = reader.Read() ? new(reader.GetString(0), reader.GetString(1), reader.GetString(2)) : new();
+
+        transaction.Commit();
+        return clinic;
+    }
+
+    internal void SaveClinic(ClinicSettings clinic)
+    {
+        using var db = Open();
+        using var transaction = db.BeginTransaction();
+        WriteClinic(db, transaction, clinic, replaceExisting: true);
+        transaction.Commit();
+    }
+
+    static void WriteClinic(SqlConnection db, SqlTransaction transaction, ClinicSettings clinic, bool replaceExisting)
+    {
+        using var command = Command(db, """
+            IF EXISTS (SELECT 1 FROM dbo.clinic_settings WITH (UPDLOCK, HOLDLOCK) WHERE id = 1)
+            BEGIN
+                IF @replace = 1
+                    UPDATE dbo.clinic_settings SET name = @name, address = @address, doctor = @doctor WHERE id = 1;
+            END
+            ELSE
+                INSERT INTO dbo.clinic_settings (id, name, address, doctor) VALUES (1, @name, @address, @doctor);
+            """, transaction);
+        command.Parameters.Add("@replace", SqlDbType.Bit).Value = replaceExisting;
+        command.Parameters.Add("@name", SqlDbType.NVarChar, -1).Value = clinic.Name;
+        command.Parameters.Add("@address", SqlDbType.NVarChar, -1).Value = clinic.Address;
+        command.Parameters.Add("@doctor", SqlDbType.NVarChar, -1).Value = clinic.Doctor;
+        command.ExecuteNonQuery();
+    }
+
     internal void SaveCard(Guid id, DocumentData source, DateTime date, Card card, Card printCard)
     {
         string client = string.Join(", ", source.Payer.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));

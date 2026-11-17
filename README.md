@@ -46,6 +46,15 @@ Katalog leków pozostaje lokalnym plikiem SQLite dostarczanym z programem.
    źródłowe i można go ponowić. Karty o tym samym identyfikatorze są pomijane,
    a dla tego samego opisu zachowywany jest wpis z nowszą datą użycia.
 
+Nazwa i adres lecznicy oraz dane lekarza są wspólne dla stanowisk. Program
+pobiera je po połączeniu z archiwum. W zakładce **Ustawienia → Dane lecznicy**
+można je edytować lub pobrać na nowo. Gdy archiwum jest puste, pierwsze
+stanowisko, na którym wcześniej zapisano dane lecznicy, uzupełnia je
+automatycznie. Przed aktualizacją stanowisk uruchom nowy instalator w trybie
+**Serwer** na dotychczasowej instancji albo wykonaj aktualny skrypt
+[Setup-SharedArchive.sql](scripts/Setup-SharedArchive.sql) w bazie archiwum
+jako administrator.
+
 Komputer z SQL Server musi być dostępny podczas pracy ze wspólnym archiwum.
 Lokalna wersja aplikacji jest dostępna na gałęzi
 [`KarLecz_lokalnie`](https://github.com/VViktorr/Karty-leczenia-zwierzat/tree/KarLecz_lokalnie).
