@@ -826,8 +826,30 @@ internal sealed class MainForm : Form
         var page = Page("Karta leczenia", treatment, withdrawalMode, routeMode,
             Action("Otwórz ChPL", () =>
             {
-                if (treatment.CurrentRow is { } row && selectedTreatmentVariants.TryGetValue(row, out var variant))
+                var row = treatment.CurrentRow;
+                if (row?.Tag is not TreatmentRow entry)
+                {
+                    status.Text = "Zaznacz pozycję na karcie leczenia.";
+                    return Task.CompletedTask;
+                }
+
+                if (selectedTreatmentVariants.TryGetValue(row, out var variant) && !string.IsNullOrWhiteSpace(variant.Pdf))
+                {
                     LocalCatalogue.OpenPdf(variant.Pdf);
+                    return Task.CompletedTask;
+                }
+
+                var paths = treatmentCatalogue?.ForProduct(entry.Get("Symbol Subiekta"), entry.Product)
+                    .Select(choice => choice.Pdf)
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray() ?? [];
+                if (paths.Length == 1)
+                    LocalCatalogue.OpenPdf(paths[0]);
+                else
+                    status.Text = paths.Length == 0
+                        ? "Brak przypisanej ChPL dla tej kartoteki."
+                        : "Wybierz gatunek i drogę podania, aby otworzyć właściwą ChPL.";
                 return Task.CompletedTask;
             }),
             Action("Zapisz kartę JSON", SaveCard), Action("Podgląd wydruku", PreviewCard));
