@@ -8,7 +8,7 @@ internal static class PdfMail
     const uint MapiDialog = 0x00000008;
     const uint MapiUserAbort = 1;
 
-    internal static void Compose(nint owner, string path, string fileName)
+    internal static void Compose(nint owner, string path, string fileName, string? address)
     {
         var file = new MapiFile
         {
@@ -18,14 +18,30 @@ internal static class PdfMail
         };
         nint attachment = Marshal.AllocHGlobal(Marshal.SizeOf<MapiFile>());
         bool initialized = false;
+        nint recipient = 0;
+        bool recipientInitialized = false;
         try
         {
             Marshal.StructureToPtr(file, attachment, false);
             initialized = true;
+            if (!string.IsNullOrWhiteSpace(address))
+            {
+                recipient = Marshal.AllocHGlobal(Marshal.SizeOf<MapiRecipient>());
+                Marshal.StructureToPtr(new MapiRecipient
+                {
+                    Class = 1,
+                    Name = address,
+                    Address = "SMTP:" + address
+                }, recipient, false);
+                recipientInitialized = true;
+            }
+
             var message = new MapiMessage
             {
                 Subject = "Karta leczenia zwierząt",
                 Body = "Dzień dobry,\r\n\r\nw załączeniu karta leczenia zwierząt.",
+                RecipientCount = recipientInitialized ? 1u : 0u,
+                Recipients = recipient,
                 FileCount = 1,
                 Files = attachment
             };
@@ -41,6 +57,8 @@ internal static class PdfMail
         }
         finally
         {
+            if (recipientInitialized) Marshal.DestroyStructure<MapiRecipient>(recipient);
+            if (recipient != 0) Marshal.FreeHGlobal(recipient);
             if (initialized) Marshal.DestroyStructure<MapiFile>(attachment);
             Marshal.FreeHGlobal(attachment);
         }
@@ -65,6 +83,17 @@ internal static class PdfMail
         public nint Recipients;
         public uint FileCount;
         public nint Files;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct MapiRecipient
+    {
+        public uint Reserved;
+        public uint Class;
+        public string Name;
+        public string Address;
+        public uint EntryIdSize;
+        public nint EntryId;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

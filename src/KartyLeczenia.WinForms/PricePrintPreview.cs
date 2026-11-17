@@ -5,7 +5,8 @@ namespace KartyLeczenia.Windows;
 
 internal sealed class PricePrintPreview : Form
 {
-    internal PricePrintPreview(string html, bool landscape, decimal margin, bool direct = false, bool treatmentCard = false)
+    internal PricePrintPreview(string html, bool landscape, decimal margin, bool direct = false, bool treatmentCard = false,
+        Func<Task<string?>>? findCardEmail = null)
     {
         Text = treatmentCard ? "Podgląd karty leczenia" : "Podgląd wydruku cennika";
         string baseName = treatmentCard ? "karta-leczenia" : "cennik-lekow";
@@ -111,10 +112,21 @@ internal sealed class PricePrintPreview : Form
         };
         if (treatmentCard)
         {
-            email.Click += (_, _) =>
+            email.Click += async (_, _) =>
             {
-                try { PdfMail.Compose(Handle, previewFile, baseName + ".pdf"); }
+                saving = true;
+                print.Enabled = pdf.Enabled = email.Enabled = close.Enabled = false;
+                try
+                {
+                    var address = findCardEmail is null ? null : await findCardEmail();
+                    PdfMail.Compose(Handle, previewFile, baseName + ".pdf", address);
+                }
                 catch (Exception ex) { Report(ex); }
+                finally
+                {
+                    saving = false;
+                    print.Enabled = pdf.Enabled = email.Enabled = close.Enabled = true;
+                }
             };
         }
         Disposed += (_, _) =>

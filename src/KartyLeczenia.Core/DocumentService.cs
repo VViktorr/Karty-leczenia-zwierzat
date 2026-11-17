@@ -188,6 +188,19 @@ public sealed class DocumentService
         });
         return await AttachRelations(con, found, options.WarehouseId, token).ConfigureAwait(false);
     }
+    public async Task<string?> ReadPayerEmailAsync(ConnectionOptions options, int payerId, CancellationToken token)
+    {
+        await using var connection = new SqlConnection(options.BuildConnectionString());
+        await connection.OpenAsync(token).ConfigureAwait(false);
+        using var command = new SqlCommand("""
+            SELECT kh_EMail FROM dbo.kh__Kontrahent WHERE kh_Id = @payerId
+            """, connection);
+        command.Parameters.Add("@payerId", SqlDbType.Int).Value = payerId;
+        var address = (await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string)?.Trim();
+        return address is not null && System.Net.Mail.MailAddress.TryCreate(address, out var mail)
+            && string.Equals(address, mail.Address, StringComparison.Ordinal) ? address : null;
+    }
+
     public async Task<DocumentData> ReadAsync(ConnectionOptions options, string documentNumber, int withdrawalSource, CancellationToken token, int? documentId = null, bool includeOtherItems = false)
     {
         if (string.IsNullOrWhiteSpace(documentNumber)) throw new InvalidOperationException("Wpisz pełny numer dokumentu.");

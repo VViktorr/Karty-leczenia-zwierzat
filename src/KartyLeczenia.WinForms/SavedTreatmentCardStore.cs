@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace KartyLeczenia.Windows;
 
-internal sealed record SavedTreatmentCard(string Id, DateTime Date, string Client, string Document);
+internal sealed record SavedTreatmentCard(string Id, DateTime Date, string Client, string Document, int? PayerId, string Scope);
 
 internal static class SavedTreatmentCardStore
 {
@@ -57,7 +57,7 @@ internal static class SavedTreatmentCardStore
         using var db = Open();
         using var command = db.CreateCommand();
         command.CommandText = """
-            SELECT id, treatment_date, client, document FROM treatment_cards
+            SELECT id, treatment_date, client, document, payer_id, source_scope FROM treatment_cards
             WHERE ($query = '' OR instr(search_text, $query) > 0)
               AND ($date IS NULL OR treatment_date = $date)
             ORDER BY treatment_date DESC, rowid DESC
@@ -68,7 +68,7 @@ internal static class SavedTreatmentCardStore
         while (reader.Read())
             cards.Add(new(reader.GetString(0),
                 DateTime.ParseExact(reader.GetString(1), "yyyy-MM-dd", CultureInfo.InvariantCulture),
-                reader.GetString(2), reader.GetString(3)));
+                reader.GetString(2), reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.GetString(5)));
         return cards;
     }
 

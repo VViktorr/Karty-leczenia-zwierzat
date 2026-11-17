@@ -1292,7 +1292,7 @@ internal sealed class MainForm : Form
         Task OpenSavedCard()
         {
             if (grid.CurrentRow?.DataBoundItem is SavedTreatmentCard row)
-                OpenCardPreview(SavedTreatmentCardStore.Read(row.Id, forPrint: true));
+                OpenCardPreview(SavedTreatmentCardStore.Read(row.Id, forPrint: true), row.PayerId, row.Scope);
             return Task.CompletedTask;
         }
 
@@ -1330,13 +1330,30 @@ internal sealed class MainForm : Form
 
     Task PreviewCard()
     {
-        OpenCardPreview(CaptureTreatmentCard(forPrint: true));
+        var card = CaptureTreatmentCard(forPrint: true);
+        OpenCardPreview(card, currentCard?.PayerId, currentCard?.Scope);
         return Task.CompletedTask;
     }
 
-    void OpenCardPreview(Card card)
+    void OpenCardPreview(Card card, int? payerId, string? scope)
     {
-        using var preview = new PricePrintPreview(CardHtmlRenderer.Render(card), landscape: true, margin: 7, treatmentCard: true);
+        async Task<string?> FindEmail()
+        {
+            if (payerId is not > 0 || connection is not { } options
+                || scope != options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant())
+                return null;
+
+            using var work = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try { return await service.ReadPayerEmailAsync(options, payerId.Value, work.Token); }
+            catch (Exception ex) when (ex is Microsoft.Data.SqlClient.SqlException or OperationCanceledException)
+            {
+                CrashLog.Write("WinForms.Card.PayerEmail", ex);
+                return null;
+            }
+        }
+
+        using var preview = new PricePrintPreview(CardHtmlRenderer.Render(card), landscape: true, margin: 7,
+            treatmentCard: true, findCardEmail: FindEmail);
         DialogPlacement.Show(preview, this, "treatment-print-preview");
     }
 
