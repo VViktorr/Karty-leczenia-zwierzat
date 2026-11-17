@@ -203,13 +203,24 @@ function Initialize-ArchiveSqlLogin {
         $sql = @"
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
-CREATE LOGIN [$login] WITH PASSWORD=N'$escaped', CHECK_POLICY=OFF, CHECK_EXPIRATION=OFF, DEFAULT_DATABASE=[KartyLeczenia];
-CREATE USER [$login] FOR LOGIN [$login];
-ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER [$login];
+CREATE LOGIN [$login] WITH PASSWORD='$escaped', CHECK_POLICY=OFF, CHECK_EXPIRATION=OFF, DEFAULT_DATABASE=[KartyLeczenia];
+USE [KartyLeczenia];
+EXEC(N'CREATE USER [$login] FOR LOGIN [$login];');
+EXEC(N'ALTER ROLE [KartyLeczeniaOperator] ADD MEMBER [$login];');
 COMMIT;
 "@
-        try { Invoke-LocalSql 'KartyLeczenia' $sql | Out-Null }
-        catch { throw 'SQL Server odrzucił utworzenie konta operatora archiwum. Sprawdź uprawnienia i dostępność bazy.' }
+        try { Invoke-LocalSql 'master' $sql | Out-Null }
+        catch {
+            $failure = $_.Exception
+            while ($failure -isnot [System.Data.SqlClient.SqlException] -and $failure.InnerException) {
+                $failure = $failure.InnerException
+            }
+            if ($failure -is [System.Data.SqlClient.SqlException]) {
+                $detail = $failure.Message.Replace($password, '[ukryte]')
+                throw "Konfiguracja konta operatora archiwum. SQL $($failure.Number), wiersz $($failure.LineNumber). $detail"
+            }
+            throw "Konfiguracja konta operatora archiwum. Błąd $($failure.GetType().Name)."
+        }
     }
     finally {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($buffer)
