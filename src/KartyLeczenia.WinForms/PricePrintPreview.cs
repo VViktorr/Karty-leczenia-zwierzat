@@ -5,8 +5,17 @@ namespace KartyLeczenia.Windows;
 
 internal sealed class PricePrintPreview : Form
 {
+    static string CardAttachmentName(string? documentNumber)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        string number = new string((documentNumber ?? "").Trim()
+            .Select(character => invalid.Contains(character) ? '-' : character).ToArray())
+            .Trim(' ', '.', '-');
+        return number.Length == 0 ? "karta-leczenia.pdf" : $"karta-leczenia-{number}.pdf";
+    }
+
     internal PricePrintPreview(string html, bool landscape, decimal margin, bool direct = false, bool treatmentCard = false,
-        Func<Task<string?>>? findCardEmail = null)
+        Func<Task<string?>>? findCardEmail = null, string? cardDocumentNumber = null)
     {
         Text = treatmentCard ? "Podgląd karty leczenia" : "Podgląd wydruku cennika";
         string baseName = treatmentCard ? "karta-leczenia" : "cennik-lekow";
@@ -119,7 +128,7 @@ internal sealed class PricePrintPreview : Form
                 try
                 {
                     var address = findCardEmail is null ? null : await findCardEmail();
-                    PdfMail.Compose(Handle, previewFile, baseName + ".pdf", address);
+                    PdfMail.Compose(Handle, previewFile, CardAttachmentName(cardDocumentNumber), address);
                 }
                 catch (Exception ex) { Report(ex); }
                 finally

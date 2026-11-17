@@ -1353,7 +1353,8 @@ internal sealed class MainForm : Form
         }
 
         using var preview = new PricePrintPreview(CardHtmlRenderer.Render(card), landscape: true, margin: 7,
-            treatmentCard: true, findCardEmail: FindEmail);
+            treatmentCard: true, findCardEmail: FindEmail,
+            cardDocumentNumber: card.Fields.GetValueOrDefault("Dokument źródłowy"));
         DialogPlacement.Show(preview, this, "treatment-print-preview");
     }
 
