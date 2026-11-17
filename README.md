@@ -72,7 +72,8 @@ logowania i hasła odbywa się w oknach dialogowych.
 
 - **Serwer → Wybierz istniejącą instancję** — w oknie konfiguracji pokażą się
   lokalne instancje SQL Server z nazwą, wersją i stanem usługi. Wybierz
-  uruchomioną instancję, do której Twoje konto Windows ma uprawnienia
+  uruchomioną instancję. Przy pierwszej instalacji kreator podpowiada tę opcję,
+  jeśli wykryje działającą usługę SQL Server. Twoje konto Windows musi mieć uprawnienia
   administratora SQL (`sysadmin`). Po potwierdzeniu instalator utworzy
   osobną bazę `KartyLeczenia` albo użyje dotychczasowego archiwum o zgodnej
   strukturze. W instancji z logowaniem mieszanym można wybrać konto SQL lub
@@ -87,6 +88,8 @@ logowania i hasła odbywa się w oknach dialogowych.
   prywatnym i domenowym. Podczas pierwszej konfiguracji wpisz hasło dla
   konta SQL `KartyLeczeniaOperator` w oknie dialogowym. Zachowaj je do
   ustawienia połączenia na stanowiskach. Instalator wyświetli adres archiwum.
+  Jeśli instalacja nowego SQL Server zatrzyma się z błędem ODBC 17 (1706),
+  kreator pokaże instrukcję Microsoft i pozwoli otworzyć dziennik instalacji.
 - **Stanowisko zdalne** — wklej adres wskazany w instalacji serwerowej,
   np. `SERWER,51433`, `SERWER,1433` albo `SERWER\INSTANCJA`. Sama nazwa
   komputera lub adres IPv4 oznacza port `51433`. Po otwarciu programu

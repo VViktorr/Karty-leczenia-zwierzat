@@ -119,6 +119,34 @@ function Invoke-LocalSql([string]$Database, [string]$Sql) {
     finally { $connection.Dispose() }
 }
 
+function Show-OdbcSourceError([string]$SummaryPath, [datetime]$Started) {
+    $summary = Get-Item -LiteralPath $SummaryPath -ErrorAction SilentlyContinue
+    if (!$summary -or $summary.LastWriteTime -lt $Started.AddSeconds(-2)) { return $false }
+    try {
+        $details = Get-Content -LiteralPath $SummaryPath -Raw
+    }
+    catch { return $false }
+    if ($details -notmatch '(?im)^\s*Component error code:\s*1706\s*$' -or
+        $details -notmatch '(?i)ODBC Driver 17 for SQL Server' -or $details -notmatch '(?i)msodbcsql_17\.msi') {
+        return $false
+    }
+
+    $options = @('Otwórz instrukcję Microsoft', 'Otwórz dziennik instalacji SQL', 'Zamknij')
+    $choice = Show-ArchiveDialog -Title 'Brakuje pakietu sterownika ODBC 17' -Notice -Choices $options -Message (
+        'Windows Installer nie znalazł pliku msodbcsql_17.msi (błąd 1706). Napraw istniejący sterownik z pakietu tej samej wersji albo wybierz działającą instancję SQL w kreatorze.')
+    try {
+        if ($choice -eq 0) {
+            Start-Process 'https://learn.microsoft.com/troubleshoot/sql/database-engine/install/windows/restore-missing-windows-installer-cache-files'
+        } elseif ($choice -eq 1) {
+            Start-Process -FilePath $SummaryPath
+        }
+    }
+    catch {
+        Show-ArchiveDialog -Title 'Dziennik instalacji SQL' -Notice -Message $SummaryPath
+    }
+    return $true
+}
+
 function Install-ArchiveEngine {
     $media = Join-Path $PSScriptRoot 'SQLEXPR_x64_ENU.exe'
     $destination = Join-Path $PSScriptRoot 'SQLExpress'
@@ -137,10 +165,13 @@ function Install-ArchiveEngine {
     # Record that this installer attempted to create the instance so it can resume after a restart.
     New-Item -Path $marker -Force | Out-Null
     New-ItemProperty -Path $marker -Name Instance -Value $instance -PropertyType String -Force | Out-Null
+    $started = Get-Date
     $result = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru -NoNewWindow
     if ($result.ExitCode -in 1641, 3010) { exit 3010 }
     if ($result.ExitCode -ne 0) {
-        throw "Instalacja SQL Server Express zakończyła się błędem $($result.ExitCode). Zobacz SQL Server Setup Bootstrap\Log\Summary.txt."
+        $summaryPath = Join-Path $env:ProgramFiles 'Microsoft SQL Server\160\Setup Bootstrap\Log\Summary.txt'
+        if (Show-OdbcSourceError $summaryPath $started) { exit 1 }
+        throw "Instalacja SQL Server Express zakończyła się błędem $($result.ExitCode). Dziennik: $summaryPath"
     }
 }
 

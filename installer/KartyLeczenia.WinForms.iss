@@ -86,7 +86,25 @@ begin
   end;
 end;
 
+function HasRunningSqlInstance: Boolean;
+var
+  Locator, Wmi, Services: Variant;
+begin
+  Result := False;
+  try
+    Locator := CreateOleObject('WbemScripting.SWbemLocator');
+    Wmi := Locator.ConnectServer('.', 'root\cimv2');
+    Services := Wmi.ExecQuery('SELECT Name FROM Win32_Service WHERE State = ''Running'' AND ' +
+      '(Name = ''MSSQLSERVER'' OR Name LIKE ''MSSQL$%'')');
+    Result := Services.Count > 0;
+  except
+    Log('Nie udało się odczytać stanu lokalnych usług SQL Server.');
+  end;
+end;
+
 procedure InitializeWizard;
+var
+  PreviousEngine: String;
 begin
   RolePage := CreateInputOptionPage(wpWelcome, 'Rodzaj instalacji', 'Wybierz rolę tego komputera',
     'Program WinForms zostanie zainstalowany w obu trybach.', True, False);
@@ -101,7 +119,8 @@ begin
     'W trybie istniejącej instancji jej nazwa, wersja i stan pojawią się przed utworzeniem bazy.', True, False);
   ServerPage.Add('Wybierz istniejącą instancję na tym komputerze');
   ServerPage.Add('Zainstaluj lub użyj osobnej instancji KLARCHIVE');
-  if GetPreviousData('ArchiveEngine', '') = 'existing' then
+  PreviousEngine := GetPreviousData('ArchiveEngine', '');
+  if (PreviousEngine = 'existing') or ((PreviousEngine = '') and HasRunningSqlInstance) then
     ServerPage.SelectedValueIndex := 0
   else
     ServerPage.SelectedValueIndex := 1;
