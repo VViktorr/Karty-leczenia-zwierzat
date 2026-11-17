@@ -16,6 +16,19 @@ internal sealed class SharedArchive(ConnectionOptions options)
     internal static string LocalDataFolder => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), DatabaseName);
 
+    internal static string ReadInstalledServer()
+    {
+        try
+        {
+            return File.ReadLines(Path.Combine(AppContext.BaseDirectory, "archive-installation.ini"))
+                .FirstOrDefault(line => line.StartsWith("Server=", StringComparison.OrdinalIgnoreCase))?[7..].Trim() ?? "";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "";
+        }
+    }
+
     internal void Test()
     {
         using var db = Open();

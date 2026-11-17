@@ -28,6 +28,7 @@ internal sealed class MainForm : Form
     readonly ConnectionSettingsStore settings = new();
     readonly ConnectionSettingsStore archiveSettings = new(Path.Combine(SharedArchive.LocalDataFolder, "archive-connection.json"));
     SharedArchive? sharedArchive;
+    readonly string installedArchiveServer = SharedArchive.ReadInstalledServer();
     bool savingTreatment;
     int descriptionEditVersion;
     readonly Dictionary<DocumentListKey, (DateTimeOffset LoadedAt, List<DocumentSuggestion> Rows, bool Truncated)> cache = new();
@@ -85,7 +86,7 @@ internal sealed class MainForm : Form
             documents.Columns["DocumentType"]!.Visible = true;
         };
         FormClosed += (_, _) => layout.Save();
-        tabs.SelectedIndex = connection is null ? 4 : 0;
+        tabs.SelectedIndex = connection is null || (sharedArchive is null && installedArchiveServer.Length > 0) ? 4 : 0;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
     }
 
@@ -1489,10 +1490,11 @@ internal sealed class MainForm : Form
             sharedArchive = new SharedArchive(archiveOptions);
 
         Add("Wspólne archiwum SQL", new Label { Text = SharedArchive.DatabaseName, AutoSize = true });
-        var archiveServer = Field("Serwer archiwum SQL", archiveOptions?.Server);
-        var archiveWindows = new CheckBox { Checked = archiveOptions?.WindowsAuthentication ?? true };
+        var archiveServer = Field("Serwer archiwum SQL", archiveOptions?.Server ?? installedArchiveServer);
+        var archiveWindows = new CheckBox { Checked = archiveOptions?.WindowsAuthentication ?? (installedArchiveServer.Length == 0) };
         Add("Logowanie Windows do archiwum", archiveWindows);
-        var archiveUser = Field("Użytkownik SQL archiwum", archiveOptions?.UserName);
+        var archiveUser = Field("Użytkownik SQL archiwum", archiveOptions?.UserName ??
+            (installedArchiveServer.Length > 0 ? "KartyLeczeniaOperator" : null));
         var archivePassword = Field("Hasło SQL archiwum", archiveOptions?.Password, true);
         var archiveTrust = new CheckBox { Checked = archiveOptions?.TrustCertificate ?? false };
         Add("Zaufaj certyfikatowi serwera archiwum", archiveTrust);

@@ -49,3 +49,41 @@ Katalog leków pozostaje lokalnym plikiem SQLite dostarczanym z programem.
 Komputer z SQL Server musi być dostępny podczas pracy ze wspólnym archiwum.
 Lokalna wersja aplikacji jest dostępna na gałęzi
 [`KarLecz_lokalnie`](https://github.com/VViktorr/Karty-leczenia-zwierzat/tree/KarLecz_lokalnie).
+
+## Instalator WinForms z wyborem stanowiska
+
+Otwórz w Inno Setup 7 plik [KartyLeczenia.WinForms.iss](installer/KartyLeczenia.WinForms.iss)
+po opublikowaniu programu w folderze `publish-winforms`. Przykład publikacji i kompilacji
+z katalogu repozytorium:
+
+```powershell
+dotnet publish src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release -r win-x64 --self-contained true -o publish-winforms
+# Uruchom z katalogu repozytorium, używając ISCC.exe z instalacji Inno Setup 7.
+ISCC.exe /DReleaseVersion=1.0.0 installer\KartyLeczenia.WinForms.iss
+```
+
+Plik `KartyLeczenia-WinForms-Setup-win-x64-v1.0.0.exe` pojawi się w głównym
+katalogu repozytorium. Użyj tego samego pliku na serwerze i stanowiskach.
+Domyślny katalog programu to `C:\Program Files\KartyLeczenia.WinForms`.
+Instalator tworzy skróty w menu Start i na pulpicie dla wszystkich użytkowników.
+Brakujący WebView2 pobiera z Microsoftu.
+
+- **Serwer** — po akceptacji licencji pobiera SQL Server 2022 Express, jeśli
+  brakuje instancji `KLARCHIVE`. Przygotowuje osobną bazę `KartyLeczenia`,
+  port TCP `51433` i regułę zapory dla lokalnej podsieci w profilach
+  prywatnym i domenowym. Podczas pierwszej konfiguracji wpisz hasło dla
+  konta SQL `KartyLeczeniaOperator` w oknie konfiguracji. Zachowaj je do
+  ustawienia połączenia na stanowiskach. Instalator wyświetli adres archiwum.
+- **Stanowisko zdalne** — podaj nazwę komputera serwera lub jego adres IPv4.
+  Po otwarciu programu adres i login pojawią się w **Ustawienia → Wspólne
+  archiwum SQL**. Wpisz hasło operatora i wybierz **Sprawdź i zapisz połączenie
+  z archiwum**. Połączenie używa szyfrowania i domyślnie weryfikuje certyfikat.
+  Jeżeli dedykowana instancja korzysta z certyfikatu własnego, możesz jawnie
+  zaznaczyć **Zaufaj certyfikatowi serwera archiwum** po sprawdzeniu adresu
+  prywatnego serwera. Dane Subiekta ustawiasz osobno.
+
+Ponowna instalacja zachowuje bazę i hasło istniejącego operatora. Odinstalowanie
+programu pozostawia instancję SQL i archiwum. W razie aktualizacji z lokalnej
+wersji użyj importu w ustawieniach. Poprzednia aplikacja instalowana w
+`%LOCALAPPDATA%` może pozostać obok nowej. Skróty nowej aplikacji mają dopisek
+**(SQL)**.
