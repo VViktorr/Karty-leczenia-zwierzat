@@ -51,7 +51,7 @@ const
   WebView2DownloadUrl = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
   SqlLicenseUrl = 'https://www.microsoft.com/useterms';
   SqlPackage = 'SQLEXPR_x64_ENU.exe';
-  SqlDownloadUrl = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLEXPR_x64_ENU.exe';
+  SqlDownloadUrl = 'https://download.microsoft.com/download/dea8c210-c44a-4a9d-9d80-0c81578860c5/ENU/SQLEXPR_x64_ENU.exe';
 
 var
   RolePage: TInputOptionWizardPage;
@@ -284,8 +284,8 @@ begin
       if (Mode = 'Server') and not RegValueExists(HKLM64, 'SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL', 'KLARCHIVE') then
       begin
         repeat
-          LicenseChoice := MsgBox('Instalator pobierze i zainstaluje Microsoft SQL Server 2022 Express.' + #13#10 +
-            'Tak — akceptuję warunki licencji SQL Server 2022 Express.' + #13#10 +
+          LicenseChoice := MsgBox('Instalator pobierze i zainstaluje Microsoft SQL Server 2025 Express.' + #13#10 +
+            'Tak — akceptuję warunki licencji SQL Server 2025 Express.' + #13#10 +
             'Nie — otwórz stronę warunków licencji Microsoft.' + #13#10 +
             'Anuluj — przerwij instalację.', mbConfirmation, MB_YESNOCANCEL);
           if LicenseChoice = IDNO then
@@ -301,7 +301,7 @@ begin
 
       ExtractTemporaryFile('Setup-SharedArchive.sql');
       if Mode = 'Server' then
-        Stage := 'Instalowanie SQL Server Express i przygotowywanie archiwum…'
+        Stage := 'Instalowanie SQL Server 2025 Express i przygotowywanie archiwum…'
       else
         Stage := 'Sprawdzanie instancji SQL Server i przygotowywanie archiwum…';
       if not RunComponent(' -Mode ' + Mode, Stage, ExitCode) then
