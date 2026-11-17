@@ -5,6 +5,10 @@ namespace KartyLeczenia.Windows;
 
 internal sealed class PricePrintPreview : Form
 {
+    const int ResourceBusy = unchecked((int)0x800700AA);
+    static readonly string PrintBrowserProfile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KartyLeczenia", "WebView2", "Print");
+
     static string CardAttachmentName(string? documentNumber)
     {
         var invalid = Path.GetInvalidFileNameChars();
@@ -39,6 +43,7 @@ internal sealed class PricePrintPreview : Form
 
         var file = Path.Combine(Path.GetTempPath(), $"{baseName}-{Guid.NewGuid():N}.html");
         var previewFile = Path.ChangeExtension(file, ".pdf");
+        string? recoveryProfile = null;
         bool saving = false;
         FormClosing += (_, e) => e.Cancel = saving;
         Disposed += (_, _) =>
@@ -48,6 +53,12 @@ internal sealed class PricePrintPreview : Form
                 try { File.Delete(path); }
                 catch (IOException ex) { CrashLog.Write("PricePreview.Cleanup", ex); }
                 catch (UnauthorizedAccessException ex) { CrashLog.Write("PricePreview.Cleanup", ex); }
+            }
+            if (recoveryProfile is not null && Directory.Exists(recoveryProfile))
+            {
+                try { Directory.Delete(recoveryProfile, recursive: true); }
+                catch (IOException ex) { CrashLog.Write("PricePreview.ProfileCleanup", ex); }
+                catch (UnauthorizedAccessException ex) { CrashLog.Write("PricePreview.ProfileCleanup", ex); }
             }
         };
         void Report(Exception ex)
@@ -65,11 +76,27 @@ internal sealed class PricePrintPreview : Form
             settings.ShouldPrintBackgrounds = true;
             return settings;
         }
+        async Task InitializeBrowser()
+        {
+            try
+            {
+                var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: PrintBrowserProfile);
+                if (!IsDisposed) await browser.EnsureCoreWebView2Async(environment);
+            }
+            catch (Exception ex) when (ex.HResult == ResourceBusy && !IsDisposed)
+            {
+                CrashLog.Write("PricePreview.ProfileBusy", ex);
+                recoveryProfile = Path.Combine(Path.GetTempPath(), $"KartyLeczenia-WebView2-{Guid.NewGuid():N}");
+                var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: recoveryProfile);
+                if (!IsDisposed) await browser.EnsureCoreWebView2Async(environment);
+            }
+        }
+
         Shown += async (_, _) =>
         {
             try
             {
-                await browser.EnsureCoreWebView2Async();
+                await InitializeBrowser();
                 if (IsDisposed) return;
                 async void PreparePreview(object? sender, CoreWebView2NavigationCompletedEventArgs e)
                 {
