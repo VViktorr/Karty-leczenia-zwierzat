@@ -137,7 +137,7 @@ function Install-ArchiveEngine {
     # Record that this installer attempted to create the instance so it can resume after a restart.
     New-Item -Path $marker -Force | Out-Null
     New-ItemProperty -Path $marker -Name Instance -Value $instance -PropertyType String -Force | Out-Null
-    $result = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru
+    $result = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru -NoNewWindow
     if ($result.ExitCode -in 1641, 3010) { exit 3010 }
     if ($result.ExitCode -ne 0) {
         throw "Instalacja SQL Server Express zakończyła się błędem $($result.ExitCode). Zobacz SQL Server Setup Bootstrap\Log\Summary.txt."
