@@ -653,18 +653,70 @@ internal sealed class MainForm : Form
     readonly Dictionary<DataGridViewRow, LocalCatalogue.Variant> selectedTreatmentVariants = new();
     LocalCatalogue? treatmentCatalogue;
     bool updatingTreatmentChoices;
+    const string ReferenceColumn = "W zamian";
+
+    sealed record TreatmentReference(string Symbol, string Name)
+    {
+        public override string ToString() => $"{Name} [{Symbol}]";
+    }
+
+    IReadOnlyList<LocalCatalogue.Variant> TreatmentVariants(DataGridViewRow row, TreatmentRow entry)
+    {
+        if (treatmentCatalogue is null) return [];
+        return row.Cells[ReferenceColumn].Tag is TreatmentReference reference
+            ? treatmentCatalogue.ForProduct(reference.Symbol, reference.Name)
+            : treatmentCatalogue.ForProduct(entry.Get("Symbol Subiekta"), entry.Product);
+    }
+
+    void PickTreatmentReference(DataGridViewRow row)
+    {
+        if (row.Tag is not TreatmentRow entry || treatmentCatalogue is null) return;
+        var cell = row.Cells[ReferenceColumn];
+        var products = treatmentCatalogue.ReferenceProducts()
+            .Where(item => !string.Equals(item.Symbol, entry.Get("Symbol Subiekta").Trim(), StringComparison.OrdinalIgnoreCase))
+            .Select(item => new TreatmentReference(item.Symbol, item.Name)).ToArray();
+        using var dialog = new Form
+        {
+            Text = "W zamian – źródło danych ChPL", StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false,
+            AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 128)
+        };
+        var layout = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var label = new Label { Text = "Wybierz preparat, którego dane mają posłużyć jako źródło na karcie.", AutoSize = true };
+        var picker = new ComboBox
+        {
+            Width = 530, DropDownStyle = ComboBoxStyle.DropDownList,
+            AutoCompleteMode = AutoCompleteMode.SuggestAppend, AutoCompleteSource = AutoCompleteSource.ListItems
+        };
+        picker.Items.Add("Preparat z dokumentu");
+        picker.Items.AddRange(products);
+        picker.SelectedIndex = cell.Tag is TreatmentReference current ? Array.IndexOf(products, current) + 1 : 0;
+        var apply = new Button { Text = "Wybierz", AutoSize = true, DialogResult = DialogResult.OK };
+        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+        layout.Controls.AddRange([label, picker, apply, cancel]);
+        dialog.Controls.Add(layout);
+        dialog.AcceptButton = apply;
+        dialog.CancelButton = cancel;
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+        var reference = picker.SelectedItem as TreatmentReference;
+        if (Equals(cell.Tag, reference)) return;
+        cell.Tag = reference;
+        cell.Value = reference?.Name ?? "Wybierz…";
+        SetTreatmentChoices(row, "", "");
+    }
 
     void SetTreatmentChoices(DataGridViewRow gridRow, string species, string route,
         bool changed = false)
     {
         if (gridRow.Tag is not TreatmentRow row || treatmentCatalogue is null) return;
-        var choices = treatmentCatalogue.ForProduct(row.Get("Symbol Subiekta"), row.Product);
-        if (choices.Count == 0) return;
+        var choices = TreatmentVariants(gridRow, row);
+        bool usesReference = gridRow.Cells[ReferenceColumn].Tag is TreatmentReference;
         var speciesList = choices.Select(v => v.Species).Where(v => !string.IsNullOrWhiteSpace(v))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         species = speciesList.FirstOrDefault(item => string.Equals(item, species, StringComparison.OrdinalIgnoreCase))
-            ?? speciesList.FirstOrDefault(item => string.Equals(item, "bydło", StringComparison.OrdinalIgnoreCase))
-            ?? (speciesList.Length == 1 ? speciesList[0] : "");
+            ?? (usesReference ? "" : speciesList.FirstOrDefault(item => string.Equals(item, "bydło", StringComparison.OrdinalIgnoreCase))
+                ?? (speciesList.Length == 1 ? speciesList[0] : ""));
         var matching = choices.Where(v => string.Equals(v.Species, species, StringComparison.OrdinalIgnoreCase)).ToArray();
         var labels = TreatmentRouteOptions(matching);
         var routes = labels.Keys.ToArray();
@@ -692,7 +744,7 @@ internal sealed class MainForm : Form
             gridRow.Cells["Dawkowanie i okres stosowania"].Value = variant?.Dose ?? "";
             gridRow.Cells["Karencja"].Value = variant?.Withdrawal ?? "";
             row.Set("Źródło karencji", variant?.Source ?? "", false);
-            if (changed && rememberTreatment.Checked && species.Length > 0)
+            if (changed && !usesReference && rememberTreatment.Checked && species.Length > 0)
                 TreatmentChoices.Save(row, species, route);
         }
         finally { updatingTreatmentChoices = false; }
@@ -725,7 +777,7 @@ internal sealed class MainForm : Form
             return Task.CompletedTask;
         }
         var species = row.Cells[TreatmentChoices.Species].Value?.ToString() ?? "";
-        var variants = treatmentCatalogue.ForProduct(entry.Get("Symbol Subiekta"), entry.Product)
+        var variants = TreatmentVariants(row, entry)
             .Where(v => string.Equals(v.Species, species, StringComparison.OrdinalIgnoreCase)).ToArray();
         var options = TreatmentRouteOptions(variants).ToArray();
         var list = new ListBox { HorizontalScrollbar = true, IntegralHeight = false };
@@ -806,6 +858,10 @@ internal sealed class MainForm : Form
                     ReadOnly = title == TreatmentChoices.Route });
             else Column(treatment, title, title, width);
         }
+        treatment.Columns.Add(new DataGridViewButtonColumn
+        {
+            Name = ReferenceColumn, HeaderText = ReferenceColumn, Width = 140
+        });
         var hint = new ToolTip();
         hint.SetToolTip(rememberTreatment, "Zapisuje gatunek i drogę podania dla leku na kolejne karty leczenia.");
         Disposed += (_, _) => hint.Dispose();
@@ -822,6 +878,15 @@ internal sealed class MainForm : Form
         {
             if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && treatment.Columns[e.ColumnIndex].Name == TreatmentChoices.Route)
                 await Run(() => PickTreatmentRoute(treatment.Rows[e.RowIndex]));
+        };
+        treatment.CellContentClick += async (_, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || treatment.Columns[e.ColumnIndex].Name != ReferenceColumn) return;
+            await Run(() =>
+            {
+                PickTreatmentReference(treatment.Rows[e.RowIndex]);
+                return Task.CompletedTask;
+            });
         };
         treatment.KeyDown += async (_, e) =>
         {
@@ -897,11 +962,11 @@ internal sealed class MainForm : Form
                     return Task.CompletedTask;
                 }
 
-                var paths = treatmentCatalogue?.ForProduct(entry.Get("Symbol Subiekta"), entry.Product)
+                var paths = TreatmentVariants(row, entry)
                     .Select(choice => choice.Pdf)
                     .Where(path => !string.IsNullOrWhiteSpace(path))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToArray() ?? [];
+                    .ToArray();
                 if (paths.Length == 1)
                     LocalCatalogue.OpenPdf(paths[0]);
                 else
@@ -964,6 +1029,7 @@ internal sealed class MainForm : Form
                     cell.Value = entry.Get(column.Name);
             gridRow.Cells["Drukuj"].Value = entry.Printed;
             gridRow.Tag = entry;
+            gridRow.Cells[ReferenceColumn].Value = "Wybierz…";
             var saved = rememberTreatment.Checked ? TreatmentChoices.Read(entry) : (Species: "", Route: "");
             SetTreatmentChoices(gridRow, saved.Species, saved.Route);
         }
@@ -989,6 +1055,17 @@ internal sealed class MainForm : Form
                     values[column.Name] = column.Name == TreatmentChoices.Route
                         && selectedTreatmentVariants.TryGetValue(item, out var variant)
                         ? variant.Route : cell.Value?.ToString() ?? "";
+            values[ReferenceColumn] = "";
+            if (item.Cells[ReferenceColumn].Tag is TreatmentReference reference)
+            {
+                values[ReferenceColumn] = reference.ToString();
+                string note = selectedTreatmentVariants.ContainsKey(item)
+                    ? $"Źródło danych ChPL: {reference}."
+                    : $"Wskazane źródło ChPL: {reference}. Nie wybrano wariantu.";
+                values["Zalecenia / uwagi"] = string.Join("\n",
+                    new[] { values.GetValueOrDefault("Zalecenia / uwagi", ""), note }
+                        .Where(value => !string.IsNullOrWhiteSpace(value)));
+            }
             if (forPrint) values["Karencja"] = FormatWithdrawal(item, values.GetValueOrDefault("Karencja", ""));
             return values;
         }).ToList();

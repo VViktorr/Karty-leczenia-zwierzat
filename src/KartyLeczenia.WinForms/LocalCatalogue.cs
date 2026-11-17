@@ -102,6 +102,11 @@ internal sealed class LocalCatalogue
             ? entry.Variants : Array.Empty<Variant>();
     }
 
+    internal (string Symbol, string Name)[] ReferenceProducts() => products
+        .Select(item => (Symbol: item.Key, Name: item.Value.Name))
+        .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(item => item.Symbol, StringComparer.OrdinalIgnoreCase).ToArray();
+
     internal string Summary(string symbol, string name) => string.Join(" | ", ForProduct(symbol, name)
         .Where(v => v.Withdrawal.Length > 0)
         .Select(v => $"{v.Species} {v.Route} · {v.Withdrawal}").Distinct());
