@@ -1500,7 +1500,7 @@ internal sealed class MainForm : Form
             Refresh();
         }
 
-        static void Require(TextBox field, string message)
+        static void Require(Control field, string message)
         {
             if (!string.IsNullOrWhiteSpace(field.Text)) return;
             field.Focus();
@@ -1607,15 +1607,96 @@ internal sealed class MainForm : Form
 
         form = Section("Subiekt GT");
         var subiektForm = form;
-        Message(form, "Sprawdź połączenie, wybierz magazyn i zapisz ustawienia. Użyj konta z dostępem do odczytu.", multiline: true);
+        Message(form, "Podaj adres i dane logowania do Subiekta. Wybierz bazę podmiotu, pobierz magazyny i zapisz ustawienia.", multiline: true);
         var server = Field("Serwer Subiekta", saved?.Server, @"np. SERWER\INSERTGT");
-        var database = Field("Baza podmiotu", saved?.Database);
         var auth = Authentication(saved?.WindowsAuthentication ?? true);
         var user = Field("Login SQL", saved?.UserName);
         var password = Field("Hasło SQL", saved?.Password, password: true);
         var remember = Option("Zapamiętaj hasło na tym koncie Windows", subiektConfiguration.Remembered);
         BindCredentials(auth, user, password, remember);
         var trust = Option("Zaufaj certyfikatowi znanego serwera Subiekta", saved?.TrustCertificate ?? false);
+        var database = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDown, Width = 360,
+            AccessibleName = "Baza podmiotu", Text = saved?.Database ?? ""
+        };
+        Add("Baza podmiotu", database);
+        var discoveryStatus = Message(form, "Wybierz bazę z listy lub wpisz jej nazwę.", multiline: true);
+        var discoveryTimer = new System.Windows.Forms.Timer { Interval = 700 };
+        CancellationTokenSource? discoveryWork = null;
+        bool discoveryAttempted = false;
+
+        bool CanDiscover() => !string.IsNullOrWhiteSpace(server.Text) &&
+            (auth.SelectedIndex == 1 || (!string.IsNullOrWhiteSpace(user.Text) && password.TextLength > 0));
+
+        void StopDiscovery()
+        {
+            discoveryTimer.Stop();
+            var work = discoveryWork;
+            discoveryWork = null;
+            work?.Cancel();
+        }
+
+        void ScheduleDiscovery()
+        {
+            if (!discoveryAttempted && CanDiscover() && sections.Visible && sections.SelectedTab == subiektForm.Parent)
+                discoveryTimer.Start();
+        }
+
+        async Task DiscoverCompanies()
+        {
+            StopDiscovery();
+            if (!CanDiscover())
+            {
+                discoveryStatus.Text = "Podaj adres serwera i dane logowania, aby pobrać bazy podmiotów.";
+                return;
+            }
+
+            discoveryAttempted = true;
+            var options = new ConnectionOptions(server.Text.Trim(), "", auth.SelectedIndex == 1,
+                user.Text, password.Text, trust.Checked);
+            using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            discoveryWork = work;
+            discoveryStatus.Text = "Pobieranie baz podmiotów…";
+            try
+            {
+                var result = await new SubiektConnectionService().DiscoverAsync(options, work.Token);
+                if (IsDisposed || discoveryWork != work) return;
+                string typed = database.Text;
+                var names = result.Companies.Select(company => company.Database).ToArray();
+                database.BeginUpdate();
+                try
+                {
+                    database.Items.Clear();
+                    database.Items.AddRange(names);
+                    if (string.IsNullOrWhiteSpace(typed) && names.Length == 1)
+                        database.SelectedIndex = 0;
+                    else if (database.Text != typed)
+                        database.Text = typed;
+                }
+                finally { database.EndUpdate(); }
+                discoveryStatus.Text = names.Length == 0
+                    ? "Nie znaleziono dostępnych baz podmiotów. Możesz wpisać nazwę bazy."
+                    : $"Dostępne bazy podmiotów: {names.Length}.";
+            }
+            catch (OperationCanceledException) when (work.IsCancellationRequested)
+            {
+                if (!IsDisposed && discoveryWork == work)
+                    discoveryStatus.Text = "Pobieranie baz trwało za długo. Ponów próbę lub wpisz nazwę bazy.";
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed && discoveryWork == work)
+                    discoveryStatus.Text = "Pobieranie baz: " + SubiektConnectionService.FriendlyError(ex);
+            }
+            finally
+            {
+                if (discoveryWork == work) discoveryWork = null;
+            }
+        }
+
+        discoveryTimer.Tick += async (_, _) => await DiscoverCompanies();
+        Add("", Action("Pobierz bazy podmiotów", DiscoverCompanies));
         var group = Field("Grupa towarów", saved?.DrugGroup ?? "Leki");
         var warehouses = new ComboBox
         {
@@ -1663,6 +1744,9 @@ internal sealed class MainForm : Form
                 current.Server.Equals(draft.Server, StringComparison.OrdinalIgnoreCase) &&
                 current.Database.Equals(draft.Database, StringComparison.OrdinalIgnoreCase))
                 previous = current.WarehouseId;
+            StopDiscovery();
+            if (discoveryStatus.Text == "Pobieranie baz podmiotów…")
+                discoveryStatus.Text = "Wybierz bazę z listy lub wpisz jej nazwę.";
             ClearWarehouseList();
             subiektForm.Enabled = false;
             subiektResult.Text = "Sprawdzanie połączenia z Subiektem…";
@@ -1709,10 +1793,32 @@ internal sealed class MainForm : Form
         saveSubiekt.Enabled = false;
         Add("", saveSubiekt);
         warehouses.SelectedIndexChanged += (_, _) => saveSubiekt.Enabled = warehouses.SelectedIndex >= 0;
-        foreach (var input in new[] { server, database, user, password, group })
-            input.TextChanged += (_, _) => ClearWarehouseList();
-        auth.SelectedIndexChanged += (_, _) => ClearWarehouseList();
-        trust.CheckedChanged += (_, _) => ClearWarehouseList();
+        void SubiektConnectionChanged()
+        {
+            StopDiscovery();
+            discoveryAttempted = false;
+            string typed = database.Text;
+            database.Items.Clear();
+            if (database.Text != typed) database.Text = typed;
+            discoveryStatus.Text = "Wybierz bazę z listy lub wpisz jej nazwę.";
+            ClearWarehouseList();
+            ScheduleDiscovery();
+        }
+
+        database.TextChanged += (_, _) => ClearWarehouseList();
+        group.TextChanged += (_, _) => ClearWarehouseList();
+        foreach (var input in new[] { server, user, password })
+            input.TextChanged += (_, _) => SubiektConnectionChanged();
+        auth.SelectedIndexChanged += (_, _) => SubiektConnectionChanged();
+        trust.CheckedChanged += (_, _) => SubiektConnectionChanged();
+        sections.SelectedIndexChanged += (_, _) => ScheduleDiscovery();
+        sections.VisibleChanged += (_, _) => ScheduleDiscovery();
+        Shown += (_, _) => ScheduleDiscovery();
+        Disposed += (_, _) =>
+        {
+            StopDiscovery();
+            discoveryTimer.Dispose();
+        };
 
         form = Section("Dane lecznicy");
         var clinic = ClinicSettingsStore.Load();
