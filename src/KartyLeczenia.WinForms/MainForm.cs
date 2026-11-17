@@ -654,6 +654,63 @@ internal sealed class MainForm : Form
     LocalCatalogue? treatmentCatalogue;
     bool updatingTreatmentChoices;
     const string ReferenceColumn = "Zamiennik produktu";
+    readonly ComboBox cardSpeciesGroup = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 145 };
+    readonly Dictionary<DataGridViewRow, bool> excludedTreatmentRows = new();
+
+    bool MatchesSpeciesGroup(string species)
+    {
+        if (cardSpeciesGroup.SelectedIndex <= 0) return true;
+        if (species.StartsWith("WARIANT DO WERYFIKACJI", StringComparison.OrdinalIgnoreCase)
+            || species.StartsWith("ZAWIESZONE", StringComparison.OrdinalIgnoreCase)) return false;
+        var pattern = cardSpeciesGroup.SelectedIndex switch
+        {
+            1 => @"\b(?:bydł|ciel|krow|jałów|buhaj)\p{L}*",
+            2 => @"\b(?:świń|świni|prosi|warchlak|tucznik|loch|losz)\p{L}*",
+            3 => @"\b(?:drób|drobi|kur|brojler|niosk|indyk|indycz|kaczk|gęś|gęsi|przepiór|kuropatw)\p{L}*",
+            4 => @"\b(?:pies|psy|psa|psów|suk[aięom])\p{L}*",
+            5 => @"\bkot\p{L}*",
+            _ => ""
+        };
+        return System.Text.RegularExpressions.Regex.IsMatch(species, pattern,
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    void ApplyCardSpeciesGroup()
+    {
+        if (currentCard is null || !treatment.EndEdit()) return;
+        var rows = treatment.Rows.Cast<DataGridViewRow>().ToArray();
+        foreach (var row in rows)
+        {
+            if (row.Tag is not TreatmentRow entry) continue;
+            bool matches = cardSpeciesGroup.SelectedIndex <= 0 || TreatmentVariants(row, entry).Any(v => MatchesSpeciesGroup(v.Species));
+            if (matches && excludedTreatmentRows.Remove(row, out bool wasChecked))
+                row.Cells["Drukuj"].Value = wasChecked;
+            else if (!matches)
+            {
+                excludedTreatmentRows.TryAdd(row, row.Cells["Drukuj"].Value is true);
+                row.Cells["Drukuj"].Value = false;
+            }
+
+            SetTreatmentChoices(row, row.Cells[TreatmentChoices.Species].Value?.ToString() ?? "",
+                row.Cells[TreatmentChoices.Route].Value?.ToString() ?? "", preserveEdits: true);
+        }
+        if (rows.Length > 1)
+            treatment.Sort(new TreatmentGroupOrder(rows, excludedTreatmentRows));
+    }
+
+    sealed class TreatmentGroupOrder(DataGridViewRow[] rows, Dictionary<DataGridViewRow, bool> excluded)
+        : System.Collections.IComparer
+    {
+        readonly Dictionary<DataGridViewRow, int> positions = rows
+            .Select((row, index) => (row, index)).ToDictionary(item => item.row, item => item.index);
+
+        public int Compare(object? x, object? y)
+        {
+            if (x is not DataGridViewRow left || y is not DataGridViewRow right) return 0;
+            int groupOrder = excluded.ContainsKey(left).CompareTo(excluded.ContainsKey(right));
+            return groupOrder != 0 ? groupOrder : positions[left].CompareTo(positions[right]);
+        }
+    }
 
     sealed record TreatmentReference(string Symbol, string Name)
     {
@@ -731,19 +788,20 @@ internal sealed class MainForm : Form
         cell.Tag = reference;
         cell.Value = reference?.Name ?? "Wybierz…";
         SetTreatmentChoices(row, "", "");
+        ApplyCardSpeciesGroup();
     }
 
     void SetTreatmentChoices(DataGridViewRow gridRow, string species, string route,
-        bool changed = false)
+        bool changed = false, bool preserveEdits = false)
     {
         if (gridRow.Tag is not TreatmentRow row || treatmentCatalogue is null) return;
-        var choices = TreatmentVariants(gridRow, row);
+        var choices = TreatmentVariants(gridRow, row).Where(v => MatchesSpeciesGroup(v.Species)).ToArray();
+        selectedTreatmentVariants.TryGetValue(gridRow, out var previousVariant);
         bool usesReference = gridRow.Cells[ReferenceColumn].Tag is TreatmentReference;
         var speciesList = choices.Select(v => v.Species).Where(v => !string.IsNullOrWhiteSpace(v))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         species = speciesList.FirstOrDefault(item => string.Equals(item, species, StringComparison.OrdinalIgnoreCase))
-            ?? (usesReference ? "" : speciesList.FirstOrDefault(item => string.Equals(item, "bydło", StringComparison.OrdinalIgnoreCase))
-                ?? (speciesList.Length == 1 ? speciesList[0] : ""));
+            ?? (!usesReference && speciesList.Length == 1 ? speciesList[0] : "");
         var matching = choices.Where(v => string.Equals(v.Species, species, StringComparison.OrdinalIgnoreCase)).ToArray();
         var labels = TreatmentRouteOptions(matching);
         var routes = labels.Keys.ToArray();
@@ -768,9 +826,12 @@ internal sealed class MainForm : Form
             if (variant is null) selectedTreatmentVariants.Remove(gridRow);
             else selectedTreatmentVariants[gridRow] = variant;
             treatment.InvalidateCell(gridRow.Cells[TreatmentChoices.Route]);
-            gridRow.Cells["Dawkowanie i okres stosowania"].Value = variant?.Dose ?? "";
-            gridRow.Cells["Karencja"].Value = variant?.Withdrawal ?? "";
-            row.Set("Źródło karencji", variant?.Source ?? "", false);
+            if (!preserveEdits || previousVariant != variant)
+            {
+                gridRow.Cells["Dawkowanie i okres stosowania"].Value = variant?.Dose ?? "";
+                gridRow.Cells["Karencja"].Value = variant?.Withdrawal ?? "";
+                row.Set("Źródło karencji", variant?.Source ?? "", false);
+            }
             if (changed && !usesReference && rememberTreatment.Checked && species.Length > 0)
                 TreatmentChoices.Save(row, species, route);
         }
@@ -973,7 +1034,11 @@ internal sealed class MainForm : Form
                 foreach (DataGridViewRow row in treatment.Rows) row.Height = treatment.RowTemplate.Height;
             treatment.InvalidateColumn(column.Index);
         };
-        var page = Page("Karta leczenia", treatment, withdrawalMode, routeMode,
+        cardSpeciesGroup.Items.AddRange(["Wszystkie gatunki", "Bydło", "Świnie", "Drób", "Pies", "Kot"]);
+        cardSpeciesGroup.SelectedIndex = 0;
+        cardSpeciesGroup.SelectedIndexChanged += (_, _) => ApplyCardSpeciesGroup();
+        var page = Page("Karta leczenia", treatment,
+            new Label { Text = "Gatunek", AutoSize = true, Anchor = AnchorStyles.Left }, cardSpeciesGroup, withdrawalMode, routeMode,
             Action("Otwórz ChPL", () =>
             {
                 var row = treatment.CurrentRow;
@@ -1044,6 +1109,7 @@ internal sealed class MainForm : Form
         treatmentCatalogue = catalogue;
         currentCard = card;
         selectedTreatmentVariants.Clear();
+        excludedTreatmentRows.Clear();
         treatment.Rows.Clear();
         foreach (var entry in card.Rows)
             if (catalogue.IsNonMedicine(entry.Get("Symbol Subiekta")))
@@ -1058,8 +1124,9 @@ internal sealed class MainForm : Form
             gridRow.Tag = entry;
             gridRow.Cells[ReferenceColumn].Value = "Wybierz…";
             var saved = rememberTreatment.Checked ? TreatmentChoices.Read(entry) : (Species: "", Route: "");
-            SetTreatmentChoices(gridRow, saved.Species, saved.Route);
+            SetTreatmentChoices(gridRow, saved.Species, saved.Route, preserveEdits: true);
         }
+        ApplyCardSpeciesGroup();
         tabs.SelectedIndex = 3;
         CrashLog.Write($"WinForms.Treatment.Loaded rows={card.Rows.Count}");
         status.Text = $"Pozycje karty: {card.Rows.Count}";
@@ -1082,6 +1149,9 @@ internal sealed class MainForm : Form
                     values[column.Name] = column.Name == TreatmentChoices.Route
                         && selectedTreatmentVariants.TryGetValue(item, out var variant)
                         ? variant.Route : cell.Value?.ToString() ?? "";
+            if (string.Equals(values.GetValueOrDefault("Domyślny gatunek"), "True", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(values.GetValueOrDefault("Opis zwierząt / numer siedziby stada"), "Bydło", StringComparison.OrdinalIgnoreCase))
+                values["Opis zwierząt / numer siedziby stada"] = "";
             values[ReferenceColumn] = "";
             if (item.Cells[ReferenceColumn].Tag is TreatmentReference reference)
             {
@@ -1182,6 +1252,7 @@ internal sealed class MainForm : Form
             UpdateRefreshLabel();
             documents.DataSource = prices.DataSource = expiry.DataSource = null;
             selectedTreatmentVariants.Clear();
+            excludedTreatmentRows.Clear();
             treatment.Rows.Clear();
             currentCard = null;
             connection = draft;
