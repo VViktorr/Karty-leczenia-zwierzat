@@ -1158,7 +1158,7 @@ internal sealed class MainForm : Form
                 return Task.CompletedTask;
             }),
             Action("Zapisz kartę", SaveTreatmentToArchive), Action("Eksportuj JSON", SaveCard),
-            Action("Podgląd wydruku", PreviewCard));
+            Action("Podgląd / PDF / e-mail", PreviewCard));
         var actions = page.Controls.OfType<FlowLayoutPanel>().Single();
         var toolbar = new TableLayoutPanel
         {
@@ -1289,11 +1289,11 @@ internal sealed class MainForm : Form
             return Task.CompletedTask;
         }
 
-        async Task OpenSavedCard()
+        Task OpenSavedCard()
         {
-            if (grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
-            var card = SavedTreatmentCardStore.Read(row.Id, forPrint: true);
-            await OpenPrintPreview("zapisana-karta-leczenia", CardHtmlRenderer.Render(card));
+            if (grid.CurrentRow?.DataBoundItem is SavedTreatmentCard row)
+                OpenCardPreview(SavedTreatmentCardStore.Read(row.Id, forPrint: true));
+            return Task.CompletedTask;
         }
 
         Task ExportSavedCard() => grid.CurrentRow?.DataBoundItem is SavedTreatmentCard row
@@ -1301,7 +1301,7 @@ internal sealed class MainForm : Form
 
         var page = Page("Zapisane karty leczenia", grid, query,
             new Label { Text = "Data leczenia", AutoSize = true }, day,
-            Action("Szukaj", RefreshCards), Action("Otwórz / drukuj", OpenSavedCard),
+            Action("Szukaj", RefreshCards), Action("Podgląd / PDF / e-mail", OpenSavedCard),
             Action("Eksportuj JSON", ExportSavedCard));
         tabs.SelectedIndexChanged += async (_, _) =>
         {
@@ -1328,17 +1328,16 @@ internal sealed class MainForm : Form
         if (dialog.ShowDialog(this) == DialogResult.OK) await File.WriteAllTextAsync(dialog.FileName, JsonSerializer.Serialize(card));
     }
 
-    async Task PreviewCard()
+    Task PreviewCard()
     {
-        var card = CaptureTreatmentCard(forPrint: true);
-        await OpenPrintPreview("karta-leczenia", CardHtmlRenderer.Render(card));
+        OpenCardPreview(CaptureTreatmentCard(forPrint: true));
+        return Task.CompletedTask;
     }
 
-    static async Task OpenPrintPreview(string name, string html)
+    void OpenCardPreview(Card card)
     {
-        var file = Path.Combine(Path.GetTempPath(), $"{name}-{Guid.NewGuid():N}.html");
-        await File.WriteAllTextAsync(file, html);
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
+        using var preview = new PricePrintPreview(CardHtmlRenderer.Render(card), landscape: true, margin: 7, treatmentCard: true);
+        DialogPlacement.Show(preview, this, "treatment-print-preview");
     }
 
     void ConfigureConnection()

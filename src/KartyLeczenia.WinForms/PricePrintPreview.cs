@@ -5,9 +5,10 @@ namespace KartyLeczenia.Windows;
 
 internal sealed class PricePrintPreview : Form
 {
-    internal PricePrintPreview(string html, bool landscape, decimal margin, bool direct = false)
+    internal PricePrintPreview(string html, bool landscape, decimal margin, bool direct = false, bool treatmentCard = false)
     {
-        Text = "Podgląd wydruku cennika";
+        Text = treatmentCard ? "Podgląd karty leczenia" : "Podgląd wydruku cennika";
+        string baseName = treatmentCard ? "karta-leczenia" : "cennik-lekow";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1100, 800);
         var browser = new WebView2 { Dock = DockStyle.Fill, Visible = false };
@@ -15,7 +16,8 @@ internal sealed class PricePrintPreview : Form
         var print = new Button { Text = "Drukuj", AutoSize = true, Enabled = false };
         var pdf = new Button { Text = "Zapisz jako PDF", AutoSize = true, Enabled = false };
         var close = new Button { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
-        bar.Controls.AddRange([print, pdf, close]);
+        var email = new Button { Text = "Wyślij mailem", AutoSize = true, Enabled = false };
+        bar.Controls.AddRange(treatmentCard ? [print, pdf, email, close] : [print, pdf, close]);
         Controls.Add(browser);
         Controls.Add(bar);
         CancelButton = close;
@@ -25,7 +27,7 @@ internal sealed class PricePrintPreview : Form
             ShowInTaskbar = false;
         }
 
-        var file = Path.Combine(Path.GetTempPath(), $"cennik-lekow-{Guid.NewGuid():N}.html");
+        var file = Path.Combine(Path.GetTempPath(), $"{baseName}-{Guid.NewGuid():N}.html");
         var previewFile = Path.ChangeExtension(file, ".pdf");
         bool saving = false;
         FormClosing += (_, e) => e.Cancel = saving;
@@ -69,11 +71,11 @@ internal sealed class PricePrintPreview : Form
                         try
                         {
                             if (!e.IsSuccess || !await browser.CoreWebView2.PrintToPdfAsync(previewFile, PrintSettings()))
-                                throw new IOException("Nie udało się przygotować podglądu stron cennika.");
+                                throw new IOException("Nie udało się przygotować podglądu stron.");
                             browser.CoreWebView2.NavigationCompleted += (_, loaded) =>
                             {
-                                print.Enabled = pdf.Enabled = loaded.IsSuccess;
-                                if (!loaded.IsSuccess) Report(new IOException("Nie udało się otworzyć podglądu stron cennika."));
+                                print.Enabled = pdf.Enabled = email.Enabled = loaded.IsSuccess;
+                                if (!loaded.IsSuccess) Report(new IOException("Nie udało się otworzyć podglądu stron."));
                             };
                             browser.Source = new Uri(previewFile);
                             browser.Visible = true;
@@ -107,12 +109,24 @@ internal sealed class PricePrintPreview : Form
             try { browser.CoreWebView2.ShowPrintUI(CoreWebView2PrintDialogKind.Browser); }
             catch (Exception ex) { Report(ex); }
         };
+        if (treatmentCard)
+        {
+            email.Click += (_, _) =>
+            {
+                try { PdfMail.Compose(Handle, previewFile, baseName + ".pdf"); }
+                catch (Exception ex) { Report(ex); }
+            };
+        }
+        Disposed += (_, _) =>
+        {
+            if (!treatmentCard) email.Dispose();
+        };
         pdf.Click += async (_, _) =>
         {
-            using var target = new SaveFileDialog { Filter = "Dokument PDF (*.pdf)|*.pdf", FileName = "cennik-lekow.pdf" };
+            using var target = new SaveFileDialog { Filter = "Dokument PDF (*.pdf)|*.pdf", FileName = baseName + ".pdf" };
             if (target.ShowDialog(this) != DialogResult.OK) return;
             saving = true;
-            print.Enabled = pdf.Enabled = close.Enabled = false;
+            print.Enabled = pdf.Enabled = email.Enabled = close.Enabled = false;
             try
             {
                 await Task.Run(() => File.Copy(previewFile, target.FileName, overwrite: true));
@@ -121,7 +135,7 @@ internal sealed class PricePrintPreview : Form
             finally
             {
                 saving = false;
-                print.Enabled = pdf.Enabled = close.Enabled = true;
+                print.Enabled = pdf.Enabled = email.Enabled = close.Enabled = true;
             }
         };
     }
