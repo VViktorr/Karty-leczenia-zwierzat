@@ -295,8 +295,10 @@ WHERE u.name = N'$login' AND r.name = N'KartyLeczeniaOperator'
 }
 
 function Initialize-Archive {
-    if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
-        throw 'Instalacja serwerowa wymaga 64-bitowego Windows na procesorze Intel lub AMD.'
+    $processor = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
+    if (!$processor) { throw 'Nie udało się odczytać architektury procesora z Windows.' }
+    if ($processor.Architecture -ne 9 -or ![Environment]::Is64BitOperatingSystem) {
+        throw "Instancja KLARCHIVE wymaga Windows x64 na procesorze Intel lub AMD. Kod architektury procesora: $($processor.Architecture)."
     }
     $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($service -and (Get-ItemProperty -LiteralPath $marker -ErrorAction SilentlyContinue).Instance -ne $instance) {
@@ -364,6 +366,15 @@ IF IS_ROLEMEMBER(N'KartyLeczeniaOperator', N'$login') <> 1
 }
 
 try {
+    if ($Mode -ne 'WebView2' -and [Environment]::Is64BitOperatingSystem -and ![Environment]::Is64BitProcess) {
+        # Use the native registry view and SQL client on WOW64.
+        $nativePowerShell = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe'
+        if (!(Test-Path -LiteralPath $nativePowerShell)) {
+            throw 'Nie udało się znaleźć 64-bitowego programu Windows PowerShell.'
+        }
+        & $nativePowerShell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Mode $Mode
+        exit $LASTEXITCODE
+    }
     if ($Mode -eq 'WebView2') {
         Assert-MicrosoftSignature $WebView2Package
         $result = Start-Process -FilePath $WebView2Package -ArgumentList '/silent /install' -Wait -PassThru
