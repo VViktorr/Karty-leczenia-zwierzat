@@ -11,7 +11,7 @@ internal sealed class MainForm : Form
         Padding = new Point(30, 9)
     };
     readonly DataGridView documents = NewGrid(), prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
-    readonly TextBox search = new() { Width = 280 };
+    readonly TextBox search = new();
     Font? boldDocumentKindFont;
     readonly Dictionary<DocumentSearchKinds, Button> documentKinds = new();
     readonly StatusStrip statusBar = new();
@@ -229,8 +229,24 @@ internal sealed class MainForm : Form
             documentSearchTimer.Stop();
             if (connection is not null) await Run(() => Search(false));
         };
+        var searchField = new Panel { Width = 280, Height = search.PreferredHeight };
+        var clearSearch = new Button
+        {
+            Text = "×", AccessibleName = "Wyczyść wyszukiwanie",
+            Dock = DockStyle.Right, Width = 27, Enabled = search.TextLength > 0
+        };
+        search.Dock = DockStyle.Fill;
+        searchField.Controls.Add(search);
+        searchField.Controls.Add(clearSearch);
+        clearSearch.Click += async (_, _) =>
+        {
+            search.Clear();
+            search.Focus();
+            if (connection is not null) await Run(() => Search(false));
+        };
         search.TextChanged += (_, _) =>
         {
+            clearSearch.Enabled = search.TextLength > 0;
             documentSearchTimer.Stop();
             if (connection is null) return;
 
@@ -261,7 +277,7 @@ internal sealed class MainForm : Form
             DocumentKindButton(DocumentSearchKinds.Receipts, "Paragony", "Alt+2"),
             DocumentKindButton(DocumentSearchKinds.WarehouseReleases, "Wydania zewnętrzne", "Alt+4"),
             new Label { Text = "Okres", AutoSize = true }, period, periodStart, periodEnd,
-            search, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
+            searchField, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
         var toolbar = page.Controls.OfType<FlowLayoutPanel>().Single();
         foreach (Control control in toolbar.Controls)
         {
