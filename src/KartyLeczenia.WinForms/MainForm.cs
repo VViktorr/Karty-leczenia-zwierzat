@@ -743,7 +743,30 @@ internal sealed class MainForm : Form
         Column(expiry, "Ważność", "Expires", 120, "dd.MM.yyyy");
         Column(expiry, "Pozostało", "Remaining", 115, "0.####");
         ConnectionOptions? loadingFor = null;
+        ConnectionOptions? loadedFor = null;
+        List<MedicineExpiry> deliveries = [];
+        int? daysFilter = null;
         TabPage? page = null;
+
+        void ShowExpiries()
+        {
+            if (loadedFor is null || !ReferenceEquals(connection, loadedFor)) return;
+            var today = DateTime.Today;
+            var rows = deliveries.Where(row => daysFilter switch
+                {
+                    null => true,
+                    < 0 => row.Expires is { } date && date.Date < today,
+                    _ => row.Expires is { } date && date.Date >= today && date.Date <= today.AddDays(daysFilter.GetValueOrDefault())
+                })
+                .OrderBy(row => row.Expires is null)
+                .ThenBy(row => row.Expires)
+                .ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(row => row.Batch, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            expiry.DataSource = rows;
+            if (tabs.SelectedTab == page) status.Text = $"Dostawy: {rows.Count} / {deliveries.Count}";
+        }
+
         async Task LoadExpiries()
         {
             var options = Connection();
@@ -754,9 +777,9 @@ internal sealed class MainForm : Form
                 using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var rows = await MedicineStockService.Expiries(options, work.Token);
                 if (!ReferenceEquals(connection, options) || IsDisposed) return;
-                expiry.DataSource = rows;
-                if (tabs.SelectedTab == page)
-                    status.Text = $"Dostawy: {rows.Count}";
+                deliveries = rows;
+                loadedFor = options;
+                ShowExpiries();
             }
             finally
             {
@@ -764,11 +787,25 @@ internal sealed class MainForm : Form
             }
         }
 
-        page = Page("Terminy ważności", expiry, Action("Odśwież", LoadExpiries));
+        RadioButton Filter(string text, int? days)
+        {
+            var button = new RadioButton { Text = text, Appearance = Appearance.Button, AutoSize = true, Checked = days is null };
+            button.CheckedChanged += (_, _) =>
+            {
+                if (!button.Checked) return;
+                daysFilter = days;
+                ShowExpiries();
+            };
+            return button;
+        }
+
+        page = Page("Terminy ważności", expiry, Action("Odśwież", LoadExpiries),
+            Filter("Wszystkie", null), Filter("Przeterminowane", -1), Filter("Do 30 dni", 30), Filter("Do 60 dni", 60));
         tabs.SelectedIndexChanged += async (_, _) =>
         {
-            if (tabs.SelectedTab == page && connection is not null && expiry.DataSource is null)
-                await Run(LoadExpiries);
+            if (tabs.SelectedTab != page || connection is null) return;
+            if (expiry.DataSource is null || !ReferenceEquals(connection, loadedFor)) await Run(LoadExpiries);
+            else ShowExpiries();
         };
     }
 
