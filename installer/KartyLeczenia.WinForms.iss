@@ -440,9 +440,9 @@ begin
   begin
     Log('Update publication FAILED: ' + UpdatePublishError);
     MsgBox('Program zostal zainstalowany na serwerze, ale nie udalo sie udostepnic nowej wersji dla stanowisk.' +
-      #13#10 + UpdatePublishError + #13#10 +
+      Chr(13) + Chr(10) + UpdatePublishError + Chr(13) + Chr(10) +
       'Szczegoly: C:\ProgramData\KartyLeczenia\update-publish.log' +
-      #13#10 + 'Poprzedni instalator na udziale nie zostal celowo usuniety.',
+      Chr(13) + Chr(10) + 'Poprzedni instalator na udziale nie zostal celowo usuniety.',
       mbError, MB_OK);
   end
   else
