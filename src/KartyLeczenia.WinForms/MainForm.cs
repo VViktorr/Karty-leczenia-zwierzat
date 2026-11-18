@@ -72,7 +72,7 @@ internal sealed class MainForm : Form
         Disposed += (_, _) => documentSearchTimer.Dispose();
         Controls.Add(tabs);
         Controls.Add(statusBar);
-        statusBar.BringToFront();
+        statusBar.SendToBack();
         ConfigureDocuments();
         ConfigurePrices();
         ConfigureExpiry();
@@ -1186,6 +1186,7 @@ internal sealed class MainForm : Form
             status.Text = "Błąd danych w tabeli karty leczenia. Szczegóły zapisano w logu.";
         };
         treatment.ReadOnly = false;
+        treatment.ScrollBars = ScrollBars.Both;
         treatment.Columns.Add(new DataGridViewCheckBoxColumn
         {
             Name = "Drukuj", HeaderText = "Druk", Width = 48
