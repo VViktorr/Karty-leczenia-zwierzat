@@ -6,6 +6,10 @@
 AppId=pl.kartyleczenia.winforms.sql
 AppName=KartyLeczenia
 AppVersion={#ReleaseVersion}
+VersionInfoVersion={#ReleaseVersion}.0
+VersionInfoProductVersion={#ReleaseVersion}.0
+VersionInfoTextVersion={#ReleaseVersion}
+VersionInfoProductTextVersion={#ReleaseVersion}
 DefaultDirName={autopf}\KartyLeczenia
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
