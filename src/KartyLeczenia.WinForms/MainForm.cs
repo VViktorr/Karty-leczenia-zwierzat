@@ -245,7 +245,7 @@ internal sealed class MainForm : Form
         {
             string message = ex.Number switch
             {
-                50004 => ex.Message,
+                50004 or 50012 => ex.Message,
                 50003 => "Najpierw uruchom nowy instalator w trybie Serwer i zaimportuj katalog leków.",
                 207 or 208 or 229 or 50001 => "Sprawdź, czy przygotowano tabele archiwum i nadano rolę KartyLeczeniaOperator.",
                 _ => SubiektConnectionService.FriendlyError(ex)
@@ -1513,21 +1513,60 @@ internal sealed class MainForm : Form
             if (existing is Guid existingId)
             {
                 if (currentArchiveId != id) return;
-                string question = existingId == id
-                    ? "Zaktualizować zapisaną kartę?"
-                    : "Zapisać kolejną kartę dla tego dokumentu?";
-                if (MessageBox.Show(this, $"Dokument {source.Number} ma już zapisaną kartę.\n\n{question}",
-                        "Karta już zapisana", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
-                        MessageBoxDefaultButton.Button2) != DialogResult.Yes)
-                    return;
-
+                var choice = PromptDuplicateCard(source.Number, updating: existingId == id);
                 if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return;
+                if (choice == DialogResult.Retry)
+                {
+                    await PreviewSavedCard(archive, existingId.ToString("N"));
+                    return;
+                }
+                if (choice != DialogResult.Yes) return;
+
                 await RunArchive(() => archive.SaveCard(id, source, date, card, printCard, confirmDuplicate: true));
                 if (IsDisposed || sharedArchive != archive) return;
             }
             status.Text = "Zapisano kartę we wspólnym archiwum.";
         }
         finally { savingTreatment = false; }
+    }
+
+    DialogResult PromptDuplicateCard(string document, bool updating)
+    {
+        using var dialog = new Form
+        {
+            Text = "Karta już zapisana", StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, AutoScaleMode = AutoScaleMode.Dpi
+        };
+        var layout = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, Padding = new Padding(12)
+        };
+        layout.Controls.Add(new Label
+        {
+            AutoSize = true, MaximumSize = new Size(560, 0),
+            Text = $"Dokument {document} ma już zapisaną kartę."
+        });
+        var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+        buttons.Controls.AddRange([
+            new Button { Text = "Otwórz zapisaną kartę", AutoSize = true, DialogResult = DialogResult.Retry },
+            new Button { Text = updating ? "Zaktualizuj kartę" : "Zapisz kolejną kartę", AutoSize = true, DialogResult = DialogResult.Yes },
+            cancel
+        ]);
+        layout.Controls.Add(buttons);
+        dialog.Controls.Add(layout);
+        dialog.AcceptButton = dialog.CancelButton = cancel;
+        dialog.ActiveControl = cancel;
+        return dialog.ShowDialog(this);
+    }
+
+    async Task PreviewSavedCard(SharedArchive archive, string id, bool inTrash = false)
+    {
+        var saved = await RunArchive(() => archive.ReadCard(id, forPrint: true, inTrash: inTrash));
+        if (!IsDisposed && sharedArchive == archive)
+            OpenCardPreview(saved.Card, saved.PayerId, saved.Scope);
     }
 
     DataGridView ConfigureSavedCards()
@@ -1537,6 +1576,7 @@ internal sealed class MainForm : Form
         Column(grid, "Klient", nameof(SavedTreatmentCard.Client), 350);
         Column(grid, "Dokument", nameof(SavedTreatmentCard.Document), 180);
         var query = new TextBox { Width = 250, PlaceholderText = "Klient lub numer dokumentu" };
+        var trash = new CheckBox { Text = "Pokaż kosz", AutoSize = true, Anchor = AnchorStyles.Left };
         var day = new DateTimePicker { Format = DateTimePickerFormat.Short, ShowCheckBox = true, Checked = false, Width = 125 };
 
         int refreshVersion = 0;
@@ -1548,58 +1588,64 @@ internal sealed class MainForm : Form
             var archive = Archive();
             var text = query.Text.Trim();
             DateTime? date = day.Checked ? day.Value.Date : null;
-            var rows = await RunArchive(() => archive.FindCards(text, date));
+            bool inTrash = trash.Checked;
+            var rows = await RunArchive(() => archive.FindCards(text, date, inTrash));
             if (IsDisposed || version != refreshVersion || sharedArchive != archive) return;
             grid.DataSource = rows;
-            status.Text = $"Zapisane karty: {rows.Count}";
+            status.Text = inTrash ? $"Karty w koszu: {rows.Count}" : $"Zapisane karty: {rows.Count}";
         }
 
         async Task OpenSavedCard()
         {
             if (grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
-            var archive = Archive();
-            var card = await RunArchive(() => archive.ReadCard(row.Id, forPrint: true));
-            if (!IsDisposed && sharedArchive == archive)
-                OpenCardPreview(card, row.PayerId, row.Scope);
+            await PreviewSavedCard(Archive(), row.Id, trash.Checked);
         }
 
         async Task ExportSavedCard()
         {
             if (grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
             var archive = Archive();
-            var card = await RunArchive(() => archive.ReadCard(row.Id, forPrint: false));
-            if (!IsDisposed && sharedArchive == archive) await ExportCard(card);
+            bool inTrash = trash.Checked;
+            var saved = await RunArchive(() => archive.ReadCard(row.Id, forPrint: false, inTrash: inTrash));
+            if (!IsDisposed && sharedArchive == archive) await ExportCard(saved.Card);
         }
 
-        bool deletingCard = false;
-        async Task DeleteSavedCard()
+        bool movingCard = false;
+        async Task MoveSavedCard()
         {
-            if (deletingCard || grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
+            if (movingCard || grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
             var archive = Archive();
-            deletingCard = true;
+            bool toTrash = !trash.Checked;
+            movingCard = true;
             try
             {
-                if (MessageBox.Show(this,
-                        $"Usunąć kartę dla dokumentu {row.Document}?\n{row.Client} · {row.Date:dd.MM.yyyy}\n\n" +
-                        "Karta zniknie ze wspólnego archiwum na wszystkich stanowiskach.",
-                        "Usuń zapisaną kartę", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                if (toTrash && MessageBox.Show(this,
+                        $"Przenieść kartę dokumentu {row.Document} do kosza?\n{row.Client} · {row.Date:dd.MM.yyyy}",
+                        "Przenieś do kosza", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                         MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                     return;
 
                 if (IsDisposed || sharedArchive != archive) return;
-                bool deleted = await RunArchive(() => archive.DeleteCard(row.Id));
+                bool moved = await RunArchive(() => archive.SetCardInTrash(row.Id, toTrash));
                 if (IsDisposed || sharedArchive != archive) return;
                 await RefreshCards();
                 if (!IsDisposed && sharedArchive == archive)
-                    status.Text = deleted ? "Usunięto kartę z archiwum." : "Karta została już usunięta.";
+                    status.Text = !moved ? "Stan karty już się zmienił."
+                        : toTrash ? "Przeniesiono kartę do kosza." : "Przywrócono kartę z kosza.";
             }
-            finally { deletingCard = false; }
+            finally { movingCard = false; }
         }
 
+        var moveCard = Action("Przenieś do kosza", MoveSavedCard);
         var page = Page("Zapisane karty leczenia", grid, query,
             new Label { Text = "Data leczenia", AutoSize = true }, day,
             Action("Szukaj", RefreshCards), Action("Podgląd / PDF / e-mail", OpenSavedCard),
-            Action("Eksportuj JSON", ExportSavedCard), Action("Usuń kartę", DeleteSavedCard));
+            Action("Eksportuj JSON", ExportSavedCard), trash, moveCard);
+        trash.CheckedChanged += async (_, _) =>
+        {
+            moveCard.Text = trash.Checked ? "Przywróć kartę" : "Przenieś do kosza";
+            await Run(RefreshCards);
+        };
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab == page) await Run(RefreshCards);

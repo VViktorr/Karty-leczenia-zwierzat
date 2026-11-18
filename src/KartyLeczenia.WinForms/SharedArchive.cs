@@ -6,7 +6,7 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia.Windows;
 
-internal sealed record SavedTreatmentCard(string Id, DateTime Date, string Client, string Document, int? PayerId, string Scope);
+internal sealed record SavedTreatmentCard(string Id, DateTime Date, string Client, string Document);
 
 internal sealed partial class SharedArchive(ConnectionOptions options)
 {
@@ -117,7 +117,7 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         {
             using var existing = Command(db, """
                 SELECT TOP (1) id FROM dbo.treatment_cards WITH (UPDLOCK, HOLDLOCK)
-                WHERE source_scope = @scope AND document = @document
+                WHERE source_scope = @scope AND document = @document AND deleted_at_utc IS NULL
                 ORDER BY CASE WHEN id = @id THEN 0 ELSE 1 END, archive_order DESC;
                 """, transaction);
             existing.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = source.Scope;
@@ -137,45 +137,54 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         return null;
     }
 
-    internal bool DeleteCard(string id)
+    internal bool SetCardInTrash(string id, bool inTrash)
     {
         using var db = Open();
-        using var command = Command(db, "DELETE FROM dbo.treatment_cards WHERE id = @id;");
+        using var command = Command(db, inTrash
+            ? "UPDATE dbo.treatment_cards SET deleted_at_utc = SYSUTCDATETIME() WHERE id = @id AND deleted_at_utc IS NULL;"
+            : "UPDATE dbo.treatment_cards SET deleted_at_utc = NULL WHERE id = @id AND deleted_at_utc IS NOT NULL;");
         command.Parameters.Add("@id", SqlDbType.UniqueIdentifier).Value = Guid.ParseExact(id, "N");
         return command.ExecuteNonQuery() > 0;
     }
 
-    internal List<SavedTreatmentCard> FindCards(string query, DateTime? date)
+    internal List<SavedTreatmentCard> FindCards(string query, DateTime? date, bool inTrash)
     {
         using var db = Open();
         using var command = Command(db, """
-            SELECT id, treatment_date, client, document, payer_id, source_scope
+            SELECT id, treatment_date, client, document
             FROM dbo.treatment_cards
-            WHERE (@query = N'' OR CHARINDEX(@query, search_text) > 0)
+            WHERE ((@trash = 0 AND deleted_at_utc IS NULL) OR (@trash = 1 AND deleted_at_utc IS NOT NULL))
+              AND (@query = N'' OR CHARINDEX(@query, search_text) > 0)
               AND (@date IS NULL OR treatment_date = @date)
             ORDER BY treatment_date DESC, archive_order DESC;
             """);
+        command.Parameters.Add("@trash", SqlDbType.Bit).Value = inTrash;
         command.Parameters.Add("@query", SqlDbType.NVarChar, -1).Value = query.ToUpperInvariant();
         command.Parameters.Add("@date", SqlDbType.Date).Value = (object?)date?.Date ?? DBNull.Value;
         using var reader = command.ExecuteReader();
         var cards = new List<SavedTreatmentCard>();
         while (reader.Read())
-            cards.Add(new(reader.GetGuid(0).ToString("N"), reader.GetDateTime(1), reader.GetString(2),
-                reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.GetString(5)));
+            cards.Add(new(reader.GetGuid(0).ToString("N"), reader.GetDateTime(1), reader.GetString(2), reader.GetString(3)));
         return cards;
     }
 
-    internal Card ReadCard(string id, bool forPrint)
+    internal (Card Card, int? PayerId, string Scope) ReadCard(string id, bool forPrint, bool inTrash = false)
     {
         using var db = Open();
-        using var command = Command(db, forPrint
-            ? "SELECT print_json FROM dbo.treatment_cards WHERE id = @id;"
-            : "SELECT card_json FROM dbo.treatment_cards WHERE id = @id;");
+        using var command = Command(db, """
+            SELECT CASE WHEN @print = 1 THEN print_json ELSE card_json END, payer_id, source_scope
+            FROM dbo.treatment_cards
+            WHERE id = @id AND ((@trash = 0 AND deleted_at_utc IS NULL) OR (@trash = 1 AND deleted_at_utc IS NOT NULL));
+            """);
         command.Parameters.Add("@id", SqlDbType.UniqueIdentifier).Value = Guid.ParseExact(id, "N");
-        if (command.ExecuteScalar() is not string json)
-            throw new InvalidOperationException("Nie znaleziono zapisanej karty.");
-        return JsonSerializer.Deserialize<Card>(json)
+        command.Parameters.Add("@print", SqlDbType.Bit).Value = forPrint;
+        command.Parameters.Add("@trash", SqlDbType.Bit).Value = inTrash;
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            throw new InvalidOperationException("Karta zmieniła stan lub nie jest już dostępna. Odśwież listę kart.");
+        var card = JsonSerializer.Deserialize<Card>(reader.GetString(0))
             ?? throw new InvalidOperationException("Zapisana karta jest pusta.");
+        return (card, reader.IsDBNull(1) ? null : reader.GetInt32(1), reader.GetString(2));
     }
 
     internal string[] ReadDescriptions(DocumentData card)
@@ -210,8 +219,12 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
             IF EXISTS (SELECT 1 FROM dbo.treatment_cards WITH (UPDLOCK, HOLDLOCK) WHERE id = @id)
             BEGIN
                 IF @update = 1
+                BEGIN
                     UPDATE dbo.treatment_cards SET treatment_date = @date, card_json = @card, print_json = @print
-                    WHERE id = @id;
+                    WHERE id = @id AND deleted_at_utc IS NULL;
+                    IF @@ROWCOUNT = 0
+                        THROW 50012, N'Zapisana karta jest w koszu. Przywróć ją lub ponownie otwórz dokument, aby zapisać nową kartę.', 1;
+                END;
                 SELECT 0;
             END
             ELSE

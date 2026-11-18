@@ -22,6 +22,9 @@ BEGIN
     CREATE INDEX IX_treatment_cards_date ON dbo.treatment_cards (treatment_date DESC, archive_order DESC);
 END;
 
+IF COL_LENGTH(N'dbo.treatment_cards', N'deleted_at_utc') IS NULL
+    ALTER TABLE dbo.treatment_cards ADD deleted_at_utc datetime2(0) NULL;
+
 IF OBJECT_ID(N'dbo.animal_descriptions', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.animal_descriptions (
@@ -108,7 +111,8 @@ END;
 IF DATABASE_PRINCIPAL_ID(N'KartyLeczeniaOperator') IS NULL
     CREATE ROLE KartyLeczeniaOperator AUTHORIZATION dbo;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.treatment_cards TO KartyLeczeniaOperator;
+GRANT SELECT, INSERT, UPDATE ON dbo.treatment_cards TO KartyLeczeniaOperator;
+REVOKE DELETE ON dbo.treatment_cards FROM KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.animal_descriptions TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.clinic_settings TO KartyLeczeniaOperator;
 

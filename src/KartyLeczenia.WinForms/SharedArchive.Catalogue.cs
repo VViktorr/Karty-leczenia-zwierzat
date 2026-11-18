@@ -186,7 +186,7 @@ internal sealed partial class SharedArchive
         return file;
     }
 
-    internal Dictionary<(string Symbol, string Product), (string Species, string Route)> ReadTreatmentChoices(string scope)
+    internal Dictionary<string, (string Species, string Route)> ReadTreatmentChoices(string scope)
     {
         using var db = Open();
         using var query = Command(db, """
@@ -194,20 +194,33 @@ internal sealed partial class SharedArchive
             """);
         query.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = scope;
         using var reader = query.ExecuteReader();
-        var result = new Dictionary<(string, string), (string, string)>();
+        var choices = new List<(string Symbol, bool BySymbol, (string Species, string Route) Value)>();
         while (reader.Read())
-            result[(reader.GetString(0), reader.GetString(1))] = (reader.GetString(2), reader.GetString(3));
+        {
+            string symbol = reader.GetString(0);
+            if (symbol.Length > 0)
+                choices.Add((symbol, reader.GetString(1).Length == 0, (reader.GetString(2), reader.GetString(3))));
+        }
+
+        var result = new Dictionary<string, (string Species, string Route)>(StringComparer.Ordinal);
+        foreach (var group in choices.GroupBy(choice => choice.Symbol, StringComparer.Ordinal))
+        {
+            // Reuse legacy choices only when the old names agree for this symbol.
+            var current = group.Where(choice => choice.BySymbol).Select(choice => choice.Value).Distinct().ToArray();
+            var values = current.Length > 0 ? current : group.Select(choice => choice.Value).Distinct().ToArray();
+            if (values.Length == 1) result.Add(group.Key, values[0]);
+        }
         return result;
     }
 
-    internal void SaveTreatmentChoice(string scope, (string Symbol, string Product) key, string species, string route)
+    internal void SaveTreatmentChoice(string scope, string symbol, string species, string route)
     {
+        if (symbol.Length == 0) return;
         using var bytes = new MemoryStream();
         using (var values = new BinaryWriter(bytes, Encoding.UTF8, leaveOpen: true))
         {
             values.Write(scope);
-            values.Write(key.Symbol);
-            values.Write(key.Product);
+            values.Write(symbol);
         }
 
         using var db = Open();
@@ -217,12 +230,11 @@ internal sealed partial class SharedArchive
                 UPDATE dbo.treatment_choices SET species = @species, route = @route WHERE choice_key = @key;
             ELSE
                 INSERT dbo.treatment_choices(choice_key,source_scope,symbol,product,species,route)
-                VALUES (@key,@scope,@symbol,@product,@species,@route);
+                VALUES (@key,@scope,@symbol,N'',@species,@route);
             """, transaction);
         query.Parameters.Add("@key", SqlDbType.Binary, 32).Value = SHA256.HashData(bytes.ToArray());
         query.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = scope;
-        query.Parameters.Add("@symbol", SqlDbType.NVarChar, -1).Value = key.Symbol;
-        query.Parameters.Add("@product", SqlDbType.NVarChar, -1).Value = key.Product;
+        query.Parameters.Add("@symbol", SqlDbType.NVarChar, -1).Value = symbol;
         query.Parameters.Add("@species", SqlDbType.NVarChar, -1).Value = species;
         query.Parameters.Add("@route", SqlDbType.NVarChar, -1).Value = route;
         query.ExecuteNonQuery();
