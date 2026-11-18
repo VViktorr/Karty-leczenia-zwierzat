@@ -1499,24 +1499,31 @@ internal sealed class MainForm : Form
             Action("Eksportuj JSON", SaveCard),
             Action("Podgląd / PDF / e-mail", PreviewCard));
         var actions = page.Controls.OfType<FlowLayoutPanel>().Single();
+        bool verticalTreatmentToolbar = interfaceScale > 100;
         var toolbar = new TableLayoutPanel
         {
-            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, RowCount = 1
+            Dock = DockStyle.Top, AutoSize = true,
+            ColumnCount = verticalTreatmentToolbar ? 1 : 3,
+            RowCount = verticalTreatmentToolbar ? 3 : 1
         };
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        if (!verticalTreatmentToolbar)
+        {
+            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
         page.Controls.Remove(actions);
         actions.Dock = DockStyle.Fill;
         actions.Margin = Padding.Empty;
+        actions.WrapContents = true;
         toolbar.Controls.Add(actions, 0, 0);
         rememberTreatment.Anchor = AnchorStyles.Right;
-        toolbar.Controls.Add(rememberTreatment, 1, 0);
+        toolbar.Controls.Add(rememberTreatment, verticalTreatmentToolbar ? 0 : 1, verticalTreatmentToolbar ? 1 : 0);
         var saveTreatment = Action("Zapisz kartę", SaveTreatmentToArchive);
         saveTreatment.Anchor = AnchorStyles.Right;
         saveTreatment.MinimumSize = new Size(150, 36);
         saveTreatment.Padding = new Padding(12, 4, 12, 4);
-        toolbar.Controls.Add(saveTreatment, 2, 0);
+        toolbar.Controls.Add(saveTreatment, verticalTreatmentToolbar ? 0 : 2, verticalTreatmentToolbar ? 2 : 0);
         var routeLegend = new Label
         {
             Dock = DockStyle.Top,
