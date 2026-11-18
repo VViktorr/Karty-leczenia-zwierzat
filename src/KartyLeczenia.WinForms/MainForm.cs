@@ -42,8 +42,11 @@ internal sealed class MainForm : Form
     Guid currentArchiveId;
     readonly DateTimePicker treatmentDate = new() { Format = DateTimePickerFormat.Short, Width = 110 };
 
-    internal MainForm(bool openSettings = false)
+    readonly int interfaceScale;
+
+    internal MainForm(bool openSettings, int interfaceScale)
     {
+        this.interfaceScale = interfaceScale;
         Text = "KartyLeczenia";
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(850, 550);
@@ -75,12 +78,14 @@ internal sealed class MainForm : Form
         ConfigureExpiry();
         ConfigureCard();
         ConfigureConnection();
-        ConfigureSavedCards();
-        var layout = new WindowLayout(this, rememberTreatment, new()
+        var savedCardsGrid = ConfigureSavedCards();
+        var tables = new Dictionary<string, DataGridView>
         {
             ["documents"] = documents, ["prices"] = prices,
             ["expiry"] = expiry, ["treatment"] = treatment
-        });
+        };
+        if (interfaceScale > 100) EnlargeInterface(tables.Values.Append(savedCardsGrid));
+        var layout = new WindowLayout(this, rememberTreatment, tables, interfaceScale);
         Load += (_, _) =>
         {
             layout.Restore();
@@ -90,6 +95,29 @@ internal sealed class MainForm : Form
         FormClosed += (_, _) => layout.Save();
         tabs.SelectedIndex = openSettings || connection is null || sharedArchive is null ? 4 : 0;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
+    }
+
+    void EnlargeInterface(IEnumerable<DataGridView> grids)
+    {
+        float factor = interfaceScale / 100f;
+        int Pixels(int value) => (int)Math.Round(value * factor);
+        var gridSizes = grids.Select(grid => (Grid: grid, Height: grid.RowTemplate.Height,
+            Widths: grid.Columns.Cast<DataGridViewColumn>().Select(column => column.Width).ToArray())).ToArray();
+
+        var workingArea = Screen.FromPoint(Cursor.Position).WorkingArea;
+        tabs.Multiline = true;
+        var tabPadding = tabs.Padding;
+        Scale(new SizeF(factor, factor));
+        tabs.Padding = new Point(Pixels(tabPadding.X), Pixels(tabPadding.Y));
+        MinimumSize = new Size(Math.Min(MinimumSize.Width, workingArea.Width), Math.Min(MinimumSize.Height, workingArea.Height));
+        Size = new Size(Math.Min(Width, workingArea.Width), Math.Min(Height, workingArea.Height));
+
+        foreach (var (grid, height, widths) in gridSizes)
+        {
+            grid.RowTemplate.Height = Math.Max(grid.RowTemplate.MinimumHeight, Pixels(height));
+            for (int i = 0; i < widths.Length; i++)
+                grid.Columns[i].Width = Math.Max(grid.Columns[i].MinimumWidth, Pixels(widths[i]));
+        }
     }
 
     void DrawMainTab(object? sender, DrawItemEventArgs e)
@@ -1501,7 +1529,7 @@ internal sealed class MainForm : Form
         finally { savingTreatment = false; }
     }
 
-    void ConfigureSavedCards()
+    DataGridView ConfigureSavedCards()
     {
         var grid = NewGrid();
         Column(grid, "Data leczenia", nameof(SavedTreatmentCard.Date), 115, "dd.MM.yyyy");
@@ -1586,6 +1614,7 @@ internal sealed class MainForm : Form
         {
             if (e.RowIndex >= 0) await Run(OpenSavedCard);
         };
+        return grid;
     }
 
     Task SaveCard() => ExportCard(CaptureTreatmentCard());
@@ -2273,6 +2302,23 @@ internal sealed class MainForm : Form
 
         Add("", Action("Archiwizuj bazę", () => MaintainArchive(restoring: false)));
         Add("", Action("Odtwórz bazę z kopii…", () => MaintainArchive(restoring: true)));
+
+        form = Section("Wygląd");
+        var scaleSelector = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, AccessibleName = "Skala interfejsu" };
+        scaleSelector.Items.AddRange(InterfaceScale.Percentages.Select(value => $"{value}%").ToArray());
+        int savedScale = InterfaceScale.Load();
+        scaleSelector.SelectedIndex = Array.IndexOf(InterfaceScale.Percentages.ToArray(), savedScale);
+        Add("Skala interfejsu", scaleSelector);
+        var scaleMessage = Message(form, "Zmiana zacznie działać po ponownym uruchomieniu programu.", multiline: true);
+        Add("", Action("Zapisz skalę", () =>
+        {
+            int selectedScale = InterfaceScale.Percentages[scaleSelector.SelectedIndex];
+            InterfaceScale.Save(selectedScale);
+            scaleMessage.Text = status.Text = selectedScale == interfaceScale
+                ? $"Zapisano skalę {selectedScale}%."
+                : $"Zapisano skalę {selectedScale}%. Zamknij i uruchom ponownie program.";
+            return Task.CompletedTask;
+        }));
 
         var settingsPage = Page("Ustawienia", sections);
         if (sharedArchive is not null && connection is null) sections.SelectedIndex = 1;

@@ -16,7 +16,12 @@ internal static class Program
                     "KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
             ApplicationConfiguration.Initialize();
-            Application.Run(new MainForm(args.Contains("--settings", StringComparer.OrdinalIgnoreCase)));
+            int scale = InterfaceScale.Load();
+            var defaultFont = Control.DefaultFont;
+            using var scaledFont = scale == 100 ? null : new Font(defaultFont.FontFamily,
+                defaultFont.SizeInPoints * scale / 100f, defaultFont.Style, GraphicsUnit.Point);
+            if (scaledFont is not null) Application.SetDefaultFont(scaledFont);
+            Application.Run(new MainForm(args.Contains("--settings", StringComparer.OrdinalIgnoreCase), scale));
             CrashLog.Write("WinForms.Application.Exit");
         }
         catch (Exception ex)

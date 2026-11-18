@@ -2,13 +2,13 @@ using System.Text.Json;
 
 namespace KartyLeczenia.Windows;
 
-internal sealed class WindowLayout(Form window, CheckBox rememberTreatment, Dictionary<string, DataGridView> tables)
+internal sealed class WindowLayout(Form window, CheckBox rememberTreatment, Dictionary<string, DataGridView> tables, int interfaceScale)
 {
     static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "KartyLeczenia", "winforms-layout.json");
 
-    sealed record Layout(Rectangle Bounds, bool Maximized, Dictionary<string, TableLayout> Tables, bool RememberTreatment = false);
+    sealed record Layout(Rectangle Bounds, bool Maximized, Dictionary<string, TableLayout> Tables, bool RememberTreatment = false, int InterfaceScale = 100);
     sealed record TableLayout(int RowHeight, bool MultiSelect, bool RowHeaders, DataGridViewCellBorderStyle Borders,
         ColumnLayout[] Columns);
     sealed record ColumnLayout(string Name, int Width, int Order, bool Visible,
@@ -39,17 +39,20 @@ internal sealed class WindowLayout(Form window, CheckBox rememberTreatment, Dict
         }
         if (layout.Maximized) window.WindowState = FormWindowState.Maximized;
 
+        int savedScale = InterfaceScale.Percentages.Contains(layout.InterfaceScale) ? layout.InterfaceScale : 100;
+        int ScalePixels(int value) => (int)Math.Round(value * (double)interfaceScale / savedScale);
+
         foreach (var (name, grid) in tables)
         {
             if (layout.Tables is null || !layout.Tables.TryGetValue(name, out var saved) || saved is null) continue;
-            grid.RowTemplate.Height = Math.Clamp(saved.RowHeight, grid.RowTemplate.MinimumHeight, 65536);
+            grid.RowTemplate.Height = Math.Clamp(ScalePixels(Math.Clamp(saved.RowHeight, 1, 65536)), grid.RowTemplate.MinimumHeight, 65536);
             grid.MultiSelect = saved.MultiSelect;
             grid.RowHeadersVisible = saved.RowHeaders;
             if (Enum.IsDefined(saved.Borders)) grid.CellBorderStyle = saved.Borders;
             foreach (var column in (saved.Columns ?? []).Where(column => column?.Name is not null).OrderBy(column => column.Order))
             {
                 if (grid.Columns[column.Name] is not { } current) continue;
-                current.Width = Math.Clamp(column.Width, current.MinimumWidth, 65536);
+                current.Width = Math.Clamp(ScalePixels(Math.Clamp(column.Width, 1, 65536)), current.MinimumWidth, 65536);
                 current.DisplayIndex = Math.Clamp(column.Order, 0, grid.Columns.Count - 1);
                 current.Visible = column.Visible;
                 DocumentColumnOptions.Apply(current, column.ValueOption);
@@ -80,7 +83,7 @@ internal sealed class WindowLayout(Form window, CheckBox rememberTreatment, Dict
             try
             {
                 File.WriteAllText(temporaryPath, JsonSerializer.Serialize(
-                    new Layout(bounds, window.WindowState == FormWindowState.Maximized, savedTables, rememberTreatment.Checked)));
+                    new Layout(bounds, window.WindowState == FormWindowState.Maximized, savedTables, rememberTreatment.Checked, interfaceScale)));
                 File.Move(temporaryPath, FilePath, overwrite: true);
             }
             finally { File.Delete(temporaryPath); }
