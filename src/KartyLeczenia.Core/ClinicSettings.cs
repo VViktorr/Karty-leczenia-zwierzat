@@ -3,6 +3,9 @@ namespace KartyLeczenia;
 
 public sealed record ClinicSettings(string Name = "", string Address = "", string Doctor = "")
 {
+    public bool UseDoctorStamp { get; init; }
+    public byte[]? DoctorStampPng { get; init; }
+
     public string CardText => string.Join("\n", new[] { Name.Trim(), Address.Trim() }.Where(s => s.Length > 0));
 }
 public static class ClinicSettingsStore

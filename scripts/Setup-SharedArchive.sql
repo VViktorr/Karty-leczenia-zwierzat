@@ -44,6 +44,13 @@ BEGIN
     );
 END;
 
+IF COL_LENGTH(N'dbo.clinic_settings', N'use_doctor_stamp') IS NULL
+    ALTER TABLE dbo.clinic_settings ADD use_doctor_stamp bit NOT NULL
+        CONSTRAINT DF_clinic_settings_use_doctor_stamp DEFAULT (0);
+
+IF COL_LENGTH(N'dbo.clinic_settings', N'doctor_stamp_png') IS NULL
+    ALTER TABLE dbo.clinic_settings ADD doctor_stamp_png varbinary(max) NULL;
+
 IF OBJECT_ID(N'dbo.catalog_products', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.catalog_products (

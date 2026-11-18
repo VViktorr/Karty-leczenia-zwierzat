@@ -1364,7 +1364,10 @@ internal sealed class MainForm : Form
             if (forPrint) values["Karencja"] = FormatWithdrawal(item, values.GetValueOrDefault("Karencja", ""));
             return values;
         }).ToList();
-        return new Card(fields, rows);
+        return new Card(fields, rows)
+        {
+            DoctorStampPng = clinic.UseDoctorStamp ? clinic.DoctorStampPng : null
+        };
     }
 
     async Task SaveTreatmentToArchive()
@@ -1878,6 +1881,45 @@ internal sealed class MainForm : Form
         var clinicName = Field("Nazwa lecznicy", localClinic.Name);
         var clinicAddress = Field("Adres lecznicy", localClinic.Address);
         var doctor = Field("Lekarz", localClinic.Doctor);
+        var doctorMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190 };
+        doctorMode.Items.AddRange(["Tekst", "Pieczątka PNG"]);
+        Add("Lekarz na karcie", doctorMode);
+        byte[]? doctorStamp = localClinic.DoctorStampPng;
+        var stampTools = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        var stampLabel = new Label { AutoSize = true, Margin = new Padding(8, 8, 0, 0) };
+
+        void UpdateStampLabel() => stampLabel.Text = doctorStamp is null ? "Brak pliku" : "PNG dodany";
+
+        stampTools.Controls.AddRange([
+            Action("Wybierz PNG…", () =>
+            {
+                using var dialog = new OpenFileDialog { Filter = "Obraz PNG (*.png)|*.png" };
+                if (dialog.ShowDialog(this) != DialogResult.OK) return Task.CompletedTask;
+                var bytes = File.ReadAllBytes(dialog.FileName);
+                if (!CardSchema.HasPngHeader(bytes)) throw new InvalidDataException("Wybierz poprawny obraz PNG.");
+                try
+                {
+                    using var stream = new MemoryStream(bytes);
+                    using var image = System.Drawing.Image.FromStream(stream, useEmbeddedColorManagement: false, validateImageData: true);
+                }
+                catch (ArgumentException ex) { throw new InvalidDataException("Nie można odczytać obrazu PNG.", ex); }
+                doctorStamp = bytes;
+                doctorMode.SelectedIndex = 1;
+                UpdateStampLabel();
+                return Task.CompletedTask;
+            }),
+            Action("Usuń", () =>
+            {
+                doctorStamp = null;
+                doctorMode.SelectedIndex = 0;
+                UpdateStampLabel();
+                return Task.CompletedTask;
+            }),
+            stampLabel
+        ]);
+        Add("Pieczątka lekarza", stampTools);
+        doctorMode.SelectedIndex = localClinic.UseDoctorStamp ? 1 : 0;
+        UpdateStampLabel();
         var clinicResult = Message(form, "Połącz się w zakładce „Archiwum SQL”, aby pobrać wspólne dane lecznicy.", multiline: true);
 
         void SetClinicStatus(string message, bool reportInStatusBar = false)
@@ -1886,19 +1928,26 @@ internal sealed class MainForm : Form
             if (reportInStatusBar) status.Text = message;
         }
 
-        ClinicSettings ClinicDraft() => new(clinicName.Text, clinicAddress.Text, doctor.Text);
+        ClinicSettings ClinicDraft() => new(clinicName.Text, clinicAddress.Text, doctor.Text)
+        {
+            UseDoctorStamp = doctorMode.SelectedIndex == 1,
+            DoctorStampPng = doctorStamp
+        };
 
         void ShowClinic(ClinicSettings clinic)
         {
             clinicName.Text = clinic.Name;
             clinicAddress.Text = clinic.Address;
             doctor.Text = clinic.Doctor;
+            doctorMode.SelectedIndex = clinic.UseDoctorStamp ? 1 : 0;
+            doctorStamp = clinic.DoctorStampPng;
+            UpdateStampLabel();
         }
 
         void ReportClinicError(Exception ex)
         {
             string message = ex is Microsoft.Data.SqlClient.SqlException { Number: 207 or 208 or 229 }
-                ? "Sprawdź, czy aktualny instalator w trybie Serwer dodał tabelę danych lecznicy na tej instancji i przyznał do niej dostęp operatorowi."
+                ? "Sprawdź, czy aktualny instalator w trybie Serwer zaktualizował dane lecznicy na tej instancji i przyznał do nich dostęp operatorowi."
                 : SubiektConnectionService.FriendlyError(ex);
             CrashLog.Write("WinForms.Clinic.SyncFailed", ex);
             SetClinicStatus($"Dane lecznicy — {sharedArchive?.Server}: {message}", reportInStatusBar: true);
@@ -1934,6 +1983,8 @@ internal sealed class MainForm : Form
         Add("", Action("Zapisz dane lecznicy", async () =>
         {
             var clinic = ClinicDraft();
+            if (clinic.UseDoctorStamp && clinic.DoctorStampPng is null)
+                throw new InvalidOperationException("Dodaj plik pieczątki PNG lub wybierz tekst.");
             var archive = Archive();
             clinicForm.Enabled = false;
             try

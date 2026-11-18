@@ -1,14 +1,25 @@
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 
 namespace KartyLeczenia;
 
-public sealed record Card(Dictionary<string, string> Fields, List<Dictionary<string, string>> Rows);
+public sealed record Card(Dictionary<string, string> Fields, List<Dictionary<string, string>> Rows)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public byte[]? DoctorStampPng { get; init; }
+}
 
 public static class CardSchema
 {
     public static readonly string[] Fields = ["Nr karty", "Lecznica i adres", "Lekarz i nr prawa wykonywania zawodu", "Właściciel i adres", "Zgłoszenie — data i godzina", "Wykonanie — data i godzina", "Wyniki badań", "Dokument źródłowy"];
     public static readonly string[] RowFields = ["Opis zwierząt / numer siedziby stada", "Liczba zwierząt", "Rozpoznanie", "Produkt", "Seria", "Ważność", "Ilość wydana", "Dawkowanie i okres stosowania", "Karencja", "Zalecenia / uwagi", "Sekcja (II lub III)"];
     public static readonly string[] ContextFields = ["Gatunek", "Droga podania", "Produkt spożywczy", "Produkt rejestru"];
+    public static bool HasPngHeader(ReadOnlySpan<byte> bytes)
+    {
+        ReadOnlySpan<byte> header = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+        return bytes.StartsWith(header);
+    }
+
     public const string RegistryVerified = "RPL — sprawdzono i zatwierdzono";
     public static bool NeedsReview(Dictionary<string, string> row) => string.IsNullOrWhiteSpace(row.GetValueOrDefault("Karencja")) || row.GetValueOrDefault("Status karencji") is not (RegistryVerified or "UPD — sprawdzono i zatwierdzono");
 }
