@@ -1,0 +1,89 @@
+name: Dodaj Albendis do katalogu SQLite
+on:
+  push:
+    branches: [winforms]
+    paths: ['.github/workflows/add-albendis-catalog.yml']
+permissions:
+  contents: write
+jobs:
+  update-catalog:
+    if: github.event.head_commit.message == 'Add Albendis catalog migration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dodaj Albendis i sprawdź bazę
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          
+          database = Path("src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite")
+          symbol = "RPL 3413"
+          name = "ALBENDIS 100MG/ML A'1 L"
+          rpl_id = "51970"
+          source = f"https://rejestrymedyczne.ezdrowie.gov.pl/api/rpl/medicinal-products/{rpl_id}/characteristic"
+          pdf = "data/ChPL/RPL/RPL 3413 ALBENDIS 100MG_ML.pdf"
+          route = "Doustnie (p.o.)"
+          restrictions = (
+              "Wstrząsnąć przed użyciem. Nie podawać przy nadwrażliwości na składniki ani w pierwszym trymestrze ciąży. "
+              "W dalszej ciąży i podczas laktacji stosować po ocenie korzyści i ryzyka przez lekarza weterynarii. "
+              "Ze względów środowiskowych stosować najwyżej raz w roku. Przez 7 dni po leczeniu "
+              "zwierzęta nie powinny mieć dostępu do wód powierzchniowych."
+          )
+          variants = [
+              ("Bydło", "Nicienie przewodu pokarmowego, tasiemce i nicienie płucne",
+               "Jednorazowo 7,5 ml/100 kg m.c. (7,5 mg albendazolu/kg m.c.)."),
+              ("Bydło", "Dorosłe przywry wątrobowe",
+               "Jednorazowo 10–15 ml/100 kg m.c. (10–15 mg albendazolu/kg m.c.). "
+               "Przy silnej inwazji powtórzyć po 21 dniach."),
+              ("Owce", "Nicienie przewodu pokarmowego, tasiemce i nicienie płucne Dictyocaulus spp.",
+               "Jednorazowo 1,5 ml/40 kg m.c. (3,75 mg albendazolu/kg m.c.)."),
+              ("Owce", "Nicienie płucne Muellerius spp. i Protostrongylus spp.",
+               "3–4 ml/40 kg m.c. (7,5–10 mg albendazolu/kg m.c.). Powtórzyć po 7 dniach."),
+              ("Owce", "Dorosłe przywry wątrobowe Fasciola spp. i Fascioloides spp.",
+               "Jednorazowo 3–4 ml/40 kg m.c. (7,5–10 mg albendazolu/kg m.c.)."),
+              ("Owce", "Dorosłe przywry wątrobowe Dicrocoelium spp.",
+               "3–4 ml/40 kg m.c. (7,5–10 mg albendazolu/kg m.c.). Powtórzyć po 7 dniach."),
+          ]
+          withdrawals = {"Bydło": ("7 dni", "84 godziny", "tk. 7 dni, ml. 84 h"),
+                         "Owce": ("4 dni", "96 godzin", "tk. 4 dni, ml. 96 h")}
+          
+          assert database.is_file() and Path(pdf).is_file()
+          with sqlite3.connect(database) as db:
+              db.execute("PRAGMA foreign_keys = ON")
+              db.execute("BEGIN IMMEDIATE")
+              if db.execute("SELECT 1 FROM products WHERE symbol = ? COLLATE NOCASE", (symbol,)).fetchone():
+                  raise SystemExit(f"Symbol {symbol} już istnieje. Przerwano bez nadpisywania danych.")
+              db.execute("INSERT OR IGNORE INTO documents(path) VALUES (?)", (pdf,))
+              db.execute("""INSERT INTO products(symbol,name,description,rpl_id,status,decision)
+                            VALUES (?,?,?,?,?,?)""",
+                         (symbol, name, "Zawiesina doustna 100 mg/ml, butelka 1 l. Pozwolenie nr 3413.",
+                          rpl_id, "Opracowano na podstawie polskiej ChPL", "SELECTED_RPL"))
+              for species, indication, dose in variants:
+                  tissues, milk, short = withdrawals[species]
+                  card = f"{species} · {indication} · {route} · {dose} · Tkanki: {tissues} · Mleko: {milk}"
+                  cursor = db.execute("""
+                      INSERT INTO variants(symbol,name,rpl_id,species,indication,route,dose,edible_tissues,milk,
+                                           restrictions,source,verified_at,card_text,pdf_path,withdrawal_short)
+                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                      """, (symbol, "Albendis 100 mg/ml", rpl_id, species, indication, route, dose, tissues, milk,
+                            restrictions, source, "2026-11-18", card, pdf, short))
+                  db.execute("INSERT INTO price_withdrawal_entries(id,compact_text) VALUES (?,?)", (cursor.lastrowid, short))
+              rows = db.execute("""
+                  SELECT v.species, v.edible_tissues, v.milk, v.pdf_path
+                  FROM products p JOIN variants v ON v.symbol = p.symbol
+                  JOIN price_withdrawal_entries w ON w.id = v.id
+                  WHERE p.symbol = ? AND v.dose <> '' AND v.route <> '' AND w.compact_text <> ''
+                  """, (symbol,)).fetchall()
+              assert len(rows) == 6 and all(row[1:] == (*withdrawals[row[0]][:2], pdf) for row in rows)
+              assert db.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              print(f"Dodano {symbol}: {len(rows)} wariantów. SQLite: integrity_check i foreign_key_check OK.")
+          PY
+      - name: Zapisz bazę
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite
+          git commit -m 'Add Albendis RPL 3413 to the SQLite catalog [skip ci]'
+          git push origin HEAD:winforms
