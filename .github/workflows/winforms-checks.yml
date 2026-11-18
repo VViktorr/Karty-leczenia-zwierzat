@@ -1,0 +1,24 @@
+name: WinForms build and regression checks
+on:
+  push:
+    branches: [winforms]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Build WinForms
+        run: dotnet build src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release
+      - name: Check card and registry compatibility
+        run: dotnet run --project tests/RegistryChecks -c Release
+      - name: Check connection settings
+        run: dotnet run --project tests/ConnectionChecks -c Release
