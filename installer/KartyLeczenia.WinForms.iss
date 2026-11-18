@@ -32,6 +32,9 @@ Source: "..\publish-winforms\*"; DestDir: "{app}"; Excludes: "medicine-catalog.s
 
 [INI]
 Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Server"; String: "{code:ArchiveServer}"
+Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Role"; String: "{code:ArchiveRole}"
+Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "AppVersion"; String: "{#ReleaseVersion}"
+Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "UpdateShare"; String: "{code:UpdateShare}"
 
 [UninstallDelete]
 Type: files; Name: "{app}\archive-installation.ini"
@@ -95,6 +98,24 @@ begin
     if (Pos(',', Result) = 0) and (Pos('\', Result) = 0) then
       Result := Result + ',' + ArchivePort;
   end;
+end;
+
+function ArchiveRole(Param: String): String;
+begin
+  if RolePage.SelectedValueIndex = 0 then Result := 'server' else Result := 'client';
+end;
+
+function UpdateShare(Param: String): String;
+var
+  Host: String;
+  Cut: Integer;
+begin
+  Host := ArchiveServer('');
+  Cut := Pos(',', Host);
+  if Cut > 0 then Host := Copy(Host, 1, Cut - 1);
+  Cut := Pos('\', Host);
+  if Cut > 0 then Host := Copy(Host, 1, Cut - 1);
+  Result := '\\' + Host + '\KartyLeczenia-Updates';
 end;
 
 function HasRunningSqlInstance: Boolean;
