@@ -1640,10 +1640,18 @@ internal sealed class MainForm : Form
         using var dialog = new Form
         {
             Text = "Daty i godziny karty leczenia", StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false,
-            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, AutoScaleMode = AutoScaleMode.Dpi
+            FormBorderStyle = FormBorderStyle.Sizable, MinimizeBox = false, MaximizeBox = true,
+            ClientSize = new Size(610, 140), AutoScaleMode = AutoScaleMode.Dpi
         };
-        var layout = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, Padding = new Padding(12) };
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 3, Padding = new Padding(12)
+        };
+        for (int i = 0; i < 3; i++)
+        {
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        }
         DateTime now = DateTime.Now;
         var reportDate = new DateTimePicker
         {
@@ -1671,6 +1679,10 @@ internal sealed class MainForm : Form
         buttons.Controls.AddRange([cancel, next]);
         layout.Controls.Add(buttons, 0, 2);
         layout.SetColumnSpan(buttons, 3);
+        var preferred = layout.GetPreferredSize(Size.Empty);
+        dialog.ClientSize = new Size(Math.Max(dialog.ClientSize.Width, preferred.Width),
+            Math.Max(dialog.ClientSize.Height, preferred.Height));
+        dialog.MinimumSize = dialog.Size;
         dialog.Controls.Add(layout);
         dialog.AcceptButton = next;
         dialog.CancelButton = cancel;
