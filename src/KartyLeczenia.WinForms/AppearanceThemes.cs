@@ -114,10 +114,43 @@ internal static class AppearanceThemes
             ? dark ? Color.FromArgb(39, 45, 54) : Color.FromArgb(244, 247, 250)
             : background;
         grid.GridColor = dark ? Color.FromArgb(72, 78, 89) : SystemColors.ControlDark;
+        grid.ShowCellToolTips = appearance.ShowToolTips;
         grid.CellBorderStyle = appearance.GridLines ? DataGridViewCellBorderStyle.Single : DataGridViewCellBorderStyle.None;
         grid.RowTemplate.Height = Math.Max(grid.RowTemplate.MinimumHeight, appearance.RowHeight);
         grid.Font = new Font(grid.Font.FontFamily, appearance.TableFontSize, grid.Font.Style, GraphicsUnit.Point);
         grid.Invalidate();
+    }
+
+    sealed class SurfaceColors(Color background, Color foreground)
+    {
+        internal Color Background { get; } = background;
+        internal Color Foreground { get; } = foreground;
+    }
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, SurfaceColors> Surfaces = new();
+
+    // Store each control's original palette once so returning to Classic does
+    // not replace custom buttons, panels or layouts with generic system colors.
+    internal static void ApplySurface(Control control, AppearanceOptions appearance)
+    {
+        if (control is DataGridView) return;
+        if (control is Form or Panel or TableLayoutPanel or FlowLayoutPanel or TabPage
+            or TabControl or Label or CheckBox or GroupBox or StatusStrip or TextBox or ComboBox)
+        {
+            var original = Surfaces.GetValue(control, item => new SurfaceColors(item.BackColor, item.ForeColor));
+            if (appearance.Preset == "Ciemny")
+            {
+                bool input = control is TextBox or ComboBox;
+                control.BackColor = input ? Color.FromArgb(40, 46, 55) : Color.FromArgb(32, 37, 45);
+                control.ForeColor = Color.FromArgb(237, 239, 243);
+            }
+            else
+            {
+                control.BackColor = original.Background;
+                control.ForeColor = original.Foreground;
+            }
+        }
+        foreach (Control child in control.Controls)
+            ApplySurface(child, appearance);
     }
 
     internal static void ApplyTabs(TabControl tabs, AppearanceOptions appearance)
