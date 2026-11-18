@@ -18,6 +18,7 @@ internal sealed class MainForm : Form
     readonly StatusStrip statusBar = new();
     readonly ToolStripStatusLabel status = new();
     readonly ToolStripStatusLabel refreshDocuments = new() { IsLink = true, Visible = false };
+    readonly ToolStripStatusLabel versionLabel = new() { BorderSides = ToolStripStatusLabelBorderSides.Left };
     CancellationTokenSource? preloadWork;
     readonly ComboBox period = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 145 };
     readonly DateTimePicker periodStart = new() { Format = DateTimePickerFormat.Short, Width = 110 };
@@ -50,13 +51,16 @@ internal sealed class MainForm : Form
     internal MainForm(bool openSettings, int interfaceScale)
     {
         this.interfaceScale = interfaceScale;
-        Text = "KartyLeczenia";
+        Text = $"KartyLeczenia — wersja {ServerUpdateGate.InstalledVersion}";
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(850, 550);
         Size = new Size(1350, 830);
         statusBar.Items.Add(status);
         statusBar.Items.Add(new ToolStripStatusLabel { Spring = true });
         statusBar.Items.Add(refreshDocuments);
+        versionLabel.Text = $"Wersja {ServerUpdateGate.InstalledVersion}";
+        versionLabel.ToolTipText = "Wersja zainstalowanego programu KartyLeczenia";
+        statusBar.Items.Add(versionLabel);
         refreshDocuments.Click += async (_, _) => await Run(() => Search(true));
         tabs.DrawItem += DrawMainTab;
         tabs.SelectedIndexChanged += (_, _) =>
@@ -2597,6 +2601,12 @@ internal sealed class MainForm : Form
         Add("", Action("Odtwórz bazę z kopii…", () => MaintainArchive(restoring: true)));
 
         form = Section("Wygląd");
+        Add("Wersja programu", new Label
+        {
+            Text = ServerUpdateGate.InstalledVersion,
+            AutoSize = true,
+            Anchor = AnchorStyles.Left
+        });
         var scaleSelector = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, AccessibleName = "Skala interfejsu" };
         scaleSelector.Items.AddRange(InterfaceScale.Percentages.Select(value => $"{value}%").ToArray());
         int savedScale = InterfaceScale.Load();
