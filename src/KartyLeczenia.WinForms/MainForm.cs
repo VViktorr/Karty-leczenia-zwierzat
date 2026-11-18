@@ -1746,31 +1746,40 @@ internal sealed class MainForm : Form
         using var dialog = new Form
         {
             Text = "Karta już zapisana", StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false,
-            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, AutoScaleMode = AutoScaleMode.Dpi
+            FormBorderStyle = FormBorderStyle.Sizable, MinimizeBox = false, MaximizeBox = true,
+            AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(740, 160),
+            MinimumSize = new Size(480, 190)
         };
-        var layout = new FlowLayoutPanel
+        var layout = new TableLayoutPanel
         {
-            Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, Padding = new Padding(12)
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
+            Padding = new Padding(12)
         };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.Controls.Add(new Label
         {
-            AutoSize = true, MaximumSize = new Size(560, 0),
-            Text = $"Dokument {document} ma już zapisaną kartę."
-        });
-        var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+            AutoSize = true, Dock = DockStyle.Fill,
+            Text = $"Dokument {document} ma już zapisaną kartę.",
+            Margin = new Padding(3, 3, 3, 14)
+        }, 0, 0);
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight
+        };
         var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
         buttons.Controls.AddRange([
             new Button { Text = "Otwórz zapisaną kartę", AutoSize = true, DialogResult = DialogResult.Retry },
             new Button { Text = updating ? "Zaktualizuj kartę" : "Zapisz kolejną kartę", AutoSize = true, DialogResult = DialogResult.Yes },
             cancel
         ]);
-        layout.Controls.Add(buttons);
+        layout.Controls.Add(buttons, 0, 1);
         dialog.Controls.Add(layout);
         dialog.AcceptButton = dialog.CancelButton = cancel;
         dialog.ActiveControl = cancel;
-        return dialog.ShowDialog(this);
+        return DialogPlacement.Show(dialog, this, "treatment-duplicate-card");
     }
 
     async Task PreviewSavedCard(SharedArchive archive, string id, bool inTrash = false)
