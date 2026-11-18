@@ -16,6 +16,8 @@ internal static class ServerUpdateGate
             .FirstOrDefault(s => s.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase))?[(key.Length + 1)..].Trim();
     }
 
+    internal static string? UpdateShare => Setting("UpdateShare");
+
     internal static string InstalledVersion
     {
         get
