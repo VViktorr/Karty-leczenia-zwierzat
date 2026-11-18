@@ -1687,7 +1687,7 @@ internal sealed class MainForm : Form
         dialog.AcceptButton = next;
         dialog.CancelButton = cancel;
 
-        if (dialog.ShowDialog(this) != DialogResult.OK) return false;
+        if (DialogPlacement.Show(dialog, this, "treatment-dates") != DialogResult.OK) return false;
         treatmentReportedAt = reportDate.Checked ? reportDate.Value.Date + Minutes(reportTime.Value) : null;
         treatmentDate.Value = executionDate.Value.Date;
         treatmentExecutionTime = Minutes(executionTime.Value);
