@@ -28,7 +28,7 @@ internal sealed class MainForm : Form
     readonly ConnectionSettingsStore settings = new();
     readonly ConnectionSettingsStore archiveSettings = new(Path.Combine(SharedArchive.LocalDataFolder, "archive-connection.json"));
     SharedArchive? sharedArchive;
-    ClinicSettings localClinic = ClinicSettingsStore.Load();
+    readonly ClinicSettings localClinic = ClinicSettingsStore.Load();
     ClinicSettings? sharedClinic;
     readonly string installedArchiveServer = SharedArchive.ReadInstalledServer();
     bool savingTreatment;
@@ -88,7 +88,7 @@ internal sealed class MainForm : Form
             documents.Columns["DocumentType"]!.Visible = true;
         };
         FormClosed += (_, _) => layout.Save();
-        tabs.SelectedIndex = openSettings || connection is null || (sharedArchive is null && installedArchiveServer.Length > 0) ? 4 : 0;
+        tabs.SelectedIndex = openSettings || connection is null || sharedArchive is null ? 4 : 0;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
     }
 
@@ -217,6 +217,8 @@ internal sealed class MainForm : Form
         {
             string message = ex.Number switch
             {
+                50004 => ex.Message,
+                50003 => "Najpierw uruchom nowy instalator w trybie Serwer i zaimportuj katalog leków.",
                 207 or 208 or 229 or 50001 => "Sprawdź, czy przygotowano tabele archiwum i nadano rolę KartyLeczeniaOperator.",
                 _ => SubiektConnectionService.FriendlyError(ex)
             };
@@ -598,8 +600,9 @@ internal sealed class MainForm : Form
                 if (levels.SelectedItem is not MedicinePriceLevel level) return;
                 bool netPrice = net.Checked;
                 var rows = await MedicineStockService.Prices(options, level.Number, work.Token, net: netPrice);
-                var catalogue = await Task.Run(LocalCatalogue.Load);
-                if (connection != options) return;
+                var archive = Archive();
+                var catalogue = await RunArchive(archive.ReadCatalogue);
+                if (connection != options || sharedArchive != archive) return;
                 prices.Columns["Gross"]!.HeaderText = netPrice ? "Cena netto" : "Cena brutto";
                 prices.DataSource = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol, row.Name) }).ToList();
                 status.Text = $"Pozycje cennika: {rows.Count}";
@@ -607,7 +610,26 @@ internal sealed class MainForm : Form
             finally { loading = false; }
         }
 
-        var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices), Action("Ustawienia wydruku", () => PreviewPrices()),
+        async Task EditCatalogue()
+        {
+            var archive = Archive();
+            var options = Connection();
+            var current = prices.CurrentRow?.DataBoundItem as MedicinePrice;
+            using var picker = new CatalogueProductPicker(options, current?.Symbol ?? "");
+            if (picker.ShowDialog(this) != DialogResult.OK || picker.Selection is not { } row) return;
+            var product = await RunArchive(() => archive.ReadCatalogueProduct(row));
+            if (sharedArchive != archive || connection != options) return;
+            using var editor = new CatalogueEditor(product, async (draft, attachments) =>
+            {
+                await RunArchive(() => { archive.SaveCatalogueProduct(draft, attachments); return true; });
+            });
+            if (editor.ShowDialog(this) != DialogResult.OK) return;
+            await LoadPrices();
+            status.Text = $"Zapisano kartotekę {row.Symbol} w katalogu SQL.";
+        }
+
+        var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices),
+            Action("Dodaj / edytuj w katalogu", EditCatalogue), Action("Ustawienia wydruku", () => PreviewPrices()),
             Action("Drukuj", () => PreviewPrices(direct: true)));
         tabs.SelectedIndexChanged += async (_, _) =>
         {
@@ -627,7 +649,9 @@ internal sealed class MainForm : Form
             status.Text = "Wczytaj cennik przed otwarciem podglądu wydruku.";
             return;
         }
-        var catalogue = await Task.Run(LocalCatalogue.Load);
+        var archive = Archive();
+        var catalogue = await RunArchive(archive.ReadCatalogue);
+        if (sharedArchive != archive) return;
         using var editor = new PricePrintEditor(pricePrintSettings, rows, prices.Columns["Gross"]!.HeaderText, catalogue);
         if (direct)
         {
@@ -635,6 +659,13 @@ internal sealed class MainForm : Form
             preview.ShowDialog(this);
         }
         else DialogPlacement.Show(editor, this, "price-print-settings");
+    }
+
+    async Task OpenCataloguePdf(string path)
+    {
+        var archive = Archive();
+        var file = await RunArchive(() => archive.ExportCataloguePdf(path));
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
     }
 
     void ConfigureExpiry()
@@ -677,8 +708,8 @@ internal sealed class MainForm : Form
     readonly CheckBox rememberTreatment = new() { Text = "Zapamiętuj wybory", AutoSize = true };
     readonly ComboBox routeMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 165 };
     readonly ComboBox withdrawalMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
-    readonly Dictionary<DataGridViewRow, LocalCatalogue.Variant> selectedTreatmentVariants = new();
-    LocalCatalogue? treatmentCatalogue;
+    readonly Dictionary<DataGridViewRow, Catalogue.Variant> selectedTreatmentVariants = new();
+    Catalogue? treatmentCatalogue;
     bool updatingTreatmentChoices;
     const string ReferenceColumn = "Zamiennik produktu";
     const string AnimalDescriptionColumn = "Numery zwierząt";
@@ -746,7 +777,7 @@ internal sealed class MainForm : Form
         public override string ToString() => $"{Name} [{Symbol}]";
     }
 
-    IReadOnlyList<LocalCatalogue.Variant> TreatmentVariants(DataGridViewRow row, TreatmentRow entry)
+    IReadOnlyList<Catalogue.Variant> TreatmentVariants(DataGridViewRow row, TreatmentRow entry)
     {
         if (treatmentCatalogue is null) return [];
         return row.Cells[ReferenceColumn].Tag is TreatmentReference reference
@@ -861,15 +892,15 @@ internal sealed class MainForm : Form
                 gridRow.Cells["Karencja"].Value = variant?.Withdrawal ?? "";
                 row.Set("Źródło karencji", variant?.Source ?? "", false);
             }
-            if (changed && !usesReference && rememberTreatment.Checked && species.Length > 0)
-                TreatmentChoices.Save(row, species, route);
+            if (changed && !usesReference && rememberTreatment.Checked && species.Length > 0 && currentCard is { } card)
+                Archive().SaveTreatmentChoice(card.Scope, TreatmentChoices.Key(row), species, route);
         }
         finally { updatingTreatmentChoices = false; }
     }
 
-    static Dictionary<string, LocalCatalogue.Variant> TreatmentRouteOptions(IEnumerable<LocalCatalogue.Variant> variants)
+    static Dictionary<string, Catalogue.Variant> TreatmentRouteOptions(IEnumerable<Catalogue.Variant> variants)
     {
-        var labels = new Dictionary<string, LocalCatalogue.Variant>(StringComparer.OrdinalIgnoreCase);
+        var labels = new Dictionary<string, Catalogue.Variant>(StringComparer.OrdinalIgnoreCase);
         foreach (var group in variants.Distinct().GroupBy(v => v.Route, StringComparer.OrdinalIgnoreCase))
         {
             bool multiple = group.Skip(1).Any();
@@ -1160,19 +1191,19 @@ internal sealed class MainForm : Form
         var page = Page("Karta leczenia", treatment,
             new Label { Text = "Gatunek", AutoSize = true, Anchor = AnchorStyles.Left }, cardSpeciesGroup, withdrawalMode, routeMode,
             new Label { Text = "Data leczenia", AutoSize = true, Anchor = AnchorStyles.Left }, treatmentDate,
-            Action("Otwórz ChPL", () =>
+            Action("Otwórz ChPL", async () =>
             {
                 var row = treatment.CurrentRow;
                 if (row?.Tag is not TreatmentRow entry)
                 {
                     status.Text = "Zaznacz pozycję na karcie leczenia.";
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 if (selectedTreatmentVariants.TryGetValue(row, out var variant) && !string.IsNullOrWhiteSpace(variant.Pdf))
                 {
-                    LocalCatalogue.OpenPdf(variant.Pdf);
-                    return Task.CompletedTask;
+                    await OpenCataloguePdf(variant.Pdf);
+                    return;
                 }
 
                 var paths = TreatmentVariants(row, entry)
@@ -1181,12 +1212,11 @@ internal sealed class MainForm : Form
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
                 if (paths.Length == 1)
-                    LocalCatalogue.OpenPdf(paths[0]);
+                    await OpenCataloguePdf(paths[0]);
                 else
                     status.Text = paths.Length == 0
                         ? "Brak przypisanej ChPL dla tej kartoteki."
                         : "Wybierz gatunek i drogę podania, aby otworzyć właściwą ChPL.";
-                return Task.CompletedTask;
             }),
             Action("Zapisz kartę", SaveTreatmentToArchive), Action("Eksportuj JSON", SaveCard),
             Action("Podgląd / PDF / e-mail", PreviewCard));
@@ -1226,8 +1256,12 @@ internal sealed class MainForm : Form
         using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var card = await service.ReadAsync(options, row.Number, 0, work.Token, row.Id);
         if (connection != options) return;
-        var catalogue = await Task.Run(LocalCatalogue.Load);
-        if (connection != options) return;
+        var archive = Archive();
+        bool remember = rememberTreatment.Checked;
+        var data = await RunArchive(() => (Catalogue: archive.ReadCatalogue(), Choices: remember
+            ? archive.ReadTreatmentChoices(card.Scope) : null));
+        if (connection != options || sharedArchive != archive) return;
+        var catalogue = data.Catalogue;
         treatmentCatalogue = catalogue;
         currentCard = card;
         currentArchiveId = Guid.NewGuid();
@@ -1247,7 +1281,7 @@ internal sealed class MainForm : Form
             gridRow.Cells["Drukuj"].Value = entry.Printed;
             gridRow.Tag = entry;
             gridRow.Cells[ReferenceColumn].Value = "Wybierz…";
-            var saved = rememberTreatment.Checked ? TreatmentChoices.Read(entry) : (Species: "", Route: "");
+            var saved = data.Choices?.GetValueOrDefault(TreatmentChoices.Key(entry)) ?? (Species: "", Route: "");
             SetTreatmentChoices(gridRow, saved.Species, saved.Route, preserveEdits: true);
         }
         ApplyCardSpeciesGroup();
@@ -1260,7 +1294,7 @@ internal sealed class MainForm : Form
     {
         var source = currentCard ?? throw new InvalidOperationException("Najpierw wczytaj dokument.");
         if (!treatment.EndEdit()) throw new InvalidOperationException("Zakończ edycję bieżącej pozycji karty.");
-        var clinic = sharedClinic ?? localClinic;
+        var clinic = sharedClinic ?? new ClinicSettings();
         var fields = new Dictionary<string, string> { ["Dokument źródłowy"] = source.Number,
             ["Właściciel i adres"] = source.Payer, ["Zakres mapowania towarów"] = source.Scope,
             ["Wykonanie — data i godzina"] = treatmentDate.Value.ToString("dd.MM.yyyy"),
@@ -1529,12 +1563,11 @@ internal sealed class MainForm : Form
             : "Stan: wczytano zapisane ustawienia."), multiline: true);
         var archiveClinicStatus = Message(form, "", multiline: true);
         var archiveForm = form;
-        bool configuringArchive = false, importing = false;
-        Button? importButton = null;
+        bool configuringArchive = false;
         Func<SharedArchive, Task>? refreshClinic = null;
         var saveArchiveConnection = Action("Sprawdź i zapisz", async () =>
         {
-            if (configuringArchive || importing) return;
+            if (configuringArchive) return;
             configuringArchive = true;
             try
             {
@@ -1553,9 +1586,18 @@ internal sealed class MainForm : Form
                 archiveForm.Enabled = false;
                 await RunArchive(() => { archive.Test(); return true; });
                 archiveSettings.Save(draft, rememberPassword);
+                bool changedServer = !string.Equals(sharedArchive?.Server, archive.Server, StringComparison.OrdinalIgnoreCase);
                 sharedArchive = archive;
-                sharedClinic = null;
-                importButton!.Enabled = true;
+                if (changedServer)
+                {
+                    sharedClinic = null;
+                    prices.DataSource = null;
+                    treatmentCatalogue = null;
+                    currentCard = null;
+                    selectedTreatmentVariants.Clear();
+                    excludedTreatmentRows.Clear();
+                    treatment.Rows.Clear();
+                }
                 archiveResult.Text = status.Text = $"Połączono z archiwum na {draft.Server}. Ustawienia zapisane.";
                 await refreshClinic!(archive);
             }
@@ -1577,40 +1619,6 @@ internal sealed class MainForm : Form
             e.SuppressKeyPress = true;
             saveArchiveConnection.PerformClick();
         };
-        importButton = Action("Importuj lokalne karty i opisy…", async () =>
-        {
-            if (importing || configuringArchive) return;
-            var archive = Archive();
-            using var folder = new FolderBrowserDialog
-            {
-                Description = "Wybierz folder z lokalnymi plikami SQLite kart i opisów zwierząt.",
-                UseDescriptionForTitle = true,
-                SelectedPath = SharedArchive.LocalDataFolder
-            };
-            if (folder.ShowDialog(this) != DialogResult.OK) return;
-            string source = folder.SelectedPath;
-            importing = true;
-            archiveForm.Enabled = false;
-            archiveResult.Text = "Importowanie kart i opisów do archiwum SQL…";
-            try
-            {
-                var result = await RunArchive(() => archive.ImportLocalData(source));
-                archiveResult.Text = status.Text = $"Dodano kart: {result.Cards}. Dodano lub odświeżono opisów: {result.Descriptions}.";
-            }
-            catch (Exception ex)
-            {
-                archiveResult.Text = ex.Message;
-                throw;
-            }
-            finally
-            {
-                importing = false;
-                archiveForm.Enabled = true;
-            }
-        });
-        importButton.Enabled = sharedArchive is not null;
-        Add("", importButton);
-
         form = Section("Subiekt GT");
         var subiektForm = form;
         Message(form, "Podaj adres i dane logowania do Subiekta. Wybierz bazę podmiotu, pobierz magazyny i zapisz ustawienia.", multiline: true);
@@ -1887,14 +1895,7 @@ internal sealed class MainForm : Form
         Add("", Action("Zapisz dane lecznicy", async () =>
         {
             var clinic = ClinicDraft();
-            if (sharedArchive is not { } archive)
-            {
-                ClinicSettingsStore.Save(clinic);
-                localClinic = clinic;
-                SetClinicStatus("Zapisano dane lokalnie. Połącz się w zakładce „Archiwum SQL”, aby udostępnić je stanowiskom.", reportInStatusBar: true);
-                return;
-            }
-
+            var archive = Archive();
             clinicForm.Enabled = false;
             try
             {

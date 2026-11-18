@@ -6,3 +6,5 @@ obj/
 *.bak
 appsettings.local.json
 cards/
+
+/catalog-seed-win-x64.zip

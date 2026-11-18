@@ -94,7 +94,7 @@ internal sealed class PricePrintEditor : Form
 {
     readonly Func<IEnumerable<MedicinePrice>, string> render;
 
-    internal PricePrintEditor(PricePrintSettings settings, MedicinePrice[] rows, string priceHeading, LocalCatalogue catalogue)
+    internal PricePrintEditor(PricePrintSettings settings, MedicinePrice[] rows, string priceHeading, Catalogue catalogue)
     {
         Text = "Ustawienia wydruku cennika";
         StartPosition = FormStartPosition.CenterParent;

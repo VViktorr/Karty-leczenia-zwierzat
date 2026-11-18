@@ -230,6 +230,30 @@ COMMIT;
     }
 }
 
+function Initialize-Catalogue {
+    if ((Invoke-LocalSql 'KartyLeczenia' 'SELECT COUNT(*) FROM dbo.catalog_import WHERE id = 1;') -eq 1) { return }
+
+    $package = Join-Path $PSScriptRoot 'catalog-seed-win-x64.zip'
+    $directory = Join-Path $PSScriptRoot ("catalog-seed-" + [Guid]::NewGuid().ToString('N'))
+    try {
+        Expand-Archive -LiteralPath $package -DestinationPath $directory
+        $installer = Join-Path $directory 'KartyLeczenia.CatalogImport.exe'
+        $server = if ($instance -eq 'MSSQLSERVER') { 'lpc:localhost' } else { "lpc:localhost\$instance" }
+        $log = Join-Path $directory 'import-error.txt'
+        $result = Start-Process -FilePath $installer -ArgumentList ('"{0}" "{1}"' -f $server, $directory) `
+            -Wait -PassThru -NoNewWindow -RedirectStandardError $log
+        if ($result.ExitCode -ne 0) {
+            $detail = Get-Content -LiteralPath $log -Raw
+            throw "Import katalogu leków do SQL nie powiódł się. $detail"
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $directory) {
+            Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Initialize-ExistingArchive {
     # Only Database Engine instance registrations are considered.
     $registered = Get-Item -LiteralPath $instanceNames -ErrorAction SilentlyContinue
@@ -373,6 +397,7 @@ WHERE type_desc = N'TSQL' AND state_desc = N'ONLINE' AND port > 0
     Invoke-LocalSql 'master' "IF DB_ID(N'KartyLeczenia') IS NULL EXEC(N'CREATE DATABASE [KartyLeczenia]');" | Out-Null
     $schema = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Setup-SharedArchive.sql') -Raw -Encoding UTF8
     Invoke-LocalSql 'KartyLeczenia' $schema | Out-Null
+    Initialize-Catalogue
 
     $literal = $account.Replace("'", "''")
     $identifier = '[' + $account.Replace(']', ']]') + ']'
@@ -461,6 +486,7 @@ function Initialize-Archive {
     Invoke-LocalSql 'master' "IF DB_ID(N'KartyLeczenia') IS NULL EXEC(N'CREATE DATABASE [KartyLeczenia]');" | Out-Null
     $schema = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Setup-SharedArchive.sql') -Raw -Encoding UTF8
     Invoke-LocalSql 'KartyLeczenia' $schema | Out-Null
+    Initialize-Catalogue
 
     if ((Invoke-LocalSql 'master' "SELECT COUNT(*) FROM sys.sql_logins WHERE name = N'$login';") -eq 0) {
         Initialize-ArchiveSqlLogin

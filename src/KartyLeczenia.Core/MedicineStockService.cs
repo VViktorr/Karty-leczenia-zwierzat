@@ -76,6 +76,26 @@ public static class MedicineStockService
         return result.ToArray();
     }
 
+    public static async Task<MedicinePrice[]> FindCatalogueProducts(ConnectionOptions options, string query, CancellationToken token)
+    {
+        await using var connection = new SqlConnection(options.BuildConnectionString());
+        await connection.OpenAsync(token);
+        using var command = new SqlCommand("""
+            SELECT TOP (100) t.tw_Symbol, t.tw_Nazwa
+            FROM dbo.tw__Towar t JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
+            WHERE g.grt_Nazwa = @group AND NULLIF(LTRIM(RTRIM(t.tw_Symbol)), '') IS NOT NULL
+                AND (@query = '' OR CHARINDEX(@query, t.tw_Symbol) > 0 OR CHARINDEX(@query, t.tw_Nazwa) > 0)
+            ORDER BY t.tw_Nazwa, t.tw_Symbol
+            """, connection);
+        command.Parameters.Add("@group", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
+        command.Parameters.Add("@query", SqlDbType.NVarChar, -1).Value = query.Trim();
+        var result = new List<MedicinePrice>();
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+            result.Add(new(reader.GetString(1), null) { Symbol = reader.GetString(0).Trim() });
+        return result.ToArray();
+    }
+
     public static async Task<List<MedicinePrice>> Prices(ConnectionOptions options, int level, CancellationToken token, int withdrawalSource = 0, bool net = false)
     {
         if (level is < 1 or > 10) throw new ArgumentOutOfRangeException(nameof(level));

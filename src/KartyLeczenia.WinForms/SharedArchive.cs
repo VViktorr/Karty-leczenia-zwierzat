@@ -1,16 +1,14 @@
 using System.Data;
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
-using Microsoft.Data.Sqlite;
 
 namespace KartyLeczenia.Windows;
 
 internal sealed record SavedTreatmentCard(string Id, DateTime Date, string Client, string Document, int? PayerId, string Scope);
 
-internal sealed class SharedArchive(ConnectionOptions options)
+internal sealed partial class SharedArchive(ConnectionOptions options)
 {
     internal const string DatabaseName = "KartyLeczenia";
     internal string Server => options.Server;
@@ -43,6 +41,7 @@ internal sealed class SharedArchive(ConnectionOptions options)
                 THROW 50001, N'Archiwum wymaga przygotowanych tabel i uprawnień SELECT, INSERT, UPDATE.', 1;
             """);
         command.ExecuteNonQuery();
+        RequireImportedCatalogue(db);
     }
 
     internal ClinicSettings? LoadClinic(ClinicSettings local)
@@ -157,45 +156,6 @@ internal sealed class SharedArchive(ConnectionOptions options)
         transaction.Commit();
     }
 
-    internal (int Cards, int Descriptions) ImportLocalData(string folder)
-    {
-        string cardsPath = Path.Combine(folder, "saved-treatment-cards.sqlite");
-        string descriptionsPath = Path.Combine(folder, "animal-descriptions.sqlite");
-        if (!File.Exists(cardsPath) && !File.Exists(descriptionsPath))
-            throw new InvalidOperationException("W wybranym folderze nie znaleziono lokalnej bazy kart ani opisów zwierząt.");
-
-        using var db = Open();
-        using var transaction = db.BeginTransaction();
-        int cards = 0, descriptions = 0;
-        if (File.Exists(cardsPath))
-        {
-            using var local = OpenLocal(cardsPath);
-            using var command = local.CreateCommand();
-            command.CommandText = """
-                SELECT id, source_scope, payer_id, client, document, treatment_date, search_text, card_json, print_json
-                FROM treatment_cards ORDER BY rowid;
-                """;
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-                cards += WriteCard(db, transaction, Guid.ParseExact(reader.GetString(0), "N"), reader.GetString(1),
-                    reader.IsDBNull(2) ? null : reader.GetInt32(2), reader.GetString(3), reader.GetString(4),
-                    DateTime.ParseExact(reader.GetString(5), "yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    reader.GetString(6), reader.GetString(7), reader.GetString(8), updateExisting: false);
-        }
-        if (File.Exists(descriptionsPath))
-        {
-            using var local = OpenLocal(descriptionsPath);
-            using var command = local.CreateCommand();
-            command.CommandText = "SELECT scope, payer_id, description, last_used FROM animal_descriptions;";
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-                descriptions += WriteDescription(db, transaction, reader.GetString(0), reader.GetInt32(1),
-                    reader.GetString(2), reader.GetInt64(3));
-        }
-        transaction.Commit();
-        return (cards, descriptions);
-    }
-
     static int WriteCard(SqlConnection db, SqlTransaction transaction, Guid id, string scope, int? payerId,
         string client, string document, DateTime date, string search, string card, string print, bool updateExisting)
     {
@@ -269,24 +229,6 @@ internal sealed class SharedArchive(ConnectionOptions options)
             ApplicationIntent = ApplicationIntent.ReadWrite
         };
         var db = new SqlConnection(connectionString.ConnectionString);
-        try
-        {
-            db.Open();
-            return db;
-        }
-        catch
-        {
-            db.Dispose();
-            throw;
-        }
-    }
-
-    static SqliteConnection OpenLocal(string path)
-    {
-        var db = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = path, Mode = SqliteOpenMode.ReadOnly, DefaultTimeout = 2
-        }.ToString());
         try
         {
             db.Open();

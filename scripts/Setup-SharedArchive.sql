@@ -44,11 +44,61 @@ BEGIN
     );
 END;
 
+IF OBJECT_ID(N'dbo.catalog_products', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.catalog_products (
+        symbol nvarchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
+        name nvarchar(max) NOT NULL, description nvarchar(max) NULL, rpl_id nvarchar(max) NULL,
+        upd_id nvarchar(max) NULL, status nvarchar(max) NULL, decision nvarchar(max) NULL,
+        revision rowversion NOT NULL
+    );
+    CREATE TABLE dbo.catalog_documents (
+        path nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
+        pdf varbinary(max) NOT NULL
+    );
+    CREATE TABLE dbo.catalog_variants (
+        id int IDENTITY NOT NULL PRIMARY KEY,
+        symbol nvarchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES dbo.catalog_products(symbol),
+        name nvarchar(max) NULL, rpl_id nvarchar(max) NULL, upd_id nvarchar(max) NULL,
+        species nvarchar(max) NULL, indication nvarchar(max) NULL, route nvarchar(max) NULL, dose nvarchar(max) NULL,
+        edible_tissues nvarchar(max) NULL, milk nvarchar(max) NULL, restrictions nvarchar(max) NULL,
+        source nvarchar(max) NULL, verified_at nvarchar(max) NULL, card_text nvarchar(max) NULL, scope nvarchar(max) NULL,
+        pdf_path nvarchar(450) COLLATE Latin1_General_100_BIN2 NULL REFERENCES dbo.catalog_documents(path),
+        withdrawal_short nvarchar(max) NULL
+    );
+    CREATE INDEX IX_catalog_variants_symbol ON dbo.catalog_variants(symbol);
+    CREATE TABLE dbo.catalog_price_withdrawal (
+        id int NOT NULL PRIMARY KEY REFERENCES dbo.catalog_variants(id) ON DELETE CASCADE,
+        compact_text nvarchar(max) NOT NULL
+    );
+    CREATE TABLE dbo.catalog_upd_search (
+        id nvarchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY, name nvarchar(max) NOT NULL
+    );
+    CREATE TABLE dbo.catalog_import (id tinyint NOT NULL PRIMARY KEY CHECK (id = 1));
+END;
+
+IF OBJECT_ID(N'dbo.treatment_choices', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.treatment_choices (
+        choice_key binary(32) NOT NULL PRIMARY KEY,
+        source_scope nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        symbol nvarchar(max) NOT NULL, product nvarchar(max) NOT NULL,
+        species nvarchar(max) NOT NULL, route nvarchar(max) NOT NULL
+    );
+END;
+
 IF DATABASE_PRINCIPAL_ID(N'KartyLeczeniaOperator') IS NULL
     CREATE ROLE KartyLeczeniaOperator AUTHORIZATION dbo;
 
 GRANT SELECT, INSERT, UPDATE ON dbo.treatment_cards TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.animal_descriptions TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.clinic_settings TO KartyLeczeniaOperator;
+
+GRANT SELECT, INSERT, UPDATE ON dbo.catalog_products TO KartyLeczeniaOperator;
+GRANT SELECT, INSERT ON dbo.catalog_documents TO KartyLeczeniaOperator;
+GRANT SELECT, INSERT, UPDATE ON dbo.catalog_variants TO KartyLeczeniaOperator;
+GRANT SELECT, INSERT, UPDATE ON dbo.catalog_price_withdrawal TO KartyLeczeniaOperator;
+GRANT SELECT ON dbo.catalog_import TO KartyLeczeniaOperator;
+GRANT SELECT, INSERT, UPDATE ON dbo.treatment_choices TO KartyLeczeniaOperator;
 
 COMMIT TRANSACTION;

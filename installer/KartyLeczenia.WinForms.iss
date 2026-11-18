@@ -27,7 +27,8 @@ Name: "desktopicon"; Description: "Utwórz skrót na pulpicie"; Flags: unchecked
 [Files]
 Source: "Configure-SharedArchive.ps1"; Flags: dontcopy
 Source: "..\scripts\Setup-SharedArchive.sql"; Flags: dontcopy
-Source: "..\publish-winforms\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\catalog-seed-win-x64.zip"; Flags: dontcopy
+Source: "..\publish-winforms\*"; DestDir: "{app}"; Excludes: "medicine-catalog.sqlite,ChPL\*,Microsoft.Data.Sqlite.dll,SQLitePCLRaw.*,e_sqlite3.dll"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [INI]
 Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Server"; String: "{code:ArchiveServer}"
@@ -310,10 +311,11 @@ begin
       end;
 
       ExtractTemporaryFile('Setup-SharedArchive.sql');
+      ExtractTemporaryFile('catalog-seed-win-x64.zip');
       if Mode = 'Server' then
-        Stage := 'Instalowanie SQL Server 2025 Express i przygotowywanie archiwum…'
+        Stage := 'Instalowanie SQL Server i import katalogu leków…'
       else
-        Stage := 'Sprawdzanie instancji SQL Server i przygotowywanie archiwum…';
+        Stage := 'Konfigurowanie archiwum SQL i import katalogu leków…';
       if not RunComponent(' -Mode ' + Mode, Stage, ExitCode) then
       begin
         Result := 'Nie udało się uruchomić konfiguracji serwera: ' + SysErrorMessage(ExitCode);

@@ -1,6 +1,6 @@
 # KartyLeczenia
 
-Aplikacja dla Windows rozwijana w **Windows Forms (WinForms)**, w C# na .NET 10, z odczytem danych z Subiekta GT i lokalnym katalogiem leków SQLite.
+Aplikacja dla Windows rozwijana w **Windows Forms (WinForms)**, w C# na .NET 10, z odczytem danych z Subiekta GT i wspólnym katalogiem leków w SQL Server.
 
 **Aktywna i domyślna gałąź to `winforms`. Bieżące zmiany interfejsu wprowadzamy w projekcie [KartyLeczenia.WinForms](src/KartyLeczenia.WinForms).**
 
@@ -16,62 +16,53 @@ dotnet build src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release
 
 - [`src/KartyLeczenia.WinForms`](src/KartyLeczenia.WinForms) — aktywna aplikacja Windows Forms.
 - [`src/KartyLeczenia.Core`](src/KartyLeczenia.Core) — wspólna biblioteka, m.in. odczyt Subiekta GT.
-- [`src/KartyLeczenia`](src/KartyLeczenia) — wcześniejszy interfejs .NET MAUI. Projekt WinForms korzysta z przechowywanych tu zasobów, w tym bazy `medicine-catalog.sqlite`.
+- [`src/KartyLeczenia`](src/KartyLeczenia) — wcześniejszy interfejs .NET MAUI. Plik `medicine-catalog.sqlite` zasila pierwszy import na serwerze.
 - [Gałąź `main`](https://github.com/VViktorr/Karty-leczenia-zwierzat/tree/main) — wcześniejszy etap projektu .NET MAUI i jego dokumentacja.
 
 ## Wspólne archiwum WinForms
 
-Program otwiera dwa połączenia SQL. Połączenie z Subiektem GT służy do odczytu.
-Karty i opisy zwierząt są zapisywane w osobnej bazie `KartyLeczenia`, która
-może działać na innym komputerze z SQL Server, w tym SQL Server Express.
-Katalog leków pozostaje lokalnym plikiem SQLite dostarczanym z programem.
+Program łączy się z bazą Subiekta GT do odczytu kartotek, dokumentów, cen i
+stanów oraz ze wspólną bazą SQL `KartyLeczenia`. Wspólna baza przechowuje
+katalog leków, warianty, karencje, PDF-y ChPL, ustawienia lecznicy,
+zapamiętane wybory leczenia, karty i opisy zwierząt.
 
-1. Na komputerze przeznaczonym na archiwum utwórz pustą bazę
-   `KartyLeczenia` i uruchom w niej [skrypt konfiguracji](scripts/Setup-SharedArchive.sql)
-   z uprawnieniami administratora. Skrypt tworzy tabele i rolę bazodanową.
-2. Dla konta Windows lub loginu SQL używanego przez program utwórz użytkownika
-   w bazie `KartyLeczenia` i dodaj go do roli `KartyLeczeniaOperator`.
-   Na przykład dla istniejącego użytkownika bazy `operator_archiwum`:
-   `ALTER ROLE KartyLeczeniaOperator ADD MEMBER [operator_archiwum];`.
-   Konto aplikacji potrzebuje dostępu sieciowego do instancji i uprawnień tej roli.
-3. Na każdym stanowisku w zakładce **Ustawienia → Archiwum SQL**
-   podaj adres instancji archiwum, wybierz uwierzytelnianie i zapisz połączenie.
-   W ustawieniach Subiekta użyj tej samej nazwy serwera i bazy podmiotu na każdym
-   stanowisku. Program wykorzystuje te nazwy do przypisywania opisów i płatników.
-   Zachowaj nazwy używane przy tworzeniu importowanych danych, żeby utrzymać te powiązania.
-4. Na każdym stanowisku z wcześniejszymi danymi wybierz w ustawieniach
-   **Importuj lokalne karty i opisy…**. Wskaż folder zawierający
-   `saved-treatment-cards.sqlite` lub `animal-descriptions.sqlite`.
-   Domyślny folder to `%LOCALAPPDATA%\KartyLeczenia`. Import zostawia pliki
-   źródłowe i można go ponowić. Karty o tym samym identyfikatorze są pomijane,
-   a dla tego samego opisu zachowywany jest wpis z nowszą datą użycia.
+1. Na serwerze uruchom instalator w trybie **Serwer**. Wybierz tę samą
+   instancję, jeśli masz już bazę `KartyLeczenia`. Instalator uzupełni schemat
+   i zaimportuje katalog z pakietu: SQLite wraz z PDF-ami ChPL. Import
+   dochodzi do skutku w jednej transakcji. Po jego zakończeniu kolejne
+   instalacje zostawiają katalog i zmiany użytkowników w bazie.
+2. Na każdym stanowisku w **Ustawienia → Archiwum SQL** zapisz połączenie
+   do tej samej instancji. W zakładce **Subiekt GT** wybierz bazę podmiotu
+   i magazyn. Użyj tej samej nazwy serwera i bazy podmiotu na stanowiskach,
+   żeby zachować powiązania z zapisanymi kartami, wyborami i opisami.
+3. W **Cennik leków → Dodaj / edytuj w katalogu** wyszukaj kartotekę
+   Subiekta po symbolu lub nazwie. Wprowadź dane, dodaj warianty i dołącz
+   ChPL do zaznaczonych wariantów. Zmiany będą dostępne na wszystkich
+   stanowiskach po odświeżeniu cennika lub ponownym otwarciu karty.
 
-Nazwa i adres lecznicy oraz dane lekarza są wspólne dla stanowisk. Program
-pobiera je po połączeniu z archiwum. W zakładce **Ustawienia → Dane lecznicy**
-można je edytować lub pobrać na nowo. Gdy archiwum jest puste, pierwsze
-stanowisko, na którym wcześniej zapisano dane lecznicy, uzupełnia je
-automatycznie. Przed aktualizacją stanowisk uruchom nowy instalator w trybie
-**Serwer** na dotychczasowej instancji albo wykonaj aktualny skrypt
-[Setup-SharedArchive.sql](scripts/Setup-SharedArchive.sql) w bazie archiwum
-jako administrator.
+`scripts/Setup-SharedArchive.sql` przygotowuje schemat i rolę operatora.
+Pakiet importu tworzy skrypt budowania instalatora, a podczas konfiguracji
+serwera uruchamia go `Configure-SharedArchive.ps1`. Aplikacja WinForms
+wczytuje katalog z SQL. Podgląd ChPL otwiera tymczasowy plik z treścią pobraną
+z serwera.
 
-Komputer z SQL Server musi być dostępny podczas pracy ze wspólnym archiwum.
-Lokalna wersja aplikacji jest dostępna na gałęzi
-[`KarLecz_lokalnie`](https://github.com/VViktorr/Karty-leczenia-zwierzat/tree/KarLecz_lokalnie).
+Dane lecznicy edytuje się w **Ustawienia → Dane lecznicy**. Jeśli wspólna
+baza nie zawiera jeszcze tych danych, program może przenieść wcześniejsze
+ustawienia lecznicy z tego stanowiska przy pierwszym połączeniu z archiwum.
 
 ## Instalator WinForms z wyborem stanowiska
 
-Otwórz w Inno Setup 7 plik [KartyLeczenia.WinForms.iss](installer/KartyLeczenia.WinForms.iss)
-po opublikowaniu programu w folderze `publish-winforms`. Przykład publikacji i kompilacji
-z katalogu repozytorium:
+Z głównego katalogu repozytorium uruchom skrypt z zainstalowanym .NET 10 SDK
+i Inno Setup 7. Skrypt publikuje aplikację, tworzy pakiet pierwszego importu
+i kompiluje instalator.
 
 ```powershell
-dotnet publish src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release -r win-x64 --self-contained true -o publish-winforms
-# Uruchom z katalogu repozytorium, używając ISCC.exe z instalacji Inno Setup 7.
-ISCC.exe /DReleaseVersion=1.0.0 installer\KartyLeczenia.WinForms.iss
+powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\Build-WinForms.ps1 -Version 1.0.7
 ```
 
-Plik `KartyLeczenia-Setup-win-x64-v1.0.0.exe` pojawi się w głównym
+Gdy `ISCC.exe` jest w innej lokalizacji, wskaż ścieżkę parametrem `-Iscc`.
+
+Plik `KartyLeczenia-Setup-win-x64-v1.0.7.exe` pojawi się w głównym
 katalogu repozytorium. Użyj tego samego pliku na serwerze i stanowiskach.
 Domyślny katalog programu to `C:\Program Files\KartyLeczenia`.
 Instalator tworzy folder **KartyLeczenia** na liście wszystkich aplikacji menu
@@ -111,7 +102,5 @@ logowania i hasła odbywa się w oknach dialogowych.
   prywatnego serwera. Dane Subiekta ustawiasz osobno.
 
 Ponowna instalacja zachowuje bazę i hasło istniejącego operatora. Odinstalowanie
-programu pozostawia instancję SQL i archiwum. W razie aktualizacji z lokalnej
-wersji użyj importu w ustawieniach. Poprzednia aplikacja instalowana w
-`%LOCALAPPDATA%` może pozostać obok nowej. Skróty nowej aplikacji mają nazwę
+programu pozostawia instancję SQL i archiwum. Skróty nowej aplikacji mają nazwę
 **KartyLeczenia**.

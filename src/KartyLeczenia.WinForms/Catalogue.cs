@@ -1,8 +1,8 @@
-using Microsoft.Data.Sqlite;
+using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia.Windows;
 
-internal sealed class LocalCatalogue
+internal sealed class Catalogue
 {
     internal sealed record Variant(string Species, string Route, string Indication, string Dose,
         string Withdrawal, string Pdf, string Source, string ShortWithdrawal, string PriceCompactWithdrawal)
@@ -14,53 +14,15 @@ internal sealed class LocalCatalogue
     readonly HashSet<string> nonMedicines = new(StringComparer.OrdinalIgnoreCase);
     internal bool IsNonMedicine(string symbol) => nonMedicines.Contains(symbol.Trim());
 
-    static readonly Lazy<LocalCatalogue> Cached = new(Read);
-    internal static LocalCatalogue Load() => Cached.Value;
-
-    static LocalCatalogue Read()
+    internal static Catalogue Read(SqlConnection db)
     {
-        var result = new LocalCatalogue();
-        using var db = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = Path.Combine(AppContext.BaseDirectory, "medicine-catalog.sqlite"), Mode = SqliteOpenMode.ReadOnly
-        }.ToString());
-        db.Open();
+        var result = new Catalogue();
         using var command = db.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('variants') WHERE name='withdrawal_short'";
-        bool hasShortWithdrawal = Convert.ToInt64(command.ExecuteScalar()) > 0;
-        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='price_withdrawal_entries'";
-        bool hasPriceWithdrawal = Convert.ToInt64(command.ExecuteScalar()) > 0;
-        command.CommandText = "PRAGMA user_version";
-        bool needsWithdrawalRefresh = Convert.ToInt64(command.ExecuteScalar()) < 3 || !hasPriceWithdrawal || !hasShortWithdrawal;
-        using var migrated = !needsWithdrawalRefresh ? null : new SqliteConnection("Data Source=:memory:");
-        if (migrated is not null)
-        {
-            migrated.Open();
-            db.BackupDatabase(migrated);
-            command.Connection = migrated;
-        }
-        if (!hasShortWithdrawal)
-        {
-            using var migration = command.Connection!.CreateCommand();
-            using var script = typeof(LocalCatalogue).Assembly.GetManifestResourceStream("withdrawal-short-v2.sql")
-                ?? throw new InvalidOperationException("Brak skryptu skrótów karencji.");
-            using var text = new StreamReader(script);
-            migration.CommandText = text.ReadToEnd();
-            migration.ExecuteNonQuery();
-        }
-        if (needsWithdrawalRefresh)
-        using (var script = typeof(LocalCatalogue).Assembly.GetManifestResourceStream("price-withdrawal-v1.sql")
-            ?? throw new InvalidOperationException("Brak definicji skrótów cennika."))
-        using (var text = new StreamReader(script))
-        {
-            command.CommandText = text.ReadToEnd();
-            command.ExecuteNonQuery();
-        }
         command.CommandText = """
             SELECT p.symbol,p.name,v.species,v.route,v.indication,v.dose,
                    v.edible_tissues,v.milk,v.pdf_path,v.source,v.withdrawal_short,price.compact_text
-            FROM products p JOIN variants v ON v.symbol=p.symbol
-            JOIN price_withdrawal_entries price ON price.id=v.id
+            FROM dbo.catalog_products p JOIN dbo.catalog_variants v ON v.symbol=p.symbol
+            JOIN dbo.catalog_price_withdrawal price ON price.id=v.id
             WHERE COALESCE(p.decision,'') <> 'NOT_MEDICINE'
               AND COALESCE(v.scope,'') NOT LIKE '%referencyjne%'
               AND COALESCE(v.scope,'') NOT LIKE '%archiwalne%'
@@ -70,8 +32,8 @@ internal sealed class LocalCatalogue
         using (var classification = db.CreateCommand())
         {
             classification.CommandText = """
-                SELECT symbol FROM products
-                WHERE decision = 'NOT_MEDICINE' OR TRIM(status) LIKE 'Nie lek / inne%'
+                SELECT symbol FROM dbo.catalog_products
+                WHERE decision = 'NOT_MEDICINE' OR LTRIM(RTRIM(status)) LIKE 'Nie lek / inne%'
                 """;
             using var entries = classification.ExecuteReader();
             while (entries.Read())
@@ -125,14 +87,4 @@ internal sealed class LocalCatalogue
             : string.Join("; ", entries.Select(v => $"{v.Species} {v.Route}: {v.Text}"));
     }
 
-    internal static void OpenPdf(string path)
-    {
-        if (!path.StartsWith("data/ChPL/", StringComparison.Ordinal))
-            throw new InvalidOperationException("Brak lokalnego PDF ChPL dla wariantu.");
-        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "ChPL")) + Path.DirectorySeparatorChar;
-        var file = Path.GetFullPath(Path.Combine(root, path["data/ChPL/".Length..]));
-        if (!file.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !File.Exists(file))
-            throw new FileNotFoundException("Nie znaleziono lokalnego PDF ChPL.");
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
-    }
 }
