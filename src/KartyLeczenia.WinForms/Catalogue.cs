@@ -67,9 +67,20 @@ internal sealed class Catalogue
 
     internal IReadOnlyList<Variant> ForProduct(string symbol, string name)
     {
-        static string Normalize(string value) => System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
-        return products.TryGetValue(symbol.Trim(), out var entry) &&
-            string.Equals(Normalize(entry.Name), Normalize(name), StringComparison.OrdinalIgnoreCase)
+        symbol = symbol.Trim();
+        if (!products.TryGetValue(symbol, out var entry)) return Array.Empty<Variant>();
+
+        string Normalize(string value)
+        {
+            string normalized = System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
+            // This Subiekt item uses two names for the same catalogue symbol.
+            return symbol == "000000000000001147" &&
+                string.Equals(normalized, "RISPOVAL RS IN A'5 DAW.", StringComparison.OrdinalIgnoreCase)
+                ? "RISPOVAL RS IN 5 DAW"
+                : normalized;
+        }
+
+        return string.Equals(Normalize(entry.Name), Normalize(name), StringComparison.OrdinalIgnoreCase)
             ? entry.Variants : Array.Empty<Variant>();
     }
 
