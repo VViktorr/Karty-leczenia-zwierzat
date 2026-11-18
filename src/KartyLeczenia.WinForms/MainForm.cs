@@ -684,14 +684,14 @@ internal sealed class MainForm : Form
                 return;
             }
             using var picker = new CatalogueProductPicker(options, onlyMissing ? "" : current?.Symbol ?? "", pending);
-            if (picker.ShowDialog(this) != DialogResult.OK || picker.Selection is not { } row) return;
+            if (DialogPlacement.Show(picker, this, "catalogue-product-picker") != DialogResult.OK || picker.Selection is not { } row) return;
             var product = await RunArchive(() => archive.ReadCatalogueProduct(row));
             if (sharedArchive != archive || connection != options) return;
             using var editor = new CatalogueEditor(product, async (draft, attachments) =>
             {
                 await RunArchive(() => { archive.SaveCatalogueProduct(draft, attachments); return true; });
             });
-            if (editor.ShowDialog(this) != DialogResult.OK) return;
+            if (DialogPlacement.Show(editor, this, "catalogue-product-editor") != DialogResult.OK) return;
             await LoadPrices();
             status.Text = $"Zapisano kartotekę {row.Symbol} w katalogu SQL.";
         }
@@ -726,7 +726,7 @@ internal sealed class MainForm : Form
         if (direct)
         {
             using var preview = new PricePrintPreview(editor.Render(rows), pricePrintSettings.Landscape, pricePrintSettings.Margin, direct: true);
-            preview.ShowDialog(this);
+            DialogPlacement.Show(preview, this, "price-print-direct");
         }
         else DialogPlacement.Show(editor, this, "price-print-settings");
     }
