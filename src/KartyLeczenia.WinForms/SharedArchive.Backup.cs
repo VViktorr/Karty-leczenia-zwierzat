@@ -11,7 +11,7 @@ internal sealed partial class SharedArchive
         return CreateBackup(db, folder, "kopia");
     }
 
-    internal string RestoreDatabase(ConnectionOptions administrator, string path)
+    internal string? RestoreDatabase(ConnectionOptions administrator, string path)
     {
         using var db = OpenMaintenance(administrator);
         using (var header = MaintenanceCommand(db, "RESTORE HEADERONLY FROM DISK = @path WITH FILE = 1;", path))
@@ -21,40 +21,37 @@ internal sealed partial class SharedArchive
                 || Convert.ToInt32(reader["BackupType"]) != 1 || Convert.ToInt32(reader["Position"]) != 1)
                 throw new InvalidOperationException("Wskaż plik z pełną kopią bazy KartyLeczenia.");
         }
-        using (var verify = MaintenanceCommand(db, "RESTORE VERIFYONLY FROM DISK = @path WITH FILE = 1;", path))
-            verify.ExecuteNonQuery();
-
-        // Keep RESTORE WITH REPLACE inside the existing archive's own database files.
-        var targetFiles = new HashSet<string>(StringComparer.Ordinal);
-        using (var files = MaintenanceCommand(db, """
-            SELECT physical_name FROM sys.master_files WHERE database_id = DB_ID(N'KartyLeczenia');
+        bool exists;
+        using (var state = MaintenanceCommand(db, """
+            SELECT CASE WHEN state_desc = N'ONLINE' AND user_access_desc = N'MULTI_USER' THEN 1 ELSE 0 END
+            FROM sys.databases WHERE name = N'KartyLeczenia';
             """))
-        using (var reader = files.ExecuteReader())
-            while (reader.Read()) targetFiles.Add(reader.GetString(0));
-
-        using (var files = MaintenanceCommand(db, "RESTORE FILELISTONLY FROM DISK = @path WITH FILE = 1;", path))
-        using (var reader = files.ExecuteReader())
         {
-            var backupFiles = new HashSet<string>(StringComparer.Ordinal);
-            while (reader.Read()) backupFiles.Add((string)reader["PhysicalName"]);
-            if (targetFiles.Count == 0 || !targetFiles.SetEquals(backupFiles))
-                throw new InvalidOperationException("Odtwarzanie w programie wymaga istniejącej bazy KartyLeczenia z tymi samymi ścieżkami plików danych i dziennika co w kopii.");
+            var value = state.ExecuteScalar();
+            exists = value is not null;
+            if (exists && value is not 1)
+                throw new InvalidOperationException("Istniejąca baza KartyLeczenia musi być dostępna w trybie wieloużytkownikowym.");
         }
 
-        using (var state = MaintenanceCommand(db, """
-            SELECT COUNT(*) FROM sys.databases
-            WHERE name = N'KartyLeczenia' AND state_desc = N'ONLINE' AND user_access_desc = N'MULTI_USER';
-            """))
-            if ((int)state.ExecuteScalar()! != 1)
-                throw new InvalidOperationException("Baza KartyLeczenia musi być dostępna w trybie wieloużytkownikowym.");
+        string moves = RestoreFileMoves(db, path, exists);
+        using (var verify = MaintenanceCommand(db, $"RESTORE VERIFYONLY FROM DISK = @path WITH FILE = 1{moves};", path))
+            verify.ExecuteNonQuery();
+
+        if (!exists)
+        {
+            using var restoreNew = MaintenanceCommand(db,
+                $"RESTORE DATABASE [KartyLeczenia] FROM DISK = @path WITH FILE = 1, RECOVERY{moves};", path);
+            restoreNew.ExecuteNonQuery();
+            return null;
+        }
 
         string safetyCopy = CreateBackup(db, "", "przed-odtworzeniem");
         try
         {
-            using var restore = MaintenanceCommand(db, """
+            using var restore = MaintenanceCommand(db, $"""
                 ALTER DATABASE [KartyLeczenia] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
                 BEGIN TRY
-                    RESTORE DATABASE [KartyLeczenia] FROM DISK = @path WITH FILE = 1, REPLACE, RECOVERY;
+                    RESTORE DATABASE [KartyLeczenia] FROM DISK = @path WITH FILE = 1, REPLACE, RECOVERY{moves};
                     ALTER DATABASE [KartyLeczenia] SET MULTI_USER WITH ROLLBACK IMMEDIATE;
                 END TRY
                 BEGIN CATCH
@@ -71,6 +68,49 @@ internal sealed partial class SharedArchive
         {
             throw new InvalidOperationException($"Odtwarzanie przerwane. Kopia sprzed odtworzenia: {safetyCopy}. {ex.Message}", ex);
         }
+    }
+
+    static string RestoreFileMoves(SqlConnection db, string path, bool exists)
+    {
+        var backupFiles = new List<(string Logical, string Physical, string Type)>();
+        using (var files = MaintenanceCommand(db, "RESTORE FILELISTONLY FROM DISK = @path WITH FILE = 1;", path))
+        using (var reader = files.ExecuteReader())
+            while (reader.Read())
+                backupFiles.Add(((string)reader["LogicalName"], (string)reader["PhysicalName"], (string)reader["Type"]));
+        if (backupFiles.Count == 0)
+            throw new InvalidOperationException("Kopia nie zawiera plików bazy.");
+
+        if (exists)
+        {
+            var targets = new HashSet<string>(StringComparer.Ordinal);
+            using var files = MaintenanceCommand(db,
+                "SELECT physical_name FROM sys.master_files WHERE database_id = DB_ID(N'KartyLeczenia');");
+            using var reader = files.ExecuteReader();
+            while (reader.Read()) targets.Add(reader.GetString(0));
+            if (targets.SetEquals(backupFiles.Select(file => file.Physical))) return "";
+        }
+
+        if (backupFiles.Any(file => file.Type is not ("D" or "L")))
+            throw new InvalidOperationException("Przeniesienie obsługuje standardowe pliki danych i dziennika SQL Server.");
+
+        using var folders = MaintenanceCommand(db, """
+            SELECT CONVERT(nvarchar(4000), SERVERPROPERTY('InstanceDefaultDataPath')),
+                   CONVERT(nvarchar(4000), SERVERPROPERTY('InstanceDefaultLogPath'));
+            """);
+        using var defaults = folders.ExecuteReader();
+        if (!defaults.Read() || defaults.IsDBNull(0) || defaults.IsDBNull(1))
+            throw new InvalidOperationException("Serwer docelowy nie podał folderów danych i dziennika.");
+
+        var prefix = $"KartyLeczenia-{Guid.NewGuid():N}";
+        int dataIndex = 0, logIndex = 0;
+        static string Quote(string value) => "N'" + value.Replace("'", "''", StringComparison.Ordinal) + "'";
+        return string.Concat(backupFiles.Select(file =>
+        {
+            string target = file.Type == "D"
+                ? ServerPath(defaults.GetString(0), $"{prefix}-d{++dataIndex}.{(dataIndex == 1 ? "mdf" : "ndf")}")
+                : ServerPath(defaults.GetString(1), $"{prefix}-l{++logIndex}.ldf");
+            return $", MOVE {Quote(file.Logical)} TO {Quote(target)}";
+        }));
     }
 
     SqlConnection OpenMaintenance(ConnectionOptions administrator)
@@ -117,8 +157,7 @@ internal sealed partial class SharedArchive
         if (string.IsNullOrWhiteSpace(folder))
             throw new InvalidOperationException("Serwer SQL nie zwrócił domyślnego folderu kopii zapasowych. Wskaż folder dostępny dla SQL Servera.");
 
-        char separator = folder.Contains('/') && !folder.Contains('\\') ? '/' : '\\';
-        string path = $"{folder.TrimEnd('\\', '/')}{separator}KartyLeczenia-{label}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak";
+        string path = ServerPath(folder, $"KartyLeczenia-{label}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak");
         using (var backup = MaintenanceCommand(db, """
             BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM;
             """, path))
@@ -126,6 +165,12 @@ internal sealed partial class SharedArchive
         using (var verify = MaintenanceCommand(db, "RESTORE VERIFYONLY FROM DISK = @path WITH FILE = 1, CHECKSUM;", path))
             verify.ExecuteNonQuery();
         return path;
+    }
+
+    static string ServerPath(string folder, string filename)
+    {
+        char separator = folder.Contains('/') && !folder.Contains('\\') ? '/' : '\\';
+        return $"{folder.TrimEnd('\\', '/')}{separator}{filename}";
     }
 
     static SqlCommand MaintenanceCommand(SqlConnection db, string sql, string? path = null)

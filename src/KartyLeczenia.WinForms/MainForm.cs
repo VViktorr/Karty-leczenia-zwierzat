@@ -1140,6 +1140,8 @@ internal sealed class MainForm : Form
                 item.Get("Sekcja (II lub III)") == section &&
                 string.Equals(row.Cells[TreatmentChoices.Species].Value?.ToString() ?? "", species, StringComparison.OrdinalIgnoreCase))
             .ToArray();
+        rows = SelectAnimalGroupRows(rows, selected);
+        if (rows.Length == 0) return;
         string? numbers = PromptAnimalField("Numery zwierząt",
             $"Wpisz numery wspólne dla pozycji do wydruku ({rows.Length}).",
             selected.Cells[AnimalDescriptionColumn].Value?.ToString() ?? "", multiline: true);
@@ -1171,6 +1173,37 @@ internal sealed class MainForm : Form
                 ((TreatmentRow)row.Tag!).Values[groupField] = group;
             }
         }
+    }
+
+    DataGridViewRow[] SelectAnimalGroupRows(DataGridViewRow[] candidates, DataGridViewRow selected)
+    {
+        if (candidates.Length <= 1) return candidates;
+        using var dialog = new Form
+        {
+            Text = "Pozycje grupy zwierząt", StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(570, 350), MinimumSize = new Size(420, 260), AutoScaleMode = AutoScaleMode.Dpi
+        };
+        var list = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, HorizontalScrollbar = true };
+        string Group(DataGridViewRow row) => ((TreatmentRow)row.Tag!).Get(CardSchema.AnimalDescriptionGroup);
+        string selectedGroup = Group(selected);
+        foreach (var row in candidates)
+        {
+            string label = $"{row.Index + 1}. {row.Cells["Produkt"].Value} · {row.Cells["Seria"].Value}";
+            list.Items.Add(label, Group(row) == selectedGroup);
+        }
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft };
+        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+        var next = new Button { Text = "Dalej", AutoSize = true, DialogResult = DialogResult.OK };
+        buttons.Controls.AddRange([cancel, next]);
+        dialog.Controls.Add(list);
+        dialog.Controls.Add(buttons);
+        dialog.AcceptButton = next;
+        dialog.CancelButton = cancel;
+        list.ItemCheck += (_, e) =>
+            next.Enabled = list.CheckedItems.Count + (e.NewValue == CheckState.Checked ? 1 : -1) > 0;
+        return dialog.ShowDialog(this) == DialogResult.OK
+            ? list.CheckedIndices.Cast<int>().Select(index => candidates[index]).ToArray()
+            : [];
     }
 
     string? PromptAnimalField(string title, string label, string value, bool multiline)
@@ -1532,6 +1565,60 @@ internal sealed class MainForm : Form
         };
     }
 
+    bool ConfirmTreatmentWarnings(Card card)
+    {
+        var warnings = new List<(int Row, string Text)>();
+        for (int index = 0; index < card.Rows.Count; index++)
+        {
+            var row = card.Rows[index];
+            if (!string.Equals(row.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var (key, label) in TreatmentWarningFields)
+            {
+                if (string.IsNullOrWhiteSpace(row.GetValueOrDefault(key)))
+                    warnings.Add((index, $"{index + 1}. {row.GetValueOrDefault("Produkt")} — {label}"));
+            }
+            if (!selectedTreatmentVariants.ContainsKey(treatment.Rows[index]))
+                warnings.Add((index, $"{index + 1}. {row.GetValueOrDefault("Produkt")} — brak wybranego wariantu ChPL"));
+        }
+        if (warnings.Count == 0) return true;
+
+        using var dialog = new Form
+        {
+            Text = "Sprawdź dane karty", StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(620, 350), MinimumSize = new Size(420, 260), AutoScaleMode = AutoScaleMode.Dpi
+        };
+        var list = new ListBox { Dock = DockStyle.Fill, HorizontalScrollbar = true };
+        list.Items.AddRange(warnings.Select(warning => warning.Text).ToArray());
+        list.SelectedIndex = 0;
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft };
+        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+        var proceed = new Button { Text = "Kontynuuj", AutoSize = true, DialogResult = DialogResult.Yes };
+        var go = new Button { Text = "Przejdź do pozycji", AutoSize = true, DialogResult = DialogResult.Retry };
+        list.DoubleClick += (_, _) => dialog.DialogResult = DialogResult.Retry;
+        buttons.Controls.AddRange([cancel, proceed, go]);
+        dialog.Controls.Add(list);
+        dialog.Controls.Add(buttons);
+        dialog.CancelButton = cancel;
+        var result = dialog.ShowDialog(this);
+        if (result == DialogResult.Retry && list.SelectedIndex >= 0)
+        {
+            var column = treatment.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
+            if (column is not null)
+            {
+                treatment.CurrentCell = treatment.Rows[warnings[list.SelectedIndex].Row].Cells[column.Index];
+                treatment.Focus();
+            }
+        }
+        return result == DialogResult.Yes;
+    }
+
+    static readonly (string Key, string Label)[] TreatmentWarningFields =
+    [
+        ("Seria", "brak numeru serii"),
+        ("Liczba zwierząt", "brak liczby zwierząt"),
+        ("Karencja", "brak danych o karencji")
+    ];
+
     async Task SaveTreatmentToArchive()
     {
         if (savingTreatment) return;
@@ -1539,6 +1626,7 @@ internal sealed class MainForm : Form
         var card = CaptureTreatmentCard();
         var printCard = CaptureTreatmentCard(forPrint: true);
         _ = CardHtmlRenderer.Render(printCard);
+        if (!ConfirmTreatmentWarnings(card)) return;
         var id = currentArchiveId;
         var source = currentCard!;
         var date = treatmentDate.Value.Date;
@@ -1712,7 +1800,7 @@ internal sealed class MainForm : Form
     Task PreviewCard()
     {
         var card = CaptureTreatmentCard(forPrint: true);
-        OpenCardPreview(card, currentCard?.PayerId, currentCard?.Scope);
+        if (ConfirmTreatmentWarnings(card)) OpenCardPreview(card, currentCard?.PayerId, currentCard?.Scope);
         return Task.CompletedTask;
     }
 
@@ -2292,8 +2380,8 @@ internal sealed class MainForm : Form
             if (sharedArchive is { } archive) await RefreshClinic(archive);
         };
         form = Section("Kopia zapasowa SQL");
-        Message(form, "Operacje obejmują całą bazę KartyLeczenia na zapisanym serwerze archiwum. " +
-            "Podaj konto administratora SQL. Ścieżki odnoszą się do serwera SQL, również gdy aplikacja działa na innym komputerze.",
+        Message(form, "Archiwizacja obejmuje całą bazę KartyLeczenia na zapisanym serwerze archiwum. " +
+            "Do odtworzenia możesz wskazać inną instancję. Podaj konto administratora SQL. Ścieżki odnoszą się do serwera SQL.",
             multiline: true);
         var maintenanceAuth = Authentication(useWindows: true);
         var maintenanceUser = Field("Login administratora SQL", "");
@@ -2302,6 +2390,8 @@ internal sealed class MainForm : Form
             maintenanceUser.Enabled = maintenancePassword.Enabled = maintenanceAuth.SelectedIndex == 0;
         maintenanceUser.Enabled = maintenancePassword.Enabled = false;
         var backupFolder = Field("Folder kopii na serwerze", "", "Puste pole = domyślny folder SQL Servera");
+        var restoreServer = Field("Serwer docelowy odtwarzania", "", "Puste pole = zapisany serwer archiwum");
+        var restoreTrust = Option("Zaufaj certyfikatowi wpisanego serwera docelowego", false);
         var restoreFile = Field("Plik kopii na serwerze", "", @"np. D:\Kopie\KartyLeczenia.bak");
         var maintenanceStatus = Message(form, "", multiline: true);
         bool maintainingArchive = false;
@@ -2315,7 +2405,9 @@ internal sealed class MainForm : Form
         async Task MaintainArchive(bool restoring)
         {
             if (maintainingArchive) return;
-            var archive = Archive();
+            string target = restoring ? restoreServer.Text.Trim() : "";
+            var archive = target.Length == 0 ? Archive() : new SharedArchive(new ConnectionOptions(
+                target, SharedArchive.DatabaseName, true, "", "", restoreTrust.Checked));
             bool windows = maintenanceAuth.SelectedIndex == 1;
             if (!windows)
             {
@@ -2332,7 +2424,7 @@ internal sealed class MainForm : Form
             if (restoring && MessageBox.Show(this,
                     $"Odtworzyć bazę KartyLeczenia na serwerze {archive.Server} z pliku:\n{path}\n\n" +
                     "Operacja zastąpi aktualne dane i rozłączy pozostałe stanowiska. Zamknij na nich aplikację przed kontynuowaniem. " +
-                    "Program najpierw wykona kopię obecnego stanu.",
+                    "Jeśli baza istnieje, program najpierw wykona kopię obecnego stanu.",
                     "Odtwarzanie bazy KartyLeczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                     MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
@@ -2347,10 +2439,10 @@ internal sealed class MainForm : Form
                 : "Wykonywanie i sprawdzanie kopii bazy KartyLeczenia…";
             try
             {
-                string backup = await Task.Run(() => restoring
+                string? backup = await Task.Run(() => restoring
                     ? archive.RestoreDatabase(administrator, path)
                     : archive.BackupDatabase(administrator, path));
-                if (restoring)
+                if (restoring && ReferenceEquals(archive, sharedArchive))
                 {
                     sharedClinic = null;
                     treatmentCatalogue = null;
@@ -2361,13 +2453,15 @@ internal sealed class MainForm : Form
                     prices.DataSource = null;
                     await RefreshClinic(archive);
                 }
-                else
+                else if (!restoring)
                 {
-                    restoreFile.Text = backup;
+                    restoreFile.Text = backup ?? "";
                 }
-                maintenanceStatus.Text = restoring
-                    ? $"Odtworzono bazę. Kopia sprzed odtworzenia: {backup}"
-                    : $"Zapisano i sprawdzono kopię na serwerze: {backup}";
+                maintenanceStatus.Text = !restoring
+                    ? $"Zapisano i sprawdzono kopię na serwerze: {backup}"
+                    : backup is null
+                        ? $"Odtworzono bazę na {archive.Server}."
+                        : $"Odtworzono bazę na {archive.Server}. Kopia sprzed odtworzenia: {backup}";
                 status.Text = restoring ? "Odtworzono bazę KartyLeczenia." : "Zapisano kopię bazy KartyLeczenia.";
             }
             catch (Exception ex)

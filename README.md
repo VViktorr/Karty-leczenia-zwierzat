@@ -50,6 +50,43 @@ Dane lecznicy edytuje się w **Ustawienia → Dane lecznicy**. Jeśli wspólna
 baza nie zawiera jeszcze tych danych, program może przenieść wcześniejsze
 ustawienia lecznicy z tego stanowiska przy pierwszym połączeniu z archiwum.
 
+## Aktualizacja katalogu w istniejącym archiwum
+
+Po zbudowaniu instalatora rozpakuj `catalog-seed-win-x64.zip` na serwerze
+SQL. Uruchom polecenia PowerShell z rozpakowanego folderu na koncie Windows
+z uprawnieniami do zapisu katalogu. Dla instancji domyślnej użyj `lpc:localhost`.
+
+```powershell
+.\KartyLeczenia.CatalogImport.exe 'lpc:localhost\KLARCHIVE' . --preview-update
+.\KartyLeczenia.CatalogImport.exe 'lpc:localhost\KLARCHIVE' . --apply-update
+```
+
+Podgląd pokazuje nowe symbole i liczbę wariantów. Zapis dodaje nowe kartoteki
+razem z wariantami, karencjami do cennika i powiązanymi PDF-ami w jednej
+transakcji. Istniejące symbole i ich ręczne poprawki są zachowywane.
+Jeśli istniejący PDF ma tę samą ścieżkę i inną treść, import zgłosi konflikt.
+
+## Odtworzenie archiwum na innym serwerze
+
+Skopiuj plik `.bak` do miejsca dostępnego dla usługi docelowego SQL Servera.
+W **Ustawienia → Kopia zapasowa SQL** wpisz **Serwer docelowy odtwarzania**
+oraz ścieżkę widoczną z tego serwera. Zaloguj się kontem administratora SQL
+docelowej instancji. Program może utworzyć bazę z kopii i przenieść standardowe
+pliki danych i dziennika do domyślnych folderów docelowej instancji. Jeśli
+baza istnieje, program najpierw wykona kopię jej obecnej zawartości.
+
+Po odtworzeniu uruchom instalator w trybie **Serwer** na docelowej instancji,
+żeby uzupełnić schemat i skonfigurować dostęp operatora. Następnie zapisz nowy
+adres w **Ustawienia → Archiwum SQL** na stanowiskach. Loginy instancji SQL
+konfiguruje się na serwerze docelowym. Jeśli odtworzony użytkownik operatora
+ma inny identyfikator SID niż jego login na serwerze docelowym, administrator
+może powiązać go z właściwym, już istniejącym loginem. Dla domyślnego konta:
+
+```sql
+USE [KartyLeczenia];
+ALTER USER [KartyLeczeniaOperatorUser] WITH LOGIN = [KartyLeczeniaOperator];
+```
+
 ## Instalator WinForms z wyborem stanowiska
 
 Z głównego katalogu repozytorium uruchom skrypt z zainstalowanym .NET 10 SDK
