@@ -193,7 +193,7 @@ internal static class AppearanceEditor
         AppearanceOptions current = original with { };
         // Prefer a narrow vertical editor when application scaling is increased.
         // Its controls must fit into the settings page without horizontal clipping.
-        bool vertical = InterfaceScale.Load() > 100;
+        bool vertical = InterfaceScale.Load() > 100 || owner.DeviceDpi > 120;
         var panel = new FlowLayoutPanel
         {
             AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown,
