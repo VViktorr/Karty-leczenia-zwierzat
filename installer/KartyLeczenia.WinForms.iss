@@ -422,7 +422,7 @@ begin
   // directory), so the shared EXE is identical to the server's installation.
   SourceInstaller := ExpandConstant('{srcexe}');
   Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
-    ExpandConstant('{app}\\Publish-KartyLeczeniaUpdate.ps1') +
+    ExpandConstant('{app}\Publish-KartyLeczeniaUpdate.ps1') +
     '" -Installer "' + SourceInstaller +
     '" -Version "{#ReleaseVersion}"';
 
@@ -441,7 +441,7 @@ begin
     Log('Update publication FAILED: ' + UpdatePublishError);
     MsgBox('Program zostal zainstalowany na serwerze, ale nie udalo sie udostepnic nowej wersji dla stanowisk.' +
       #13#10 + UpdatePublishError + #13#10 +
-      'Szczegoly: C:\\ProgramData\\KartyLeczenia\\update-publish.log' +
+      'Szczegoly: C:\ProgramData\KartyLeczenia\update-publish.log' +
       #13#10 + 'Poprzedni instalator na udziale nie zostal celowo usuniety.',
       mbError, MB_OK);
   end
