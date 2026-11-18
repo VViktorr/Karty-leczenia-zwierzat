@@ -9,12 +9,16 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $logPath = Join-Path $env:ProgramData 'KartyLeczenia\update-publish.log'
+# Create the log before doing any publication work (including access checks).
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $logPath) | Out-Null
+Add-Content -LiteralPath $logPath -Encoding ASCII -Value (
+    '[{0}] START version {1}; installer {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Version, $Installer)
 trap {
     $failure = $_
     try {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $logPath) | Out-Null
-        Add-Content -LiteralPath $logPath -Encoding UTF8 -Value (
-            '[{0}] ERROR version {1}: {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Version, $failure.ToString())
+        Add-Content -LiteralPath $logPath -Encoding ASCII -Value (
+            '[{0}] ERROR version {1}: {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Version, ($failure | Out-String).Trim())
     } catch {}
     Write-Host ('Blad publikacji aktualizacji: ' + $failure.ToString())
     exit 1
