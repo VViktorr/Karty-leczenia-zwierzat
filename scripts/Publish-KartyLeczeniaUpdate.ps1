@@ -34,19 +34,41 @@ if ($share) {
 # Only administrators may write publication files. Readers have read/execute rights.
 & icacls.exe $Folder /inheritance:r /grant:r "*S-1-5-32-544:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-11:(OI)(CI)RX" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Nie udało się ustawić uprawnień NTFS.' }
-$destination = Join-Path $Folder $installerFile.Name
-if ([IO.Path]::GetFullPath($installerFile.FullName) -ine [IO.Path]::GetFullPath($destination)) {
-    Copy-Item -LiteralPath $installerFile.FullName -Destination $destination -Force
-}
-$sha = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash
-$manifest = @{ version = $Version; installer = $installerFile.Name; sha256 = $sha } |
-    ConvertTo-Json -Compress
-$temp = Join-Path $Folder ('release-' + [guid]::NewGuid().ToString('N') + '.tmp')
+# Every release has one stable name on the server. Stage the new binary first,
+# so remote workstations never see a partly copied executable.
+$publishedName = 'KartyLeczenia-Setup-win-x64.exe'
+$destination = Join-Path $Folder $publishedName
+$stagedInstaller = Join-Path $Folder ('installer-' + [guid]::NewGuid().ToString('N') + '.tmp')
+$tempManifest = Join-Path $Folder ('release-' + [guid]::NewGuid().ToString('N') + '.tmp')
 try {
-    [IO.File]::WriteAllText($temp, $manifest, [Text.UTF8Encoding]::new($false))
-    Move-Item -LiteralPath $temp -Destination (Join-Path $Folder 'release.json') -Force
+    Copy-Item -LiteralPath $installerFile.FullName -Destination $stagedInstaller
+    $sha = (Get-FileHash -LiteralPath $stagedInstaller -Algorithm SHA256).Hash
+    $manifest = @{ version = $Version; installer = $publishedName; sha256 = $sha } |
+        ConvertTo-Json -Compress
+
+    # An atomic rename/replace on the same volume keeps the public file whole.
+    if ([IO.File]::Exists($destination)) {
+        [IO.File]::Replace($stagedInstaller, $destination, $null)
+    } else {
+        [IO.File]::Move($stagedInstaller, $destination)
+    }
+
+    # Publish metadata only after the installer is in place.
+    [IO.File]::WriteAllText($tempManifest, $manifest, [Text.UTF8Encoding]::new($false))
+    $releasePath = Join-Path $Folder 'release.json'
+    if ([IO.File]::Exists($releasePath)) {
+        [IO.File]::Replace($tempManifest, $releasePath, $null)
+    } else {
+        [IO.File]::Move($tempManifest, $releasePath)
+    }
+
+    # Remove installers from the previous versioned-file scheme after success.
+    Get-ChildItem -LiteralPath $Folder -File -Filter 'KartyLeczenia-Setup-win-x64-v*.exe' |
+        Remove-Item -Force
 } finally {
-    Remove-Item -LiteralPath $temp -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $stagedInstaller -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $tempManifest -ErrorAction SilentlyContinue
 }
 Write-Host "Opublikowano aktualizację $Version w \\$env:COMPUTERNAME\$ShareName"
+Write-Host "Plik serwera: $publishedName"
 Write-Host "SHA-256: $sha"
