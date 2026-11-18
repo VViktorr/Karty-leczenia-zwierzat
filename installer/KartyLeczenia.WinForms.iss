@@ -60,7 +60,6 @@ Name: "{commonprograms}\KartyLeczenia\Ustawienia KartyLeczenia"; Filename: "{app
 Name: "{commondesktop}\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Publish-KartyLeczeniaUpdate.ps1"" -Installer ""{srcexe}"" -Version ""{#ReleaseVersion}"""; Flags: runhidden waituntilterminated; StatusMsg: "Publikowanie instalatora dla stanowisk zdalnych..."; Check: IsServerInstall
 Filename: "{app}\KartyLeczenia.WinForms.exe"; Description: "Uruchom KartyLeczenia"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [Code]
@@ -80,6 +79,8 @@ var
   ExistingServerAddress: String;
   DownloadPage: TDownloadWizardPage;
   ComponentProgress: TOutputMarqueeProgressWizardPage;
+  UpdatePublished: Boolean;
+  UpdatePublishError: String;
 
 function IsServerInstall: Boolean;
 begin
@@ -409,9 +410,56 @@ begin
   end;
 end;
 
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ExitCode: Integer;
+  Parameters: String;
+  SourceInstaller: String;
+begin
+  if (CurStep <> ssPostInstall) or not IsServerInstall then Exit;
+
+  // Publish from the installer being run (not from the installed application
+  // directory), so the shared EXE is identical to the server's installation.
+  SourceInstaller := ExpandConstant('{srcexe}');
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    ExpandConstant('{app}\\Publish-KartyLeczeniaUpdate.ps1') +
+    '" -Installer "' + SourceInstaller +
+    '" -Version "{#ReleaseVersion}"';
+
+  UpdatePublished := False;
+  UpdatePublishError := '';
+  Log('Publishing KartyLeczenia server installer: ' + SourceInstaller);
+  if not Exec(PowerShellPath, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+    UpdatePublishError := 'Nie mozna uruchomic skryptu publikacji: ' + SysErrorMessage(ExitCode)
+  else if ExitCode <> 0 then
+    UpdatePublishError := 'Skrypt publikacji zakonczyl sie bledem (kod ' + IntToStr(ExitCode) + ').'
+  else
+    UpdatePublished := True;
+
+  if not UpdatePublished then
+  begin
+    Log('Update publication FAILED: ' + UpdatePublishError);
+    MsgBox('Program zostal zainstalowany na serwerze, ale nie udalo sie udostepnic nowej wersji dla stanowisk.' +
+      #13#10 + UpdatePublishError + #13#10 +
+      'Szczegoly: C:\\ProgramData\\KartyLeczenia\\update-publish.log' +
+      #13#10 + 'Poprzedni instalator na udziale nie zostal celowo usuniety.',
+      mbError, MB_OK);
+  end
+  else
+    Log('Update publication completed for version {#ReleaseVersion}.');
+end;
+
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (CurPageID = wpFinished) and (RolePage.SelectedValueIndex = 0) then
+  begin
     WizardForm.FinishedLabel.Caption := 'Serwer archiwum jest gotowy. Adres dla stanowisk: ' +
-      ArchiveServer('') + #13#10 + 'Użyj trybu logowania wybranego podczas konfiguracji SQL.';
+      ArchiveServer('') + #13#10;
+    if UpdatePublished then
+      WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption +
+        'Aktualizacje: opublikowano wersje {#ReleaseVersion}.'
+    else
+      WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption +
+        'UWAGA: nie udalo sie opublikowac instalatora aktualizacji.';
+  end;
 end;
