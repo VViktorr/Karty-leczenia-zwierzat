@@ -4,6 +4,53 @@ namespace KartyLeczenia.Windows;
 
 internal static class PdfMail
 {
+    // MAPI is synchronous and may block until the user closes the mail composer.
+    // Run it on its own STA thread and keep a separate attachment file independent
+    // of the print preview's temporary PDF.
+    internal static Task ComposeInBackground(string sourcePdf, string fileName, string? address)
+    {
+        string directory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KartyLeczenia", "MailAttachments");
+        Directory.CreateDirectory(directory);
+        string attachment = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".pdf");
+        File.Copy(sourcePdf, attachment);
+
+        var result = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                // Old attachments are retained while external mail clients may need them.
+                // Remove files older than 30 days, never the current attachment.
+                foreach (var old in Directory.EnumerateFiles(directory, "*.pdf"))
+                {
+                    if (string.Equals(old, attachment, StringComparison.OrdinalIgnoreCase)) continue;
+                    try
+                    {
+                        if (File.GetLastWriteTimeUtc(old) < DateTime.UtcNow.AddDays(-30))
+                            File.Delete(old);
+                    }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+                Compose(0, attachment, fileName, address);
+                result.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                result.TrySetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "KartyLeczenia-MAPI"
+        };
+        worker.SetApartmentState(ApartmentState.STA);
+        worker.Start();
+        return result.Task;
+    }
+
     const uint MapiLogonUi = 0x00000001;
     const uint MapiDialog = 0x00000008;
     const uint MapiUserAbort = 1;
