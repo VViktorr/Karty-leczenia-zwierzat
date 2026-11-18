@@ -88,6 +88,7 @@ internal static class AppearanceThemes
         internal AppearanceOptions Options = new();
         internal Font? BoldFont;
         internal Font? ThemedFont;
+        internal int? AppliedRowHeight;
         internal readonly Color Background = grid.BackgroundColor;
         internal readonly Color GridColor = grid.GridColor;
         internal readonly Font Font = grid.Font;
@@ -138,7 +139,12 @@ internal static class AppearanceThemes
             grid.DefaultCellStyle = state.Data.Clone();
             grid.AlternatingRowsDefaultCellStyle = state.Alternating.Clone();
             grid.CellBorderStyle = state.Border;
+            int previousRowHeight = state.AppliedRowHeight ?? state.RowHeight;
             grid.RowTemplate.Height = state.RowHeight;
+            foreach (DataGridViewRow row in grid.Rows)
+                if (!row.IsNewRow && row.Height == previousRowHeight)
+                    row.Height = state.RowHeight;
+            state.AppliedRowHeight = null;
             grid.Font = state.Font;
             grid.ShowCellToolTips = appearance.ShowToolTips;
             grid.Invalidate();
@@ -167,14 +173,16 @@ internal static class AppearanceThemes
         grid.GridColor = dark ? Color.FromArgb(72, 78, 89) : SystemColors.ControlDark;
         grid.ShowCellToolTips = appearance.ShowToolTips;
         grid.CellBorderStyle = appearance.GridLines ? DataGridViewCellBorderStyle.Single : DataGridViewCellBorderStyle.None;
+        int previousAppliedHeight = state.AppliedRowHeight ?? state.RowHeight;
         grid.RowTemplate.Height = Math.Max(grid.RowTemplate.MinimumHeight, appearance.RowHeight);
+        state.AppliedRowHeight = grid.RowTemplate.Height;
         state.ThemedFont = new Font(state.Font.FontFamily, appearance.TableFontSize,
             state.Font.Style, GraphicsUnit.Point);
         grid.Font = state.ThemedFont;
         // Existing rows retain their old height unless it is explicitly applied.
         // Respect an operator's manually resized rows rather than rewriting them.
         foreach (DataGridViewRow row in grid.Rows)
-            if (!row.IsNewRow && row.Height == state.RowHeight)
+            if (!row.IsNewRow && row.Height == previousAppliedHeight)
                 row.Height = grid.RowTemplate.Height;
         grid.Invalidate();
     }
