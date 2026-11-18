@@ -80,8 +80,8 @@ internal sealed class MainForm : Form
         ConfigurePrices();
         ConfigureExpiry();
         ConfigureCard();
-        ConfigureConnection();
         var savedCardsGrid = ConfigureSavedCards();
+        ConfigureConnection();
         var tables = new Dictionary<string, DataGridView>
         {
             ["documents"] = documents, ["prices"] = prices,
@@ -96,7 +96,7 @@ internal sealed class MainForm : Form
             documents.Columns["DocumentType"]!.Visible = true;
         };
         FormClosed += (_, _) => layout.Save();
-        tabs.SelectedIndex = openSettings || connection is null || sharedArchive is null ? 4 : 0;
+        tabs.SelectedIndex = openSettings || connection is null || sharedArchive is null ? tabs.TabCount - 1 : 0;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
     }
 
