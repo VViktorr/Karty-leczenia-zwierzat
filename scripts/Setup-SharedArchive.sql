@@ -25,6 +25,31 @@ END;
 IF COL_LENGTH(N'dbo.treatment_cards', N'deleted_at_utc') IS NULL
     ALTER TABLE dbo.treatment_cards ADD deleted_at_utc datetime2(0) NULL;
 
+IF COL_LENGTH(N'dbo.treatment_cards', N'card_year') IS NULL
+    ALTER TABLE dbo.treatment_cards ADD card_year int NULL;
+IF COL_LENGTH(N'dbo.treatment_cards', N'card_sequence') IS NULL
+    ALTER TABLE dbo.treatment_cards ADD card_sequence bigint NULL;
+
+EXEC(N'
+    WITH LastNumber AS (
+        SELECT card_year, MAX(card_sequence) AS last_number
+        FROM dbo.treatment_cards WHERE card_year IS NOT NULL GROUP BY card_year
+    ), Unnumbered AS (
+        SELECT id, YEAR(treatment_date) AS card_year,
+               ROW_NUMBER() OVER (PARTITION BY YEAR(treatment_date) ORDER BY archive_order) AS next_number
+        FROM dbo.treatment_cards WHERE card_sequence IS NULL
+    )
+    UPDATE card SET card_year = pending.card_year,
+        card_sequence = pending.next_number + COALESCE(existing.last_number, 0)
+    FROM dbo.treatment_cards card JOIN Unnumbered pending ON pending.id = card.id
+    LEFT JOIN LastNumber existing ON existing.card_year = pending.card_year;
+');
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.treatment_cards')
+               AND name = N'UX_treatment_cards_number')
+    EXEC(N'CREATE UNIQUE INDEX UX_treatment_cards_number ON dbo.treatment_cards(card_year, card_sequence)
+           WHERE card_year IS NOT NULL AND card_sequence IS NOT NULL;');
+
 IF OBJECT_ID(N'dbo.animal_descriptions', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.animal_descriptions (

@@ -40,6 +40,9 @@ internal sealed class MainForm : Form
     DocumentSearchKinds kind = DocumentSearchKinds.Invoices;
     DocumentData? currentCard;
     Guid currentArchiveId;
+    string? currentCardNumber;
+    DateTime? treatmentReportedAt;
+    TimeSpan? treatmentExecutionTime;
     readonly DateTimePicker treatmentDate = new() { Format = DateTimePickerFormat.Short, Width = 110 };
 
     readonly int interfaceScale;
@@ -245,7 +248,7 @@ internal sealed class MainForm : Form
         {
             string message = ex.Number switch
             {
-                50004 or 50012 => ex.Message,
+                50004 or 50012 or 50016 => ex.Message,
                 50003 => "Najpierw uruchom nowy instalator w trybie Serwer i zaimportuj katalog leków.",
                 207 or 208 or 229 or 50001 => "Sprawdź, czy przygotowano tabele archiwum i nadano rolę KartyLeczeniaOperator.",
                 _ => SubiektConnectionService.FriendlyError(ex)
@@ -1498,6 +1501,9 @@ internal sealed class MainForm : Form
         treatmentCatalogue = catalogue;
         currentCard = card;
         currentArchiveId = Guid.NewGuid();
+        currentCardNumber = null;
+        treatmentReportedAt = null;
+        treatmentExecutionTime = null;
         treatmentDate.Value = DateTime.Today;
         selectedTreatmentVariants.Clear();
         excludedTreatmentRows.Clear();
@@ -1530,7 +1536,11 @@ internal sealed class MainForm : Form
         var clinic = sharedClinic ?? new ClinicSettings();
         var fields = new Dictionary<string, string> { ["Dokument źródłowy"] = source.Number,
             ["Właściciel i adres"] = source.Payer, ["Zakres mapowania towarów"] = source.Scope,
-            ["Wykonanie — data i godzina"] = treatmentDate.Value.ToString("dd.MM.yyyy"),
+            ["Nr karty"] = currentCardNumber ?? "",
+            ["Zgłoszenie — data i godzina"] = treatmentReportedAt?.ToString("dd.MM.yyyy HH:mm") ?? "",
+            ["Wykonanie — data i godzina"] = treatmentExecutionTime is { } time
+                ? (treatmentDate.Value.Date + time).ToString("dd.MM.yyyy HH:mm")
+                : treatmentDate.Value.ToString("dd.MM.yyyy"),
             ["Lecznica i adres"] = clinic.CardText,
             ["Lekarz i nr prawa wykonywania zawodu"] = clinic.Doctor };
         var rows = treatment.Rows.Cast<DataGridViewRow>().Select(item =>
@@ -1619,38 +1629,97 @@ internal sealed class MainForm : Form
         ("Karencja", "brak danych o karencji")
     ];
 
-    async Task SaveTreatmentToArchive()
+    bool EditTreatmentDates()
     {
-        if (savingTreatment) return;
+        using var dialog = new Form
+        {
+            Text = "Daty i godziny karty leczenia", StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, AutoScaleMode = AutoScaleMode.Dpi
+        };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, Padding = new Padding(12) };
+        DateTime now = DateTime.Now;
+        var reportDate = new DateTimePicker
+        {
+            Width = 155, Format = DateTimePickerFormat.Short, ShowCheckBox = true,
+            Value = treatmentReportedAt ?? treatmentDate.Value.Date, Checked = treatmentReportedAt is not null,
+            AccessibleName = "Data zgłoszenia"
+        };
+        var reportTime = TimePicker(treatmentReportedAt ?? now, "Godzina zgłoszenia");
+        var executionDate = new DateTimePicker
+        {
+            Width = 155, Format = DateTimePickerFormat.Short, Value = treatmentDate.Value.Date,
+            AccessibleName = "Data wykonania czynności"
+        };
+        var executionTime = TimePicker(treatmentDate.Value.Date + (treatmentExecutionTime ?? now.TimeOfDay),
+            "Godzina wykonania czynności");
+        layout.Controls.Add(new Label { Text = "Zgłoszenie (zaznacz, aby wpisać)", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
+        layout.Controls.Add(reportDate, 1, 0);
+        layout.Controls.Add(reportTime, 2, 0);
+        layout.Controls.Add(new Label { Text = "Wykonanie czynności weterynaryjnych", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
+        layout.Controls.Add(executionDate, 1, 1);
+        layout.Controls.Add(executionTime, 2, 1);
+        var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft };
+        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+        var next = new Button { Text = "Dalej", AutoSize = true, DialogResult = DialogResult.OK };
+        buttons.Controls.AddRange([cancel, next]);
+        layout.Controls.Add(buttons, 0, 2);
+        layout.SetColumnSpan(buttons, 3);
+        dialog.Controls.Add(layout);
+        dialog.AcceptButton = next;
+        dialog.CancelButton = cancel;
+
+        if (dialog.ShowDialog(this) != DialogResult.OK) return false;
+        treatmentReportedAt = reportDate.Checked ? reportDate.Value.Date + Minutes(reportTime.Value) : null;
+        treatmentDate.Value = executionDate.Value.Date;
+        treatmentExecutionTime = Minutes(executionTime.Value);
+        return true;
+
+        static TimeSpan Minutes(DateTime value) => new(value.Hour, value.Minute, 0);
+        static DateTimePicker TimePicker(DateTime value, string label) => new()
+        {
+            Width = 90, Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true,
+            Value = value, AccessibleName = label
+        };
+    }
+
+    Task SaveTreatmentToArchive() => SaveNumberedTreatmentCard();
+
+    async Task<bool> SaveNumberedTreatmentCard()
+    {
+        if (savingTreatment) return false;
         var archive = Archive();
-        var card = CaptureTreatmentCard();
-        var printCard = CaptureTreatmentCard(forPrint: true);
-        _ = CardHtmlRenderer.Render(printCard);
-        if (!ConfirmTreatmentWarnings(card)) return;
+        var source = currentCard ?? throw new InvalidOperationException("Najpierw wczytaj dokument.");
         var id = currentArchiveId;
-        var source = currentCard!;
-        var date = treatmentDate.Value.Date;
         savingTreatment = true;
         try
         {
-            var existing = await RunArchive(() => archive.SaveCard(id, source, date, card, printCard));
-            if (IsDisposed || sharedArchive != archive) return;
-            if (existing is Guid existingId)
+            if (!EditTreatmentDates()) return false;
+            var card = CaptureTreatmentCard();
+            var printCard = CaptureTreatmentCard(forPrint: true);
+            _ = CardHtmlRenderer.Render(printCard);
+            if (!ConfirmTreatmentWarnings(card)) return false;
+            var date = treatmentDate.Value.Date;
+
+            var saved = await RunArchive(() => archive.SaveCard(id, source, date, card, printCard));
+            if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return false;
+            if (saved.DuplicateId is Guid existingId)
             {
-                if (currentArchiveId != id) return;
                 var choice = PromptDuplicateCard(source.Number, updating: existingId == id);
-                if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return;
+                if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return false;
                 if (choice == DialogResult.Retry)
                 {
                     await PreviewSavedCard(archive, existingId.ToString("N"));
-                    return;
+                    return false;
                 }
-                if (choice != DialogResult.Yes) return;
+                if (choice != DialogResult.Yes) return false;
 
-                await RunArchive(() => archive.SaveCard(id, source, date, card, printCard, confirmDuplicate: true));
-                if (IsDisposed || sharedArchive != archive) return;
+                saved = await RunArchive(() => archive.SaveCard(id, source, date, card, printCard, confirmDuplicate: true));
+                if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return false;
             }
-            status.Text = "Zapisano kartę we wspólnym archiwum.";
+            currentCardNumber = saved.Number ?? throw new InvalidOperationException("Nie udało się pobrać numeru zapisanej karty.");
+            status.Text = $"Zapisano kartę {currentCardNumber} we wspólnym archiwum.";
+            return true;
         }
         finally { savingTreatment = false; }
     }
@@ -1697,10 +1766,11 @@ internal sealed class MainForm : Form
     DataGridView ConfigureSavedCards()
     {
         var grid = NewGrid();
+        Column(grid, "Nr karty", nameof(SavedTreatmentCard.Number), 125);
         Column(grid, "Data leczenia", nameof(SavedTreatmentCard.Date), 115, "dd.MM.yyyy");
         Column(grid, "Klient", nameof(SavedTreatmentCard.Client), 350);
         Column(grid, "Dokument", nameof(SavedTreatmentCard.Document), 180);
-        var query = new TextBox { Width = 250, PlaceholderText = "Klient lub numer dokumentu" };
+        var query = new TextBox { Width = 250, PlaceholderText = "Klient, nr karty lub dokumentu" };
         var trash = new CheckBox { Text = "Pokaż kosz", AutoSize = true, Anchor = AnchorStyles.Left };
         var day = new DateTimePicker { Format = DateTimePickerFormat.Short, ShowCheckBox = true, Checked = false, Width = 125 };
 
@@ -1797,11 +1867,19 @@ internal sealed class MainForm : Form
         if (dialog.ShowDialog(this) == DialogResult.OK) await File.WriteAllTextAsync(dialog.FileName, JsonSerializer.Serialize(card));
     }
 
-    Task PreviewCard()
+    async Task PreviewCard()
     {
+        if (currentCard is null) throw new InvalidOperationException("Najpierw wczytaj dokument.");
+        bool needsNumber = currentCardNumber is null;
+        if (needsNumber)
+        {
+            if (MessageBox.Show(this, "Zapisz kartę, aby nadać jej numer widoczny na wydruku. Zapisać teraz?",
+                    "Numer karty leczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button2) != DialogResult.Yes || !await SaveNumberedTreatmentCard())
+                return;
+        }
         var card = CaptureTreatmentCard(forPrint: true);
-        if (ConfirmTreatmentWarnings(card)) OpenCardPreview(card, currentCard?.PayerId, currentCard?.Scope);
-        return Task.CompletedTask;
+        if (needsNumber || ConfirmTreatmentWarnings(card)) OpenCardPreview(card, currentCard?.PayerId, currentCard?.Scope);
     }
 
     void OpenCardPreview(Card card, int? payerId, string? scope)

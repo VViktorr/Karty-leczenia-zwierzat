@@ -42,7 +42,7 @@ public static class CardHtmlRenderer
             : Fill("Lecznica i adres");
         html.Append($"<div class='top'><div class='block'><div class='value'>{clinic}</div><div class='caption'>(nazwa i adres zakładu<br>leczniczego dla zwierząt)</div></div>");
         html.Append($"<div class='block'><div class='value'>{Fill("Właściciel i adres")}</div><div class='caption'>(imię, nazwisko i adres albo nazwa,<br>siedziba i adres posiadacza zwierzęcia)</div></div>");
-        html.Append($"<div class='date'>zgłoszenie &nbsp; data / godz. {Fill("Zgłoszenie — data i godzina")}</div><div class='block'><div class='number'>Nr dokumentu</div><div class='value'>{Fill("Nr karty")}</div><div class='caption'>(nr kolejnej strony/miesiąc/rok)</div></div></div>");
+        html.Append($"<div class='date'>zgłoszenie &nbsp; data / godz. {Fill("Zgłoszenie — data i godzina")}</div><div class='block'><div class='number'>Nr karty</div><div class='value'>{Fill("Nr karty")}</div></div></div>");
         html.Append($"<div class='execution'>wykonanie czynności lekarsko-weterynaryjnych &nbsp; data / godz. {Fill("Wykonanie — data i godzina")}</div><div class='section'>II.</div>");
         const string columns = "<colgroup><col style='width:3.8%'><col style='width:21.8%'><col style='width:7.6%'><col style='width:9.2%'><col style='width:11.8%'><col style='width:12.4%'><col style='width:18.4%'><col style='width:6.3%'><col style='width:8.7%'></colgroup>";
         html.Append("<table>" + columns + """

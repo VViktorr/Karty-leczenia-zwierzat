@@ -6,7 +6,7 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia.Windows;
 
-internal sealed record SavedTreatmentCard(string Id, DateTime Date, string Client, string Document);
+internal sealed record SavedTreatmentCard(string Id, DateTime Date, string Client, string Document, string Number);
 
 internal sealed partial class SharedArchive(ConnectionOptions options)
 {
@@ -106,13 +106,21 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         command.ExecuteNonQuery();
     }
 
-    // Return the existing card ID if confirmation is needed, or null after saving.
-    internal Guid? SaveCard(Guid id, DocumentData source, DateTime date, Card card, Card printCard,
+    internal (Guid? DuplicateId, string? Number) SaveCard(Guid id, DocumentData source, DateTime date, Card card, Card printCard,
         bool confirmDuplicate = false)
     {
         string client = string.Join(", ", source.Payer.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
         using var db = Open();
         using var transaction = db.BeginTransaction();
+        // Serialize allocation and duplicate checks across all WinForms stations.
+        using (var guard = Command(db, """
+            DECLARE @result int;
+            EXEC @result = sys.sp_getapplock @Resource = N'KartyLeczenia.CardNumber',
+                @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 10000;
+            IF @result < 0 THROW 50016, N'Inne stanowisko zapisuje kartę. Spróbuj ponownie.', 1;
+            """, transaction))
+            guard.ExecuteNonQuery();
+
         if (!confirmDuplicate)
         {
             using var existing = Command(db, """
@@ -126,16 +134,51 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
             if (existing.ExecuteScalar() is Guid existingId)
             {
                 transaction.Commit();
-                return existingId;
+                return (existingId, null);
             }
         }
 
+        int year = date.Year;
+        long? sequence = null;
+        using (var existing = Command(db, """
+            SELECT card_year, card_sequence, deleted_at_utc
+            FROM dbo.treatment_cards WITH (UPDLOCK, HOLDLOCK) WHERE id = @id;
+            """, transaction))
+        {
+            existing.Parameters.Add("@id", SqlDbType.UniqueIdentifier).Value = id;
+            using var reader = existing.ExecuteReader();
+            if (reader.Read())
+            {
+                if (!reader.IsDBNull(2))
+                    throw new InvalidOperationException("Zapisana karta jest w koszu. Przywróć ją lub ponownie otwórz dokument, aby zapisać nową kartę.");
+                if (!reader.IsDBNull(0) && !reader.IsDBNull(1))
+                {
+                    year = reader.GetInt32(0);
+                    sequence = reader.GetInt64(1);
+                }
+            }
+        }
+        if (sequence is null)
+        {
+            using var next = Command(db, """
+                SELECT COALESCE(MAX(card_sequence), 0) + 1
+                FROM dbo.treatment_cards WITH (UPDLOCK, HOLDLOCK)
+                WHERE card_year = @year AND card_sequence IS NOT NULL;
+                """, transaction);
+            next.Parameters.Add("@year", SqlDbType.Int).Value = year;
+            sequence = (long)next.ExecuteScalar()!;
+        }
+
+        string number = FormatCardNumber(year, sequence.Value);
+        card.Fields["Nr karty"] = printCard.Fields["Nr karty"] = number;
         WriteCard(db, transaction, id, source.Scope, source.PayerId, client, source.Number, date,
             (client + " " + source.Number).ToUpperInvariant(), JsonSerializer.Serialize(card),
-            JsonSerializer.Serialize(printCard), updateExisting: true);
+            JsonSerializer.Serialize(printCard), year, sequence.Value);
         transaction.Commit();
-        return null;
+        return (null, number);
     }
+
+    static string FormatCardNumber(int year, long sequence) => FormattableString.Invariant($"K/{sequence}/{year:D4}");
 
     internal bool SetCardInTrash(string id, bool inTrash)
     {
@@ -151,10 +194,11 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
     {
         using var db = Open();
         using var command = Command(db, """
-            SELECT id, treatment_date, client, document
+            SELECT id, treatment_date, client, document, card_year, card_sequence
             FROM dbo.treatment_cards
             WHERE ((@trash = 0 AND deleted_at_utc IS NULL) OR (@trash = 1 AND deleted_at_utc IS NOT NULL))
-              AND (@query = N'' OR CHARINDEX(@query, search_text) > 0)
+              AND (@query = N'' OR CHARINDEX(@query, search_text) > 0
+                   OR (card_sequence IS NOT NULL AND CHARINDEX(@query, CONCAT(N'K/', card_sequence, N'/', card_year)) > 0))
               AND (@date IS NULL OR treatment_date = @date)
             ORDER BY treatment_date DESC, archive_order DESC;
             """);
@@ -164,7 +208,8 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         using var reader = command.ExecuteReader();
         var cards = new List<SavedTreatmentCard>();
         while (reader.Read())
-            cards.Add(new(reader.GetGuid(0).ToString("N"), reader.GetDateTime(1), reader.GetString(2), reader.GetString(3)));
+            cards.Add(new(reader.GetGuid(0).ToString("N"), reader.GetDateTime(1), reader.GetString(2), reader.GetString(3),
+                reader.IsDBNull(4) || reader.IsDBNull(5) ? "" : FormatCardNumber(reader.GetInt32(4), reader.GetInt64(5))));
         return cards;
     }
 
@@ -172,7 +217,7 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
     {
         using var db = Open();
         using var command = Command(db, """
-            SELECT CASE WHEN @print = 1 THEN print_json ELSE card_json END, payer_id, source_scope
+            SELECT CASE WHEN @print = 1 THEN print_json ELSE card_json END, payer_id, source_scope, card_year, card_sequence
             FROM dbo.treatment_cards
             WHERE id = @id AND ((@trash = 0 AND deleted_at_utc IS NULL) OR (@trash = 1 AND deleted_at_utc IS NOT NULL));
             """);
@@ -184,6 +229,8 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
             throw new InvalidOperationException("Karta zmieniła stan lub nie jest już dostępna. Odśwież listę kart.");
         var card = JsonSerializer.Deserialize<Card>(reader.GetString(0))
             ?? throw new InvalidOperationException("Zapisana karta jest pusta.");
+        if (!reader.IsDBNull(3) && !reader.IsDBNull(4))
+            card.Fields["Nr karty"] = FormatCardNumber(reader.GetInt32(3), reader.GetInt64(4));
         return (card, reader.IsDBNull(1) ? null : reader.GetInt32(1), reader.GetString(2));
     }
 
@@ -212,28 +259,16 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         transaction.Commit();
     }
 
-    static int WriteCard(SqlConnection db, SqlTransaction transaction, Guid id, string scope, int? payerId,
-        string client, string document, DateTime date, string search, string card, string print, bool updateExisting)
+    static void WriteCard(SqlConnection db, SqlTransaction transaction, Guid id, string scope, int? payerId,
+        string client, string document, DateTime date, string search, string card, string print, int year, long sequence)
     {
         using var command = Command(db, """
-            IF EXISTS (SELECT 1 FROM dbo.treatment_cards WITH (UPDLOCK, HOLDLOCK) WHERE id = @id)
-            BEGIN
-                IF @update = 1
-                BEGIN
-                    UPDATE dbo.treatment_cards SET treatment_date = @date, card_json = @card, print_json = @print
-                    WHERE id = @id AND deleted_at_utc IS NULL;
-                    IF @@ROWCOUNT = 0
-                        THROW 50012, N'Zapisana karta jest w koszu. Przywróć ją lub ponownie otwórz dokument, aby zapisać nową kartę.', 1;
-                END;
-                SELECT 0;
-            END
-            ELSE
-            BEGIN
+            UPDATE dbo.treatment_cards SET treatment_date = @date, card_json = @card, print_json = @print,
+                card_year = @year, card_sequence = @sequence WHERE id = @id;
+            IF @@ROWCOUNT = 0
                 INSERT INTO dbo.treatment_cards
-                    (id, source_scope, payer_id, client, document, treatment_date, search_text, card_json, print_json)
-                VALUES (@id, @scope, @payer, @client, @document, @date, @search, @card, @print);
-                SELECT 1;
-            END;
+                    (id, source_scope, payer_id, client, document, treatment_date, search_text, card_json, print_json, card_year, card_sequence)
+                VALUES (@id, @scope, @payer, @client, @document, @date, @search, @card, @print, @year, @sequence);
             """, transaction);
         command.Parameters.Add("@id", SqlDbType.UniqueIdentifier).Value = id;
         command.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = scope;
@@ -244,8 +279,9 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         command.Parameters.Add("@search", SqlDbType.NVarChar, -1).Value = search;
         command.Parameters.Add("@card", SqlDbType.NVarChar, -1).Value = card;
         command.Parameters.Add("@print", SqlDbType.NVarChar, -1).Value = print;
-        command.Parameters.Add("@update", SqlDbType.Bit).Value = updateExisting;
-        return (int)command.ExecuteScalar()!;
+        command.Parameters.Add("@year", SqlDbType.Int).Value = year;
+        command.Parameters.Add("@sequence", SqlDbType.BigInt).Value = sequence;
+        command.ExecuteNonQuery();
     }
 
     static int WriteDescription(SqlConnection db, SqlTransaction transaction, string scope, int payerId,
