@@ -19,14 +19,21 @@ internal sealed record AppearanceOptions
     public bool UseCustomAccent { get; set; }
     public int AccentArgb { get; set; } = Color.FromArgb(0, 100, 190).ToArgb();
     public int PrintPreviewZoom { get; set; } = 100;
+    public int SwitchStyle { get; set; } = 1; // 0 Windows, 1 filled, 2 outline
+    public int CornerRadius { get; set; } = 8;
+    public bool ColorButtons { get; set; } = true;
 
-    internal static string[] Names { get; } = ["Klasyczny", "Jasny", "Ciemny", "Kompaktowy", "Wygodny", "Własny"];
+    internal static string[] Names { get; } = ["Klasyczny", "Jasny", "Ciemny", "Błękitny", "Zielony", "Fioletowy", "Grafitowy", "Kompaktowy", "Wygodny", "Własny"];
     internal static AppearanceOptions ForPreset(string name) => name switch
     {
         "Jasny" => new() { Preset = name, RowHeight = 30, TableFontSize = 10, WideTabs = true },
-        "Ciemny" => new() { Preset = name, RowHeight = 30, TableFontSize = 10, WideTabs = true },
-        "Kompaktowy" => new() { Preset = name, RowHeight = 22, TableFontSize = 9, AlternatingRows = false },
-        "Wygodny" => new() { Preset = name, RowHeight = 36, TableFontSize = 12, WideTabs = true },
+        "Ciemny" => new() { Preset = name, RowHeight = 30, TableFontSize = 10, WideTabs = true, AccentArgb = Color.FromArgb(83, 157, 235).ToArgb() },
+        "Błękitny" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(20, 108, 200).ToArgb() },
+        "Zielony" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(32, 126, 86).ToArgb() },
+        "Fioletowy" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(118, 72, 177).ToArgb() },
+        "Grafitowy" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(93, 122, 150).ToArgb() },
+        "Kompaktowy" => new() { Preset = name, RowHeight = 22, TableFontSize = 9, AlternatingRows = false, CornerRadius = 4 },
+        "Wygodny" => new() { Preset = name, RowHeight = 36, TableFontSize = 12, WideTabs = true, CornerRadius = 12 },
         _ => new() { Preset = name }
     };
 }
@@ -52,6 +59,8 @@ internal static class AppearanceThemes
         value.TableFontSize = Math.Clamp(value.TableFontSize, 8, 18);
         value.RowHeight = Math.Clamp(value.RowHeight, 20, 60);
         value.PrintPreviewZoom = Math.Clamp(value.PrintPreviewZoom, 50, 200);
+        value.SwitchStyle = Math.Clamp(value.SwitchStyle, 0, 2);
+        value.CornerRadius = Math.Clamp(value.CornerRadius, 0, 20);
         if (!AppearanceOptions.Names.Contains(value.Preset)) value.Preset = "Klasyczny";
         return value;
     }
@@ -67,6 +76,12 @@ internal static class AppearanceThemes
         }
         finally { File.Delete(temp); }
     }
+
+    internal static bool IsDark(AppearanceOptions options) => options.Preset is "Ciemny" or "Grafitowy";
+    internal static bool IsClassic(AppearanceOptions options) =>
+        options == AppearanceOptions.ForPreset("Klasyczny");
+    internal static Color Accent(AppearanceOptions options) =>
+        Color.FromArgb(options.AccentArgb);
 
     sealed class GridState(DataGridView grid)
     {
@@ -118,12 +133,12 @@ internal static class AppearanceThemes
             grid.Invalidate();
             return;
         }
-        bool dark = appearance.Preset == "Ciemny";
+        bool dark = IsDark(appearance);
         bool classic = appearance.Preset == "Klasyczny";
         Color background = dark ? Color.FromArgb(31, 35, 42) : Color.White;
         Color foreground = dark ? Color.FromArgb(235, 238, 244) : SystemColors.WindowText;
         Color header = dark ? Color.FromArgb(47, 53, 63) : SystemColors.Control;
-        Color accent = appearance.UseCustomAccent ? Color.FromArgb(appearance.AccentArgb) : Color.FromArgb(35, 100, 179);
+        Color accent = Accent(appearance);
 
         grid.BackgroundColor = dark ? background : SystemColors.Window;
         grid.EnableHeadersVisualStyles = false;
@@ -146,25 +161,110 @@ internal static class AppearanceThemes
         grid.Invalidate();
     }
 
-    sealed class SurfaceColors(Color background, Color foreground)
+    sealed class SurfaceColors(Control control)
     {
-        internal Color Background { get; } = background;
-        internal Color Foreground { get; } = foreground;
+        internal readonly Color Background = control.BackColor;
+        internal readonly Color Foreground = control.ForeColor;
+        internal readonly FlatStyle? ButtonFlat = control is ButtonBase button ? button.FlatStyle : null;
+        internal readonly bool? VisualStyle = control is ButtonBase styled ? styled.UseVisualStyleBackColor : null;
+        internal readonly int? Border = control is ButtonBase bordered ? bordered.FlatAppearance.BorderSize : null;
+        internal readonly Color? BorderColor = control is ButtonBase colored ? colored.FlatAppearance.BorderColor : null;
+        internal readonly Color? MouseOver = control is ButtonBase hovered ? hovered.FlatAppearance.MouseOverBackColor : null;
+        internal readonly Color? MouseDown = control is ButtonBase pressed ? pressed.FlatAppearance.MouseDownBackColor : null;
     }
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, SurfaceColors> Surfaces = new();
 
-    // Store each control's original palette once so returning to Classic does
-    // not replace custom buttons, panels or layouts with generic system colors.
+    static Color Blend(Color a, Color b, float ratio) =>
+        Color.FromArgb((int)(a.R * (1 - ratio) + b.R * ratio),
+            (int)(a.G * (1 - ratio) + b.G * ratio),
+            (int)(a.B * (1 - ratio) + b.B * ratio));
+
+    static void UpdateRoundCorners(ButtonBase button, int radius)
+    {
+        button.Region?.Dispose();
+        if (radius == 0 || button.Width < 5 || button.Height < 5)
+        {
+            button.Region = null;
+            return;
+        }
+        int diameter = Math.Min(radius * 2, Math.Min(button.Width, button.Height));
+        using var path = new System.Drawing.Drawing2D.GraphicsPath();
+        int right = button.Width - diameter - 1, bottom = button.Height - diameter - 1;
+        path.AddArc(0, 0, diameter, diameter, 180, 90);
+        path.AddArc(right, 0, diameter, diameter, 270, 90);
+        path.AddArc(right, bottom, diameter, diameter, 0, 90);
+        path.AddArc(0, bottom, diameter, diameter, 90, 90);
+        path.CloseFigure();
+        button.Region = new Region(path);
+    }
+
+    static void StyleButton(ButtonBase button, AppearanceOptions appearance, SurfaceColors original)
+    {
+        if (IsClassic(appearance) || appearance.SwitchStyle == 0)
+        {
+            if (original.ButtonFlat is { } flat) button.FlatStyle = flat;
+            if (original.VisualStyle is { } visual) button.UseVisualStyleBackColor = visual;
+            if (original.Border is { } border) button.FlatAppearance.BorderSize = border;
+            if (original.BorderColor is { } borderColor) button.FlatAppearance.BorderColor = borderColor;
+            if (original.MouseOver is { } hover) button.FlatAppearance.MouseOverBackColor = hover;
+            if (original.MouseDown is { } down) button.FlatAppearance.MouseDownBackColor = down;
+            UpdateRoundCorners(button, 0);
+            return;
+        }
+
+        // Do not redraw regular checkboxes/radio circles. Only button-like
+        // selectors (Appearance.Button) get the rounded switch treatment.
+        if (button is CheckBox check && check.Appearance != Appearance.Button) return;
+        if (button is RadioButton radio && radio.Appearance != Appearance.Button) return;
+        Color accent = Accent(appearance);
+        bool selected = button switch
+        {
+            CheckBox cb => cb.Checked,
+            RadioButton rb => rb.Checked,
+            _ => false
+        };
+        bool dark = IsDark(appearance);
+        Color background = dark ? Color.FromArgb(49, 56, 66) : Color.White;
+        button.FlatStyle = FlatStyle.Flat;
+        button.UseVisualStyleBackColor = false;
+        button.FlatAppearance.BorderSize = appearance.SwitchStyle == 2 ? 2 : 1;
+        button.FlatAppearance.BorderColor = selected ? accent : Blend(accent, background, .65f);
+        button.FlatAppearance.MouseOverBackColor = Blend(background, accent, dark ? .35f : .16f);
+        button.FlatAppearance.MouseDownBackColor = Blend(background, accent, .45f);
+        if (selected)
+        {
+            button.BackColor = accent;
+            button.ForeColor = Color.White;
+        }
+        else
+        {
+            button.BackColor = appearance.SwitchStyle == 2
+                ? background : Blend(background, accent, dark ? .17f : .07f);
+            button.ForeColor = dark ? Color.WhiteSmoke : Color.FromArgb(35, 40, 52);
+        }
+        UpdateRoundCorners(button, appearance.CornerRadius);
+    }
+
+    // Revert each individual control to its captured appearance when returning
+    // to Classic; don't force the standard Windows palette over custom controls.
     internal static void ApplySurface(Control control, AppearanceOptions appearance)
     {
         if (control is DataGridView) return;
+        bool classic = IsClassic(appearance);
+        bool dark = IsDark(appearance);
+        var original = Surfaces.GetValue(control, item => new SurfaceColors(item));
         if (control is Form or Panel or TableLayoutPanel or FlowLayoutPanel or TabPage
-            or TabControl or Label or CheckBox or GroupBox or StatusStrip or TextBox or ComboBox)
+            or TabControl or Label or CheckBox or RadioButton or Button or GroupBox
+            or StatusStrip or TextBox or ComboBox)
         {
-            var original = Surfaces.GetValue(control, item => new SurfaceColors(item.BackColor, item.ForeColor));
-            if (appearance.Preset == "Ciemny")
+            bool input = control is TextBox or ComboBox;
+            if (classic)
             {
-                bool input = control is TextBox or ComboBox;
+                control.BackColor = original.Background;
+                control.ForeColor = original.Foreground;
+            }
+            else if (dark)
+            {
                 control.BackColor = input ? Color.FromArgb(40, 46, 55) : Color.FromArgb(32, 37, 45);
                 control.ForeColor = Color.FromArgb(237, 239, 243);
             }
@@ -174,9 +274,31 @@ internal static class AppearanceThemes
                 control.ForeColor = original.Foreground;
             }
         }
+        if (control is ButtonBase button)
+        {
+            if (original.ButtonFlat is not null && !button.IsDisposed)
+                StyleButton(button, appearance, original);
+            if (!classic && appearance.SwitchStyle != 0 && button is CheckBox or RadioButton)
+            {
+                // Keep selector visual state in sync when toggled.
+                if (!ThemeHandlers.TryGetValue(button, out _))
+                {
+                    ThemeHandlers.Add(button, new ButtonThemeMarker());
+                    if (button is CheckBox cb) cb.CheckedChanged += (_, _) => StyleButton(cb, CurrentStyles.GetValue(cb, _ => appearance), original);
+                    if (button is RadioButton rb) rb.CheckedChanged += (_, _) => StyleButton(rb, CurrentStyles.GetValue(rb, _ => appearance), original);
+                    button.SizeChanged += (_, _) => UpdateRoundCorners(button, CurrentStyles.GetValue(button, _ => appearance).CornerRadius);
+                }
+            }
+            CurrentStyles.Remove(button);
+            CurrentStyles.Add(button, appearance);
+        }
         foreach (Control child in control.Controls)
             ApplySurface(child, appearance);
     }
+
+    sealed class ButtonThemeMarker { }
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ButtonBase, ButtonThemeMarker> ThemeHandlers = new();
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ButtonBase, AppearanceOptions> CurrentStyles = new();
 
     internal static void ApplyTabs(TabControl tabs, AppearanceOptions appearance)
     {
