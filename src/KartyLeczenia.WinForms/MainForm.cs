@@ -108,6 +108,7 @@ internal sealed class MainForm : Form
         void ApplyAppearance(AppearanceOptions options)
         {
             appearance = AppearanceThemes.Normalize(options);
+            AppearanceThemes.ApplySurface(this, appearance);
             AppearanceThemes.ApplyTabs(tabs, appearance);
             foreach (var grid in tables.Values.Append(savedCardsGrid))
                 AppearanceThemes.ApplyGrid(grid, appearance);
