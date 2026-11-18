@@ -115,6 +115,8 @@ internal sealed class PricePrintPreview : Form
                             browser.CoreWebView2.NavigationCompleted += (_, loaded) =>
                             {
                                 print.Enabled = pdf.Enabled = email.Enabled = loaded.IsSuccess;
+                                if (loaded.IsSuccess)
+                                    browser.ZoomFactor = AppearanceThemes.Load().PrintPreviewZoom / 100d;
                                 if (!loaded.IsSuccess) Report(new IOException("Nie udało się otworzyć podglądu stron."));
                             };
                             browser.Source = new Uri(previewFile);
