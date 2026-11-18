@@ -590,7 +590,7 @@ internal sealed class MainForm : Form
                 catalogue ??= await RunArchive(archive.ReadCatalogue);
                 var products = await MedicineStockService.FindCatalogueProducts(options, "", timeout.Token, limit: int.MaxValue);
                 if (connection != options || sharedArchive != archive) return [];
-                var missing = products.Where(row => catalogue.NeedsCompletion(row.Symbol, row.Name)).ToArray();
+                var missing = products.Where(row => catalogue.NeedsCompletion(row.Symbol)).ToArray();
                 missingButton.Text = $"Leki do uzupełnienia ({missing.Length})";
                 return missing;
             }
@@ -633,7 +633,7 @@ internal sealed class MainForm : Form
                 var catalogue = await RunArchive(archive.ReadCatalogue);
                 if (connection != options || sharedArchive != archive) return;
                 prices.Columns["Gross"]!.HeaderText = netPrice ? "Cena netto" : "Cena brutto";
-                prices.DataSource = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol, row.Name) }).ToList();
+                prices.DataSource = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol) }).ToList();
                 status.Text = $"Pozycje cennika: {rows.Count}";
                 await RefreshMissing(options, archive, catalogue);
             }
@@ -820,8 +820,8 @@ internal sealed class MainForm : Form
     {
         if (treatmentCatalogue is null) return [];
         return row.Cells[ReferenceColumn].Tag is TreatmentReference reference
-            ? treatmentCatalogue.ForProduct(reference.Symbol, reference.Name)
-            : treatmentCatalogue.ForProduct(entry.Get("Symbol Subiekta"), entry.Product);
+            ? treatmentCatalogue.ForProduct(reference.Symbol)
+            : treatmentCatalogue.ForProduct(entry.Get("Symbol Subiekta"));
     }
 
     void PickTreatmentReference(DataGridViewRow row)

@@ -339,7 +339,7 @@ internal sealed class PricePrintEditor : Form
             foreach (var row in data)
             {
                 string[] values = [(++index).ToString(), row.Name, row.LatestBatch, row.Gross?.ToString("N2") ?? "",
-                    withdrawal.Checked ? catalogue.PriceWithdrawal(row.Symbol, row.Name, format.SelectedIndex, routes.SelectedIndex == 1) : ""];
+                    withdrawal.Checked ? catalogue.PriceWithdrawal(row.Symbol, format.SelectedIndex, routes.SelectedIndex == 1) : ""];
                 html.Append("<tr>");
                 foreach (int i in columns)
                     html.Append($"<td style='{TypographyCss(i + 1)}'>").Append(WebUtility.HtmlEncode(values[i]).ReplaceLineEndings("<br>")).Append("</td>");

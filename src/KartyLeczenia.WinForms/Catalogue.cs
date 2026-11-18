@@ -14,8 +14,8 @@ internal sealed class Catalogue
     readonly HashSet<string> nonMedicines = new(StringComparer.OrdinalIgnoreCase);
     readonly HashSet<string> incompleteProducts = new(StringComparer.OrdinalIgnoreCase);
 
-    internal bool NeedsCompletion(string symbol, string name) => !IsNonMedicine(symbol) &&
-        (incompleteProducts.Contains(symbol.Trim()) || ForProduct(symbol, name).Count == 0);
+    internal bool NeedsCompletion(string symbol) => !IsNonMedicine(symbol) &&
+        (incompleteProducts.Contains(symbol.Trim()) || ForProduct(symbol).Count == 0);
 
     internal bool IsNonMedicine(string symbol) => nonMedicines.Contains(symbol.Trim());
 
@@ -65,38 +65,22 @@ internal sealed class Catalogue
         return result;
     }
 
-    internal IReadOnlyList<Variant> ForProduct(string symbol, string name)
-    {
-        symbol = symbol.Trim();
-        if (!products.TryGetValue(symbol, out var entry)) return Array.Empty<Variant>();
-
-        string Normalize(string value)
-        {
-            string normalized = System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
-            // This Subiekt item uses two names for the same catalogue symbol.
-            return symbol == "000000000000001147" &&
-                string.Equals(normalized, "RISPOVAL RS IN A'5 DAW.", StringComparison.OrdinalIgnoreCase)
-                ? "RISPOVAL RS IN 5 DAW"
-                : normalized;
-        }
-
-        return string.Equals(Normalize(entry.Name), Normalize(name), StringComparison.OrdinalIgnoreCase)
-            ? entry.Variants : Array.Empty<Variant>();
-    }
+    internal IReadOnlyList<Variant> ForProduct(string symbol) =>
+        products.TryGetValue(symbol.Trim(), out var entry) ? entry.Variants : Array.Empty<Variant>();
 
     internal (string Symbol, string Name)[] ReferenceProducts() => products
         .Select(item => (Symbol: item.Key, Name: item.Value.Name))
         .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
         .ThenBy(item => item.Symbol, StringComparer.OrdinalIgnoreCase).ToArray();
 
-    internal string Summary(string symbol, string name) => string.Join(" | ", ForProduct(symbol, name)
+    internal string Summary(string symbol) => string.Join(" | ", ForProduct(symbol)
         .Where(v => v.Withdrawal.Length > 0)
         .Select(v => $"{v.Species} {v.Route} · {v.Withdrawal}").Distinct());
 
-    internal string PriceWithdrawal(string symbol, string name, int format, bool routeCodes)
+    internal string PriceWithdrawal(string symbol, int format, bool routeCodes)
     {
         string Route(string route) => routeCodes ? AdministrationRouteLegend.Abbreviate(route) : AdministrationRouteLegend.Expand(route);
-        var variants = ForProduct(symbol, name).Where(v => !string.IsNullOrWhiteSpace(v.Withdrawal));
+        var variants = ForProduct(symbol).Where(v => !string.IsNullOrWhiteSpace(v.Withdrawal));
         if (format == 0)
             return string.Join(" | ", variants.Select(v => $"{v.Species} {Route(v.Route)} · {v.Withdrawal}").Distinct());
 
