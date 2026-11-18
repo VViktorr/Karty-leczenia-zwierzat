@@ -30,12 +30,15 @@ internal sealed class WindowLayout(Form window, CheckBox rememberTreatment, Dict
 
         rememberTreatment.Checked = layout.RememberTreatment;
         var bounds = layout.Bounds;
-        var visible = Rectangle.Intersect(bounds, Screen.FromRectangle(bounds).WorkingArea);
-        if (visible.Width >= 100 && visible.Height >= 50 &&
-            bounds.Width >= window.MinimumSize.Width && bounds.Height >= window.MinimumSize.Height)
+        if (bounds.Width > 0 && bounds.Height > 0)
         {
+            var area = Screen.FromRectangle(bounds).WorkingArea;
+            int width = Math.Clamp(bounds.Width, Math.Min(window.MinimumSize.Width, area.Width), area.Width);
+            int height = Math.Clamp(bounds.Height, Math.Min(window.MinimumSize.Height, area.Height), area.Height);
             window.StartPosition = FormStartPosition.Manual;
-            window.Bounds = bounds;
+            window.Bounds = new Rectangle(
+                Math.Clamp(bounds.X, area.Left, area.Right - width),
+                Math.Clamp(bounds.Y, area.Top, area.Bottom - height), width, height);
         }
         if (layout.Maximized) window.WindowState = FormWindowState.Maximized;
 
