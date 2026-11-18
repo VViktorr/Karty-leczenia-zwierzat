@@ -47,6 +47,9 @@ internal sealed class MainForm : Form
     readonly DateTimePicker treatmentDate = new() { Format = DateTimePickerFormat.Short, Width = 110 };
 
     readonly int interfaceScale;
+    AppearanceOptions appearance = AppearanceThemes.Load();
+    Action<AppearanceOptions>? applyAppearance;
+    static readonly string LastTabPath = Path.Combine(SharedArchive.LocalDataFolder, "winforms-last-tab.txt");
 
     internal MainForm(bool openSettings, int interfaceScale)
     {
@@ -65,6 +68,15 @@ internal sealed class MainForm : Form
         tabs.DrawItem += DrawMainTab;
         tabs.SelectedIndexChanged += (_, _) =>
         {
+            if (appearance.RememberLastTab && tabs.SelectedIndex >= 0)
+            {
+                try
+                {
+                    Directory.CreateDirectory(SharedArchive.LocalDataFolder);
+                    File.WriteAllText(LastTabPath, tabs.SelectedIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { CrashLog.Write("Appearance.SaveTab", ex); }
+            }
             tabs.Invalidate();
             UpdateRefreshLabel();
             CrashLog.Write($"WinForms.TabChanged index={tabs.SelectedIndex}");
@@ -93,14 +105,35 @@ internal sealed class MainForm : Form
         };
         if (interfaceScale > 100) EnlargeInterface(tables.Values.Append(savedCardsGrid));
         var layout = new WindowLayout(this, rememberTreatment, tables, interfaceScale);
+        void ApplyAppearance(AppearanceOptions options)
+        {
+            appearance = AppearanceThemes.Normalize(options);
+            AppearanceThemes.ApplyTabs(tabs, appearance);
+            foreach (var grid in tables.Values.Append(savedCardsGrid))
+                AppearanceThemes.ApplyGrid(grid, appearance);
+            tabs.Invalidate();
+        }
+        applyAppearance = ApplyAppearance;
         Load += (_, _) =>
         {
             layout.Restore();
+            ApplyAppearance(appearance);
+            if (appearance.StartMaximized) WindowState = FormWindowState.Maximized;
             treatment.Columns["Drukuj"]!.DisplayIndex = 0;
             documents.Columns["DocumentType"]!.Visible = true;
         };
         FormClosed += (_, _) => layout.Save();
-        tabs.SelectedIndex = openSettings || connection is null || sharedArchive is null ? tabs.TabCount - 1 : 0;
+        int startupTab = 0;
+        if (appearance.RememberLastTab)
+        {
+            try
+            {
+                if (int.TryParse(File.ReadAllText(LastTabPath), out int remembered))
+                    startupTab = Math.Clamp(remembered, 0, tabs.TabCount - 1);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { CrashLog.Write("Appearance.RestoreTab", ex); }
+        }
+        tabs.SelectedIndex = openSettings || connection is null || sharedArchive is null ? tabs.TabCount - 1 : startupTab;
         Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
     }
 
@@ -2607,6 +2640,7 @@ internal sealed class MainForm : Form
             AutoSize = true,
             Anchor = AnchorStyles.Left
         });
+        Add("", AppearanceEditor.Create(this, options => applyAppearance?.Invoke(options)));
         var scaleSelector = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, AccessibleName = "Skala interfejsu" };
         scaleSelector.Items.AddRange(InterfaceScale.Percentages.Select(value => $"{value}%").ToArray());
         int savedScale = InterfaceScale.Load();
