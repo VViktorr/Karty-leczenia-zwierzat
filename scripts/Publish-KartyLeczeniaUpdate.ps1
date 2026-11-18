@@ -64,6 +64,8 @@ $publishedName = 'KartyLeczenia-Setup-win-x64.exe'
 $destination = Join-Path $Folder $publishedName
 $stagedInstaller = Join-Path $Folder ('installer-' + [guid]::NewGuid().ToString('N') + '.tmp')
 $tempManifest = Join-Path $Folder ('release-' + [guid]::NewGuid().ToString('N') + '.tmp')
+$installerBackup = Join-Path $Folder ('installer-backup-' + [guid]::NewGuid().ToString('N') + '.bak')
+$manifestBackup = Join-Path $Folder ('release-backup-' + [guid]::NewGuid().ToString('N') + '.bak')
 try {
     Copy-Item -LiteralPath $installerFile.FullName -Destination $stagedInstaller
     $sha = (Get-FileHash -LiteralPath $stagedInstaller -Algorithm SHA256).Hash
@@ -72,7 +74,7 @@ try {
 
     # An atomic rename/replace on the same volume keeps the public file whole.
     if ([IO.File]::Exists($destination)) {
-        [IO.File]::Replace($stagedInstaller, $destination, $null)
+        [IO.File]::Replace($stagedInstaller, $destination, $installerBackup)
     } else {
         [IO.File]::Move($stagedInstaller, $destination)
     }
@@ -81,7 +83,7 @@ try {
     [IO.File]::WriteAllText($tempManifest, $manifest, [Text.UTF8Encoding]::new($false))
     $releasePath = Join-Path $Folder 'release.json'
     if ([IO.File]::Exists($releasePath)) {
-        [IO.File]::Replace($tempManifest, $releasePath, $null)
+        [IO.File]::Replace($tempManifest, $releasePath, $manifestBackup)
     } else {
         [IO.File]::Move($tempManifest, $releasePath)
     }
@@ -92,6 +94,8 @@ try {
 } finally {
     Remove-Item -LiteralPath $stagedInstaller -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $tempManifest -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $installerBackup -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $manifestBackup -ErrorAction SilentlyContinue
 }
 Write-Host "Opublikowano aktualizacje $Version w \\$env:COMPUTERNAME\$ShareName"
 Write-Host "Plik serwera: $publishedName"
