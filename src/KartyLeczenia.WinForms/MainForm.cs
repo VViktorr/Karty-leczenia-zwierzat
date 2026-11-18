@@ -167,11 +167,15 @@ internal sealed class MainForm : Form
         var bounds = e.Bounds;
         bounds.Inflate(-1, -1);
         if (!selected) bounds.Inflate(-1, -2);
-        e.Graphics.FillRectangle(SystemBrushes.Control, bounds);
+        bool dark = appearance.Preset == "Ciemny";
+        using var tabBrush = new SolidBrush(dark
+            ? selected ? Color.FromArgb(53, 64, 78) : Color.FromArgb(38, 43, 52)
+            : SystemColors.Control);
+        e.Graphics.FillRectangle(tabBrush, bounds);
 
         using var selectedFont = selected ? new Font(tabs.Font.FontFamily, tabs.Font.SizeInPoints + 2, tabs.Font.Style | FontStyle.Bold, GraphicsUnit.Point) : null;
         TextRenderer.DrawText(e.Graphics, tabs.TabPages[e.Index].Text, selectedFont ?? tabs.Font, bounds,
-            SystemColors.ControlText,
+            dark ? Color.WhiteSmoke : SystemColors.ControlText,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
             TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         if (selected && tabs.Focused)
