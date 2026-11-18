@@ -298,8 +298,7 @@ internal static class AppearanceEditor
             {
                 Text = label, AutoSize = vertical, Width = vertical ? 390 : 240,
                 MaximumSize = new Size(vertical ? 390 : 240, 0),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Height = vertical ? 0 : 28
+                TextAlign = ContentAlignment.MiddleLeft
             });
             line.Controls.Add(control);
             panel.Controls.Add(line);
