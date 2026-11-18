@@ -30,7 +30,14 @@ internal static class ServerUpdateGate
 
             string manifest = Path.Combine(share, "release.json");
             if (!File.Exists(manifest))
-                throw new IOException("Brak dostępu do manifestu aktualizacji na serwerze: " + manifest);
+            {
+                // A new deployment may not have published a release yet. Do not
+                // lock users out simply because the update share is uninitialized.
+                // An actual announced update remains mandatory below.
+                CrashLog.Write("ServerUpdateGate.NoManifest",
+                    new FileNotFoundException("Nie opublikowano jeszcze instalatora na serwerze.", manifest));
+                return true;
+            }
             var release = JsonSerializer.Deserialize<Release>(File.ReadAllText(manifest),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Pusty manifest aktualizacji.");
