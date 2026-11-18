@@ -25,8 +25,11 @@ internal sealed class PricePrintPreview : Form
         string baseName = treatmentCard ? "karta-leczenia" : "cennik-lekow";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1100, 800);
+        MinimumSize = new Size(480, 320);
+        AutoScaleMode = AutoScaleMode.Dpi;
         var browser = new WebView2 { Dock = DockStyle.Fill, Visible = false };
-        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true,
+            WrapContents = true, AutoScroll = true };
         var print = new Button { Text = "Drukuj", AutoSize = true, Enabled = false };
         var pdf = new Button { Text = "Zapisz jako PDF", AutoSize = true, Enabled = false };
         var close = new Button { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
