@@ -2487,7 +2487,8 @@ internal sealed class MainForm : Form
         };
         form = Section("Kopia zapasowa SQL");
         Message(form, "Archiwizacja obejmuje całą bazę KartyLeczenia na zapisanym serwerze archiwum. " +
-            "Do odtworzenia możesz wskazać inną instancję. Podaj konto administratora SQL. Ścieżki odnoszą się do serwera SQL.",
+            "Do odtworzenia możesz wskazać inną instancję. Podaj konto administratora SQL. " +
+            "Po kliknięciu przycisku otworzy się wybór miejsca oraz kompresji kopii (zależnej od edycji SQL).",
             multiline: true);
         var maintenanceAuth = Authentication(useWindows: true);
         var maintenanceUser = Field("Login administratora SQL", "");
@@ -2521,7 +2522,14 @@ internal sealed class MainForm : Form
                 Require(maintenancePassword, "Wpisz hasło administratora SQL.");
             }
 
-            string path = (restoring ? restoreFile : backupFolder).Text.Trim();
+            using var archiveDialog = new ArchiveBackupDialog(restoring,
+                (restoring ? restoreFile : backupFolder).Text.Trim());
+            if (DialogPlacement.Show(archiveDialog, this,
+                    restoring ? "database-restore-options" : "database-backup-options") != DialogResult.OK)
+                return;
+            string path = archiveDialog.SelectedPath;
+            if (restoring) restoreFile.Text = path;
+            else backupFolder.Text = path;
             if (restoring && !path.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Podaj pełną ścieżkę do pliku .bak dostępnego z serwera SQL.");
             if (path.Length > 0 && !Path.IsPathFullyQualified(path) && !path.StartsWith('/'))
@@ -2547,7 +2555,7 @@ internal sealed class MainForm : Form
             {
                 string? backup = await Task.Run(() => restoring
                     ? archive.RestoreDatabase(administrator, path)
-                    : archive.BackupDatabase(administrator, path));
+                    : archive.BackupDatabase(administrator, path, archiveDialog.Compressed));
                 if (restoring && ReferenceEquals(archive, sharedArchive))
                 {
                     sharedClinic = null;
