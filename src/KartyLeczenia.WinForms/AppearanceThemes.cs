@@ -180,7 +180,14 @@ internal static class AppearanceThemes
 
     internal static void ApplyTabs(TabControl tabs, AppearanceOptions appearance)
     {
-        tabs.Padding = appearance.WideTabs ? new Point(36, 12) : new Point(30, 9);
+        // Owner-drawn tab headers need their padding scaled too. Otherwise the
+        // font grows but the tab hit area stays small and captions are cut off.
+        float scale = Math.Max(1f, tabs.DeviceDpi / 96f) * InterfaceScale.Load() / 100f;
+        int horizontal = appearance.WideTabs ? 36 : 30;
+        int vertical = appearance.WideTabs ? 12 : 9;
+        tabs.Padding = new Point((int)Math.Ceiling(horizontal * scale),
+            (int)Math.Ceiling(vertical * scale));
+        tabs.Multiline = scale > 1.01f;
         tabs.Invalidate();
     }
 }
