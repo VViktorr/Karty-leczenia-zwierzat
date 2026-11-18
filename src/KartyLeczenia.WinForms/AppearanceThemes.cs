@@ -68,10 +68,19 @@ internal static class AppearanceThemes
         finally { File.Delete(temp); }
     }
 
-    sealed class GridState
+    sealed class GridState(DataGridView grid)
     {
         internal AppearanceOptions Options = new();
         internal Font? BoldFont;
+        internal readonly Color Background = grid.BackgroundColor;
+        internal readonly Color GridColor = grid.GridColor;
+        internal readonly Font Font = grid.Font;
+        internal readonly int RowHeight = grid.RowTemplate.Height;
+        internal readonly bool HeaderStylesEnabled = grid.EnableHeadersVisualStyles;
+        internal readonly DataGridViewCellBorderStyle Border = grid.CellBorderStyle;
+        internal readonly DataGridViewCellStyle Header = grid.ColumnHeadersDefaultCellStyle.Clone();
+        internal readonly DataGridViewCellStyle Data = grid.DefaultCellStyle.Clone();
+        internal readonly DataGridViewCellStyle Alternating = grid.AlternatingRowsDefaultCellStyle.Clone();
     }
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGridView, GridState> GridStates = new();
 
@@ -79,7 +88,7 @@ internal static class AppearanceThemes
     {
         if (!GridStates.TryGetValue(grid, out var state))
         {
-            state = new GridState();
+            state = new GridState(grid);
             GridStates.Add(grid, state);
             grid.CellFormatting += (_, args) =>
             {
@@ -93,6 +102,22 @@ internal static class AppearanceThemes
         state.BoldFont?.Dispose();
         state.BoldFont = new Font(grid.Font.FontFamily, appearance.TableFontSize, FontStyle.Bold, GraphicsUnit.Point);
         Normalize(appearance);
+        if (appearance == AppearanceOptions.ForPreset("Klasyczny"))
+        {
+            // Restore the exact styles captured before the first theme change.
+            grid.BackgroundColor = state.Background;
+            grid.GridColor = state.GridColor;
+            grid.EnableHeadersVisualStyles = state.HeaderStylesEnabled;
+            grid.ColumnHeadersDefaultCellStyle = state.Header.Clone();
+            grid.DefaultCellStyle = state.Data.Clone();
+            grid.AlternatingRowsDefaultCellStyle = state.Alternating.Clone();
+            grid.CellBorderStyle = state.Border;
+            grid.RowTemplate.Height = state.RowHeight;
+            grid.Font = state.Font;
+            grid.ShowCellToolTips = appearance.ShowToolTips;
+            grid.Invalidate();
+            return;
+        }
         bool dark = appearance.Preset == "Ciemny";
         bool classic = appearance.Preset == "Klasyczny";
         Color background = dark ? Color.FromArgb(31, 35, 42) : Color.White;
