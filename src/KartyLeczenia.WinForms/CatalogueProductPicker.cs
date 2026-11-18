@@ -9,12 +9,15 @@ internal sealed class CatalogueProductPicker : Form
         Text = pending is null ? "Wybierz kartotekę Subiekta" : "Leki do uzupełnienia";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(670, 480);
-        var query = new TextBox { Width = 355, Text = initialSymbol, PlaceholderText = "Symbol lub nazwa z Subiekta" };
+        MinimumSize = new Size(400, 300);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        var query = new TextBox { Width = 290, Text = initialSymbol, PlaceholderText = "Symbol lub nazwa z Subiekta" };
         var search = new Button { Text = "Szukaj", AutoSize = true };
         var accept = new Button { Text = "Wybierz", AutoSize = true, Enabled = false };
         var message = new Label { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
         var list = new ListBox { Dock = DockStyle.Fill, HorizontalScrollbar = true };
-        var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8) };
+        var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true,
+            WrapContents = true, Padding = new Padding(8) };
         toolbar.Controls.AddRange([query, search, accept]);
         Controls.Add(list);
         Controls.Add(toolbar);
