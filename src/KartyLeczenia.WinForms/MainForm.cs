@@ -1454,14 +1454,15 @@ internal sealed class MainForm : Form
                         ? "Brak przypisanej ChPL dla tej kartoteki."
                         : "Wybierz gatunek i drogę podania, aby otworzyć właściwą ChPL.";
             }),
-            Action("Zapisz kartę", SaveTreatmentToArchive), Action("Eksportuj JSON", SaveCard),
+            Action("Eksportuj JSON", SaveCard),
             Action("Podgląd / PDF / e-mail", PreviewCard));
         var actions = page.Controls.OfType<FlowLayoutPanel>().Single();
         var toolbar = new TableLayoutPanel
         {
-            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 1
+            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, RowCount = 1
         };
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         page.Controls.Remove(actions);
         actions.Dock = DockStyle.Fill;
@@ -1469,6 +1470,11 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(actions, 0, 0);
         rememberTreatment.Anchor = AnchorStyles.Right;
         toolbar.Controls.Add(rememberTreatment, 1, 0);
+        var saveTreatment = Action("Zapisz kartę", SaveTreatmentToArchive);
+        saveTreatment.Anchor = AnchorStyles.Right;
+        saveTreatment.MinimumSize = new Size(150, 36);
+        saveTreatment.Padding = new Padding(12, 4, 12, 4);
+        toolbar.Controls.Add(saveTreatment, 2, 0);
         var routeLegend = new Label
         {
             Dock = DockStyle.Top,
@@ -1683,43 +1689,42 @@ internal sealed class MainForm : Form
         };
     }
 
-    Task SaveTreatmentToArchive() => SaveNumberedTreatmentCard();
-
-    async Task<bool> SaveNumberedTreatmentCard()
+    async Task SaveTreatmentToArchive()
     {
-        if (savingTreatment) return false;
+        if (savingTreatment) return;
         var archive = Archive();
         var source = currentCard ?? throw new InvalidOperationException("Najpierw wczytaj dokument.");
         var id = currentArchiveId;
         savingTreatment = true;
         try
         {
-            if (!EditTreatmentDates()) return false;
+            if (!EditTreatmentDates()) return;
             var card = CaptureTreatmentCard();
             var printCard = CaptureTreatmentCard(forPrint: true);
             _ = CardHtmlRenderer.Render(printCard);
-            if (!ConfirmTreatmentWarnings(card)) return false;
+            if (!ConfirmTreatmentWarnings(card)) return;
             var date = treatmentDate.Value.Date;
 
             var saved = await RunArchive(() => archive.SaveCard(id, source, date, card, printCard));
-            if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return false;
+            if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return;
             if (saved.DuplicateId is Guid existingId)
             {
                 var choice = PromptDuplicateCard(source.Number, updating: existingId == id);
-                if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return false;
+                if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return;
                 if (choice == DialogResult.Retry)
                 {
                     await PreviewSavedCard(archive, existingId.ToString("N"));
-                    return false;
+                    return;
                 }
-                if (choice != DialogResult.Yes) return false;
+                if (choice != DialogResult.Yes) return;
 
                 saved = await RunArchive(() => archive.SaveCard(id, source, date, card, printCard, confirmDuplicate: true));
-                if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return false;
+                if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return;
             }
             currentCardNumber = saved.Number ?? throw new InvalidOperationException("Nie udało się pobrać numeru zapisanej karty.");
             status.Text = $"Zapisano kartę {currentCardNumber} we wspólnym archiwum.";
-            return true;
+            printCard.Fields["Nr karty"] = currentCardNumber;
+            OpenCardPreview(printCard, source.PayerId, source.Scope);
         }
         finally { savingTreatment = false; }
     }
@@ -1869,17 +1874,19 @@ internal sealed class MainForm : Form
 
     async Task PreviewCard()
     {
+        if (savingTreatment) return;
         if (currentCard is null) throw new InvalidOperationException("Najpierw wczytaj dokument.");
-        bool needsNumber = currentCardNumber is null;
-        if (needsNumber)
+        if (currentCardNumber is null)
         {
             if (MessageBox.Show(this, "Zapisz kartę, aby nadać jej numer widoczny na wydruku. Zapisać teraz?",
                     "Numer karty leczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
-                    MessageBoxDefaultButton.Button2) != DialogResult.Yes || !await SaveNumberedTreatmentCard())
-                return;
+                    MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+                await SaveTreatmentToArchive();
+            return;
         }
+
         var card = CaptureTreatmentCard(forPrint: true);
-        if (needsNumber || ConfirmTreatmentWarnings(card)) OpenCardPreview(card, currentCard?.PayerId, currentCard?.Scope);
+        if (ConfirmTreatmentWarnings(card)) OpenCardPreview(card, currentCard.PayerId, currentCard.Scope);
     }
 
     void OpenCardPreview(Card card, int? payerId, string? scope)
