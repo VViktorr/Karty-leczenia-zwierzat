@@ -342,7 +342,11 @@ internal static class AppearanceEditor
         var maximize = new CheckBox { Text = "Otwieraj zmaksymalizowane okno", AutoSize = true };
         var tooltips = new CheckBox { Text = "Wyświetlaj podpowiedzi w tabelach", AutoSize = true };
         var wide = new CheckBox { Text = "Powiększone zakładki", AutoSize = true };
-        var customAccent = new CheckBox { Text = "Własny kolor zaznaczenia", AutoSize = true };
+        var customAccent = new CheckBox { Text = "Własny kolor zaznaczenia i przełączników", AutoSize = true };
+        var switchStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
+        switchStyle.Items.AddRange(["Systemowe", "Wypełnione", "Z obramowaniem"]);
+        var cornerRadius = new NumericUpDown { Minimum = 0, Maximum = 20, Width = 80 };
+        var colorButtons = new CheckBox { Text = "Koloruj także zwykłe przyciski", AutoSize = true };
         var accent = new Button { Text = "Wybierz kolor…", AutoSize = true };
         var explanation = new Label { AutoSize = true, MaximumSize = new Size(vertical ? 390 : 620, 0),
             Text = "Motyw Klasyczny odpowiada dotychczasowemu wyglądowi. Indywidualne szerokości i kolejność kolumn pozostają bez zmian." };
@@ -354,6 +358,16 @@ internal static class AppearanceEditor
         preview.Rows.Add("FS 128/26", "Lecznica A", "248,00 zł");
         preview.Rows.Add("FS 129/26", "Lecznica B", "560,00 zł");
         preview.ClearSelection();
+        var switchPreview = new FlowLayoutPanel
+        {
+            AutoSize = true, Width = vertical ? 390 : 600, WrapContents = true,
+            Padding = new Padding(0, 5, 0, 5)
+        };
+        var previewInvoice = new RadioButton { Text = "Faktury", Appearance = Appearance.Button, AutoSize = true, Checked = true };
+        var previewReceipts = new RadioButton { Text = "Paragony", Appearance = Appearance.Button, AutoSize = true };
+        var previewFilter = new CheckBox { Text = "Do 30 dni", Appearance = Appearance.Button, AutoSize = true };
+        var previewAction = new Button { Text = "Zapisz", AutoSize = true };
+        switchPreview.Controls.AddRange([previewInvoice, previewReceipts, previewFilter, previewAction]);
 
         bool loading = false;
         void LoadControls()
@@ -370,8 +384,12 @@ internal static class AppearanceEditor
             tooltips.Checked = current.ShowToolTips;
             wide.Checked = current.WideTabs;
             customAccent.Checked = current.UseCustomAccent;
+            switchStyle.SelectedIndex = current.SwitchStyle;
+            cornerRadius.Value = current.CornerRadius;
+            colorButtons.Checked = current.ColorButtons;
             accent.BackColor = Color.FromArgb(current.AccentArgb);
             AppearanceThemes.ApplyGrid(preview, current);
+            AppearanceThemes.ApplySurface(switchPreview, current);
             loading = false;
         }
         void Capture()
@@ -392,7 +410,11 @@ internal static class AppearanceEditor
             current.ShowToolTips = tooltips.Checked;
             current.WideTabs = wide.Checked;
             current.UseCustomAccent = customAccent.Checked;
+            current.SwitchStyle = switchStyle.SelectedIndex < 0 ? 1 : switchStyle.SelectedIndex;
+            current.CornerRadius = (int)cornerRadius.Value;
+            current.ColorButtons = colorButtons.Checked;
             AppearanceThemes.ApplyGrid(preview, current);
+            AppearanceThemes.ApplySurface(switchPreview, current);
         }
         preset.SelectedIndexChanged += (_, _) =>
         {
@@ -406,6 +428,9 @@ internal static class AppearanceEditor
         size.ValueChanged += (_, _) => Capture();
         height.ValueChanged += (_, _) => Capture();
         zoom.ValueChanged += (_, _) => Capture();
+        switchStyle.SelectedIndexChanged += (_, _) => Capture();
+        cornerRadius.ValueChanged += (_, _) => Capture();
+        colorButtons.CheckedChanged += (_, _) => Capture();
         accent.Click += (_, _) =>
         {
             using var dialog = new ColorDialog { Color = Color.FromArgb(current.AccentArgb), FullOpen = true };
@@ -445,9 +470,14 @@ internal static class AppearanceEditor
         panel.Controls.Add(wide);
         panel.Controls.Add(customAccent);
         panel.Controls.Add(accent);
+        AddLabeled("Styl przełączników i przycisków", switchStyle);
+        AddLabeled("Zaokrąglenie narożników (px)", cornerRadius);
+        panel.Controls.Add(colorButtons);
         AddLabeled("Powiększenie podglądu wydruku (%)", zoom);
         panel.Controls.Add(new Label { Text = "Podgląd motywu", AutoSize = true });
         panel.Controls.Add(preview);
+        panel.Controls.Add(new Label { Text = "Podgląd przełączników i przycisków", AutoSize = true });
+        panel.Controls.Add(switchPreview);
         var actions = new FlowLayoutPanel { AutoSize = true, Width = vertical ? 390 : 640, WrapContents = true };
         var applyButton = new Button { Text = "Zastosuj", AutoSize = true };
         var save = new Button { Text = "Zapisz motyw", AutoSize = true };
