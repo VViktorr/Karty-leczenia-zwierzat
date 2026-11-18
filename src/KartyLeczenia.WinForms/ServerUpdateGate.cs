@@ -16,6 +16,21 @@ internal static class ServerUpdateGate
             .FirstOrDefault(s => s.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase))?[(key.Length + 1)..].Trim();
     }
 
+    internal static string InstalledVersion
+    {
+        get
+        {
+            // The setup version is saved by Inno Setup. Standalone builds use EXE metadata.
+            string? version = Setting("AppVersion");
+            if (!string.IsNullOrWhiteSpace(version) && Version.TryParse(version, out _))
+                return version;
+            string? executableVersion = FileVersionInfo.GetVersionInfo(
+                Environment.ProcessPath ?? Application.ExecutablePath).ProductVersion;
+            return !string.IsNullOrWhiteSpace(executableVersion) && Version.TryParse(executableVersion, out _)
+                ? executableVersion : "nieznana";
+        }
+    }
+
     internal static bool Check(bool settingsOnly)
     {
         // Server controls publication. Settings can still be opened to repair a broken connection.
@@ -45,10 +60,7 @@ internal static class ServerUpdateGate
                 throw new InvalidDataException("Błędny numer wersji aktualizacji.");
             // The installer records the installed release version. Fall back to the
             // executable metadata for portable builds without installer settings.
-            string? installedVersion = Setting("AppVersion");
-            if (string.IsNullOrWhiteSpace(installedVersion))
-                installedVersion = FileVersionInfo.GetVersionInfo(Environment.ProcessPath
-                    ?? Application.ExecutablePath).ProductVersion;
+            string installedVersion = InstalledVersion;
             if (!Version.TryParse(installedVersion, out var current) || current is null)
             {
                 CrashLog.Write("ServerUpdateGate.UnknownVersion",
