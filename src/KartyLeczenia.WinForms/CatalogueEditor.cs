@@ -28,11 +28,13 @@ internal sealed class CatalogueEditor : Form
         Text = "Kartoteka w katalogu leków";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1150, 530);
+        AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(700, 360);
         rpl.Text = product.RplId;
         description.Text = product.Description;
 
-        var header = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8) };
+        var header = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoScroll = true,
+            WrapContents = true, Padding = new Padding(8) };
         header.Controls.Add(new Label { Text = $"{product.Symbol} · {product.Name}", AutoSize = true });
         header.SetFlowBreak(header.Controls[0], true);
         header.Controls.AddRange([
@@ -50,7 +52,8 @@ internal sealed class CatalogueEditor : Form
         variants.Columns[10].ReadOnly = true;
         foreach (var variant in product.Variants) AddVariant(variant);
 
-        var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8) };
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true,
+            WrapContents = true, Padding = new Padding(8) };
         var add = new Button { Text = "Dodaj wariant", AutoSize = true };
         add.Click += (_, _) => AddVariant(new());
         var pdf = new Button { Text = "Dołącz PDF do zaznaczonych wariantów", AutoSize = true };
