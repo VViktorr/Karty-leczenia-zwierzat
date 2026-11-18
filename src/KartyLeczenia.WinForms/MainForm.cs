@@ -2638,6 +2638,91 @@ internal sealed class MainForm : Form
         Add("", Action("Archiwizuj bazę", () => MaintainArchive(restoring: false)));
         Add("", Action("Odtwórz bazę z kopii…", () => MaintainArchive(restoring: true)));
 
+        form = Section("Aktualizacje");
+        string? updateShare = ServerUpdateGate.UpdateShare;
+        Message(form, "Poświadczenia dostępu do instalatorów na serwerze. Hasło jest zapisywane wyłącznie w Menedżerze poświadczeń Windows bieżącego użytkownika, nie w ustawieniach KartyLeczenia.", multiline: true);
+        Message(form, string.IsNullOrWhiteSpace(updateShare)
+            ? "Nie skonfigurowano udziału aktualizacji w instalatorze. Zainstaluj program w trybie stanowiska zdalnego."
+            : "Udział aktualizacji: " + updateShare, multiline: true);
+        string? updateHost = null;
+        if (!string.IsNullOrWhiteSpace(updateShare))
+        {
+            try { updateHost = UpdateCredentials.ServerFromShare(updateShare); }
+            catch (ArgumentException ex) { CrashLog.Write("UpdateCredentials.Share", ex); }
+        }
+        var credentialsUser = Field("Konto Windows na serwerze", "", @"np. LEWY\KartyAktualizacje");
+        var credentialsPassword = Field("Hasło konta aktualizacji", "", password: true);
+        var credentialsState = Message(form, "", multiline: true);
+        if (updateHost is not null)
+        {
+            try
+            {
+                credentialsUser.Text = UpdateCredentials.SavedUser(updateHost) ?? "";
+                credentialsState.Text = credentialsUser.TextLength > 0
+                    ? "Zapisano poświadczenia dla serwera " + updateHost + ". Hasło nie jest wyświetlane."
+                    : "Poświadczenia nie są jeszcze zapisane dla tego konta Windows.";
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write("UpdateCredentials.Read", ex);
+                credentialsState.Text = ex.Message;
+            }
+        }
+        var updateCredentialsHost = updateHost;
+        var saveCredentials = Action("Zapisz poświadczenia", () =>
+        {
+            if (updateCredentialsHost is null)
+                throw new InvalidOperationException("Brak skonfigurowanego adresu serwera aktualizacji.");
+            Require(credentialsUser, "Podaj konto Windows na serwerze aktualizacji.");
+            Require(credentialsPassword, "Podaj hasło konta aktualizacji.");
+            try
+            {
+                UpdateCredentials.Save(updateCredentialsHost, credentialsUser.Text, credentialsPassword.Text);
+                credentialsState.Text = status.Text = "Zapisano poświadczenia w Menedżerze poświadczeń Windows.";
+            }
+            finally { credentialsPassword.Clear(); }
+            return Task.CompletedTask;
+        });
+        saveCredentials.Enabled = updateHost is not null;
+        Add("", saveCredentials);
+        var testCredentials = Action("Sprawdź dostęp do aktualizacji", async () =>
+        {
+            if (string.IsNullOrWhiteSpace(updateShare))
+                throw new InvalidOperationException("Brak skonfigurowanego udziału aktualizacji.");
+            try
+            {
+                string json = await Task.Run(() => UpdateCredentials.Test(updateShare));
+                using var data = JsonDocument.Parse(json);
+                string? version = data.RootElement.TryGetProperty("version", out var versionValue)
+                    ? versionValue.GetString() : null;
+                credentialsState.Text = status.Text = "Dostęp do aktualizacji działa. Wersja na serwerze: " +
+                    (version ?? "nieznana") + ".";
+            }
+            catch (Exception ex)
+            {
+                credentialsState.Text = "Nie udało się odczytać aktualizacji: " + ex.Message +
+                    " Jeśli dostęp SMB korzysta ze starej sesji, wyloguj się z Windows i zaloguj ponownie.";
+                throw;
+            }
+        });
+        testCredentials.Enabled = updateHost is not null;
+        Add("", testCredentials);
+        var deleteCredentials = Action("Usuń zapisane poświadczenia", () =>
+        {
+            if (updateCredentialsHost is null)
+                throw new InvalidOperationException("Brak skonfigurowanego adresu serwera aktualizacji.");
+            if (MessageBox.Show(this, "Usunąć zapisane poświadczenia aktualizacji z Windows?",
+                "KartyLeczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return Task.CompletedTask;
+            UpdateCredentials.Delete(updateCredentialsHost);
+            credentialsUser.Clear();
+            credentialsPassword.Clear();
+            credentialsState.Text = status.Text = "Usunięto poświadczenia aktualizacji.";
+            return Task.CompletedTask;
+        });
+        deleteCredentials.Enabled = updateHost is not null;
+        Add("", deleteCredentials);
+
         form = Section("Wygląd");
         Add("Wersja programu", new Label
         {
