@@ -415,6 +415,9 @@ var
   ExitCode: Integer;
   Parameters: String;
   SourceInstaller: String;
+  LogContents: AnsiString;
+  LogFilePath: String;
+  LastErrorDetails: String;
 begin
   if (CurStep <> ssPostInstall) or not IsServerInstall then Exit;
 
@@ -439,10 +442,18 @@ begin
   if not UpdatePublished then
   begin
     Log('Update publication FAILED: ' + UpdatePublishError);
+    LogFilePath := ExpandConstant('{commonappdata}\KartyLeczenia\update-publish.log');
+    LastErrorDetails := 'Log nie zostal utworzony: ' + LogFilePath;
+    if LoadStringFromFile(LogFilePath, LogContents) then
+    begin
+      LastErrorDetails := Trim(String(LogContents));
+      if Length(LastErrorDetails) > 1400 then
+        LastErrorDetails := Copy(LastErrorDetails, Length(LastErrorDetails) - 1399, 1400);
+    end;
     MsgBox('Program zostal zainstalowany na serwerze, ale nie udalo sie udostepnic nowej wersji dla stanowisk.' +
       Chr(13) + Chr(10) + UpdatePublishError + Chr(13) + Chr(10) +
-      'Szczegoly: C:\ProgramData\KartyLeczenia\update-publish.log' +
-      Chr(13) + Chr(10) + 'Poprzedni instalator na udziale nie zostal celowo usuniety.',
+      LastErrorDetails + Chr(13) + Chr(10) +
+      'Poprzedni instalator na udziale pozostaje dostepny.',
       mbError, MB_OK);
   end
   else
