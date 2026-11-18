@@ -14,6 +14,7 @@ internal static class DialogPlacement
         {
             if (dialog.IsDisposed || dialog.WindowState != FormWindowState.Normal) return;
             var area = Screen.FromControl(dialog).WorkingArea;
+            FitMinimumSize(dialog, area);
             int width = Math.Min(dialog.Width, area.Width);
             int height = Math.Min(dialog.Height, area.Height);
             int left = Math.Clamp(dialog.Left, area.Left, area.Right - width);
@@ -31,9 +32,10 @@ internal static class DialogPlacement
                 var screen = Screen.AllScreens.FirstOrDefault(screen => screen.WorkingArea.IntersectsWith(saved.Bounds))
                     ?? Screen.FromControl(owner);
                 var area = screen.WorkingArea;
+                FitMinimumSize(dialog, area);
                 bool resizable = dialog.FormBorderStyle is FormBorderStyle.Sizable or FormBorderStyle.SizableToolWindow;
-                int width = Math.Clamp(resizable ? saved.Bounds.Width : dialog.Width, 1, area.Width);
-                int height = Math.Clamp(resizable ? saved.Bounds.Height : dialog.Height, 1, area.Height);
+                int width = Math.Clamp(resizable ? saved.Bounds.Width : dialog.Width, Math.Max(1, dialog.MinimumSize.Width), area.Width);
+                int height = Math.Clamp(resizable ? saved.Bounds.Height : dialog.Height, Math.Max(1, dialog.MinimumSize.Height), area.Height);
                 dialog.StartPosition = FormStartPosition.Manual;
                 dialog.Bounds = new Rectangle(Math.Clamp(saved.Bounds.X, area.Left, area.Right - width),
                     Math.Clamp(saved.Bounds.Y, area.Top, area.Bottom - height), width, height);
@@ -67,5 +69,12 @@ internal static class DialogPlacement
             CrashLog.Write("DialogPlacement.Save." + key, ex);
         }
         return result;
+    }
+
+    static void FitMinimumSize(Form dialog, Rectangle area)
+    {
+        var minimum = dialog.MinimumSize;
+        var fitted = new Size(Math.Min(minimum.Width, area.Width), Math.Min(minimum.Height, area.Height));
+        if (minimum != fitted) dialog.MinimumSize = fitted;
     }
 }
