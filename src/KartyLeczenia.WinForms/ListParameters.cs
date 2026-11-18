@@ -5,7 +5,8 @@ internal static class ListParameters
     internal static void Show(Form owner, DataGridView grid)
     {
         using var dialog = new Form { Text = "Parametry listy", StartPosition = FormStartPosition.CenterParent,
-            Size = new Size(620, 420), MinimizeBox = false, MaximizeBox = false };
+            Size = new Size(760, 500), MinimumSize = new Size(460, 320), AutoScaleMode = AutoScaleMode.Dpi,
+            MinimizeBox = false, MaximizeBox = true };
         var list = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, DisplayMember = "HeaderText" };
         foreach (var column in grid.Columns.Cast<DataGridViewColumn>().OrderBy(column => column.DisplayIndex))
             list.Items.Add(column, column.Visible);
@@ -43,8 +44,9 @@ internal static class ListParameters
             {
                 Text = $"{column.HeaderText} – {(header ? "Nagłówek" : "Dane")}",
                 StartPosition = FormStartPosition.CenterParent,
-                AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false
+                ClientSize = new Size(440, 490), MinimumSize = new Size(320, 350),
+                AutoScaleMode = AutoScaleMode.Dpi, FormBorderStyle = FormBorderStyle.Sizable,
+                MaximizeBox = true, MinimizeBox = false
             };
             var columns = new ListBox { SelectionMode = SelectionMode.MultiExtended, Width = 300,
                 Height = 140, DisplayMember = "HeaderText" };
@@ -54,7 +56,8 @@ internal static class ListParameters
                 Increment = 0.5m, Value = Math.Clamp((decimal)style.Size, 1, 200) };
             bool sizeChanged = false, fontChanged = false, colorChanged = false, alignmentChanged = false;
             size.ValueChanged += (_, _) => sizeChanged = true;
-            var panel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Padding = new Padding(10) };
+            var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true,
+                FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(10) };
             var fontButton = new Button { AutoSize = true, Text = $"{style.Family}, {style.Size:g} pkt" };
             fontButton.Click += (_, _) =>
             {
@@ -130,8 +133,9 @@ internal static class ListParameters
             using var picker = new Form
             {
                 Text = column.HeaderText, StartPosition = FormStartPosition.CenterParent,
-                ClientSize = new Size(300, 85), FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false, MinimizeBox = false
+                ClientSize = new Size(400, 135), MinimumSize = new Size(300, 125),
+                AutoScaleMode = AutoScaleMode.Dpi, FormBorderStyle = FormBorderStyle.Sizable,
+                MaximizeBox = true, MinimizeBox = false
             };
             var choices = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
             choices.Items.AddRange(options);
