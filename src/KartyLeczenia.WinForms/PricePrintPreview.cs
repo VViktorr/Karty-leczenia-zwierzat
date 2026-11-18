@@ -153,20 +153,36 @@ internal sealed class PricePrintPreview : Form
         {
             email.Click += async (_, _) =>
             {
-                saving = true;
-                print.Enabled = pdf.Enabled = email.Enabled = close.Enabled = false;
+                // Do not hold the preview open while the mail program is composing a message.
+                email.Enabled = false;
                 try
                 {
                     var address = findCardEmail is null ? null : await findCardEmail();
-                    PdfMail.Compose(Handle, previewFile, CardAttachmentName(cardDocumentNumber), address);
+                    if (IsDisposed || Disposing) return;
+                    Task mail = PdfMail.ComposeInBackground(
+                        previewFile, CardAttachmentName(cardDocumentNumber), address);
+                    _ = ObserveMail(mail);
                 }
-                catch (Exception ex) { Report(ex); }
+                catch (Exception ex)
+                {
+                    CrashLog.Write("PricePreview.Mail", ex);
+                    if (!IsDisposed && !Disposing) Report(ex);
+                }
                 finally
                 {
-                    saving = false;
-                    print.Enabled = pdf.Enabled = email.Enabled = close.Enabled = true;
+                    if (!IsDisposed && !Disposing) email.Enabled = true;
                 }
             };
+
+            async Task ObserveMail(Task operation)
+            {
+                try { await operation; }
+                catch (Exception ex)
+                {
+                    CrashLog.Write("PricePreview.Mail", ex);
+                    if (!IsDisposed && !Disposing) Report(ex);
+                }
+            }
         }
         Disposed += (_, _) =>
         {
