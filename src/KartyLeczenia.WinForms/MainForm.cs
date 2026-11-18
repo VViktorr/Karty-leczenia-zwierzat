@@ -2528,6 +2528,7 @@ internal sealed class MainForm : Form
                     restoring ? "database-restore-options" : "database-backup-options") != DialogResult.OK)
                 return;
             string path = archiveDialog.SelectedPath;
+            bool compressBackup = archiveDialog.Compressed;
             if (restoring) restoreFile.Text = path;
             else backupFolder.Text = path;
             if (restoring && !path.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
@@ -2555,7 +2556,7 @@ internal sealed class MainForm : Form
             {
                 string? backup = await Task.Run(() => restoring
                     ? archive.RestoreDatabase(administrator, path)
-                    : archive.BackupDatabase(administrator, path, archiveDialog.Compressed));
+                    : archive.BackupDatabase(administrator, path, compressBackup));
                 if (restoring && ReferenceEquals(archive, sharedArchive))
                 {
                     sharedClinic = null;
