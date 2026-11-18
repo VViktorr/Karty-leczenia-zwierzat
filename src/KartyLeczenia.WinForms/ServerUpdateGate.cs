@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace KartyLeczenia.Windows;
 
-/// <summary>Checks the administrator-published installer before the client opens its archive.</summary>
+/// <summary>Offers an administrator-published update without preventing normal work.</summary>
 internal static class ServerUpdateGate
 {
     sealed record Release(string Version, string Installer, string Sha256);
@@ -43,8 +43,18 @@ internal static class ServerUpdateGate
                 ?? throw new InvalidDataException("Pusty manifest aktualizacji.");
             if (!Version.TryParse(release.Version, out var required) || required is null)
                 throw new InvalidDataException("Błędny numer wersji aktualizacji.");
-            if (!Version.TryParse(Setting("AppVersion"), out var current) || current is null)
-                throw new InvalidDataException("Brak wersji aktualnie zainstalowanego programu.");
+            // The installer records the installed release version. Fall back to the
+            // executable metadata for portable builds without installer settings.
+            string? installedVersion = Setting("AppVersion");
+            if (string.IsNullOrWhiteSpace(installedVersion))
+                installedVersion = FileVersionInfo.GetVersionInfo(Environment.ProcessPath
+                    ?? Application.ExecutablePath).ProductVersion;
+            if (!Version.TryParse(installedVersion, out var current) || current is null)
+            {
+                CrashLog.Write("ServerUpdateGate.UnknownVersion",
+                    new InvalidDataException("Nie można ustalić wersji zainstalowanego programu."));
+                return true;
+            }
             if (current >= required) return true;
             if (string.IsNullOrWhiteSpace(release.Installer)
                 || release.Installer != Path.GetFileName(release.Installer)
@@ -55,12 +65,14 @@ internal static class ServerUpdateGate
 
             string installer = Path.Combine(share, release.Installer);
             var choice = MessageBox.Show(
-                $"Serwer wymaga wersji {required}, a na tym komputerze jest {current}.\n\n" +
-                "Przed dalszą pracą trzeba zainstalować aktualizację.\n" +
-                "Tak — pobierz i uruchom instalator.\nNie — zamknij program.",
-                "Wymagana aktualizacja KartyLeczenia",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1);
-            if (choice != DialogResult.Yes) return false;
+                $"Znaleziono nowszą wersję programu KartyLeczenia ({required}).\n" +
+                $"Obecna wersja: {current}.\n\n" +
+                "Aktualizować teraz?\n\n" +
+                "Tak — pobierz aktualizację i uruchom instalator.\n" +
+                "Nie — uruchom program bez aktualizacji.",
+                "Dostępna aktualizacja KartyLeczenia",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Information, MessageBoxDefaultButton.Button2);
+            if (choice != DialogResult.Yes) return true;
 
             // Copy to local temp: the installer can restart even when the SMB share disconnects.
             string tempDir = Path.Combine(Path.GetTempPath(), "KartyLeczenia-Update", Guid.NewGuid().ToString("N"));
@@ -81,10 +93,10 @@ internal static class ServerUpdateGate
         {
             CrashLog.Write("ServerUpdateGate.Check", ex);
             MessageBox.Show(
-                "Nie można sprawdzić lub uruchomić wymaganej aktualizacji z serwera.\n\n" +
-                ex.Message + "\n\nPraca została wstrzymana. Skontaktuj się z administratorem serwera.",
-                "Kontrola aktualizacji", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return false;
+                "Nie udało się sprawdzić lub uruchomić aktualizacji.\n\n" +
+                ex.Message + "\n\nProgram zostanie uruchomiony bez aktualizacji.",
+                "Aktualizacja KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return true;
         }
     }
 }
