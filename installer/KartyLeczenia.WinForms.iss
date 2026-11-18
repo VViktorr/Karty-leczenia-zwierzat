@@ -26,6 +26,7 @@ Name: "desktopicon"; Description: "Utwórz skrót na pulpicie"; Flags: unchecked
 
 [Files]
 Source: "Configure-SharedArchive.ps1"; Flags: dontcopy
+Source: "..\scripts\Publish-KartyLeczeniaUpdate.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\scripts\Setup-SharedArchive.sql"; Flags: dontcopy
 Source: "..\catalog-seed-win-x64.zip"; Flags: dontcopy
 Source: "..\publish-winforms\*"; DestDir: "{app}"; Excludes: "medicine-catalog.sqlite,ChPL\*,Microsoft.Data.Sqlite.dll,SQLitePCLRaw.*,e_sqlite3.dll"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -55,6 +56,7 @@ Name: "{commonprograms}\KartyLeczenia\Ustawienia KartyLeczenia"; Filename: "{app
 Name: "{commondesktop}\KartyLeczenia"; Filename: "{app}\KartyLeczenia.WinForms.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Publish-KartyLeczeniaUpdate.ps1"" -Installer ""{srcexe}"" -Version ""{#ReleaseVersion}"""; Flags: runhidden waituntilterminated; StatusMsg: "Publikowanie instalatora dla stanowisk zdalnych..."; Check: IsServerInstall
 Filename: "{app}\KartyLeczenia.WinForms.exe"; Description: "Uruchom KartyLeczenia"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [Code]
@@ -74,6 +76,11 @@ var
   ExistingServerAddress: String;
   DownloadPage: TDownloadWizardPage;
   ComponentProgress: TOutputMarqueeProgressWizardPage;
+
+function IsServerInstall: Boolean;
+begin
+  Result := RolePage.SelectedValueIndex = 0;
+end;
 
 function NeedsWebView2: Boolean;
 var
