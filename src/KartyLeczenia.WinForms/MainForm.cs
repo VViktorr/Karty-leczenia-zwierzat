@@ -902,8 +902,8 @@ internal sealed class MainForm : Form
         using var dialog = new Form
         {
             Text = ReferenceColumn, StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false,
-            AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(560, 340)
+            FormBorderStyle = FormBorderStyle.Sizable, MinimizeBox = false,
+            AutoScaleMode = AutoScaleMode.Dpi, ClientSize = new Size(650, 400), MinimumSize = new Size(400, 250)
         };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(8), ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -948,7 +948,7 @@ internal sealed class MainForm : Form
         apply.Enabled = picker.SelectedIndex >= 0;
         dialog.AcceptButton = apply;
         dialog.CancelButton = cancel;
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        if (DialogPlacement.Show(dialog, this, "treatment-reference") != DialogResult.OK) return;
 
         var reference = picker.SelectedItem as TreatmentReference;
         if (Equals(cell.Tag, reference)) return;
@@ -1124,7 +1124,7 @@ internal sealed class MainForm : Form
         dialog.Controls.Add(heading);
         dialog.Controls.Add(actions);
         dialog.CancelButton = close;
-        dialog.ShowDialog(this);
+        DialogPlacement.Show(dialog, this, "treatment-indication");
     }
 
     async Task EditSharedAnimals(DataGridViewRow selected)
@@ -1204,7 +1204,7 @@ internal sealed class MainForm : Form
         dialog.CancelButton = cancel;
         list.ItemCheck += (_, e) =>
             next.Enabled = list.CheckedItems.Count + (e.NewValue == CheckState.Checked ? 1 : -1) > 0;
-        return dialog.ShowDialog(this) == DialogResult.OK
+        return DialogPlacement.Show(dialog, this, "treatment-animal-group") == DialogResult.OK
             ? list.CheckedIndices.Cast<int>().Select(index => candidates[index]).ToArray()
             : [];
     }
@@ -1213,9 +1213,9 @@ internal sealed class MainForm : Form
     {
         using var dialog = new Form
         {
-            Text = title, StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog,
-            MinimizeBox = false, MaximizeBox = false, AutoScaleMode = AutoScaleMode.Dpi,
-            ClientSize = new Size(490, multiline ? 270 : 112)
+            Text = title, StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable,
+            MinimizeBox = false, AutoScaleMode = AutoScaleMode.Dpi,
+            ClientSize = new Size(550, multiline ? 310 : 170), MinimumSize = new Size(350, 165)
         };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(10), ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -1247,7 +1247,7 @@ internal sealed class MainForm : Form
             }
             dialog.DialogResult = DialogResult.OK;
         };
-        return dialog.ShowDialog(this) == DialogResult.OK ? input.Text.Trim() : null;
+        return DialogPlacement.Show(dialog, this, multiline ? "treatment-animal-description" : "treatment-animal-count") == DialogResult.OK ? input.Text.Trim() : null;
     }
 
     void ConfigureCard()
@@ -1615,7 +1615,7 @@ internal sealed class MainForm : Form
         dialog.Controls.Add(list);
         dialog.Controls.Add(buttons);
         dialog.CancelButton = cancel;
-        var result = dialog.ShowDialog(this);
+        var result = DialogPlacement.Show(dialog, this, "treatment-warnings");
         if (result == DialogResult.Retry && list.SelectedIndex >= 0)
         {
             var column = treatment.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
