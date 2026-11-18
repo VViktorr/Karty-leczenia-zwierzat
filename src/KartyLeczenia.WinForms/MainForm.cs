@@ -1499,7 +1499,7 @@ internal sealed class MainForm : Form
             Action("Eksportuj JSON", SaveCard),
             Action("Podgląd / PDF / e-mail", PreviewCard));
         var actions = page.Controls.OfType<FlowLayoutPanel>().Single();
-        bool verticalTreatmentToolbar = interfaceScale > 100;
+        bool verticalTreatmentToolbar = interfaceScale > 100 || DeviceDpi > 120;
         var toolbar = new TableLayoutPanel
         {
             Dock = DockStyle.Top, AutoSize = true,
@@ -1692,7 +1692,7 @@ internal sealed class MainForm : Form
             FormBorderStyle = FormBorderStyle.Sizable, MinimizeBox = false, MaximizeBox = true,
             ClientSize = new Size(610, 140), AutoScaleMode = AutoScaleMode.Dpi
         };
-        bool verticalDates = interfaceScale > 100;
+        bool verticalDates = interfaceScale > 100 || DeviceDpi > 120;
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, AutoScroll = true,
@@ -2011,7 +2011,7 @@ internal sealed class MainForm : Form
         var sections = new TabControl { Dock = DockStyle.Fill, Multiline = true };
         // At increased application scale use a vertical field layout. A fixed label
         // column plus 360px inputs otherwise pushes controls outside the viewport.
-        bool compactSettings = interfaceScale > 100;
+        bool compactSettings = (interfaceScale > 100 || DeviceDpi > 120);
         TableLayoutPanel Section(string title)
         {
             var page = new TabPage(title) { AutoScroll = true, Padding = Padding.Empty };
