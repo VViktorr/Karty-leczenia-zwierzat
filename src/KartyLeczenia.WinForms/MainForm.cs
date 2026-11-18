@@ -1692,15 +1692,18 @@ internal sealed class MainForm : Form
             FormBorderStyle = FormBorderStyle.Sizable, MinimizeBox = false, MaximizeBox = true,
             ClientSize = new Size(610, 140), AutoScaleMode = AutoScaleMode.Dpi
         };
+        bool verticalDates = interfaceScale > 100;
         var layout = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 3, Padding = new Padding(12)
+            Dock = DockStyle.Fill, AutoScroll = true,
+            ColumnCount = verticalDates ? 1 : 3,
+            RowCount = verticalDates ? 5 : 3,
+            Padding = new Padding(12)
         };
-        for (int i = 0; i < 3; i++)
-        {
+        for (int i = 0; i < layout.ColumnCount; i++)
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        for (int i = 0; i < layout.RowCount; i++)
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        }
         DateTime now = DateTime.Now;
         var reportDate = new DateTimePicker
         {
@@ -1716,18 +1719,34 @@ internal sealed class MainForm : Form
         };
         var executionTime = TimePicker(treatmentDate.Value.Date + (treatmentExecutionTime ?? now.TimeOfDay),
             "Godzina wykonania czynności");
-        layout.Controls.Add(new Label { Text = "Zgłoszenie (zaznacz, aby wpisać)", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-        layout.Controls.Add(reportDate, 1, 0);
-        layout.Controls.Add(reportTime, 2, 0);
-        layout.Controls.Add(new Label { Text = "Wykonanie czynności weterynaryjnych", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
-        layout.Controls.Add(executionDate, 1, 1);
-        layout.Controls.Add(executionTime, 2, 1);
+        var reportLabel = new Label { Text = "Zgłoszenie (zaznacz, aby wpisać)", AutoSize = true, Anchor = AnchorStyles.Left };
+        var executionLabel = new Label { Text = "Wykonanie czynności weterynaryjnych", AutoSize = true, Anchor = AnchorStyles.Left };
+        if (verticalDates)
+        {
+            var reportControls = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Dock = DockStyle.Fill };
+            reportControls.Controls.AddRange([reportDate, reportTime]);
+            var executionControls = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Dock = DockStyle.Fill };
+            executionControls.Controls.AddRange([executionDate, executionTime]);
+            layout.Controls.Add(reportLabel, 0, 0);
+            layout.Controls.Add(reportControls, 0, 1);
+            layout.Controls.Add(executionLabel, 0, 2);
+            layout.Controls.Add(executionControls, 0, 3);
+        }
+        else
+        {
+            layout.Controls.Add(reportLabel, 0, 0);
+            layout.Controls.Add(reportDate, 1, 0);
+            layout.Controls.Add(reportTime, 2, 0);
+            layout.Controls.Add(executionLabel, 0, 1);
+            layout.Controls.Add(executionDate, 1, 1);
+            layout.Controls.Add(executionTime, 2, 1);
+        }
         var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft };
         var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
         var next = new Button { Text = "Dalej", AutoSize = true, DialogResult = DialogResult.OK };
         buttons.Controls.AddRange([cancel, next]);
-        layout.Controls.Add(buttons, 0, 2);
-        layout.SetColumnSpan(buttons, 3);
+        layout.Controls.Add(buttons, 0, verticalDates ? 4 : 2);
+        layout.SetColumnSpan(buttons, layout.ColumnCount);
         var preferred = layout.GetPreferredSize(Size.Empty);
         dialog.ClientSize = new Size(Math.Max(dialog.ClientSize.Width, preferred.Width),
             Math.Max(dialog.ClientSize.Height, preferred.Height));
