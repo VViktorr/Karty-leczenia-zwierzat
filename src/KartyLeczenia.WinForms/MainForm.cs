@@ -135,7 +135,13 @@ internal sealed class MainForm : Form
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { CrashLog.Write("Appearance.RestoreTab", ex); }
         }
         tabs.SelectedIndex = openSettings || connection is null || sharedArchive is null ? tabs.TabCount - 1 : startupTab;
-        Shown += async (_, _) => { if (connection is not null) await LoadStartupDocuments(); };
+        // Startup preloading must not escape an async event handler and bring down
+        // the UI when an unexpected Subiekt connection error occurs.
+        Shown += async (_, _) =>
+        {
+            if (connection is not null)
+                await Run(LoadStartupDocuments, "WinForms.Startup.Preload");
+        };
     }
 
     void EnlargeInterface(IEnumerable<DataGridView> grids)
