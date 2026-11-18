@@ -46,16 +46,20 @@ internal static class ServerUpdateGate
                 throw new InvalidDataException("Nieprawidłowy folder aktualizacji.");
 
             string manifest = Path.Combine(share, "release.json");
-            if (!File.Exists(manifest))
+            string manifestContent;
+            try
             {
-                // A new deployment may not have published a release yet. Do not
-                // lock users out simply because the update share is uninitialized.
-                // An actual announced update remains mandatory below.
+                // File.Exists also returns false on access errors. Reading the
+                // manifest directly preserves useful authentication diagnostics.
+                manifestContent = File.ReadAllText(manifest);
+            }
+            catch (FileNotFoundException)
+            {
                 CrashLog.Write("ServerUpdateGate.NoManifest",
                     new FileNotFoundException("Nie opublikowano jeszcze instalatora na serwerze.", manifest));
                 return true;
             }
-            var release = JsonSerializer.Deserialize<Release>(File.ReadAllText(manifest),
+            var release = JsonSerializer.Deserialize<Release>(manifestContent,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Pusty manifest aktualizacji.");
             if (!Version.TryParse(release.Version, out var required) || required is null)
