@@ -21,19 +21,16 @@ internal static class ServerUpdateGate
         // Server controls publication. Settings can still be opened to repair a broken connection.
         if (settingsOnly || string.Equals(Setting("Role"), "server", StringComparison.OrdinalIgnoreCase))
             return true;
-        string? share = Setting("UpdateShare");
-        if (string.IsNullOrWhiteSpace(share)) return true;
         try
         {
+            string? share = Setting("UpdateShare");
+            if (string.IsNullOrWhiteSpace(share)) return true;
             if (!share.StartsWith(@"\\", StringComparison.Ordinal) || share.Contains("..", StringComparison.Ordinal))
                 throw new InvalidDataException("Nieprawidłowy folder aktualizacji.");
 
             string manifest = Path.Combine(share, "release.json");
             if (!File.Exists(manifest))
-            {
-                // No release has been published yet; support existing deployments without an update share.
-                return true;
-            }
+                throw new IOException("Brak dostępu do manifestu aktualizacji na serwerze: " + manifest);
             var release = JsonSerializer.Deserialize<Release>(File.ReadAllText(manifest),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Pusty manifest aktualizacji.");
