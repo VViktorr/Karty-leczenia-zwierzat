@@ -181,10 +181,11 @@ internal static class AppearanceThemes
 
     static void UpdateRoundCorners(ButtonBase button, int radius)
     {
-        button.Region?.Dispose();
+        var oldRegion = button.Region;
         if (radius == 0 || button.Width < 5 || button.Height < 5)
         {
             button.Region = null;
+            oldRegion?.Dispose();
             return;
         }
         int diameter = Math.Min(radius * 2, Math.Min(button.Width, button.Height));
@@ -196,11 +197,13 @@ internal static class AppearanceThemes
         path.AddArc(0, bottom, diameter, diameter, 90, 90);
         path.CloseFigure();
         button.Region = new Region(path);
+        oldRegion?.Dispose();
     }
 
     static void StyleButton(ButtonBase button, AppearanceOptions appearance, SurfaceColors original)
     {
-        if (IsClassic(appearance) || appearance.SwitchStyle == 0)
+        if (IsClassic(appearance) || appearance.SwitchStyle == 0 ||
+            (button is Button && !appearance.ColorButtons))
         {
             if (original.ButtonFlat is { } flat) button.FlatStyle = flat;
             if (original.VisualStyle is { } visual) button.UseVisualStyleBackColor = visual;
