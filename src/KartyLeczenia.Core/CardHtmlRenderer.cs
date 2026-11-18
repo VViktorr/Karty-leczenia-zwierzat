@@ -54,24 +54,49 @@ public static class CardHtmlRenderer
             <th>nr serii produktu<br>leczniczego<br>lub produktu<br>leczniczego<br>weterynaryjnego</th>
             <th>ilość i dawkowanie<br>zastosowanego produktu<br>leczniczego lub ilość,<br>dawkowanie i okres<br>stosowania nabytego<br>produktu leczniczego<br>weterynaryjnego/paszy<br>leczniczej</th><th>okres<br>karencji</th></tr></thead><tbody>
             """);
+        static string AnimalDescription(Dictionary<string, string> row)
+        {
+            string description = row.GetValueOrDefault("Opis zwierząt / numer siedziby stada") ?? "";
+            string species = row.GetValueOrDefault("Gatunek") ?? "";
+            if (species.Length > 0 && !description.Contains(species, StringComparison.OrdinalIgnoreCase)) description += "\n" + species;
+            string numbers = (row.GetValueOrDefault("Numery zwierząt") ?? "").Trim();
+            return numbers.Length > 0 ? (description.Trim() + "\n" + numbers).Trim() : description;
+        }
+
         void Rows(string section, int minimum)
         {
+            var rows = selected.Where(r => r.GetValueOrDefault("Sekcja (II lub III)") == section).ToArray();
+            string[] descriptions = rows.Select(AnimalDescription).ToArray();
+            string[] counts = rows.Select(row => row.GetValueOrDefault("Liczba zwierząt", "")).ToArray();
+
+            string AnimalCell(int index, string[] values, string groupField, ref int nextCell)
+            {
+                if (index < nextCell) return "";
+                string? group = rows[index].GetValueOrDefault(groupField);
+                string? species = rows[index].GetValueOrDefault("Gatunek");
+                nextCell = index + 1;
+                while (!string.IsNullOrEmpty(group) && nextCell < rows.Length &&
+                    rows[nextCell].GetValueOrDefault(groupField) == group && values[nextCell] == values[index] &&
+                    string.Equals(rows[nextCell].GetValueOrDefault("Gatunek"), species, StringComparison.OrdinalIgnoreCase))
+                    nextCell++;
+                int span = nextCell - index;
+                return span > 1 ? $"<td rowspan='{span}'>{E(values[index])}</td>" : $"<td>{E(values[index])}</td>";
+            }
+
+            int nextDescription = 0, nextCount = 0;
             int index = 0;
-            foreach (var row in selected.Where(r => r.GetValueOrDefault("Sekcja (II lub III)") == section))
+            foreach (var row in rows)
             {
                 string V(string key) => E(row.GetValueOrDefault(key));
-                string description = row.GetValueOrDefault("Opis zwierząt / numer siedziby stada") ?? "";
-                string species = row.GetValueOrDefault("Gatunek") ?? "";
-                if (species.Length > 0 && !description.Contains(species, StringComparison.OrdinalIgnoreCase)) description += "\n" + species;
-                string animalNumbers = (row.GetValueOrDefault("Numery zwierząt") ?? "").Trim();
-                if (animalNumbers.Length > 0) description = (description.Trim() + "\n" + animalNumbers).Trim();
+                string description = AnimalCell(index, descriptions, CardSchema.AnimalDescriptionGroup, ref nextDescription);
+                string count = AnimalCell(index, counts, CardSchema.AnimalCountGroup, ref nextCount);
                 string notes = string.Join("\n", (row.GetValueOrDefault("Zalecenia / uwagi") ?? "").Split('\n')
                     .Where(line => !System.Text.RegularExpressions.Regex.IsMatch(line,
                         @"^\s*WZ\s+.+?, poz\. ID \d+, ruch ID \d*: .*; seria: .*; ważność: .+",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
                     .Replace("Sprawdź / uzupełnij serię i ważność.", "", StringComparison.OrdinalIgnoreCase).Trim();
                 string route = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Droga podania")) ? "" : "<br>" + V("Droga podania");
-                html.Append($"<tr><td class='lp'>{++index}</td><td>{E(description)}</td><td>{V("Liczba zwierząt")}</td><td>{V("Rozpoznanie")}</td><td>{V("Produkt")}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
+                html.Append($"<tr><td class='lp'>{++index}</td>{description}{count}<td>{V("Rozpoznanie")}</td><td>{V("Produkt")}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
             }
             for (; index < minimum; index++) html.Append("<tr class='empty'>" + string.Concat(Enumerable.Repeat("<td>&nbsp;</td>", 9)) + "</tr>");
         }

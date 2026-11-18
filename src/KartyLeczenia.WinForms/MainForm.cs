@@ -1059,6 +1059,96 @@ internal sealed class MainForm : Form
         dialog.ShowDialog(this);
     }
 
+    async Task EditSharedAnimals(DataGridViewRow selected)
+    {
+        if (!treatment.EndEdit() || currentCard is not { } card || selected.Tag is not TreatmentRow entry) return;
+        if (selected.Cells["Drukuj"].Value is not true)
+        {
+            status.Text = "Zaznacz pozycję do wydruku, aby wpisać wspólne dane zwierząt.";
+            return;
+        }
+
+        string species = selected.Cells[TreatmentChoices.Species].Value?.ToString() ?? "";
+        string section = entry.Get("Sekcja (II lub III)");
+        var rows = treatment.Rows.Cast<DataGridViewRow>()
+            .Where(row => row.Cells["Drukuj"].Value is true && row.Tag is TreatmentRow item &&
+                item.Get("Sekcja (II lub III)") == section &&
+                string.Equals(row.Cells[TreatmentChoices.Species].Value?.ToString() ?? "", species, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        string? numbers = PromptAnimalField("Numery zwierząt",
+            $"Wpisz numery wspólne dla pozycji do wydruku ({rows.Length}).",
+            selected.Cells[AnimalDescriptionColumn].Value?.ToString() ?? "", multiline: true);
+        if (numbers is null) return;
+
+        string group = Guid.NewGuid().ToString("N");
+        Apply(AnimalDescriptionColumn, CardSchema.AnimalDescriptionGroup, numbers);
+        const string countColumn = "Liczba zwierząt";
+        string? count = PromptAnimalField("Liczba leczonych zwierząt",
+            "Wpisz wspólną liczbę leczonych zwierząt.",
+            selected.Cells[countColumn].Value?.ToString() ?? "", multiline: false);
+        if (count is not null) Apply(countColumn, CardSchema.AnimalCountGroup, count);
+
+        if (numbers.Length > 0 && card.PayerId is > 0)
+        {
+            var archive = Archive();
+            await RunArchive(() =>
+            {
+                archive.SaveDescription(card, numbers);
+                return true;
+            });
+        }
+
+        void Apply(string column, string groupField, string value)
+        {
+            foreach (var row in rows)
+            {
+                row.Cells[column].Value = value;
+                ((TreatmentRow)row.Tag!).Values[groupField] = group;
+            }
+        }
+    }
+
+    string? PromptAnimalField(string title, string label, string value, bool multiline)
+    {
+        using var dialog = new Form
+        {
+            Text = title, StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false, MaximizeBox = false, AutoScaleMode = AutoScaleMode.Dpi,
+            ClientSize = new Size(490, multiline ? 270 : 112)
+        };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(10), ColumnCount = 1, RowCount = 3 };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var input = new TextBox
+        {
+            AccessibleName = title, Text = value, Dock = DockStyle.Fill, Multiline = multiline,
+            AcceptsReturn = multiline, ScrollBars = multiline ? ScrollBars.Vertical : ScrollBars.None
+        };
+        var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft };
+        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+        var save = new Button { Text = "Zapisz", AutoSize = true };
+        buttons.Controls.AddRange([cancel, save]);
+        layout.Controls.Add(new Label { Text = label, AutoSize = true }, 0, 0);
+        layout.Controls.Add(input, 0, 1);
+        layout.Controls.Add(buttons, 0, 2);
+        dialog.Controls.Add(layout);
+        dialog.AcceptButton = save;
+        dialog.CancelButton = cancel;
+        save.Click += (_, _) =>
+        {
+            string text = input.Text.Trim();
+            if (!multiline && (!int.TryParse(text, out int count) || count <= 0))
+            {
+                MessageBox.Show(dialog, "Wpisz dodatnią liczbę całkowitą.", title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                input.Focus();
+                return;
+            }
+            dialog.DialogResult = DialogResult.OK;
+        };
+        return dialog.ShowDialog(this) == DialogResult.OK ? input.Text.Trim() : null;
+    }
+
     void ConfigureCard()
     {
         treatment.DataError += (_, e) =>
@@ -1092,7 +1182,12 @@ internal sealed class MainForm : Form
             Text = "Pokaż wskazanie z ChPL", UseColumnTextForButtonValue = true
         });
         Column(treatment, "Opis zwierzęcia", AnimalDescriptionColumn, 240);
-        treatment.Columns[AnimalDescriptionColumn]!.ToolTipText = "Wpisz numery leczonych zwierząt lub ich opis.";
+        treatment.Columns[AnimalDescriptionColumn]!.ToolTipText = "Dwuklik otwiera edycję wspólnych numerów i liczby zwierząt.";
+        treatment.CellDoubleClick += async (_, e) =>
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && treatment.Columns[e.ColumnIndex].Name == AnimalDescriptionColumn)
+                await Run(() => EditSharedAnimals(treatment.Rows[e.RowIndex]));
+        };
         var hint = new ToolTip();
         hint.SetToolTip(rememberTreatment, "Zapisuje gatunek i drogę podania dla leku na kolejne karty leczenia.");
         Disposed += (_, _) => hint.Dispose();

@@ -14,6 +14,9 @@ public sealed record Card(Dictionary<string, string> Fields, List<Dictionary<str
 
 public static class CardSchema
 {
+    public const string AnimalDescriptionGroup = "Grupa wspólnego opisu zwierząt";
+    public const string AnimalCountGroup = "Grupa wspólnej liczby zwierząt";
+
     public static readonly string[] Fields = ["Nr karty", "Lecznica i adres", "Lekarz i nr prawa wykonywania zawodu", "Właściciel i adres", "Zgłoszenie — data i godzina", "Wykonanie — data i godzina", "Wyniki badań", "Dokument źródłowy"];
     public static readonly string[] RowFields = ["Opis zwierząt / numer siedziby stada", "Liczba zwierząt", "Rozpoznanie", "Produkt", "Seria", "Ważność", "Ilość wydana", "Dawkowanie i okres stosowania", "Karencja", "Zalecenia / uwagi", "Sekcja (II lub III)"];
     public static readonly string[] ContextFields = ["Gatunek", "Droga podania", "Produkt spożywczy", "Produkt rejestru"];
