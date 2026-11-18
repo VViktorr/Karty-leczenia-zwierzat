@@ -2178,6 +2178,102 @@ internal sealed class MainForm : Form
         {
             if (sharedArchive is { } archive) await RefreshClinic(archive);
         };
+        form = Section("Kopia zapasowa SQL");
+        Message(form, "Operacje obejmują całą bazę KartyLeczenia na zapisanym serwerze archiwum. " +
+            "Podaj konto administratora SQL. Ścieżki odnoszą się do serwera SQL, również gdy aplikacja działa na innym komputerze.",
+            multiline: true);
+        var maintenanceAuth = Authentication(useWindows: true);
+        var maintenanceUser = Field("Login administratora SQL", "");
+        var maintenancePassword = Field("Hasło administratora SQL", "", password: true);
+        maintenanceAuth.SelectedIndexChanged += (_, _) =>
+            maintenanceUser.Enabled = maintenancePassword.Enabled = maintenanceAuth.SelectedIndex == 0;
+        maintenanceUser.Enabled = maintenancePassword.Enabled = false;
+        var backupFolder = Field("Folder kopii na serwerze", "", "Puste pole = domyślny folder SQL Servera");
+        var restoreFile = Field("Plik kopii na serwerze", "", @"np. D:\Kopie\KartyLeczenia.bak");
+        var maintenanceStatus = Message(form, "", multiline: true);
+        bool maintainingArchive = false;
+        FormClosing += (_, e) =>
+        {
+            if (!maintainingArchive) return;
+            e.Cancel = true;
+            status.Text = "Poczekaj na zakończenie operacji na bazie KartyLeczenia.";
+        };
+
+        async Task MaintainArchive(bool restoring)
+        {
+            if (maintainingArchive) return;
+            var archive = Archive();
+            bool windows = maintenanceAuth.SelectedIndex == 1;
+            if (!windows)
+            {
+                Require(maintenanceUser, "Wpisz login administratora SQL.");
+                Require(maintenancePassword, "Wpisz hasło administratora SQL.");
+            }
+
+            string path = (restoring ? restoreFile : backupFolder).Text.Trim();
+            if (restoring && !path.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Podaj pełną ścieżkę do pliku .bak dostępnego z serwera SQL.");
+            if (path.Length > 0 && !Path.IsPathFullyQualified(path) && !path.StartsWith('/'))
+                throw new InvalidOperationException("Podaj pełną ścieżkę na serwerze SQL lub ścieżkę sieciową.");
+
+            if (restoring && MessageBox.Show(this,
+                    $"Odtworzyć bazę KartyLeczenia na serwerze {archive.Server} z pliku:\n{path}\n\n" +
+                    "Operacja zastąpi aktualne dane i rozłączy pozostałe stanowiska. Zamknij na nich aplikację przed kontynuowaniem. " +
+                    "Program najpierw wykona kopię obecnego stanu.",
+                    "Odtwarzanie bazy KartyLeczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+
+            var administrator = new ConnectionOptions(archive.Server, SharedArchive.DatabaseName, windows,
+                maintenanceUser.Text, maintenancePassword.Text, false);
+            maintainingArchive = true;
+            tabs.Enabled = false;
+            UseWaitCursor = true;
+            maintenanceStatus.Text = status.Text = restoring
+                ? "Sprawdzanie kopii, zabezpieczanie bieżących danych i odtwarzanie bazy…"
+                : "Wykonywanie i sprawdzanie kopii bazy KartyLeczenia…";
+            try
+            {
+                string backup = await Task.Run(() => restoring
+                    ? archive.RestoreDatabase(administrator, path)
+                    : archive.BackupDatabase(administrator, path));
+                if (restoring)
+                {
+                    sharedClinic = null;
+                    treatmentCatalogue = null;
+                    currentCard = null;
+                    selectedTreatmentVariants.Clear();
+                    excludedTreatmentRows.Clear();
+                    treatment.Rows.Clear();
+                    prices.DataSource = null;
+                    await RefreshClinic(archive);
+                }
+                else
+                {
+                    restoreFile.Text = backup;
+                }
+                maintenanceStatus.Text = restoring
+                    ? $"Odtworzono bazę. Kopia sprzed odtworzenia: {backup}"
+                    : $"Zapisano i sprawdzono kopię na serwerze: {backup}";
+                status.Text = restoring ? "Odtworzono bazę KartyLeczenia." : "Zapisano kopię bazy KartyLeczenia.";
+            }
+            catch (Exception ex)
+            {
+                maintenanceStatus.Text = ex.Message;
+                throw;
+            }
+            finally
+            {
+                maintenancePassword.Clear();
+                maintainingArchive = false;
+                UseWaitCursor = false;
+                tabs.Enabled = true;
+            }
+        }
+
+        Add("", Action("Archiwizuj bazę", () => MaintainArchive(restoring: false)));
+        Add("", Action("Odtwórz bazę z kopii…", () => MaintainArchive(restoring: true)));
+
         var settingsPage = Page("Ustawienia", sections);
         if (sharedArchive is not null && connection is null) sections.SelectedIndex = 1;
         Shown += (_, _) =>
