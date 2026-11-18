@@ -8,6 +8,19 @@ internal static class DialogPlacement
 
     internal static DialogResult Show(Form dialog, Form owner, string key)
     {
+        // Ensure dialogs remain visible after a change of DPI, resolution or monitor.
+        dialog.AutoScaleMode = AutoScaleMode.Dpi;
+        dialog.Shown += (_, _) =>
+        {
+            if (dialog.IsDisposed || dialog.WindowState != FormWindowState.Normal) return;
+            var area = Screen.FromControl(dialog).WorkingArea;
+            int width = Math.Min(dialog.Width, area.Width);
+            int height = Math.Min(dialog.Height, area.Height);
+            int left = Math.Clamp(dialog.Left, area.Left, area.Right - width);
+            int top = Math.Clamp(dialog.Top, area.Top, area.Bottom - height);
+            var visible = new Rectangle(left, top, width, height);
+            if (dialog.Bounds != visible) dialog.Bounds = visible;
+        };
         string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "KartyLeczenia", "windows", key + ".json");
         try
