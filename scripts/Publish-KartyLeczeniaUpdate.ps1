@@ -12,10 +12,10 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     [Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Uruchom PowerShell jako administrator serwera.'
 }
-if ([IO.Path]::GetExtension($Installer) -ine '.exe') { throw 'Wskaż instalator EXE.' }
+if ([IO.Path]::GetExtension($Installer) -ine '.exe') { throw 'Wskaz instalator EXE.' }
 $installerFile = Get-Item -LiteralPath $Installer
 if ($installerFile.Name -notmatch ('-v' + [regex]::Escape($Version) + '\.exe$')) {
-    throw 'Numer wersji nie zgadza się z nazwą instalatora.'
+    throw 'Numer wersji nie zgadza sie z nazwa instalatora.'
 }
 New-Item -Path $Folder -ItemType Directory -Force | Out-Null
 # Use localized account names obtained from well-known SIDs.
@@ -26,14 +26,14 @@ $readers = ([Security.Principal.SecurityIdentifier]'S-1-5-11').Translate(
 $share = Get-SmbShare -Name $ShareName -ErrorAction SilentlyContinue
 if ($share) {
     if ([IO.Path]::GetFullPath($share.Path) -ine [IO.Path]::GetFullPath($Folder)) {
-        throw "Udział $ShareName wskazuje na inny folder: $($share.Path)."
+        throw "Udzial $ShareName wskazuje na inny folder: $($share.Path)."
     }
 } else {
     New-SmbShare -Name $ShareName -Path $Folder -FullAccess $administrators -ReadAccess $readers | Out-Null
 }
 # Only administrators may write publication files. Readers have read/execute rights.
 & icacls.exe $Folder /inheritance:r /grant:r "*S-1-5-32-544:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-11:(OI)(CI)RX" | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'Nie udało się ustawić uprawnień NTFS.' }
+if ($LASTEXITCODE -ne 0) { throw 'Nie udalo sie ustawic uprawnien NTFS.' }
 # Every release has one stable name on the server. Stage the new binary first,
 # so remote workstations never see a partly copied executable.
 $publishedName = 'KartyLeczenia-Setup-win-x64.exe'
@@ -69,6 +69,6 @@ try {
     Remove-Item -LiteralPath $stagedInstaller -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $tempManifest -ErrorAction SilentlyContinue
 }
-Write-Host "Opublikowano aktualizację $Version w \\$env:COMPUTERNAME\$ShareName"
+Write-Host "Opublikowano aktualizacje $Version w \\$env:COMPUTERNAME\$ShareName"
 Write-Host "Plik serwera: $publishedName"
 Write-Host "SHA-256: $sha"
