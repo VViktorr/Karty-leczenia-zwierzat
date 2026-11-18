@@ -87,6 +87,7 @@ internal static class AppearanceThemes
     {
         internal AppearanceOptions Options = new();
         internal Font? BoldFont;
+        internal Font? ThemedFont;
         internal readonly Color Background = grid.BackgroundColor;
         internal readonly Color GridColor = grid.GridColor;
         internal readonly Font Font = grid.Font;
@@ -111,12 +112,22 @@ internal static class AppearanceThemes
                     && grid.Rows[args.RowIndex].Selected && state.BoldFont is not null)
                     args.CellStyle.Font = state.BoldFont;
             };
-            grid.Disposed += (_, _) => state.BoldFont?.Dispose();
+            grid.Disposed += (_, _) =>
+            {
+                state.BoldFont?.Dispose();
+                state.ThemedFont?.Dispose();
+            };
         }
         state.Options = appearance;
-        state.BoldFont?.Dispose();
-        state.BoldFont = new Font(grid.Font.FontFamily, appearance.TableFontSize, FontStyle.Bold, GraphicsUnit.Point);
         Normalize(appearance);
+        // Release only fonts owned by the theme engine, never a user-supplied font.
+        Font? previousFont = state.ThemedFont;
+        state.ThemedFont = null;
+        grid.Font = state.Font;
+        previousFont?.Dispose();
+        state.BoldFont?.Dispose();
+        state.BoldFont = new Font(state.Font.FontFamily, appearance.TableFontSize,
+            FontStyle.Bold, GraphicsUnit.Point);
         if (appearance == AppearanceOptions.ForPreset("Klasyczny"))
         {
             // Restore the exact styles captured before the first theme change.
@@ -157,7 +168,14 @@ internal static class AppearanceThemes
         grid.ShowCellToolTips = appearance.ShowToolTips;
         grid.CellBorderStyle = appearance.GridLines ? DataGridViewCellBorderStyle.Single : DataGridViewCellBorderStyle.None;
         grid.RowTemplate.Height = Math.Max(grid.RowTemplate.MinimumHeight, appearance.RowHeight);
-        grid.Font = new Font(grid.Font.FontFamily, appearance.TableFontSize, grid.Font.Style, GraphicsUnit.Point);
+        state.ThemedFont = new Font(state.Font.FontFamily, appearance.TableFontSize,
+            state.Font.Style, GraphicsUnit.Point);
+        grid.Font = state.ThemedFont;
+        // Existing rows retain their old height unless it is explicitly applied.
+        // Respect an operator's manually resized rows rather than rewriting them.
+        foreach (DataGridViewRow row in grid.Rows)
+            if (!row.IsNewRow && row.Height == state.RowHeight)
+                row.Height = grid.RowTemplate.Height;
         grid.Invalidate();
     }
 
