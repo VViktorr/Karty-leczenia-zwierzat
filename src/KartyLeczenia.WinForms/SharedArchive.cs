@@ -49,16 +49,18 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         using var db = Open();
         using var transaction = db.BeginTransaction();
         if (!string.IsNullOrWhiteSpace(local.Name) || !string.IsNullOrWhiteSpace(local.Address) ||
-            !string.IsNullOrWhiteSpace(local.Doctor) || local.DoctorStampPng is { Length: > 0 })
+            !string.IsNullOrWhiteSpace(local.Doctor) || local.DoctorStampPng is { Length: > 0 } || local.ClinicStampPng is { Length: > 0 })
             WriteClinic(db, transaction, local, replaceExisting: false);
 
         ClinicSettings? clinic;
-        using (var command = Command(db, "SELECT name, address, doctor, use_doctor_stamp, doctor_stamp_png FROM dbo.clinic_settings WHERE id = 1;", transaction))
+        using (var command = Command(db, "SELECT name, address, doctor, use_doctor_stamp, doctor_stamp_png, use_clinic_stamp, clinic_stamp_png FROM dbo.clinic_settings WHERE id = 1;", transaction))
         using (var reader = command.ExecuteReader())
             clinic = reader.Read() ? new(reader.GetString(0), reader.GetString(1), reader.GetString(2))
             {
                 UseDoctorStamp = reader.GetBoolean(3),
-                DoctorStampPng = reader.IsDBNull(4) ? null : reader.GetFieldValue<byte[]>(4)
+                DoctorStampPng = reader.IsDBNull(4) ? null : reader.GetFieldValue<byte[]>(4),
+                UseClinicStamp = reader.GetBoolean(5),
+                ClinicStampPng = reader.IsDBNull(6) ? null : reader.GetFieldValue<byte[]>(6)
             } : null;
 
         transaction.Commit();
@@ -80,11 +82,12 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
             BEGIN
                 IF @replace = 1
                     UPDATE dbo.clinic_settings SET name = @name, address = @address, doctor = @doctor,
-                        use_doctor_stamp = @use_stamp, doctor_stamp_png = @stamp WHERE id = 1;
+                        use_doctor_stamp = @use_stamp, doctor_stamp_png = @stamp,
+                        use_clinic_stamp = @use_clinic_stamp, clinic_stamp_png = @clinic_stamp WHERE id = 1;
             END
             ELSE
-                INSERT INTO dbo.clinic_settings (id, name, address, doctor, use_doctor_stamp, doctor_stamp_png)
-                    VALUES (1, @name, @address, @doctor, @use_stamp, @stamp);
+                INSERT INTO dbo.clinic_settings (id, name, address, doctor, use_doctor_stamp, doctor_stamp_png, use_clinic_stamp, clinic_stamp_png)
+                    VALUES (1, @name, @address, @doctor, @use_stamp, @stamp, @use_clinic_stamp, @clinic_stamp);
             """, transaction);
         command.Parameters.Add("@replace", SqlDbType.Bit).Value = replaceExisting;
         command.Parameters.Add("@name", SqlDbType.NVarChar, -1).Value = clinic.Name;
@@ -92,6 +95,8 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         command.Parameters.Add("@doctor", SqlDbType.NVarChar, -1).Value = clinic.Doctor;
         command.Parameters.Add("@use_stamp", SqlDbType.Bit).Value = clinic.UseDoctorStamp;
         command.Parameters.Add("@stamp", SqlDbType.VarBinary, -1).Value = (object?)clinic.DoctorStampPng ?? DBNull.Value;
+        command.Parameters.Add("@use_clinic_stamp", SqlDbType.Bit).Value = clinic.UseClinicStamp;
+        command.Parameters.Add("@clinic_stamp", SqlDbType.VarBinary, -1).Value = (object?)clinic.ClinicStampPng ?? DBNull.Value;
         command.ExecuteNonQuery();
     }
 

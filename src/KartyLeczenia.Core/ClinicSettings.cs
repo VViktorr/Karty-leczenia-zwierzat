@@ -3,6 +3,9 @@ namespace KartyLeczenia;
 
 public sealed record ClinicSettings(string Name = "", string Address = "", string Doctor = "")
 {
+    public bool UseClinicStamp { get; init; }
+    public byte[]? ClinicStampPng { get; init; }
+
     public bool UseDoctorStamp { get; init; }
     public byte[]? DoctorStampPng { get; init; }
 

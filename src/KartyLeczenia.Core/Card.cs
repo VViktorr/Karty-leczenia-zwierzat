@@ -7,6 +7,9 @@ public sealed record Card(Dictionary<string, string> Fields, List<Dictionary<str
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public byte[]? DoctorStampPng { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public byte[]? ClinicStampPng { get; init; }
 }
 
 public static class CardSchema

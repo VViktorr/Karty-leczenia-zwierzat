@@ -1366,7 +1366,8 @@ internal sealed class MainForm : Form
         }).ToList();
         return new Card(fields, rows)
         {
-            DoctorStampPng = clinic.UseDoctorStamp ? clinic.DoctorStampPng : null
+            DoctorStampPng = clinic.UseDoctorStamp ? clinic.DoctorStampPng : null,
+            ClinicStampPng = clinic.UseClinicStamp ? clinic.ClinicStampPng : null
         };
     }
 
@@ -1880,46 +1881,61 @@ internal sealed class MainForm : Form
         var clinicForm = form;
         var clinicName = Field("Nazwa lecznicy", localClinic.Name);
         var clinicAddress = Field("Adres lecznicy", localClinic.Address);
-        var doctor = Field("Lekarz", localClinic.Doctor);
-        var doctorMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190 };
-        doctorMode.Items.AddRange(["Tekst", "Pieczątka PNG"]);
-        Add("Lekarz na karcie", doctorMode);
-        byte[]? doctorStamp = localClinic.DoctorStampPng;
-        var stampTools = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-        var stampLabel = new Label { AutoSize = true, Margin = new Padding(8, 8, 0, 0) };
+        (Func<(bool Use, byte[]? Png)> Read, Action<bool, byte[]?> Show) StampFields(string modeLabel, string fileLabel)
+        {
+            var mode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190 };
+            mode.Items.AddRange(["Tekst", "Pieczątka PNG"]);
+            Add(modeLabel, mode);
+            byte[]? stamp = null;
+            var stampTools = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+            var stampLabel = new Label { AutoSize = true, Margin = new Padding(8, 8, 0, 0) };
 
-        void UpdateStampLabel() => stampLabel.Text = doctorStamp is null ? "Brak pliku" : "PNG dodany";
+            void UpdateStampLabel() => stampLabel.Text = stamp is null ? "Brak pliku" : "PNG dodany";
 
-        stampTools.Controls.AddRange([
-            Action("Wybierz PNG…", () =>
-            {
-                using var dialog = new OpenFileDialog { Filter = "Obraz PNG (*.png)|*.png" };
-                if (dialog.ShowDialog(this) != DialogResult.OK) return Task.CompletedTask;
-                var bytes = File.ReadAllBytes(dialog.FileName);
-                if (!CardSchema.HasPngHeader(bytes)) throw new InvalidDataException("Wybierz poprawny obraz PNG.");
-                try
+            stampTools.Controls.AddRange([
+                Action("Wybierz PNG…", () =>
                 {
-                    using var stream = new MemoryStream(bytes);
-                    using var image = System.Drawing.Image.FromStream(stream, useEmbeddedColorManagement: false, validateImageData: true);
-                }
-                catch (ArgumentException ex) { throw new InvalidDataException("Nie można odczytać obrazu PNG.", ex); }
-                doctorStamp = bytes;
-                doctorMode.SelectedIndex = 1;
-                UpdateStampLabel();
-                return Task.CompletedTask;
-            }),
-            Action("Usuń", () =>
+                    using var dialog = new OpenFileDialog { Filter = "Obraz PNG (*.png)|*.png" };
+                    if (dialog.ShowDialog(this) != DialogResult.OK) return Task.CompletedTask;
+                    var bytes = File.ReadAllBytes(dialog.FileName);
+                    if (!CardSchema.HasPngHeader(bytes)) throw new InvalidDataException("Wybierz poprawny obraz PNG.");
+                    try
+                    {
+                        using var stream = new MemoryStream(bytes);
+                        using var image = System.Drawing.Image.FromStream(stream, useEmbeddedColorManagement: false, validateImageData: true);
+                    }
+                    catch (ArgumentException ex) { throw new InvalidDataException("Nie można odczytać obrazu PNG.", ex); }
+                    stamp = bytes;
+                    mode.SelectedIndex = 1;
+                    UpdateStampLabel();
+                    return Task.CompletedTask;
+                }),
+                Action("Usuń", () =>
+                {
+                    stamp = null;
+                    mode.SelectedIndex = 0;
+                    UpdateStampLabel();
+                    return Task.CompletedTask;
+                }),
+                stampLabel
+            ]);
+            Add(fileLabel, stampTools);
+
+            void Show(bool useStamp, byte[]? png)
             {
-                doctorStamp = null;
-                doctorMode.SelectedIndex = 0;
+                mode.SelectedIndex = useStamp ? 1 : 0;
+                stamp = png;
                 UpdateStampLabel();
-                return Task.CompletedTask;
-            }),
-            stampLabel
-        ]);
-        Add("Pieczątka lekarza", stampTools);
-        doctorMode.SelectedIndex = localClinic.UseDoctorStamp ? 1 : 0;
-        UpdateStampLabel();
+            }
+
+            return (() => (mode.SelectedIndex == 1, stamp), Show);
+        }
+
+        var clinicStamp = StampFields("Lecznica na karcie", "Pieczątka lecznicy");
+        var doctor = Field("Lekarz", localClinic.Doctor);
+        var doctorStamp = StampFields("Lekarz na karcie", "Pieczątka lekarza");
+        clinicStamp.Show(localClinic.UseClinicStamp, localClinic.ClinicStampPng);
+        doctorStamp.Show(localClinic.UseDoctorStamp, localClinic.DoctorStampPng);
         var clinicResult = Message(form, "Połącz się w zakładce „Archiwum SQL”, aby pobrać wspólne dane lecznicy.", multiline: true);
 
         void SetClinicStatus(string message, bool reportInStatusBar = false)
@@ -1928,20 +1944,26 @@ internal sealed class MainForm : Form
             if (reportInStatusBar) status.Text = message;
         }
 
-        ClinicSettings ClinicDraft() => new(clinicName.Text, clinicAddress.Text, doctor.Text)
+        ClinicSettings ClinicDraft()
         {
-            UseDoctorStamp = doctorMode.SelectedIndex == 1,
-            DoctorStampPng = doctorStamp
-        };
+            var (useClinicStamp, clinicPng) = clinicStamp.Read();
+            var (useDoctorStamp, doctorPng) = doctorStamp.Read();
+            return new(clinicName.Text, clinicAddress.Text, doctor.Text)
+            {
+                UseClinicStamp = useClinicStamp,
+                ClinicStampPng = clinicPng,
+                UseDoctorStamp = useDoctorStamp,
+                DoctorStampPng = doctorPng
+            };
+        }
 
         void ShowClinic(ClinicSettings clinic)
         {
             clinicName.Text = clinic.Name;
             clinicAddress.Text = clinic.Address;
             doctor.Text = clinic.Doctor;
-            doctorMode.SelectedIndex = clinic.UseDoctorStamp ? 1 : 0;
-            doctorStamp = clinic.DoctorStampPng;
-            UpdateStampLabel();
+            clinicStamp.Show(clinic.UseClinicStamp, clinic.ClinicStampPng);
+            doctorStamp.Show(clinic.UseDoctorStamp, clinic.DoctorStampPng);
         }
 
         void ReportClinicError(Exception ex)
@@ -1984,7 +2006,9 @@ internal sealed class MainForm : Form
         {
             var clinic = ClinicDraft();
             if (clinic.UseDoctorStamp && clinic.DoctorStampPng is null)
-                throw new InvalidOperationException("Dodaj plik pieczątki PNG lub wybierz tekst.");
+                throw new InvalidOperationException("Dodaj pieczątkę lekarza w PNG lub wybierz tekst.");
+            if (clinic.UseClinicStamp && clinic.ClinicStampPng is null)
+                throw new InvalidOperationException("Dodaj pieczątkę lecznicy w PNG lub wybierz tekst.");
             var archive = Archive();
             clinicForm.Enabled = false;
             try

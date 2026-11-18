@@ -21,6 +21,7 @@ public static class CardHtmlRenderer
             h1 {font-size:10pt;line-height:1.2;text-align:center;margin:0 0 4mm;font-weight:700}
             .section {font-size:10pt;margin:1.4mm 0 .6mm} .top {display:grid;grid-template-columns:19% 25% 36% 20%;gap:0;align-items:start;margin:0 0 3mm}
             .block {padding:0 3mm;text-align:center}.value {min-height:9mm;display:block;white-space:normal;overflow-wrap:anywhere;border-bottom:1px dotted #333;padding-bottom:1mm}
+            .clinic-stamp {display:block;margin:auto;max-width:100%;max-height:16mm;width:auto;height:auto}
             .caption {font-size:8pt;line-height:1.15;margin-top:1mm}.date {padding:4mm 2mm 0;line-height:1.6}.number {font-size:10pt;font-weight:bold}.execution {font-size:9pt;margin:2mm 0 2mm 6mm}
             table {width:100%;border-collapse:collapse;table-layout:fixed} th,td {border:.3mm solid #111;overflow-wrap:anywhere;padding:1mm;line-height:1.13;vertical-align:top}
             th {font-weight:normal;text-align:center;vertical-align:middle;font-size:8.3pt} thead {display:table-header-group} tr {break-inside:avoid;page-break-inside:avoid}
@@ -36,7 +37,10 @@ public static class CardHtmlRenderer
             Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h1>
             <div class="section">I.</div>
             """);
-        html.Append($"<div class='top'><div class='block'><div class='value'>{Fill("Lecznica i adres")}</div><div class='caption'>(nazwa i adres zakładu<br>leczniczego dla zwierząt)</div></div>");
+        string clinic = card.ClinicStampPng is { } clinicStamp && CardSchema.HasPngHeader(clinicStamp)
+            ? $"<img class='clinic-stamp' alt='Pieczątka lecznicy' src='data:image/png;base64,{Convert.ToBase64String(clinicStamp)}'>"
+            : Fill("Lecznica i adres");
+        html.Append($"<div class='top'><div class='block'><div class='value'>{clinic}</div><div class='caption'>(nazwa i adres zakładu<br>leczniczego dla zwierząt)</div></div>");
         html.Append($"<div class='block'><div class='value'>{Fill("Właściciel i adres")}</div><div class='caption'>(imię, nazwisko i adres albo nazwa,<br>siedziba i adres posiadacza zwierzęcia)</div></div>");
         html.Append($"<div class='date'>zgłoszenie &nbsp; data / godz. {Fill("Zgłoszenie — data i godzina")}</div><div class='block'><div class='number'>Nr dokumentu</div><div class='value'>{Fill("Nr karty")}</div><div class='caption'>(nr kolejnej strony/miesiąc/rok)</div></div></div>");
         html.Append($"<div class='execution'>wykonanie czynności lekarsko-weterynaryjnych &nbsp; data / godz. {Fill("Wykonanie — data i godzina")}</div><div class='section'>II.</div>");
