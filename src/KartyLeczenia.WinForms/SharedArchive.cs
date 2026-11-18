@@ -263,7 +263,9 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         string client, string document, DateTime date, string search, string card, string print, int year, long sequence)
     {
         using var command = Command(db, """
-            UPDATE dbo.treatment_cards SET treatment_date = @date, card_json = @card, print_json = @print,
+            UPDATE dbo.treatment_cards SET source_scope = @scope, payer_id = @payer,
+                client = @client, document = @document, search_text = @search,
+                treatment_date = @date, card_json = @card, print_json = @print,
                 card_year = @year, card_sequence = @sequence WHERE id = @id;
             IF @@ROWCOUNT = 0
                 INSERT INTO dbo.treatment_cards
