@@ -1879,8 +1879,14 @@ internal sealed class MainForm : Form
 
         form = Section("Dane lecznicy");
         var clinicForm = form;
-        var clinicName = Field("Nazwa lecznicy", localClinic.Name);
+        var clinicName = new TextBox
+        {
+            Width = 360, Height = 68, Multiline = true, AcceptsReturn = true,
+            ScrollBars = ScrollBars.Vertical, Text = localClinic.Name, AccessibleName = "Nazwa lecznicy"
+        };
+        Add("Nazwa lecznicy", clinicName);
         var clinicAddress = Field("Adres lecznicy", localClinic.Address);
+        var clinicPhone = Field("Telefon", localClinic.Phone);
         (Func<(bool Use, byte[]? Png)> Read, Action<bool, byte[]?> Show) StampFields(string modeLabel, string fileLabel)
         {
             var mode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190 };
@@ -1950,6 +1956,7 @@ internal sealed class MainForm : Form
             var (useDoctorStamp, doctorPng) = doctorStamp.Read();
             return new(clinicName.Text, clinicAddress.Text, doctor.Text)
             {
+                Phone = clinicPhone.Text,
                 UseClinicStamp = useClinicStamp,
                 ClinicStampPng = clinicPng,
                 UseDoctorStamp = useDoctorStamp,
@@ -1961,6 +1968,7 @@ internal sealed class MainForm : Form
         {
             clinicName.Text = clinic.Name;
             clinicAddress.Text = clinic.Address;
+            clinicPhone.Text = clinic.Phone;
             doctor.Text = clinic.Doctor;
             clinicStamp.Show(clinic.UseClinicStamp, clinic.ClinicStampPng);
             doctorStamp.Show(clinic.UseDoctorStamp, clinic.DoctorStampPng);

@@ -58,6 +58,10 @@ IF COL_LENGTH(N'dbo.clinic_settings', N'use_clinic_stamp') IS NULL
 IF COL_LENGTH(N'dbo.clinic_settings', N'clinic_stamp_png') IS NULL
     ALTER TABLE dbo.clinic_settings ADD clinic_stamp_png varbinary(max) NULL;
 
+IF COL_LENGTH(N'dbo.clinic_settings', N'phone') IS NULL
+    ALTER TABLE dbo.clinic_settings ADD phone nvarchar(max) NOT NULL
+        CONSTRAINT DF_clinic_settings_phone DEFAULT (N'');
+
 IF OBJECT_ID(N'dbo.catalog_products', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.catalog_products (
