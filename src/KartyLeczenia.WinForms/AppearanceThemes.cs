@@ -307,10 +307,16 @@ internal static class AppearanceEditor
         panel.Controls.Add(new Label { Text = "Podgląd motywu", AutoSize = true });
         panel.Controls.Add(preview);
         var actions = new FlowLayoutPanel { AutoSize = true, Width = 640 };
+        var applyButton = new Button { Text = "Zastosuj", AutoSize = true };
         var save = new Button { Text = "Zapisz motyw", AutoSize = true };
         var reset = new Button { Text = "Przywróć Klasyczny", AutoSize = true };
-        actions.Controls.AddRange([save, reset]);
+        actions.Controls.AddRange([applyButton, save, reset]);
         panel.Controls.Add(actions);
+        applyButton.Click += (_, _) =>
+        {
+            Capture();
+            apply(current with { });
+        };
         save.Click += (_, _) =>
         {
             Capture();
