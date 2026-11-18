@@ -1384,11 +1384,23 @@ internal sealed class MainForm : Form
         savingTreatment = true;
         try
         {
-            await RunArchive(() =>
+            var existing = await RunArchive(() => archive.SaveCard(id, source, date, card, printCard));
+            if (IsDisposed || sharedArchive != archive) return;
+            if (existing is Guid existingId)
             {
-                archive.SaveCard(id, source, date, card, printCard);
-                return true;
-            });
+                if (currentArchiveId != id) return;
+                string question = existingId == id
+                    ? "Zaktualizować zapisaną kartę?"
+                    : "Zapisać kolejną kartę dla tego dokumentu?";
+                if (MessageBox.Show(this, $"Dokument {source.Number} ma już zapisaną kartę.\n\n{question}",
+                        "Karta już zapisana", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                    return;
+
+                if (IsDisposed || sharedArchive != archive || currentArchiveId != id) return;
+                await RunArchive(() => archive.SaveCard(id, source, date, card, printCard, confirmDuplicate: true));
+                if (IsDisposed || sharedArchive != archive) return;
+            }
             status.Text = "Zapisano kartę we wspólnym archiwum.";
         }
         finally { savingTreatment = false; }
@@ -1435,10 +1447,35 @@ internal sealed class MainForm : Form
             if (!IsDisposed && sharedArchive == archive) await ExportCard(card);
         }
 
+        bool deletingCard = false;
+        async Task DeleteSavedCard()
+        {
+            if (deletingCard || grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
+            var archive = Archive();
+            deletingCard = true;
+            try
+            {
+                if (MessageBox.Show(this,
+                        $"Usunąć kartę dla dokumentu {row.Document}?\n{row.Client} · {row.Date:dd.MM.yyyy}\n\n" +
+                        "Karta zniknie ze wspólnego archiwum na wszystkich stanowiskach.",
+                        "Usuń zapisaną kartę", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                    return;
+
+                if (IsDisposed || sharedArchive != archive) return;
+                bool deleted = await RunArchive(() => archive.DeleteCard(row.Id));
+                if (IsDisposed || sharedArchive != archive) return;
+                await RefreshCards();
+                if (!IsDisposed && sharedArchive == archive)
+                    status.Text = deleted ? "Usunięto kartę z archiwum." : "Karta została już usunięta.";
+            }
+            finally { deletingCard = false; }
+        }
+
         var page = Page("Zapisane karty leczenia", grid, query,
             new Label { Text = "Data leczenia", AutoSize = true }, day,
             Action("Szukaj", RefreshCards), Action("Podgląd / PDF / e-mail", OpenSavedCard),
-            Action("Eksportuj JSON", ExportSavedCard));
+            Action("Eksportuj JSON", ExportSavedCard), Action("Usuń kartę", DeleteSavedCard));
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab == page) await Run(RefreshCards);

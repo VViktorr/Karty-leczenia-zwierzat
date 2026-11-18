@@ -106,15 +106,43 @@ internal sealed partial class SharedArchive(ConnectionOptions options)
         command.ExecuteNonQuery();
     }
 
-    internal void SaveCard(Guid id, DocumentData source, DateTime date, Card card, Card printCard)
+    // Return the existing card ID if confirmation is needed, or null after saving.
+    internal Guid? SaveCard(Guid id, DocumentData source, DateTime date, Card card, Card printCard,
+        bool confirmDuplicate = false)
     {
         string client = string.Join(", ", source.Payer.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
         using var db = Open();
         using var transaction = db.BeginTransaction();
+        if (!confirmDuplicate)
+        {
+            using var existing = Command(db, """
+                SELECT TOP (1) id FROM dbo.treatment_cards WITH (UPDLOCK, HOLDLOCK)
+                WHERE source_scope = @scope AND document = @document
+                ORDER BY CASE WHEN id = @id THEN 0 ELSE 1 END, archive_order DESC;
+                """, transaction);
+            existing.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = source.Scope;
+            existing.Parameters.Add("@document", SqlDbType.NVarChar, -1).Value = source.Number;
+            existing.Parameters.Add("@id", SqlDbType.UniqueIdentifier).Value = id;
+            if (existing.ExecuteScalar() is Guid existingId)
+            {
+                transaction.Commit();
+                return existingId;
+            }
+        }
+
         WriteCard(db, transaction, id, source.Scope, source.PayerId, client, source.Number, date,
             (client + " " + source.Number).ToUpperInvariant(), JsonSerializer.Serialize(card),
             JsonSerializer.Serialize(printCard), updateExisting: true);
         transaction.Commit();
+        return null;
+    }
+
+    internal bool DeleteCard(string id)
+    {
+        using var db = Open();
+        using var command = Command(db, "DELETE FROM dbo.treatment_cards WHERE id = @id;");
+        command.Parameters.Add("@id", SqlDbType.UniqueIdentifier).Value = Guid.ParseExact(id, "N");
+        return command.ExecuteNonQuery() > 0;
     }
 
     internal List<SavedTreatmentCard> FindCards(string query, DateTime? date)

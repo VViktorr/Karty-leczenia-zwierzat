@@ -108,7 +108,7 @@ END;
 IF DATABASE_PRINCIPAL_ID(N'KartyLeczeniaOperator') IS NULL
     CREATE ROLE KartyLeczeniaOperator AUTHORIZATION dbo;
 
-GRANT SELECT, INSERT, UPDATE ON dbo.treatment_cards TO KartyLeczeniaOperator;
+GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.treatment_cards TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.animal_descriptions TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.clinic_settings TO KartyLeczeniaOperator;
 
