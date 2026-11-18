@@ -150,7 +150,7 @@ internal static class AppearanceEditor
         var bold = new CheckBox { Text = "Pogrubienie zaznaczonego wiersza", AutoSize = true };
         var last = new CheckBox { Text = "Otwieraj ostatnio używaną zakładkę", AutoSize = true };
         var maximize = new CheckBox { Text = "Otwieraj zmaksymalizowane okno", AutoSize = true };
-        var tooltips = new CheckBox { Text = "Wyświetlaj podpowiedzi", AutoSize = true };
+        var tooltips = new CheckBox { Text = "Wyświetlaj podpowiedzi w tabelach", AutoSize = true };
         var wide = new CheckBox { Text = "Powiększone zakładki", AutoSize = true };
         var customAccent = new CheckBox { Text = "Własny kolor zaznaczenia", AutoSize = true };
         var accent = new Button { Text = "Wybierz kolor…", AutoSize = true };
@@ -165,8 +165,10 @@ internal static class AppearanceEditor
         preview.Rows.Add("FS 129/26", "Lecznica B", "560,00 zł");
         preview.ClearSelection();
 
+        bool loading = false;
         void LoadControls()
         {
+            loading = true;
             size.Value = current.TableFontSize;
             height.Value = current.RowHeight;
             zoom.Value = current.PrintPreviewZoom;
@@ -180,8 +182,14 @@ internal static class AppearanceEditor
             customAccent.Checked = current.UseCustomAccent;
             accent.BackColor = Color.FromArgb(current.AccentArgb);
             AppearanceThemes.ApplyGrid(preview, current);
+            loading = false;
         }
         void Capture()
+        {
+            if (loading) return;
+            CaptureValues();
+        }
+        void CaptureValues()
         {
             current.TableFontSize = (int)size.Value;
             current.RowHeight = (int)height.Value;
