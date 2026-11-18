@@ -68,8 +68,30 @@ internal static class AppearanceThemes
         finally { File.Delete(temp); }
     }
 
+    sealed class GridState
+    {
+        internal AppearanceOptions Options = new();
+        internal Font? BoldFont;
+    }
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGridView, GridState> GridStates = new();
+
     internal static void ApplyGrid(DataGridView grid, AppearanceOptions appearance)
     {
+        if (!GridStates.TryGetValue(grid, out var state))
+        {
+            state = new GridState();
+            GridStates.Add(grid, state);
+            grid.CellFormatting += (_, args) =>
+            {
+                if (args.RowIndex >= 0 && state.Options.BoldSelection
+                    && grid.Rows[args.RowIndex].Selected && state.BoldFont is not null)
+                    args.CellStyle.Font = state.BoldFont;
+            };
+            grid.Disposed += (_, _) => state.BoldFont?.Dispose();
+        }
+        state.Options = appearance;
+        state.BoldFont?.Dispose();
+        state.BoldFont = new Font(grid.Font.FontFamily, appearance.TableFontSize, FontStyle.Bold, GraphicsUnit.Point);
         Normalize(appearance);
         bool dark = appearance.Preset == "Ciemny";
         bool classic = appearance.Preset == "Klasyczny";
