@@ -576,7 +576,9 @@ internal sealed class MainForm : Form
         var net = new CheckBox { Text = "Netto", AutoSize = true };
         bool loading = false;
         ConnectionOptions? levelsFor = null;
-        var missingButton = Action("Sprawdź braki w katalogu", () => EditCatalogue(onlyMissing: true));
+        const string missingLabel = "Sprawdź braki w katalogu";
+        var missingButton = new Button { Text = missingLabel, AutoSize = true };
+        missingButton.Click += async (_, _) => await Run(() => EditCatalogue(onlyMissing: true), missingLabel);
 
         async Task<MedicinePrice[]> RefreshMissing(ConnectionOptions options, SharedArchive archive, Catalogue? catalogue = null)
         {
@@ -594,7 +596,7 @@ internal sealed class MainForm : Form
             }
             finally
             {
-                if (missingButton.Text == "Sprawdzanie katalogu…") missingButton.Text = "Sprawdź braki w katalogu";
+                if (missingButton.Text == "Sprawdzanie katalogu…") missingButton.Text = missingLabel;
                 missingButton.Enabled = true;
             }
         }
