@@ -168,15 +168,17 @@ internal sealed class MainForm : Form
         var bounds = e.Bounds;
         bounds.Inflate(-1, -1);
         if (!selected) bounds.Inflate(-1, -2);
-        bool dark = appearance.Preset == "Ciemny";
-        using var tabBrush = new SolidBrush(dark
-            ? selected ? Color.FromArgb(53, 64, 78) : Color.FromArgb(38, 43, 52)
-            : SystemColors.Control);
+        bool dark = AppearanceThemes.IsDark(appearance);
+        bool classic = AppearanceThemes.IsClassic(appearance);
+        Color tabColor = classic ? SystemColors.Control
+            : selected ? AppearanceThemes.Accent(appearance)
+            : dark ? Color.FromArgb(48, 56, 67) : Color.FromArgb(235, 239, 245);
+        using var tabBrush = new SolidBrush(tabColor);
         e.Graphics.FillRectangle(tabBrush, bounds);
 
         using var selectedFont = selected ? new Font(tabs.Font.FontFamily, tabs.Font.SizeInPoints + 2, tabs.Font.Style | FontStyle.Bold, GraphicsUnit.Point) : null;
         TextRenderer.DrawText(e.Graphics, tabs.TabPages[e.Index].Text, selectedFont ?? tabs.Font, bounds,
-            dark ? Color.WhiteSmoke : SystemColors.ControlText,
+            selected && !classic ? Color.White : dark ? Color.WhiteSmoke : SystemColors.ControlText,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
             TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         if (selected && tabs.Focused)
@@ -436,12 +438,15 @@ internal sealed class MainForm : Form
             outline.AddArc(0, bounds.Height - diameter, diameter, diameter, 90, 90);
             outline.CloseFigure();
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            e.Graphics.FillPath(SystemBrushes.Highlight, outline);
+            Color highlight = AppearanceThemes.IsClassic(appearance)
+                ? SystemColors.Highlight : AppearanceThemes.Accent(appearance);
+            using var selectedBrush = new SolidBrush(highlight);
+            e.Graphics.FillPath(selectedBrush, outline);
             TextRenderer.DrawText(e.Graphics, button.Text, button.Font, bounds, SystemColors.HighlightText,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             if (button.Focused)
                 ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(bounds, -3, -3),
-                    SystemColors.HighlightText, SystemColors.Highlight);
+                    SystemColors.HighlightText, highlight);
         };
         button.Font = boldDocumentKindFont;
         button.MinimumSize = button.GetPreferredSize(Size.Empty);
