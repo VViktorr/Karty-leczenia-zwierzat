@@ -191,10 +191,13 @@ internal static class AppearanceEditor
     {
         AppearanceOptions original = AppearanceThemes.Load();
         AppearanceOptions current = original with { };
+        // Prefer a narrow vertical editor when application scaling is increased.
+        // Its controls must fit into the settings page without horizontal clipping.
+        bool vertical = InterfaceScale.Load() > 100;
         var panel = new FlowLayoutPanel
         {
             AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.TopDown,
-            Margin = Padding.Empty, Padding = new Padding(0, 4, 0, 4), Width = 660
+            Margin = Padding.Empty, Padding = new Padding(0, 4, 0, 4), Width = vertical ? 420 : 660
         };
         var preset = new ComboBox { Width = 240, DropDownStyle = ComboBoxStyle.DropDownList };
         preset.Items.AddRange(AppearanceOptions.Names);
@@ -212,9 +215,9 @@ internal static class AppearanceEditor
         var wide = new CheckBox { Text = "Powiększone zakładki", AutoSize = true };
         var customAccent = new CheckBox { Text = "Własny kolor zaznaczenia", AutoSize = true };
         var accent = new Button { Text = "Wybierz kolor…", AutoSize = true };
-        var explanation = new Label { AutoSize = true, MaximumSize = new Size(620, 0),
+        var explanation = new Label { AutoSize = true, MaximumSize = new Size(vertical ? 390 : 620, 0),
             Text = "Motyw Klasyczny odpowiada dotychczasowemu wyglądowi. Indywidualne szerokości i kolejność kolumn pozostają bez zmian." };
-        var preview = new DataGridView { Width = 600, Height = 120, ReadOnly = true, RowHeadersVisible = false,
+        var preview = new DataGridView { Width = vertical ? 390 : 600, Height = 120, ReadOnly = true, RowHeadersVisible = false,
             AllowUserToAddRows = false, AllowUserToResizeRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
         preview.Columns.Add("document", "Dokument");
         preview.Columns.Add("customer", "Kontrahent");
@@ -285,8 +288,19 @@ internal static class AppearanceEditor
 
         void AddLabeled(string label, Control control)
         {
-            var line = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = 640 };
-            line.Controls.Add(new Label { Text = label, Width = 240, TextAlign = ContentAlignment.MiddleLeft, Height = 28 });
+            var line = new FlowLayoutPanel
+            {
+                AutoSize = true, WrapContents = false,
+                FlowDirection = vertical ? FlowDirection.TopDown : FlowDirection.LeftToRight,
+                Width = vertical ? 390 : 640
+            };
+            line.Controls.Add(new Label
+            {
+                Text = label, AutoSize = vertical, Width = vertical ? 390 : 240,
+                MaximumSize = new Size(vertical ? 390 : 240, 0),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Height = vertical ? 0 : 28
+            });
             line.Controls.Add(control);
             panel.Controls.Add(line);
         }
@@ -306,7 +320,7 @@ internal static class AppearanceEditor
         AddLabeled("Powiększenie podglądu wydruku (%)", zoom);
         panel.Controls.Add(new Label { Text = "Podgląd motywu", AutoSize = true });
         panel.Controls.Add(preview);
-        var actions = new FlowLayoutPanel { AutoSize = true, Width = 640 };
+        var actions = new FlowLayoutPanel { AutoSize = true, Width = vertical ? 390 : 640, WrapContents = true };
         var applyButton = new Button { Text = "Zastosuj", AutoSize = true };
         var save = new Button { Text = "Zapisz motyw", AutoSize = true };
         var reset = new Button { Text = "Przywróć Klasyczny", AutoSize = true };
