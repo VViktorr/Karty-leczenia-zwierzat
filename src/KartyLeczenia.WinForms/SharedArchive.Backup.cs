@@ -5,10 +5,10 @@ namespace KartyLeczenia.Windows;
 
 internal sealed partial class SharedArchive
 {
-    internal string BackupDatabase(ConnectionOptions administrator, string folder)
+    internal string BackupDatabase(ConnectionOptions administrator, string folder, bool compress = false)
     {
         using var db = OpenMaintenance(administrator);
-        return CreateBackup(db, folder, "kopia");
+        return CreateBackup(db, folder, "kopia", compress);
     }
 
     internal string? RestoreDatabase(ConnectionOptions administrator, string path)
@@ -147,7 +147,7 @@ internal sealed partial class SharedArchive
         }
     }
 
-    static string CreateBackup(SqlConnection db, string folder, string label)
+    static string CreateBackup(SqlConnection db, string folder, string label, bool compress = false)
     {
         if (folder.Length == 0)
         {
@@ -158,9 +158,10 @@ internal sealed partial class SharedArchive
             throw new InvalidOperationException("Serwer SQL nie zwrócił domyślnego folderu kopii zapasowych. Wskaż folder dostępny dla SQL Servera.");
 
         string path = ServerPath(folder, $"KartyLeczenia-{label}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak");
-        using (var backup = MaintenanceCommand(db, """
-            BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM;
-            """, path))
+        string backupSql = compress
+            ? "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM, COMPRESSION;"
+            : "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM, NO_COMPRESSION;";
+        using (var backup = MaintenanceCommand(db, backupSql, path))
             backup.ExecuteNonQuery();
         using (var verify = MaintenanceCommand(db, "RESTORE VERIFYONLY FROM DISK = @path WITH FILE = 1, CHECKSUM;", path))
             verify.ExecuteNonQuery();
