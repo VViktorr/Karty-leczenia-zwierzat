@@ -1982,17 +1982,28 @@ internal sealed class MainForm : Form
         if (saved is { WarehouseId: not null } && (saved.WindowsAuthentication || saved.Password.Length > 0))
             connection = saved;
 
-        var sections = new TabControl { Dock = DockStyle.Fill };
+        var sections = new TabControl { Dock = DockStyle.Fill, Multiline = true };
+        // At increased application scale use a vertical field layout. A fixed label
+        // column plus 360px inputs otherwise pushes controls outside the viewport.
+        bool compactSettings = interfaceScale > 100;
         TableLayoutPanel Section(string title)
         {
-            var page = new TabPage(title) { AutoScroll = true };
+            var page = new TabPage(title) { AutoScroll = true, Padding = Padding.Empty };
             var layout = new TableLayoutPanel
             {
-                Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 2, Padding = new Padding(16)
+                Dock = DockStyle.Top,
+                AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                GrowStyle = TableLayoutPanelGrowStyle.AddRows,
+                ColumnCount = compactSettings ? 1 : 2,
+                Padding = new Padding(12)
             };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            if (compactSettings)
+                layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            else
+            {
+                layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            }
             page.Controls.Add(layout);
             sections.TabPages.Add(page);
             return layout;
@@ -2001,6 +2012,23 @@ internal sealed class MainForm : Form
         var form = Section("Archiwum SQL");
         void Add(string title, Control input)
         {
+            if (compactSettings)
+            {
+                if (title.Length > 0)
+                {
+                    int labelRow = form.RowCount++;
+                    form.Controls.Add(new Label
+                    {
+                        Text = title, AutoSize = true, MaximumSize = new Size(800, 0),
+                        Margin = new Padding(3, 8, 3, 1)
+                    }, 0, labelRow);
+                }
+                int inputRow = form.RowCount++;
+                input.Anchor = AnchorStyles.Left;
+                form.Controls.Add(input, 0, inputRow);
+                return;
+            }
+
             int row = form.RowCount++;
             if (title.Length > 0)
                 form.Controls.Add(new Label { Text = title, AutoSize = true, Anchor = AnchorStyles.Left }, 0, row);
@@ -2016,7 +2044,7 @@ internal sealed class MainForm : Form
                 MaximumSize = multiline ? new Size(620, 0) : Size.Empty
             };
             section.Controls.Add(label, 0, row);
-            section.SetColumnSpan(label, 2);
+            section.SetColumnSpan(label, section.ColumnCount);
             return label;
         }
 
