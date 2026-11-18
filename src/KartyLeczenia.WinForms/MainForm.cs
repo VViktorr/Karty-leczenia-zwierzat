@@ -576,6 +576,29 @@ internal sealed class MainForm : Form
         var net = new CheckBox { Text = "Netto", AutoSize = true };
         bool loading = false;
         ConnectionOptions? levelsFor = null;
+        var missingButton = Action("Sprawdź braki w katalogu", () => EditCatalogue(onlyMissing: true));
+
+        async Task<MedicinePrice[]> RefreshMissing(ConnectionOptions options, SharedArchive archive, Catalogue? catalogue = null)
+        {
+            missingButton.Enabled = false;
+            missingButton.Text = "Sprawdzanie katalogu…";
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+                catalogue ??= await RunArchive(archive.ReadCatalogue);
+                var products = await MedicineStockService.FindCatalogueProducts(options, "", timeout.Token, limit: int.MaxValue);
+                if (connection != options || sharedArchive != archive) return [];
+                var missing = products.Where(row => catalogue.NeedsCompletion(row.Symbol, row.Name)).ToArray();
+                missingButton.Text = $"Leki do uzupełnienia ({missing.Length})";
+                return missing;
+            }
+            finally
+            {
+                if (missingButton.Text == "Sprawdzanie katalogu…") missingButton.Text = "Sprawdź braki w katalogu";
+                missingButton.Enabled = true;
+            }
+        }
+
         async Task LoadPrices()
         {
             if (loading) return;
@@ -597,25 +620,37 @@ internal sealed class MainForm : Form
                     levels.SelectedItem = levels.Items.Cast<MedicinePriceLevel>().FirstOrDefault(item => item.IsRetail);
                     if (levels.SelectedIndex < 0 && levels.Items.Count > 0) levels.SelectedIndex = 0;
                 }
-                if (levels.SelectedItem is not MedicinePriceLevel level) return;
+                var archive = Archive();
+                if (levels.SelectedItem is not MedicinePriceLevel level)
+                {
+                    await RefreshMissing(options, archive);
+                    return;
+                }
                 bool netPrice = net.Checked;
                 var rows = await MedicineStockService.Prices(options, level.Number, work.Token, net: netPrice);
-                var archive = Archive();
                 var catalogue = await RunArchive(archive.ReadCatalogue);
                 if (connection != options || sharedArchive != archive) return;
                 prices.Columns["Gross"]!.HeaderText = netPrice ? "Cena netto" : "Cena brutto";
                 prices.DataSource = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol, row.Name) }).ToList();
                 status.Text = $"Pozycje cennika: {rows.Count}";
+                await RefreshMissing(options, archive, catalogue);
             }
             finally { loading = false; }
         }
 
-        async Task EditCatalogue()
+        async Task EditCatalogue(bool onlyMissing = false)
         {
             var archive = Archive();
             var options = Connection();
             var current = prices.CurrentRow?.DataBoundItem as MedicinePrice;
-            using var picker = new CatalogueProductPicker(options, current?.Symbol ?? "");
+            var pending = onlyMissing ? await RefreshMissing(options, archive) : null;
+            if (connection != options || sharedArchive != archive) return;
+            if (pending is { Length: 0 })
+            {
+                status.Text = "W katalogu nie ma leków do uzupełnienia.";
+                return;
+            }
+            using var picker = new CatalogueProductPicker(options, onlyMissing ? "" : current?.Symbol ?? "", pending);
             if (picker.ShowDialog(this) != DialogResult.OK || picker.Selection is not { } row) return;
             var product = await RunArchive(() => archive.ReadCatalogueProduct(row));
             if (sharedArchive != archive || connection != options) return;
@@ -629,12 +664,14 @@ internal sealed class MainForm : Form
         }
 
         var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices),
-            Action("Dodaj / edytuj w katalogu", EditCatalogue), Action("Ustawienia wydruku", () => PreviewPrices()),
+            missingButton, Action("Dodaj / edytuj w katalogu", () => EditCatalogue()),
+            Action("Ustawienia wydruku", () => PreviewPrices()),
             Action("Drukuj", () => PreviewPrices(direct: true)));
         tabs.SelectedIndexChanged += async (_, _) =>
         {
-            if (tabs.SelectedTab == page && connection is not null && prices.DataSource is null)
-                await Run(LoadPrices);
+            if (tabs.SelectedTab != page || connection is not { } options || sharedArchive is not { } archive) return;
+            if (prices.DataSource is null) await Run(LoadPrices);
+            else if (missingButton.Enabled) await Run(async () => { await RefreshMissing(options, archive); });
         };
     }
 

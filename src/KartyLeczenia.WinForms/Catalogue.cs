@@ -12,6 +12,11 @@ internal sealed class Catalogue
 
     readonly Dictionary<string, (string Name, List<Variant> Variants)> products = new(StringComparer.OrdinalIgnoreCase);
     readonly HashSet<string> nonMedicines = new(StringComparer.OrdinalIgnoreCase);
+    readonly HashSet<string> incompleteProducts = new(StringComparer.OrdinalIgnoreCase);
+
+    internal bool NeedsCompletion(string symbol, string name) => !IsNonMedicine(symbol) &&
+        (incompleteProducts.Contains(symbol.Trim()) || ForProduct(symbol, name).Count == 0);
+
     internal bool IsNonMedicine(string symbol) => nonMedicines.Contains(symbol.Trim());
 
     internal static Catalogue Read(SqlConnection db)
@@ -22,11 +27,10 @@ internal sealed class Catalogue
             SELECT p.symbol,p.name,v.species,v.route,v.indication,v.dose,
                    v.edible_tissues,v.milk,v.pdf_path,v.source,v.withdrawal_short,price.compact_text
             FROM dbo.catalog_products p JOIN dbo.catalog_variants v ON v.symbol=p.symbol
-            JOIN dbo.catalog_price_withdrawal price ON price.id=v.id
+            LEFT JOIN dbo.catalog_price_withdrawal price ON price.id=v.id
             WHERE COALESCE(p.decision,'') <> 'NOT_MEDICINE'
               AND COALESCE(v.scope,'') NOT LIKE '%referencyjne%'
               AND COALESCE(v.scope,'') NOT LIKE '%archiwalne%'
-              AND COALESCE(v.dose,'') <> '' AND COALESCE(v.route,'') <> ''
             ORDER BY p.symbol,v.id
             """;
         using (var classification = db.CreateCommand())
@@ -44,6 +48,11 @@ internal sealed class Catalogue
         {
             string Text(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i);
             var symbol = Text(0);
+            string species = Text(2), route = Text(3), indication = Text(4), dose = Text(5);
+            if (string.IsNullOrWhiteSpace(species) || string.IsNullOrWhiteSpace(indication) ||
+                string.IsNullOrWhiteSpace(route) || string.IsNullOrWhiteSpace(dose) || reader.IsDBNull(11))
+                result.incompleteProducts.Add(symbol.Trim());
+            if (string.IsNullOrWhiteSpace(route) || string.IsNullOrWhiteSpace(dose) || reader.IsDBNull(11)) continue;
             if (!result.products.TryGetValue(symbol, out var entry))
             {
                 entry = (Text(1), new List<Variant>());
@@ -51,7 +60,7 @@ internal sealed class Catalogue
             }
             var withdrawal = string.Join(", ", new[] { Text(6).Length == 0 ? "" : "Tkanki: " + Text(6),
                 Text(7).Length == 0 ? "" : "Mleko: " + Text(7) }.Where(value => value.Length > 0));
-            entry.Variants.Add(new(Text(2), Text(3), Text(4), Text(5), withdrawal, Text(8), Text(9), Text(10), Text(11)));
+            entry.Variants.Add(new(species, route, indication, dose, withdrawal, Text(8), Text(9), Text(10), Text(11)));
         }
         return result;
     }

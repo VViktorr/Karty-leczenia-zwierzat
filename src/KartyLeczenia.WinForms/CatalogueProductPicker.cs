@@ -4,9 +4,9 @@ internal sealed class CatalogueProductPicker : Form
 {
     internal MedicinePrice? Selection { get; private set; }
 
-    internal CatalogueProductPicker(ConnectionOptions options, string initialSymbol)
+    internal CatalogueProductPicker(ConnectionOptions options, string initialSymbol, MedicinePrice[]? pending = null)
     {
-        Text = "Wybierz kartotekę Subiekta";
+        Text = pending is null ? "Wybierz kartotekę Subiekta" : "Leki do uzupełnienia";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(670, 480);
         var query = new TextBox { Width = 355, Text = initialSymbol, PlaceholderText = "Symbol lub nazwa z Subiekta" };
@@ -29,11 +29,16 @@ internal sealed class CatalogueProductPicker : Form
             try
             {
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                var results = await MedicineStockService.FindCatalogueProducts(options, query.Text, timeout.Token);
+                string filter = query.Text.Trim();
+                var results = pending is null
+                    ? await MedicineStockService.FindCatalogueProducts(options, filter, timeout.Token)
+                    : pending.Where(row => row.Symbol.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
+                        || row.Name.Contains(filter, StringComparison.CurrentCultureIgnoreCase)).ToArray();
                 if (IsDisposed) return;
                 list.Items.AddRange(results.Select(row => new Item(row)).ToArray());
                 if (results.Length == 1) list.SelectedIndex = 0;
                 message.Text = results.Length == 0 ? "Brak pasujących kartotek." :
+                    pending is not null ? $"Kartoteki wymagające uzupełnienia: {results.Length}." :
                     results.Length == 100 ? "Pokazano pierwsze 100 kartotek. Zawęź wyszukiwanie." : "";
             }
             catch (Exception ex)
