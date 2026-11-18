@@ -8,6 +8,17 @@ param(
     [string]$ShareName = 'KartyLeczenia-Updates'
 )
 $ErrorActionPreference = 'Stop'
+$logPath = Join-Path $env:ProgramData 'KartyLeczenia\update-publish.log'
+trap {
+    $failure = $_
+    try {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $logPath) | Out-Null
+        Add-Content -LiteralPath $logPath -Encoding UTF8 -Value (
+            '[{0}] ERROR version {1}: {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Version, $failure.ToString())
+    } catch {}
+    Write-Host ('Blad publikacji aktualizacji: ' + $failure.ToString())
+    exit 1
+}
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Uruchom PowerShell jako administrator serwera.'
@@ -18,6 +29,15 @@ if ($installerFile.Name -notmatch ('-v' + [regex]::Escape($Version) + '\.exe$'))
     throw 'Numer wersji nie zgadza sie z nazwa instalatora.'
 }
 New-Item -Path $Folder -ItemType Directory -Force | Out-Null
+# Never replace a newer server release with an older installer.
+$existingManifest = Join-Path $Folder 'release.json'
+if (Test-Path -LiteralPath $existingManifest -PathType Leaf) {
+    $currentRelease = Get-Content -LiteralPath $existingManifest -Raw | ConvertFrom-Json
+    $publishedVersion = [version]$currentRelease.version
+    if ([version]$Version -lt $publishedVersion) {
+        throw "Na serwerze jest juz nowsza wersja $publishedVersion. Nie opublikowano starszej $Version."
+    }
+}
 # Use localized account names obtained from well-known SIDs.
 $administrators = ([Security.Principal.SecurityIdentifier]'S-1-5-32-544').Translate(
     [Security.Principal.NTAccount]).Value
@@ -72,3 +92,10 @@ try {
 Write-Host "Opublikowano aktualizacje $Version w \\$env:COMPUTERNAME\$ShareName"
 Write-Host "Plik serwera: $publishedName"
 Write-Host "SHA-256: $sha"
+
+try {
+    Add-Content -LiteralPath $logPath -Encoding UTF8 -Value (
+        '[{0}] OK version {1}; file {2}; SHA256 {3}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Version, $destination, $sha)
+} catch {
+    Write-Host ('Uwaga: nie udalo sie zapisac dziennika publikacji: ' + $_.Exception.Message)
+}
