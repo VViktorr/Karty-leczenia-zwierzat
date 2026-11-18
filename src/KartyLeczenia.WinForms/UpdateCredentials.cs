@@ -6,7 +6,7 @@ namespace KartyLeczenia.Windows;
 /// <summary>
 /// Stores SMB authentication in the current user's Windows Credential Manager.
 /// No passwords are saved in KartyLeczenia application configuration.
-</summary>
+/// </summary>
 internal static class UpdateCredentials
 {
     const uint CredentialDomainPassword = 2;
