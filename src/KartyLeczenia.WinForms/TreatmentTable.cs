@@ -41,6 +41,8 @@ internal sealed class TreatmentTable : AntdUI.Table
         "Wskazanie z ChPL", "Numery zwierząt"
     ];
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    [Browsable(false)]
     internal Func<DataGridViewRow, string, Task>? EditRequested { get; set; }
 
     internal TreatmentTable(DataGridView source, int interfaceScale)
