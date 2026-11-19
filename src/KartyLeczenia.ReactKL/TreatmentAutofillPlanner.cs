@@ -90,7 +90,17 @@ internal static class TreatmentAutofillPlanner
                 "Mleko: " + candidate.Milk.Trim()
         }.Where(s => s.Length > 0));
 
-        bool needsReview = string.IsNullOrWhiteSpace(withdrawal) ||
+        // The compact catalogue model does not carry every food-animal
+        // restriction (notably eggs). Such products still need manual review.
+        string target = candidate.Species.Trim().ToLowerInvariant();
+        bool poultry = new[] {"kury","drób","indyki","gęsi","kaczki","kurczęta"}
+            .Any(name => target.Contains(name, StringComparison.Ordinal));
+        bool dairy = new[] {"bydło","krowy","owce","kozy"}
+            .Any(name => target.Contains(name, StringComparison.Ordinal));
+        bool needsReview = poultry ||
+            string.IsNullOrWhiteSpace(candidate.Tissues) ||
+            (dairy && string.IsNullOrWhiteSpace(candidate.Milk)) ||
+            string.IsNullOrWhiteSpace(withdrawal) ||
             string.IsNullOrWhiteSpace(candidate.Source) ||
             string.IsNullOrWhiteSpace(candidate.Pdf) ||
             new[] { candidate.Dose, candidate.Indication, candidate.Tissues,
