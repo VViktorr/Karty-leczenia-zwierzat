@@ -11,6 +11,9 @@ internal sealed class Catalogue
     }
 
     readonly Dictionary<string, (string Name, List<Variant> Variants)> products = new(StringComparer.OrdinalIgnoreCase);
+    static readonly string[] NonMedicineStatusPrefixes =
+        ["To nie jest lek", "To nie lek", "Nie lek", "Nie jest lekiem", "Nie jest produktem leczniczym"];
+
     readonly HashSet<string> nonMedicines = new(StringComparer.OrdinalIgnoreCase);
     readonly HashSet<string> incompleteProducts = new(StringComparer.OrdinalIgnoreCase);
 
@@ -36,12 +39,19 @@ internal sealed class Catalogue
         using (var classification = db.CreateCommand())
         {
             classification.CommandText = """
-                SELECT symbol FROM dbo.catalog_products
-                WHERE decision = 'NOT_MEDICINE' OR LTRIM(RTRIM(status)) LIKE 'Nie lek / inne%'
+                SELECT symbol, COALESCE(decision, ''), COALESCE(status, '')
+                FROM dbo.catalog_products
                 """;
             using var entries = classification.ExecuteReader();
             while (entries.Read())
-                if (!entries.IsDBNull(0)) result.nonMedicines.Add(entries.GetString(0).Trim());
+            {
+                if (entries.IsDBNull(0)) continue;
+                var decision = entries.GetString(1).Trim();
+                var status = entries.GetString(2).TrimStart();
+                if (decision.Equals("NOT_MEDICINE", StringComparison.OrdinalIgnoreCase) ||
+                    NonMedicineStatusPrefixes.Any(prefix => status.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+                    result.nonMedicines.Add(entries.GetString(0).Trim());
+            }
         }
         using var reader = command.ExecuteReader();
         while (reader.Read())
