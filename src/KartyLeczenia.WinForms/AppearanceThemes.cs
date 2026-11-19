@@ -450,27 +450,57 @@ internal static class AppearanceEditor
         };
         var previewInvoice = new ThemeSelector { Text = "Faktury", Toggle = true };
         var previewReceipts = new ThemeSelector { Text = "Paragony" };
+        var previewWarehouse = new ThemeSelector { Text = "WZ" };
+        var previewAll = new ThemeSelector { Text = "Wszystkie", Toggle = true };
+        var previewExpired = new ThemeSelector { Text = "Przeterminowane" };
+        var previewSoon = new ThemeSelector { Text = "Do 30 dni" };
         var previewFilter = new CheckBox { Text = "Netto", AutoSize = true };
+        var previewAdditional = new CheckBox { Text = "Pokaż karencję", AutoSize = true, Checked = true };
         var previewAction = new Button { Text = "Zapisz", AutoSize = true };
-        switchPreview.Controls.AddRange([previewInvoice, previewReceipts, previewFilter, previewAction]);
+        var previewCancel = new Button { Text = "Anuluj", AutoSize = true };
+        var previewSelection = new FlowLayoutPanel
+        {
+            AutoSize = true, Width = vertical ? 390 : 600,
+            WrapContents = true, Padding = new Padding(0, 2, 0, 4)
+        };
+        previewSelection.Controls.AddRange([previewAll, previewExpired, previewSoon]);
+        switchPreview.Controls.AddRange([previewInvoice, previewReceipts,
+            previewWarehouse, previewFilter, previewAdditional, previewAction, previewCancel]);
         void RenderPreview()
         {
             AppearanceThemes.ApplyGrid(preview, current);
             AppearanceThemes.ApplySurface(switchPreview, current);
+            AppearanceThemes.ApplySurface(previewSelection, current);
             accentSample.BackColor = AppearanceThemes.Accent(current);
         }
         previewInvoice.Click += (_, _) =>
         {
             previewInvoice.Toggle = true;
-            previewReceipts.Toggle = false;
+            previewReceipts.Toggle = previewWarehouse.Toggle = false;
             RenderPreview();
         };
         previewReceipts.Click += (_, _) =>
         {
             previewInvoice.Toggle = false;
             previewReceipts.Toggle = true;
+            previewWarehouse.Toggle = false;
             RenderPreview();
         };
+        previewWarehouse.Click += (_, _) =>
+        {
+            previewInvoice.Toggle = previewReceipts.Toggle = false;
+            previewWarehouse.Toggle = true;
+            RenderPreview();
+        };
+        void SelectPreviewFilter(ThemeSelector chosen)
+        {
+            foreach (var selector in new[] { previewAll, previewExpired, previewSoon })
+                selector.Toggle = ReferenceEquals(selector, chosen);
+            RenderPreview();
+        }
+        previewAll.Click += (_, _) => SelectPreviewFilter(previewAll);
+        previewExpired.Click += (_, _) => SelectPreviewFilter(previewExpired);
+        previewSoon.Click += (_, _) => SelectPreviewFilter(previewSoon);
 
         bool loading = false;
         void LoadControls()
@@ -569,7 +599,10 @@ internal static class AppearanceEditor
         }
         AddLabeled("Motyw kolorystyczny", preset);
         Heading("Podgląd");
+        panel.Controls.Add(new Label { Text = "Przełączniki dokumentów i akcje", AutoSize = true });
         panel.Controls.Add(switchPreview);
+        panel.Controls.Add(new Label { Text = "Filtry terminów ważności", AutoSize = true });
+        panel.Controls.Add(previewSelection);
         panel.Controls.Add(preview);
 
         Heading("Kolory i przełączniki");
