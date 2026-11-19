@@ -22,7 +22,8 @@ internal static class Program
                 defaultFont.SizeInPoints * scale / 100f, defaultFont.Style, GraphicsUnit.Point);
             if (scaledFont is not null) Application.SetDefaultFont(scaledFont);
             bool settingsOnly = args.Contains("--settings", StringComparer.OrdinalIgnoreCase);
-            Application.Run(new MainForm(settingsOnly, scale));
+            bool reactUi = args.Contains("--react", StringComparer.OrdinalIgnoreCase);
+            Application.Run(reactUi ? new ReactShellForm() : new MainForm(settingsOnly, scale));
             CrashLog.Write("WinForms.Application.Exit");
         }
         catch (Exception ex)

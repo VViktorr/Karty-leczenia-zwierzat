@@ -13,4 +13,10 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
     <PackageReference Include="PdfPig" Version="0.1.12" />
   </ItemGroup>
+  <!-- Include the compiled React frontend in both local builds and published installers. -->
+  <ItemGroup Condition="Exists('../../ui/react/dist/index.html')">
+    <Content Include="../../ui/react/dist/**/*"
+             Link="react-ui/%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
