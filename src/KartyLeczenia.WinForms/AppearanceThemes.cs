@@ -274,6 +274,9 @@ internal static class AppearanceThemes
         }
         switch (control)
         {
+            case ExpiryTable expiry:
+                expiry.ApplyAppearance(appearance);
+                return;
             case Button button:
                 ApplyButton(button, appearance);
                 break;

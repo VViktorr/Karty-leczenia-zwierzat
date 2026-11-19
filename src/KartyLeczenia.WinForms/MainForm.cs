@@ -474,7 +474,7 @@ internal sealed class MainForm : Form
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    DataGridView? ActiveGrid() => tabs.SelectedIndex switch { 0 => documents, 1 => prices, 2 => expiry, 3 => treatment, _ => null };
+    DataGridView? ActiveGrid() => tabs.SelectedIndex switch { 0 => documents, 1 => prices, 2 when expiry.Visible => expiry, 3 => treatment, _ => null };
 
     Task SelectKind(DocumentSearchKinds selected)
     {
@@ -774,6 +774,19 @@ internal sealed class MainForm : Form
         Column(expiry, "Przyjęcie", "Received", 120, "dd.MM.yyyy");
         Column(expiry, "Ważność", "Expires", 120, "dd.MM.yyyy");
         Column(expiry, "Pozostało", "Remaining", 115, "0.####");
+        var antTable = new ExpiryTable(interfaceScale);
+        var viewToggle = new CheckBox { Text = "Tabela AntdUI", AutoSize = true, Checked = antTable.ShowAntd };
+        var tableHost = new Panel { Dock = DockStyle.Fill };
+        tableHost.Controls.AddRange([expiry, antTable]);
+        void ApplyExpiryView()
+        {
+            expiry.Visible = !viewToggle.Checked;
+            antTable.Visible = viewToggle.Checked;
+        }
+        viewToggle.CheckedChanged += (_, _) => ApplyExpiryView();
+        FormClosed += (_, _) => antTable.SaveLayout(viewToggle.Checked);
+        ApplyExpiryView();
+
         ConnectionOptions? loadingFor = null;
         ConnectionOptions? loadedFor = null;
         List<MedicineExpiry> deliveries = [];
@@ -796,6 +809,7 @@ internal sealed class MainForm : Form
                 .ThenBy(row => row.Batch, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
             expiry.DataSource = rows;
+            antTable.ShowRows(rows);
             if (tabs.SelectedTab == page) status.Text = $"Dostawy: {rows.Count} / {deliveries.Count}";
         }
 
@@ -851,8 +865,8 @@ internal sealed class MainForm : Form
             };
         }
 
-        page = Page("Terminy ważności", expiry, Action("Odśwież", LoadExpiries),
-            filters[0].Button, filters[1].Button, filters[2].Button, filters[3].Button);
+        page = Page("Terminy ważności", tableHost, Action("Odśwież", LoadExpiries),
+            filters[0].Button, filters[1].Button, filters[2].Button, filters[3].Button, viewToggle);
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab != page || connection is null) return;
