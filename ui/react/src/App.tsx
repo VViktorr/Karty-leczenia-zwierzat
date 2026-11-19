@@ -263,9 +263,51 @@ const treatmentColumns=[{value:"selected",label:"Druk"},{value:"product",label:"
   {value:"quantity",label:"Ilość"},{value:"indication",label:"Wskazanie z ChPL"},
   ...editable.map(({key,title})=>({value:key,label:title}))];
 const treatmentColumnKeys=treatmentColumns.map(column=>column.value);
+function treatmentColumnKey(column:ColumnsType<DraftRow>[number]):string {
+  return String(column.key??("dataIndex" in column?column.dataIndex:""));
+}
+function restoreColumnOrder():string[] {
+  try{
+    const savedOrder=JSON.parse(localStorage.getItem("kl.treatmentColumnOrder")??"null");
+    if(Array.isArray(savedOrder))
+      return ["selected","product",...Array.from(new Set(
+        savedOrder.filter((value:unknown)=>typeof value==="string"&&
+          treatmentColumnKeys.includes(value)&&value!=="selected"&&value!=="product")
+      )),...treatmentColumnKeys.filter(key=>key!=="selected"&&key!=="product"&&
+        !savedOrder.includes(key))];
+  }catch{/* Reset invalid legacy settings. */}
+  return treatmentColumnKeys;
+}
+function restoreColumnWidths():Record<string,number> {
+  try{
+    const values:unknown=JSON.parse(localStorage.getItem("kl.treatmentColumnWidths")??"null");
+    if(values && typeof values==="object" && !Array.isArray(values))
+      return Object.fromEntries(Object.entries(values).filter(([key,width])=>
+        treatmentColumnKeys.includes(key)&&typeof width==="number"&&
+        Number.isFinite(width)&&width>=60&&width<=800));
+  }catch{/* Use default widths. */}
+  return {};
+}
 function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () => void}) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
   const [showColumns,setShowColumns]=useState(false);
+  const [columnOrder,setColumnOrder]=useState<string[]>(restoreColumnOrder);
+  const [columnWidths,setColumnWidths]=useState<Record<string,number>>(restoreColumnWidths);
+  useEffect(()=>{
+    try{
+      localStorage.setItem("kl.treatmentColumnOrder",JSON.stringify(columnOrder));
+      localStorage.setItem("kl.treatmentColumnWidths",JSON.stringify(columnWidths));
+    }catch{/* Session settings still work. */}
+  },[columnOrder,columnWidths]);
+  function moveColumn(key:string,direction:-1|1){
+    if(key==="selected"||key==="product")return;
+    setColumnOrder(current=>{
+      const index=current.indexOf(key),other=index+direction;
+      if(index<2||other<2||other>=current.length)return current;
+      const next=[...current];[next[index],next[other]]=[next[other],next[index]];
+      return next;
+    });
+  }
   const [visibleColumns,setVisibleColumns]=useState<string[]>(()=>{
     try{
       const stored=JSON.parse(localStorage.getItem("kl.treatmentColumns")??"null");
@@ -795,7 +837,10 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
     <Card><Table<DraftRow> rowKey="index" dataSource={sortedRows}
-      columns={columns.filter(column=>visibleColumns.includes(String(column.key??("dataIndex" in column?column.dataIndex:""))))} size="small"
+      columns={columns.filter(column=>visibleColumns.includes(treatmentColumnKey(column)))
+        .sort((a,b)=>columnOrder.indexOf(treatmentColumnKey(a))-
+          columnOrder.indexOf(treatmentColumnKey(b)))
+        .map(column=>({...column,width:columnWidths[treatmentColumnKey(column)]??column.width}))} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
       scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
@@ -815,8 +860,35 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
         onChange={values=>setVisibleColumns(Array.from(new Set([
           ...values.map(String),"selected","product"
         ])))}/>
+      <Typography.Paragraph style={{marginTop:14}} type="secondary">
+        Kolejność i szerokość kolumn (piksele). „Druk” i „Produkt” są przypięte na początku.
+      </Typography.Paragraph>
+      <div style={{maxHeight:300,overflowY:"auto"}}>
+        {columnOrder.filter(key=>visibleColumns.includes(key)).map(key=>{
+          const index=columnOrder.indexOf(key);
+          const label=treatmentColumns.find(item=>item.value===key)?.label??key;
+          const defaultWidth=columns.find(col=>treatmentColumnKey(col)===key)?.width;
+          return <div key={key} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+            <span style={{flex:1}}>{label}</span>
+            <InputNumber aria-label={"Szerokość kolumny "+label} min={60} max={800}
+              style={{width:105}} value={columnWidths[key]??Number(defaultWidth??170)}
+              onChange={value=>{if(value!=null)setColumnWidths(current=>({
+                ...current,[key]:Math.max(60,Math.min(800,value))
+              }));}}/>
+            <Button size="small" aria-label={"Przesuń kolumnę "+label+" w lewo"}
+              disabled={index<=2} onClick={()=>moveColumn(key,-1)}>←</Button>
+            <Button size="small" aria-label={"Przesuń kolumnę "+label+" w prawo"}
+              disabled={index<2||index>=columnOrder.length-1}
+              onClick={()=>moveColumn(key,1)}>→</Button>
+          </div>;
+        })}
+      </div>
       <Button size="small" style={{marginTop:16}}
-        onClick={()=>setVisibleColumns(treatmentColumnKeys)}>Przywróć wszystkie kolumny</Button>
+        onClick={()=>{
+          setVisibleColumns(treatmentColumnKeys);
+          setColumnOrder(treatmentColumnKeys);
+          setColumnWidths({});
+        }}>Przywróć domyślne kolumny</Button>
     </Modal>
     <Modal width="90vw" open={suggestReviewOpen}
       title="Potwierdź uzupełnienie jednoznacznych wariantów ChPL"
