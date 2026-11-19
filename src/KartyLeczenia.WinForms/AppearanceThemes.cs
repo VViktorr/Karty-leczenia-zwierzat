@@ -19,13 +19,17 @@ internal sealed record AppearanceOptions
     public bool UseCustomAccent { get; set; }
     public int AccentArgb { get; set; } = Color.FromArgb(0, 100, 190).ToArgb();
     public int PrintPreviewZoom { get; set; } = 100;
-    public int SwitchStyle { get; set; } = 1; // 0 Windows, 1 filled, 2 outline
+    public int SwitchStyle { get; set; } = 1; // 0 neutral, 1 filled, 2 outline
     public int CornerRadius { get; set; } = 8;
     public bool ColorButtons { get; set; } = true;
 
-    internal static string[] Names { get; } = ["Klasyczny", "Jasny", "Ciemny", "Błękitny", "Zielony", "Fioletowy", "Grafitowy", "Kompaktowy", "Wygodny", "Własny"];
+    internal static string[] Names { get; } = ["Antd Jasny", "Antd Ciemny", "Antd Morski", "Antd Śliwkowy", "Klasyczny", "Jasny", "Ciemny", "Błękitny", "Zielony", "Fioletowy", "Grafitowy", "Kompaktowy", "Wygodny", "Własny"];
     internal static AppearanceOptions ForPreset(string name) => name switch
     {
+        "Antd Jasny" => new() { Preset = name, RowHeight = 28, AccentArgb = Color.FromArgb(22, 119, 255).ToArgb() },
+        "Antd Ciemny" => new() { Preset = name, RowHeight = 28, AccentArgb = Color.FromArgb(82, 153, 255).ToArgb() },
+        "Antd Morski" => new() { Preset = name, RowHeight = 28, WideTabs = true, AccentArgb = Color.FromArgb(0, 116, 112).ToArgb() },
+        "Antd Śliwkowy" => new() { Preset = name, RowHeight = 30, WideTabs = true, AccentArgb = Color.FromArgb(193, 146, 244).ToArgb() },
         "Jasny" => new() { Preset = name, RowHeight = 30, TableFontSize = 10, WideTabs = true },
         "Ciemny" => new() { Preset = name, RowHeight = 30, TableFontSize = 10, WideTabs = true, AccentArgb = Color.FromArgb(83, 157, 235).ToArgb() },
         "Błękitny" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(20, 108, 200).ToArgb() },
@@ -46,11 +50,11 @@ internal static class AppearanceThemes
         try
         {
             var value = JsonSerializer.Deserialize<AppearanceOptions>(File.ReadAllText(FilePath));
-            return value is null ? new AppearanceOptions() : Normalize(value);
+            return value is null ? AppearanceOptions.ForPreset("Antd Jasny") : Normalize(value);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
-            return new AppearanceOptions();
+            return AppearanceOptions.ForPreset("Antd Jasny");
         }
     }
 
@@ -77,11 +81,24 @@ internal static class AppearanceThemes
         finally { File.Delete(temp); }
     }
 
-    internal static bool IsDark(AppearanceOptions options) => options.Preset is "Ciemny" or "Grafitowy";
+    internal static bool IsDark(AppearanceOptions options) => options.Preset is "Antd Ciemny" or "Antd Śliwkowy" or "Ciemny" or "Grafitowy";
     internal static bool IsClassic(AppearanceOptions options) =>
         options == AppearanceOptions.ForPreset("Klasyczny");
     internal static Color Accent(AppearanceOptions options) =>
-        Color.FromArgb(options.AccentArgb);
+        Color.FromArgb(options.UseCustomAccent ? options.AccentArgb : AppearanceOptions.ForPreset(options.Preset).AccentArgb);
+
+    internal static AppearanceOptions Current { get; set; } = Load();
+
+    internal static Color Canvas(AppearanceOptions options) => options.Preset switch
+    {
+        "Antd Ciemny" => Color.FromArgb(20, 20, 24),
+        "Antd Śliwkowy" => Color.FromArgb(35, 28, 47),
+        "Antd Morski" => Color.FromArgb(236, 247, 246),
+        _ => IsDark(options) ? Color.FromArgb(32, 37, 45) : Color.FromArgb(245, 247, 250)
+    };
+
+    internal static Color Ink(AppearanceOptions options) =>
+        IsDark(options) ? Color.FromArgb(237, 239, 243) : Color.FromArgb(30, 37, 49);
 
     sealed class GridState(DataGridView grid)
     {
@@ -152,12 +169,13 @@ internal static class AppearanceThemes
         }
         bool dark = IsDark(appearance);
         bool classic = appearance.Preset == "Klasyczny";
-        Color background = dark ? Color.FromArgb(31, 35, 42) : Color.White;
-        Color foreground = dark ? Color.FromArgb(235, 238, 244) : SystemColors.WindowText;
-        Color header = dark ? Color.FromArgb(47, 53, 63) : SystemColors.Control;
+        Color canvas = Canvas(appearance);
+        Color background = dark ? Blend(canvas, Color.White, .03f) : Color.White;
+        Color foreground = Ink(appearance);
+        Color header = classic ? SystemColors.Control : Blend(canvas, foreground, dark ? .10f : .05f);
         Color accent = Accent(appearance);
 
-        grid.BackgroundColor = dark ? background : SystemColors.Window;
+        grid.BackgroundColor = background;
         grid.EnableHeadersVisualStyles = false;
         grid.ColumnHeadersDefaultCellStyle.BackColor = header;
         grid.ColumnHeadersDefaultCellStyle.ForeColor = dark ? foreground : SystemColors.ControlText;
@@ -166,11 +184,11 @@ internal static class AppearanceThemes
         grid.DefaultCellStyle.BackColor = background;
         grid.DefaultCellStyle.ForeColor = foreground;
         grid.DefaultCellStyle.SelectionBackColor = classic ? SystemColors.Highlight : accent;
-        grid.DefaultCellStyle.SelectionForeColor = classic ? SystemColors.HighlightText : Color.White;
+        grid.DefaultCellStyle.SelectionForeColor = classic ? SystemColors.HighlightText : ContrastingText(accent);
         grid.AlternatingRowsDefaultCellStyle.BackColor = appearance.AlternatingRows
-            ? dark ? Color.FromArgb(39, 45, 54) : Color.FromArgb(244, 247, 250)
+            ? Blend(background, foreground, dark ? .045f : .03f)
             : background;
-        grid.GridColor = dark ? Color.FromArgb(72, 78, 89) : SystemColors.ControlDark;
+        grid.GridColor = classic ? SystemColors.ControlDark : Blend(background, foreground, dark ? .24f : .14f);
         grid.ShowCellToolTips = appearance.ShowToolTips;
         grid.CellBorderStyle = appearance.GridLines ? DataGridViewCellBorderStyle.Single : DataGridViewCellBorderStyle.None;
         int previousAppliedHeight = state.AppliedRowHeight ?? state.RowHeight;
@@ -191,18 +209,15 @@ internal static class AppearanceThemes
     {
         internal readonly Color Background = control.BackColor;
         internal readonly Color Foreground = control.ForeColor;
-        internal readonly FlatStyle? ButtonFlat = (control as ButtonBase)?.FlatStyle;
-        internal readonly bool? VisualStyle = (control as ButtonBase)?.UseVisualStyleBackColor;
     }
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, SurfaceColors> Surfaces = new();
-    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ButtonBase, ButtonTheme> ButtonThemes = new();
 
-    static Color Blend(Color a, Color b, float ratio) =>
+    internal static Color Blend(Color a, Color b, float ratio) =>
         Color.FromArgb((int)(a.R * (1 - ratio) + b.R * ratio),
             (int)(a.G * (1 - ratio) + b.G * ratio),
             (int)(a.B * (1 - ratio) + b.B * ratio));
 
-    static Color ContrastingText(Color fill)
+    internal static Color ContrastingText(Color fill)
     {
         static double Linear(byte channel)
         {
@@ -214,183 +229,79 @@ internal static class AppearanceThemes
         return luminance > .179 ? Color.Black : Color.White;
     }
 
-    sealed class ButtonTheme(ButtonBase button)
+    internal static void ApplyButton(Button button, AppearanceOptions options)
     {
-        internal AppearanceOptions? Options;
-        bool hovered;
-        bool pressed;
-
-        internal void Attach()
-        {
-            button.Paint += (_, e) => Draw(e.Graphics);
-            button.MouseEnter += (_, _) => { hovered = true; button.Invalidate(); };
-            button.MouseLeave += (_, _) => { hovered = pressed = false; button.Invalidate(); };
-            button.MouseDown += (_, e) => { pressed = e.Button == MouseButtons.Left; button.Invalidate(); };
-            button.MouseUp += (_, _) => { pressed = false; button.Invalidate(); };
-            button.MouseCaptureChanged += (_, _) => { if (!button.Capture) pressed = false; button.Invalidate(); };
-            button.KeyDown += (_, e) => { if (e.KeyCode == Keys.Space) { pressed = true; button.Invalidate(); } };
-            button.KeyUp += (_, e) => { if (e.KeyCode == Keys.Space) { pressed = false; button.Invalidate(); } };
-            button.LostFocus += (_, _) => { pressed = false; button.Invalidate(); };
-            if (button is CheckBox check) check.CheckedChanged += (_, _) => button.Invalidate();
-            if (button is RadioButton radio) radio.CheckedChanged += (_, _) => button.Invalidate();
-        }
-
-        internal bool UsesTheme => Options is { SwitchStyle: > 0 } options && !IsClassic(options) &&
-            ((button is Button && options.ColorButtons) ||
-                button is CheckBox { Appearance: Appearance.Button } ||
-                button is RadioButton { Appearance: Appearance.Button });
-
-        void Draw(Graphics graphics)
-        {
-            if (!UsesTheme) return;
-            bool selected = button is CheckBox { Checked: true } || button is RadioButton { Checked: true };
-
-            var options = Options;
-            Color surface = button.Parent?.BackColor ?? SystemColors.Control;
-            Color accent = Accent(options!);
-            bool dark = IsDark(options!);
-            bool outline = options!.SwitchStyle == 2;
-            Color ink = dark ? Color.WhiteSmoke : Color.FromArgb(30, 37, 49);
-            Color edge = dark ? Blend(accent, Color.White, .45f) : Blend(accent, Color.Black, .25f);
-            Color fill = selected && !outline ? Blend(accent, Color.Black, .32f)
-                : Blend(surface, accent, selected ? .19f : outline ? 0f : .07f);
-            if (button.Enabled && (hovered || pressed))
-                fill = Blend(fill, selected && !outline ? Color.Black : accent, pressed ? .25f : .13f);
-            Color text = selected && !outline ? ContrastingText(fill) : ink;
-            if (!button.Enabled)
-            {
-                fill = Blend(fill, surface, .7f);
-                edge = Blend(edge, surface, .55f);
-                text = SystemColors.GrayText;
-            }
-
-            float scale = button.DeviceDpi / 96f;
-            float stroke = (selected ? 2f : 1f) * scale;
-            var bounds = new RectangleF(stroke / 2, stroke / 2,
-                button.ClientSize.Width - stroke - 1, button.ClientSize.Height - stroke - 1);
-            if (bounds.Width <= 0 || bounds.Height <= 0) return;
-            float diameter = Math.Min(options!.CornerRadius * 2 * scale,
-                Math.Min(bounds.Width, bounds.Height));
-
-            using var path = new System.Drawing.Drawing2D.GraphicsPath();
-            if (diameter < 1) path.AddRectangle(bounds);
-            else
-            {
-                path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
-                path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
-                path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
-                path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
-                path.CloseFigure();
-            }
-            using var background = new SolidBrush(surface);
-            using var brush = new SolidBrush(fill);
-            using var pen = new Pen(selected && !outline ? fill : edge, stroke);
-            var state = graphics.Save();
-            graphics.FillRectangle(background, button.ClientRectangle);
-            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            graphics.FillPath(brush, path);
-            graphics.DrawPath(pen, path);
-            graphics.Restore(state);
-
-            TextRenderer.DrawText(graphics, button.Text, button.Font, button.ClientRectangle, text,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
-                TextFormatFlags.SingleLine | (button.UseMnemonic ? TextFormatFlags.HidePrefix : TextFormatFlags.NoPrefix));
-            if (button.Focused && button.Enabled)
-            {
-                int inset = (int)Math.Ceiling(4 * scale);
-                var focus = Rectangle.Inflate(button.ClientRectangle, -inset, -inset);
-                if (focus.Width > 0 && focus.Height > 0)
-                    ControlPaint.DrawFocusRectangle(graphics, focus, text, fill);
-            }
-        }
-    }
-
-    internal static void ApplyDocumentSelector(AntdUI.Button button, AppearanceOptions options, bool selected)
-    {
-        bool classic = IsClassic(options) || options.SwitchStyle == 0;
+        bool selector = button is ThemeSelector;
+        bool selected = selector && button.Toggle;
+        bool classic = IsClassic(options);
+        bool neutral = options.SwitchStyle == 0 || (!selector && !options.ColorButtons);
+        bool outlined = options.SwitchStyle == 2;
         bool dark = IsDark(options);
-        bool outlined = !classic && options.SwitchStyle == 2;
-        Color accent = classic ? SystemColors.Highlight : Accent(options);
-        Color surface = button.Parent?.BackColor ?? SystemColors.Control;
-        Color text = dark ? Color.WhiteSmoke : SystemColors.ControlText;
-        Color selectedFill = classic ? accent : Blend(accent, Color.Black, .22f);
-        Color edge = dark ? Blend(accent, Color.White, .45f) : Blend(accent, Color.Black, .25f);
+        Color surface = button.Parent?.BackColor ?? (classic ? SystemColors.Control : Canvas(options));
+        Color ink = Ink(options);
+        Color accent = neutral ? (dark ? Color.LightGray : SystemColors.Highlight) : Accent(options);
+        Color edge = dark ? Blend(accent, Color.White, .40f) : Blend(accent, Color.Black, .26f);
+        bool filled = selected && !outlined;
+        Color fill = filled ? (dark ? accent : Blend(accent, Color.Black, .12f))
+            : Blend(surface, accent, selected ? .18f : neutral || outlined ? 0f : .05f);
+        Color hover = Blend(fill, filled ? ink : accent, dark ? .17f : .11f);
+        Color pressed = Blend(fill, filled ? ink : accent, dark ? .24f : .18f);
 
-        button.Radius = classic ? 4 : options.CornerRadius;
+        button.ColorScheme = dark ? AntdUI.TAMode.Dark : AntdUI.TAMode.Light;
+        button.Radius = neutral ? 4 : options.CornerRadius;
         button.BorderWidth = selected && outlined ? 2 : 1;
-        button.DefaultBorderColor = selected ? edge : Blend(surface, edge, .42f);
-        button.DefaultBack = selected && !outlined ? selectedFill
-            : Blend(surface, accent, selected ? .15f : .03f);
-        button.ForeColor = selected && !outlined ? ContrastingText(selectedFill) : text;
-        button.ForeHover = button.ForeColor;
-        button.ForeActive = button.ForeColor;
-        button.BackHover = selected && !outlined ? selectedFill : edge;
-        button.BackActive = button.BackHover;
-        button.AccessibleDescription = (button.Tag as string) + (selected ? " · wybrano" : "");
+        button.DefaultBorderColor = selected ? edge : Blend(surface, neutral ? ink : edge, .30f);
+        button.DefaultBack = fill;
+        button.ForeColor = filled ? ContrastingText(fill) : ink;
+        button.ForeHover = filled ? ContrastingText(hover) : ink;
+        button.ForeActive = filled ? ContrastingText(pressed) : ink;
+        button.BackHover = filled ? hover : edge;
+        button.BackActive = filled ? pressed : edge;
+        if (button.Tag is string shortcut)
+            button.AccessibleDescription = selected ? shortcut + " · wybrano" : shortcut;
         button.Invalidate();
     }
 
-    static ButtonTheme GetButtonTheme(ButtonBase button) => ButtonThemes.GetValue(button, item =>
-    {
-        var theme = new ButtonTheme(item);
-        theme.Attach();
-        return theme;
-    });
-
-    // Revert each individual control to its captured appearance when returning
-    // to Classic; don't force the standard Windows palette over custom controls.
     internal static void ApplySurface(Control control, AppearanceOptions appearance)
     {
-        if (control is DataGridView) return;
         bool classic = IsClassic(appearance);
         bool dark = IsDark(appearance);
-        var original = Surfaces.GetValue(control, item => new SurfaceColors(item));
-        if (control is Form or Panel or TableLayoutPanel or FlowLayoutPanel or TabPage
-            or TabControl or Label or CheckBox or RadioButton or Button or GroupBox
-            or StatusStrip or TextBox or ComboBox)
+        if (control is DataGridView grid)
         {
-            bool input = control is TextBox or ComboBox;
-            if (classic)
-            {
-                control.BackColor = original.Background;
-                control.ForeColor = original.Foreground;
-            }
-            else if (dark)
-            {
-                control.BackColor = input ? Color.FromArgb(40, 46, 55) : Color.FromArgb(32, 37, 45);
-                control.ForeColor = Color.FromArgb(237, 239, 243);
-            }
-            else
-            {
-                control.BackColor = original.Background;
-                control.ForeColor = original.Foreground;
-            }
+            ApplyGrid(grid, appearance);
+            return;
         }
-        if (control is ButtonBase button && !button.IsDisposed)
+        switch (control)
         {
-            var theme = GetButtonTheme(button);
-            theme.Options = appearance;
-            if (theme.UsesTheme)
-            {
-                button.FlatStyle = FlatStyle.Flat;
-                button.UseVisualStyleBackColor = false;
-            }
-            else
-            {
-                if (original.ButtonFlat is { } flat) button.FlatStyle = flat;
-                if (original.VisualStyle is { } visual) button.UseVisualStyleBackColor = visual;
-            }
-            button.Invalidate();
+            case Button button:
+                ApplyButton(button, appearance);
+                break;
+            case CheckBox check:
+                check.ColorScheme = dark ? AntdUI.TAMode.Dark : AntdUI.TAMode.Light;
+                check.ForeColor = classic ? SystemColors.ControlText : Ink(appearance);
+                check.Fill = classic ? SystemColors.Highlight : Accent(appearance);
+                break;
+            case Form or Panel or TabPage or TabControl or Label or GroupBox or ToolStrip
+                or TextBoxBase or ListControl or NumericUpDown:
+                var original = Surfaces.GetValue(control, item => new SurfaceColors(item));
+                var canvas = Canvas(appearance);
+                bool input = control is TextBoxBase or ListControl or NumericUpDown;
+                control.BackColor = classic ? original.Background
+                    : input ? (dark ? Blend(canvas, Color.White, .07f) : Color.White) : canvas;
+                control.ForeColor = classic ? original.Foreground : Ink(appearance);
+                if (control is TabPage page) page.UseVisualStyleBackColor = classic;
+                break;
         }
-        foreach (Control child in control.Controls)
-            ApplySurface(child, appearance);
+
+        if (control.ContextMenuStrip is { } menu) ApplySurface(menu, appearance);
+        foreach (Control child in control.Controls) ApplySurface(child, appearance);
     }
 
-    internal static void ApplyTabs(TabControl tabs, AppearanceOptions appearance)
+    internal static void ApplyTabs(TabControl tabs, AppearanceOptions appearance, int interfaceScale)
     {
         // Owner-drawn tab headers need their padding scaled too. Otherwise the
         // font grows but the tab hit area stays small and captions are cut off.
-        float scale = Math.Max(1f, tabs.DeviceDpi / 96f) * InterfaceScale.Load() / 100f;
+        float scale = Math.Max(1f, tabs.DeviceDpi / 96f) * interfaceScale / 100f;
         int horizontal = appearance.WideTabs ? 36 : 30;
         int vertical = appearance.WideTabs ? 12 : 9;
         tabs.Padding = new Point((int)Math.Ceiling(horizontal * scale),
@@ -404,8 +315,7 @@ internal static class AppearanceEditor
 {
     internal static Control Create(Form owner, Action<AppearanceOptions> apply)
     {
-        AppearanceOptions original = AppearanceThemes.Load();
-        AppearanceOptions current = original with { };
+        AppearanceOptions current = AppearanceThemes.Load();
         // Prefer a narrow vertical editor when application scaling is increased.
         // Its controls must fit into the settings page without horizontal clipping.
         bool vertical = InterfaceScale.Load() > 100 || owner.DeviceDpi > 120;
@@ -430,12 +340,11 @@ internal static class AppearanceEditor
         var wide = new CheckBox { Text = "Powiększone zakładki", AutoSize = true };
         var customAccent = new CheckBox { Text = "Własny kolor zaznaczenia i przełączników", AutoSize = true };
         var switchStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
-        switchStyle.Items.AddRange(["Systemowe", "Wypełnione", "Z obramowaniem"]);
+        switchStyle.Items.AddRange(["Neutralne", "Wypełnione", "Z obramowaniem"]);
         var cornerRadius = new NumericUpDown { Minimum = 0, Maximum = 20, Width = 80 };
         var colorButtons = new CheckBox { Text = "Koloruj także zwykłe przyciski", AutoSize = true };
         var accent = new Button { Text = "Wybierz kolor…", AutoSize = true };
-        var explanation = new Label { AutoSize = true, MaximumSize = new Size(vertical ? 390 : 620, 0),
-            Text = "Motyw Klasyczny odpowiada dotychczasowemu wyglądowi. Indywidualne szerokości i kolejność kolumn pozostają bez zmian." };
+        var accentSample = new Label { Width = 28, Height = 24, AccessibleName = "Próbka akcentu" };
         var preview = new DataGridView { Width = vertical ? 390 : 600, Height = 120, ReadOnly = true, RowHeadersVisible = false,
             AllowUserToAddRows = false, AllowUserToResizeRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
         preview.Columns.Add("document", "Dokument");
@@ -449,11 +358,29 @@ internal static class AppearanceEditor
             AutoSize = true, Width = vertical ? 390 : 600, WrapContents = true,
             Padding = new Padding(0, 5, 0, 5)
         };
-        var previewInvoice = new RadioButton { Text = "Faktury", Appearance = Appearance.Button, AutoSize = true, Checked = true };
-        var previewReceipts = new RadioButton { Text = "Paragony", Appearance = Appearance.Button, AutoSize = true };
-        var previewFilter = new CheckBox { Text = "Do 30 dni", Appearance = Appearance.Button, AutoSize = true };
+        var previewInvoice = new ThemeSelector { Text = "Faktury", Toggle = true };
+        var previewReceipts = new ThemeSelector { Text = "Paragony" };
+        var previewFilter = new CheckBox { Text = "Netto", AutoSize = true };
         var previewAction = new Button { Text = "Zapisz", AutoSize = true };
         switchPreview.Controls.AddRange([previewInvoice, previewReceipts, previewFilter, previewAction]);
+        void RenderPreview()
+        {
+            AppearanceThemes.ApplyGrid(preview, current);
+            AppearanceThemes.ApplySurface(switchPreview, current);
+            accentSample.BackColor = AppearanceThemes.Accent(current);
+        }
+        previewInvoice.Click += (_, _) =>
+        {
+            previewInvoice.Toggle = true;
+            previewReceipts.Toggle = false;
+            RenderPreview();
+        };
+        previewReceipts.Click += (_, _) =>
+        {
+            previewInvoice.Toggle = false;
+            previewReceipts.Toggle = true;
+            RenderPreview();
+        };
 
         bool loading = false;
         void LoadControls()
@@ -473,9 +400,8 @@ internal static class AppearanceEditor
             switchStyle.SelectedIndex = current.SwitchStyle;
             cornerRadius.Value = current.CornerRadius;
             colorButtons.Checked = current.ColorButtons;
-            accent.BackColor = Color.FromArgb(current.AccentArgb);
-            AppearanceThemes.ApplyGrid(preview, current);
-            AppearanceThemes.ApplySurface(switchPreview, current);
+            accent.Enabled = customAccent.Checked;
+            RenderPreview();
             loading = false;
         }
         void Capture()
@@ -499,14 +425,19 @@ internal static class AppearanceEditor
             current.SwitchStyle = switchStyle.SelectedIndex < 0 ? 1 : switchStyle.SelectedIndex;
             current.CornerRadius = (int)cornerRadius.Value;
             current.ColorButtons = colorButtons.Checked;
-            AppearanceThemes.ApplyGrid(preview, current);
-            AppearanceThemes.ApplySurface(switchPreview, current);
+            accent.Enabled = customAccent.Checked;
+            RenderPreview();
         }
         preset.SelectedIndexChanged += (_, _) =>
         {
             if (preset.SelectedItem is not string name) return;
             if (name == "Własny") current.Preset = name;
-            else current = AppearanceOptions.ForPreset(name);
+            else current = AppearanceOptions.ForPreset(name) with
+            {
+                RememberLastTab = current.RememberLastTab,
+                StartMaximized = current.StartMaximized,
+                PrintPreviewZoom = current.PrintPreviewZoom
+            };
             LoadControls();
         };
         foreach (var checkbox in new[] { lines, stripes, bold, last, maximize, tooltips, wide, customAccent })
@@ -519,7 +450,7 @@ internal static class AppearanceEditor
         colorButtons.CheckedChanged += (_, _) => Capture();
         accent.Click += (_, _) =>
         {
-            using var dialog = new ColorDialog { Color = Color.FromArgb(current.AccentArgb), FullOpen = true };
+            using var dialog = new ColorDialog { Color = AppearanceThemes.Accent(current), FullOpen = true };
             if (dialog.ShowDialog(owner) != DialogResult.OK) return;
             current.AccentArgb = dialog.Color.ToArgb();
             current.UseCustomAccent = true;
@@ -543,30 +474,40 @@ internal static class AppearanceEditor
             line.Controls.Add(control);
             panel.Controls.Add(line);
         }
-        AddLabeled("Motyw", preset);
-        panel.Controls.Add(explanation);
+        void Heading(string text)
+        {
+            panel.Controls.Add(new Label { Text = text, AutoSize = true, Margin = new Padding(3, 12, 3, 4) });
+        }
+        AddLabeled("Motyw kolorystyczny", preset);
+        Heading("Podgląd");
+        panel.Controls.Add(switchPreview);
+        panel.Controls.Add(preview);
+
+        Heading("Kolory i przełączniki");
+        AddLabeled("Styl przełączników", switchStyle);
+        AddLabeled("Zaokrąglenie narożników (px)", cornerRadius);
+        panel.Controls.Add(colorButtons);
+        panel.Controls.Add(customAccent);
+        var accentTools = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        accentTools.Controls.AddRange([accent, accentSample]);
+        panel.Controls.Add(accentTools);
+
+        Heading("Tabele");
         AddLabeled("Czcionka tabel (pkt)", size);
         AddLabeled("Wysokość wierszy (px)", height);
         panel.Controls.Add(lines);
         panel.Controls.Add(stripes);
         panel.Controls.Add(bold);
+        panel.Controls.Add(tooltips);
+
+        Heading("Okno i wydruki");
+        panel.Controls.Add(wide);
         panel.Controls.Add(last);
         panel.Controls.Add(maximize);
-        panel.Controls.Add(tooltips);
-        panel.Controls.Add(wide);
-        panel.Controls.Add(customAccent);
-        panel.Controls.Add(accent);
-        AddLabeled("Styl przełączników i przycisków", switchStyle);
-        AddLabeled("Zaokrąglenie narożników (px)", cornerRadius);
-        panel.Controls.Add(colorButtons);
         AddLabeled("Powiększenie podglądu wydruku (%)", zoom);
-        panel.Controls.Add(new Label { Text = "Podgląd motywu", AutoSize = true });
-        panel.Controls.Add(preview);
-        panel.Controls.Add(new Label { Text = "Podgląd przełączników i przycisków", AutoSize = true });
-        panel.Controls.Add(switchPreview);
         var actions = new FlowLayoutPanel { AutoSize = true, Width = vertical ? 390 : 640, WrapContents = true };
-        var applyButton = new Button { Text = "Zastosuj", AutoSize = true };
-        var save = new Button { Text = "Zapisz motyw", AutoSize = true };
+        var applyButton = new Button { Text = "Zastosuj tymczasowo", AutoSize = true };
+        var save = new Button { Text = "Zapisz i zastosuj", AutoSize = true };
         var reset = new Button { Text = "Przywróć Klasyczny", AutoSize = true };
         actions.Controls.AddRange([applyButton, save, reset]);
         panel.Controls.Add(actions);
@@ -574,12 +515,14 @@ internal static class AppearanceEditor
         {
             Capture();
             apply(current with { });
+            RenderPreview();
         };
         save.Click += (_, _) =>
         {
             Capture();
             AppearanceThemes.Save(current);
-            apply(current);
+            apply(current with { });
+            RenderPreview();
             MessageBox.Show(owner, "Zapisano wygląd programu. Niektóre ustawienia okien będą widoczne po ponownym uruchomieniu.",
                 "KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Information);
         };

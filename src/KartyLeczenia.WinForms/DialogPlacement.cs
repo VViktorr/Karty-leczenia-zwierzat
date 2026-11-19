@@ -10,6 +10,7 @@ internal static class DialogPlacement
     {
         // Ensure dialogs remain visible after a change of DPI, resolution or monitor.
         dialog.AutoScaleMode = AutoScaleMode.Dpi;
+        AppearanceThemes.ApplySurface(dialog, AppearanceThemes.Current);
         dialog.Shown += (_, _) =>
         {
             if (dialog.IsDisposed || dialog.WindowState != FormWindowState.Normal) return;

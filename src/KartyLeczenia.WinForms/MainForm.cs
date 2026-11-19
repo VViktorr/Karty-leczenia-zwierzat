@@ -14,7 +14,7 @@ internal sealed class MainForm : Form
     readonly DataGridView prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new();
     Font? boldDocumentKindFont;
-    readonly Dictionary<DocumentSearchKinds, AntdUI.Button> documentKinds = new();
+    readonly Dictionary<DocumentSearchKinds, ThemeSelector> documentKinds = new();
     readonly StatusStrip statusBar = new();
     readonly ToolStripStatusLabel status = new();
     readonly ToolStripStatusLabel refreshDocuments = new() { IsLink = true, Visible = false };
@@ -108,11 +108,10 @@ internal sealed class MainForm : Form
         void ApplyAppearance(AppearanceOptions options)
         {
             appearance = AppearanceThemes.Normalize(options);
+            AppearanceThemes.Current = appearance;
+            AntdUI.Config.Mode = AppearanceThemes.IsDark(appearance) ? AntdUI.TMode.Dark : AntdUI.TMode.Light;
             AppearanceThemes.ApplySurface(this, appearance);
-            UpdateDocumentKindButtons();
-            AppearanceThemes.ApplyTabs(tabs, appearance);
-            foreach (var grid in tables.Values.Append(savedCardsGrid))
-                AppearanceThemes.ApplyGrid(grid, appearance);
+            AppearanceThemes.ApplyTabs(tabs, appearance, interfaceScale);
             tabs.Invalidate();
         }
         applyAppearance = ApplyAppearance;
@@ -157,13 +156,6 @@ internal sealed class MainForm : Form
         var tabPadding = tabs.Padding;
         Scale(new SizeF(factor, factor));
         tabs.Padding = new Point(Pixels(tabPadding.X), Pixels(tabPadding.Y));
-        var scaledFont = new Font(Font.FontFamily, Font.SizeInPoints * factor, Font.Style, GraphicsUnit.Point);
-        Font = scaledFont;
-        Disposed += (_, _) => scaledFont.Dispose();
-        var previousBold = boldDocumentKindFont;
-        boldDocumentKindFont = new Font(Font, Font.Style | FontStyle.Bold);
-        UpdateDocumentKindButtons();
-        previousBold?.Dispose();
         MinimumSize = new Size(Math.Min(MinimumSize.Width, workingArea.Width), Math.Min(MinimumSize.Height, workingArea.Height));
         Size = new Size(Math.Min(Width, workingArea.Width), Math.Min(Height, workingArea.Height));
 
@@ -182,17 +174,17 @@ internal sealed class MainForm : Form
         var bounds = e.Bounds;
         bounds.Inflate(-1, -1);
         if (!selected) bounds.Inflate(-1, -2);
-        bool dark = AppearanceThemes.IsDark(appearance);
         bool classic = AppearanceThemes.IsClassic(appearance);
+        Color ink = AppearanceThemes.Ink(appearance);
         Color tabColor = classic ? SystemColors.Control
             : selected ? AppearanceThemes.Accent(appearance)
-            : dark ? Color.FromArgb(48, 56, 67) : Color.FromArgb(235, 239, 245);
+            : AppearanceThemes.Blend(AppearanceThemes.Canvas(appearance), ink, .065f);
         using var tabBrush = new SolidBrush(tabColor);
         e.Graphics.FillRectangle(tabBrush, bounds);
 
         using var selectedFont = selected ? new Font(tabs.Font.FontFamily, tabs.Font.SizeInPoints + 2, tabs.Font.Style | FontStyle.Bold, GraphicsUnit.Point) : null;
         TextRenderer.DrawText(e.Graphics, tabs.TabPages[e.Index].Text, selectedFont ?? tabs.Font, bounds,
-            selected && !classic ? Color.White : dark ? Color.WhiteSmoke : SystemColors.ControlText,
+            selected && !classic ? AppearanceThemes.ContrastingText(tabColor) : ink,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
             TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         if (selected && tabs.Focused)
@@ -430,12 +422,9 @@ internal sealed class MainForm : Form
         UpdateDocumentKindButtons();
     }
 
-    AntdUI.Button DocumentKindButton(DocumentSearchKinds value, string label, string shortcut)
+    ThemeSelector DocumentKindButton(DocumentSearchKinds value, string label, string shortcut)
     {
-        var button = new AntdUI.Button
-        {
-            Text = label, AutoSize = true, WaveSize = 0, TabStop = true, Tag = shortcut
-        };
+        var button = new ThemeSelector { Text = label, Tag = shortcut };
         button.Click += async (_, _) => await Run(() => SelectKind(value), label);
         if (boldDocumentKindFont is null)
         {
@@ -453,7 +442,8 @@ internal sealed class MainForm : Form
         {
             bool selected = value == kind;
             button.Font = selected ? boldDocumentKindFont : Font;
-            AppearanceThemes.ApplyDocumentSelector(button, appearance, selected);
+            button.Toggle = selected;
+            AppearanceThemes.ApplyButton(button, appearance);
         }
     }
 
@@ -829,20 +819,40 @@ internal sealed class MainForm : Form
             }
         }
 
-        RadioButton Filter(string text, int? days)
+        var filters = new (ThemeSelector Button, int? Days)[]
         {
-            var button = new RadioButton { Text = text, Appearance = Appearance.Button, AutoSize = true, Checked = days is null };
-            button.CheckedChanged += (_, _) =>
+            (new() { Text = "Wszystkie", Toggle = true }, null),
+            (new() { Text = "Przeterminowane" }, -1),
+            (new() { Text = "Do 30 dni" }, 30),
+            (new() { Text = "Do 60 dni" }, 60)
+        };
+        for (int index = 0; index < filters.Length; index++)
+        {
+            int filterIndex = index;
+            var (button, days) = filters[index];
+            button.Click += (_, _) =>
             {
-                if (!button.Checked) return;
                 daysFilter = days;
+                foreach (var (filter, value) in filters)
+                {
+                    filter.Toggle = value == daysFilter;
+                    AppearanceThemes.ApplyButton(filter, appearance);
+                }
                 ShowExpiries();
             };
-            return button;
+            button.KeyDown += (_, e) =>
+            {
+                int direction = e.KeyCode switch { Keys.Left or Keys.Up => -1, Keys.Right or Keys.Down => 1, _ => 0 };
+                if (direction == 0) return;
+                var target = filters[(filterIndex + direction + filters.Length) % filters.Length].Button;
+                target.Focus();
+                target.PerformClick();
+                e.Handled = true;
+            };
         }
 
         page = Page("Terminy ważności", expiry, Action("Odśwież", LoadExpiries),
-            Filter("Wszystkie", null), Filter("Przeterminowane", -1), Filter("Do 30 dni", 30), Filter("Do 60 dni", 60));
+            filters[0].Button, filters[1].Button, filters[2].Button, filters[3].Button);
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab != page || connection is null) return;
