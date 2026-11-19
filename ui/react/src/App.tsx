@@ -338,6 +338,7 @@ function SavedCards() {
   const [purgeTarget,setPurgeTarget]=useState<SavedCard|null>(null);
   const [purgeConfirmation,setPurgeConfirmation]=useState("");
   const [purgeBusy,setPurgeBusy]=useState(false);
+  const [purgeError,setPurgeError]=useState("");
   const [notice,setNotice]=useState("");
   const remote=useRemote<SavedCard[]>("savedCards",{trash,query},[trash,query]);
   const open=async (row: SavedCard) => {
@@ -353,7 +354,7 @@ function SavedCards() {
   async function purgeCard(){
     const expected=purgeTarget?.number || purgeTarget?.document || "";
     if(!purgeTarget || !expected || purgeConfirmation!==expected || purgeBusy)return;
-    setPurgeBusy(true);setError("");setNotice("");
+    setPurgeBusy(true);setPurgeError("");setError("");setNotice("");
     try{
       const result=await invoke<{deleted:boolean;cancelled:boolean}>("purgeTrashedCard",{
         id:purgeTarget.id,confirmation:purgeConfirmation
@@ -362,8 +363,11 @@ function SavedCards() {
         setPurgeTarget(null);setPurgeConfirmation("");
         setNotice("Karta została trwale usunięta z kosza SQL.");
         remote.reload();
-      }else if(result.cancelled)setNotice("Usuwanie anulowane przez Windows Hello.");
-    }catch(e){setError(e instanceof Error?e.message:String(e));}
+      }else if(result.cancelled){
+        setPurgeTarget(null);setPurgeConfirmation("");
+        setNotice("Usuwanie anulowane przez Windows Hello.");
+      }
+    }catch(e){setPurgeError(e instanceof Error?e.message:String(e));}
     finally{setPurgeBusy(false);}
   }
   const changeTrash=(row:SavedCard)=>{
@@ -393,7 +397,7 @@ function SavedCards() {
             <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
             <Button size="small" onClick={()=>{void printSaved(row);}}>Drukuj</Button>
             <Button size="small" danger={!trash} onClick={()=>changeTrash(row)}>{trash?"Przywróć":"Kosz"}</Button>
-            {trash&&<Button size="small" danger onClick={()=>{setPurgeTarget(row);setPurgeConfirmation("");setNotice("");}}>
+            {trash&&<Button size="small" danger onClick={()=>{setPurgeTarget(row);setPurgeConfirmation("");setPurgeError("");setNotice("");}}>
               Usuń trwale
             </Button>}
           </Space>}
@@ -408,6 +412,7 @@ function SavedCards() {
           disabled={!purgeTarget || purgeConfirmation!==(purgeTarget.number||purgeTarget.document)}
           onClick={()=>{void purgeCard();}}>Usuń trwale z SQL</Button>
       </Space>}>
+      {purgeError&&<Alert className="notice" type="error" showIcon message={purgeError}/>}
       <Alert className="notice" type="warning" showIcon
         message="Nieodwracalna operacja — wymaga Windows Hello i uprawnień administratora SQL"
         description="Usuwana jest tylko wskazana karta znajdująca się już w koszu. Po usunięciu nie będzie jej można przywrócić z kosza."/>
