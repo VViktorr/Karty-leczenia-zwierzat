@@ -196,6 +196,19 @@ internal sealed class ReactWindow : Form
 
     private async Task<object> Handle(string action, JsonElement root, CancellationToken token)
     {
+        if (action == "getPricePrintSettings")
+            return PricePrintOptionsStore.Load();
+        if (action == "savePricePrintSettings")
+        {
+            if (!root.TryGetProperty("settings", out var value) ||
+                value.ValueKind != JsonValueKind.Object)
+                throw new ArgumentException("Brak ustawień wydruku.");
+            var settings = JsonSerializer.Deserialize<PricePrintOptions>(
+                value.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                ?? throw new ArgumentException("Nieprawidłowe ustawienia wydruku.");
+            await Task.Run(() => PricePrintOptionsStore.Save(settings), token);
+            return new { saved = true };
+        }
         if (action == "searchCatalogue")
         {
             string search = Text(root, "query", 120);
