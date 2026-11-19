@@ -2125,6 +2125,7 @@ internal sealed class MainForm : Form
                 {
                     sharedClinic = null;
                     prices.DataSource = null;
+                    priceRows = [];
                     treatmentCatalogue = null;
                     currentCard = null;
                     selectedTreatmentVariants.Clear();
@@ -2620,6 +2621,7 @@ internal sealed class MainForm : Form
                     excludedTreatmentRows.Clear();
                     treatment.Rows.Clear();
                     prices.DataSource = null;
+                    priceRows = [];
                     await RefreshClinic(archive);
                 }
                 else if (!restoring)
