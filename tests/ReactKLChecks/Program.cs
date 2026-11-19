@@ -64,6 +64,49 @@ static class Program
             catch (InvalidDataException) { bad = true; }
             Check(bad, "malformed published SQL version must be rejected");
 
+            var previous = new KartyLeczenia.TreatmentRow();
+            previous.Set("Produkt", "Example product", false);
+            previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
+            previous.Set("Automatyczna karencja", "Tkanki jadalne: 28 dni", false);
+            previous.Set("Produkt kontekstu", "Example product", false);
+            previous.Set("Dokument kontekstu JSON", "previous registry", false);
+            previous.Set("SHA256 źródła", "old-pdf", false);
+            var choice = new CatalogueVariantModel(
+                Id: 12, Species: "Świnie", Route: "im.",
+                Dose: "1 ml/10 kg", Tissues: "", Milk: "",
+                Indication: "Nowe wskazanie", Source: "Aktualna ChPL");
+            var applied = TreatmentVariantApplier.Apply(previous, choice);
+            Check(applied.Withdrawal.Length == 0,
+                "missing new withdrawal must clear previous species withdrawal");
+            Check(previous.Get("Karencja").Length == 0,
+                "old withdrawal must never leak into printed treatment row");
+            Check(previous.Get("Dokument kontekstu JSON").Length == 0 &&
+                  previous.Get("Automatyczna karencja").Length == 0,
+                "old registry auto-context must be reset before species change");
+            Check(previous.Get("Gatunek") == "Świnie" &&
+                  previous.Get("Droga podania") == "im." &&
+                  previous.Get("Dawkowanie i okres stosowania") == "1 ml/10 kg",
+                "new treatment species route and dose must replace old values");
+            Check(previous.Get("Opis zwierząt / numer siedziby stada") == "Świnie",
+                "default animal description must follow selected species");
+            Check(previous.Get("Wskazanie ChPL") == "Nowe wskazanie",
+                "selected ChPL indication must be retained");
+            Check(previous.Get("SHA256 źródła").Length == 0,
+                "old registry PDF fingerprint must not be attributed to new choice");
+            Check(previous.Get("Status karencji").Contains("zweryfikuj",
+                  StringComparison.OrdinalIgnoreCase),
+                "new treatment variant always requires clinical verification");
+            var second = choice with { Id = 13, Tissues = "5 dni", Milk = "36 godzin" };
+            var updated = TreatmentVariantApplier.Apply(previous, second);
+            Check(updated.Withdrawal.Contains("Tkanki jadalne: 5 dni") &&
+                  updated.Withdrawal.Contains("Mleko: 36 godzin"),
+                "new animal withdrawal must include tissues and milk");
+            Check(previous.Get("Karencja")==updated.Withdrawal,
+                "printed withdrawal must match the selected SQL catalogue variant");
+            bool incompleteRejected = false;
+            try { TreatmentVariantApplier.Apply(previous, choice with { Route = "" }); }
+            catch (InvalidOperationException) { incompleteRejected = true; }
+            Check(incompleteRejected, "incomplete variant must be rejected");
             Console.WriteLine($"ReactKL regression checks passed: {checks}");
         }
         finally
