@@ -14,6 +14,7 @@ internal sealed class CatalogueEditor : Form
     readonly CatalogueProduct product;
     readonly TextBox rpl = new() { Width = 160 };
     readonly TextBox description = new() { Width = 410 };
+    CatalogueVariantsTable? variantView;
     readonly DataGridView variants = new()
     {
         Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
@@ -51,6 +52,7 @@ internal sealed class CatalogueEditor : Form
             variants.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = name, Width = width });
         variants.Columns[10].ReadOnly = true;
         foreach (var variant in product.Variants) AddVariant(variant);
+        variantView = new CatalogueVariantsTable(variants);
 
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true,
             WrapContents = true, Padding = new Padding(8) };
@@ -66,7 +68,11 @@ internal sealed class CatalogueEditor : Form
         buttons.Controls.AddRange([add, autoPdf, pdf, save, cancel, message]);
         CancelButton = cancel;
         FormClosing += (_, e) => { if (!Enabled && DialogResult != DialogResult.OK) e.Cancel = true; };
+        // AntdUI is the visible, editable catalogue table. The original grid
+        // remains a data model for existing SQL/PDF draft processing.
+        variants.Visible = false;
         Controls.Add(variants);
+        Controls.Add(variantView);
         Controls.Add(header);
         Controls.Add(buttons);
         AppearanceThemes.ApplySurface(this, AppearanceThemes.Current);
@@ -78,6 +84,7 @@ internal sealed class CatalogueEditor : Form
             variant.Tissues, variant.Milk, variant.Remarks, variant.Source, variant.Short, variant.Price, variant.Pdf)];
         row.Tag = variant;
         if (variant.Id is null) variants.CurrentCell = row.Cells[0];
+        variantView?.RefreshFromSource();
     }
 
     async Task SuggestFromPdf(Button button)
@@ -193,7 +200,7 @@ internal sealed class CatalogueEditor : Form
 
     void AttachPdf()
     {
-        if (!variants.EndEdit() || variants.SelectedRows.Count == 0)
+        if (!variants.EndEdit() || variantView?.SelectedSources().Count is not > 0)
         {
             message.Text = "Zaznacz warianty, do których chcesz dołączyć ChPL.";
             return;
@@ -211,7 +218,7 @@ internal sealed class CatalogueEditor : Form
             }
             var key = $"ChPL/{Convert.ToHexString(SHA256.HashData(content))}.pdf";
             pdfs[key] = content;
-            foreach (DataGridViewRow row in variants.SelectedRows) row.Cells[10].Value = key;
+            foreach (DataGridViewRow row in variantView!.SelectedSources()) row.Cells[10].Value = key;
             message.Text = $"Wybrano {Path.GetFileName(dialog.FileName)}.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
