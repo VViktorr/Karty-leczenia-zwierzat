@@ -14,12 +14,19 @@ type LayoutName = "classic" | "modern" | "fluent";
 type PaletteName = "light" | "dark" | "sea";
 type Section = "documents" | "prices" | "catalogue" | "treatment" | "saved" | "expiry" | "settings";
 interface DraftRow {
-  index: number; product: string; quantity: string; batch: string;
+  index: number; product: string; symbol: string; indication: string; quantity: string; batch: string;
   species: string; route: string; dosing: string; withdrawal: string;
   description: string; animals: string; diagnosis: string; section: string; selected: boolean;
 }
 interface Draft {
   draftId: string; number: string; payer: string; recipient: string; rows: DraftRow[];
+}
+interface TreatmentVariantChoice {
+  id:number;species:string;indication:string;route:string;dose:string;
+  tissues:string;milk:string;remarks:string;source:string;pdf:string;
+}
+interface TreatmentVariantList {
+  product:string;symbol:string;variants:TreatmentVariantChoice[];
 }
 interface PriceLevel { number: number; name: string; }
 interface MedicinePrice {
@@ -173,7 +180,14 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   const [findings, setFindings] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
   const previewFrame = useRef<HTMLIFrameElement>(null);
-  useEffect(() => { setRows(draft?.rows ?? []); setSavedNumber(""); }, [draft]);
+  const [variantModal,setVariantModal]=useState<{
+    index:number;product:string;symbol:string;variants:TreatmentVariantChoice[];
+  }|null>(null);
+  const [variantBusy,setVariantBusy]=useState(false);
+  const [variantError,setVariantError]=useState("");
+  useEffect(() => {
+    setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
+  }, [draft]);
   async function saveCard(confirmDuplicate = false) {
     if (!draft || busy) return;
     setBusy(true); setError("");
@@ -203,6 +217,33 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     } catch(e) {setError(e instanceof Error ? e.message : String(e));}
     finally {setBusy(false);}
   }
+  async function openVariants(row:DraftRow){
+    if(!draft || variantBusy)return;
+    setVariantBusy(true);setVariantError("");setError("");
+    try{
+      const found=await invoke<TreatmentVariantList>("treatmentVariants",{
+        draftId:draft.draftId,index:row.index
+      });
+      if(!found.variants.length)throw new Error(
+        "W katalogu SQL brak wariantów dla tego produktu. Sprawdź jego kartotekę.");
+      setVariantModal({index:row.index,product:found.product,
+        symbol:found.symbol,variants:found.variants});
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setVariantBusy(false);}
+  }
+  async function applyVariant(id:number){
+    if(!draft || !variantModal || variantBusy)return;
+    setVariantBusy(true);setVariantError("");
+    try{
+      const result=await invoke<Pick<DraftRow,"species"|"route"|"dosing"|"withdrawal"|"indication">>(
+        "applyTreatmentVariant",{draftId:draft.draftId,
+          index:variantModal.index,variantId:id});
+      setRows(current=>current.map(row=>row.index===variantModal.index
+        ? {...row,...result} : row));
+      setVariantModal(null);setError("");
+    }catch(e){setVariantError(e instanceof Error?e.message:String(e));}
+    finally{setVariantBusy(false);}
+  }
   if (!draft) return <Card>
     <Empty description="Wybierz dokument w zakładce Dokumenty">
       <Button type="primary" onClick={onDocuments}>Przejdź do dokumentów</Button>
@@ -220,7 +261,15 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     {title:"Druk",dataIndex:"selected",width:63,render:(value:boolean,row) =>
       <Checkbox checked={value} onChange={e => {void update(row.index,"selected",e.target.checked);}}/>},
     {title:"Produkt",dataIndex:"product",width:240,ellipsis:true,fixed:"left"},
+    {title:"Wariant ChPL",key:"variant",width:150,
+      render:(_value:unknown,row:DraftRow)=><Button size="small"
+        disabled={!row.symbol || variantBusy}
+        onClick={()=>{void openVariants(row);}}>
+        Wybierz wariant
+      </Button>},
     {title:"Ilość",dataIndex:"quantity",width:100},
+    {title:"Wskazanie z ChPL",dataIndex:"indication",width:220,ellipsis:true,
+      render:(value:string)=><span title={value}>{value||"—"}</span>},
     ...editable.map(({key,title}) => ({
       title, dataIndex:key, width:key==="section" ? 125 : key==="dosing" || key==="withdrawal" ? 245 : 170,
       render:(value:string,row:DraftRow) => key==="section"
@@ -259,6 +308,35 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}</Typography.Text>
     </Card>
+    <Modal width="90vw" open={variantModal!==null}
+      title={"Dobór wariantu leku — "+(variantModal?.product||"")}
+      onCancel={()=>{if(!variantBusy)setVariantModal(null);}}
+      footer={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>
+        Anuluj
+      </Button>}>
+      <Alert className="notice" type="warning" showIcon
+        message="Zweryfikuj gatunek, dawkowanie i karencję z aktualną urzędową ChPL."
+        description="Wybór zastąpi dotychczasowy gatunek, drogę podania i dawkowanie; pełną karencję zmieni tylko, gdy katalog zawiera jej dane. Nic nie jest automatycznie zapisywane do archiwum kart."/>
+      <ErrorNotice error={variantError}/>
+      <Table<TreatmentVariantChoice> rowKey="id" loading={variantBusy}
+        dataSource={variantModal?.variants??[]} size="small"
+        pagination={{pageSize:12}} scroll={{x:1190,y:340}}
+        columns={[
+          {title:"Gatunek",dataIndex:"species",width:130},
+          {title:"Droga podania",dataIndex:"route",width:140},
+          {title:"Dawkowanie",dataIndex:"dose",width:230,ellipsis:true},
+          {title:"Karencja — tkanki",dataIndex:"tissues",width:180,ellipsis:true},
+          {title:"Karencja — mleko",dataIndex:"milk",width:145,ellipsis:true},
+          {title:"Wskazanie",dataIndex:"indication",width:225,ellipsis:true},
+          {title:"PDF ChPL",dataIndex:"pdf",width:110,
+            render:(value:string)=>value?"Przypisany":"Brak"},
+          {title:"Wybór",width:130,
+            render:(_value:unknown,row:TreatmentVariantChoice)=>
+              <Button type="primary" size="small" disabled={variantBusy ||
+                !row.species?.trim() || !row.route?.trim() || !row.dose?.trim()}
+                onClick={()=>{void applyVariant(row.id);}}>Wybierz</Button>}
+        ]}/>
+    </Modal>
     <Modal width="92vw" open={preview!==null} title="Podgląd karty leczenia" onCancel={()=>setPreview(null)}
       footer={<Space><Button onClick={()=>setPreview(null)}>Zamknij</Button>
         <Button type="primary" onClick={()=>previewFrame.current?.contentWindow?.print()}>Drukuj</Button></Space>}>
