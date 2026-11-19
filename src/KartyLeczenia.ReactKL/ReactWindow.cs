@@ -30,7 +30,7 @@ internal sealed class ReactWindow : Form
     {
         cards = new CardArchiveService(archive);
         backups = new SqlBackupService(archive);
-        this.Text = "KartyLeczenia — ReactKL";
+        base.Text = "KartyLeczenia — ReactKL";
         MinimumSize = new Size(900, 600);
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;
