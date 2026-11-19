@@ -1,13 +1,16 @@
 ﻿#ifndef ReleaseVersion
   #define ReleaseVersion "1.0.0"
 #endif
+#ifndef ReleaseFileVersion
+  #define ReleaseFileVersion "1.0.0.0"
+#endif
 
 [Setup]
 AppId=pl.kartyleczenia.winforms.sql
 AppName=SQL KartyLeczenia
 AppVersion={#ReleaseVersion}
-VersionInfoVersion={#ReleaseVersion}.0
-VersionInfoProductVersion={#ReleaseVersion}.0
+VersionInfoVersion={#ReleaseFileVersion}
+VersionInfoProductVersion={#ReleaseFileVersion}
 VersionInfoTextVersion={#ReleaseVersion}
 VersionInfoProductTextVersion={#ReleaseVersion}
 DefaultDirName={autopf}\KartyLeczenia
