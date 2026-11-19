@@ -168,6 +168,36 @@ static class Program
             Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine])
                   .Status=="missingSymbol",
                 "missing exact Subiekt symbol must not fall back to fuzzy name match");
+            var confirmed = TreatmentAutofillPlanner.Propose(0,
+                new KartyLeczenia.TreatmentRow(new Dictionary<string,string> {
+                    ["Symbol Subiekta"]="VET-123",["Drukuj"]="True",
+                    ["Domyślny gatunek"]="True",["Gatunek"]="Bydło"
+                }),[swine]);
+            Check(confirmed.Status=="ready", "review test fixture must be eligible");
+            Check(TreatmentAutofillPlanner.MatchesReviewed(confirmed,
+                confirmed.Species, confirmed.Route, confirmed.Dosing,
+                confirmed.Withdrawal, confirmed.Source, confirmed.PdfPath, confirmed.HasPdf),
+                "reviewed suggestion must match unchanged SQL clinical data");
+            Check(!TreatmentAutofillPlanner.MatchesReviewed(confirmed,
+                confirmed.Species, confirmed.Route, "inna dawka",
+                confirmed.Withdrawal, confirmed.Source, confirmed.PdfPath, confirmed.HasPdf),
+                "concurrent dosage edit must reject prior approval");
+            Check(!TreatmentAutofillPlanner.MatchesReviewed(confirmed,
+                confirmed.Species, confirmed.Route, confirmed.Dosing,
+                "inna karencja", confirmed.Source, confirmed.PdfPath, confirmed.HasPdf),
+                "concurrent withdrawal edit must reject prior approval");
+            Check(!TreatmentAutofillPlanner.MatchesReviewed(confirmed,
+                confirmed.Species, confirmed.Route, confirmed.Dosing,
+                confirmed.Withdrawal, "inna ChPL", confirmed.PdfPath, confirmed.HasPdf),
+                "changed clinical source must reject prior approval");
+            Check(!TreatmentAutofillPlanner.MatchesReviewed(confirmed,
+                confirmed.Species, confirmed.Route, confirmed.Dosing,
+                confirmed.Withdrawal, confirmed.Source, "ChPL/inny-dokument.pdf", true),
+                "changed official PDF path must reject prior approval");
+            Check(!TreatmentAutofillPlanner.MatchesReviewed(confirmed,
+                confirmed.Species, confirmed.Route, confirmed.Dosing,
+                confirmed.Withdrawal, confirmed.Source, confirmed.PdfPath, false),
+                "missing official PDF flag must reject prior approval");
             Console.WriteLine($"ReactKL regression checks passed: {checks}");
         }
         finally
