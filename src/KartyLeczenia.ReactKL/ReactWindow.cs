@@ -20,6 +20,9 @@ internal sealed class ReactWindow : Form
         "KartyLeczenia", "archive-connection.json"));
     private readonly DocumentService documents = new();
     private readonly CardArchiveService cards;
+    private readonly SharedClinicService clinicService;
+    private byte[]? stagedClinicStamp;
+    private byte[]? stagedDoctorStamp;
     private readonly SqlBackupService backups;
     private readonly SqlRestoreService restores;
     private readonly ReactUpdateService updates;
@@ -37,6 +40,7 @@ internal sealed class ReactWindow : Form
     internal ReactWindow()
     {
         cards = new CardArchiveService(archive);
+        clinicService = new SharedClinicService(archive);
         backups = new SqlBackupService(archive);
         restores = new SqlRestoreService(archive);
         updates = new ReactUpdateService(archive);
@@ -395,16 +399,66 @@ internal sealed class ReactWindow : Form
         }
         if (action == "getClinic")
         {
-            var clinic = ClinicSettingsStore.Load();
-            return new {clinic.Name, clinic.Address, clinic.Doctor, clinic.Phone};
+            var current = await Task.Run(() => clinicService.Load(), token);
+            stagedClinicStamp = null;
+            stagedDoctorStamp = null;
+            var clinic = current.Settings;
+            return new
+            {
+                clinic.Name, clinic.Address, clinic.Doctor, clinic.Phone,
+                clinic.UseClinicStamp, clinic.UseDoctorStamp,
+                hasClinicStamp = clinic.ClinicStampPng is { Length: > 0 },
+                hasDoctorStamp = clinic.DoctorStampPng is { Length: > 0 },
+                current.Revision
+            };
+        }
+        if (action == "chooseClinicStamp")
+        {
+            string kind = Text(root, "kind", 12);
+            if (kind is not ("clinic" or "doctor"))
+                throw new ArgumentException("Nieznany rodzaj pieczątki.");
+            using var dialog = new OpenFileDialog
+            {
+                Title = kind == "clinic" ? "Wybierz pieczątkę lecznicy PNG" : "Wybierz pieczątkę lekarza PNG",
+                Filter = "Obraz PNG (*.png)|*.png",
+                CheckFileExists = true
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return new { cancelled = true };
+            var info = new FileInfo(dialog.FileName);
+            if (info.Length is < 8 or > 2097152)
+                throw new InvalidDataException("Pieczątka musi mieć format PNG i maksymalnie 2 MB.");
+            byte[] bytes = await File.ReadAllBytesAsync(dialog.FileName, token);
+            SharedClinicService.ValidatePng(bytes, kind == "clinic" ? "lecznicy" : "lekarza");
+            if (kind == "clinic") stagedClinicStamp = bytes;
+            else stagedDoctorStamp = bytes;
+            return new { cancelled = false, name = info.Name, size = bytes.Length };
         }
         if (action == "saveClinic")
         {
-            var clinic = new ClinicSettings(Text(root, "name", 200),
+            string expectedRevision = Text(root, "revision", 100);
+            if (expectedRevision.Length != 64)
+                throw new InvalidOperationException("Najpierw odśwież dane lecznicy z SQL.");
+            var previous = await Task.Run(() => clinicService.Load(), token);
+            var old = previous.Settings;
+            var updated = new ClinicSettings(Text(root, "name", 200),
                 Text(root, "address", 500), Text(root, "doctor", 200))
-            { Phone = Text(root, "phone", 100) };
-            ClinicSettingsStore.Save(clinic);
-            return new { saved = true };
+            {
+                Phone = Text(root, "phone", 100),
+                UseClinicStamp = Flag(root, "useClinicStamp"),
+                UseDoctorStamp = Flag(root, "useDoctorStamp"),
+                ClinicStampPng = Flag(root, "removeClinicStamp") ? null : stagedClinicStamp ?? old.ClinicStampPng,
+                DoctorStampPng = Flag(root, "removeDoctorStamp") ? null : stagedDoctorStamp ?? old.DoctorStampPng
+            };
+            var saved = await Task.Run(() => clinicService.Save(updated, expectedRevision), token);
+            stagedClinicStamp = null;
+            stagedDoctorStamp = null;
+            return new
+            {
+                saved = true, saved.Revision,
+                hasClinicStamp = updated.ClinicStampPng is { Length: > 0 },
+                hasDoctorStamp = updated.DoctorStampPng is { Length: > 0 }
+            };
         }
         if (action == "getArchiveSettings")
         {
