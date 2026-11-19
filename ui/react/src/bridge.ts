@@ -79,6 +79,8 @@ export function invoke<T>(action: string, fields: Record<string, unknown> = {},
       };
       signal.addEventListener("abort",abort,{once:true});
     }
-    bridge.postMessage({id, action, ...fields});
+    // The payload may itself contain an "id" (e.g. an archived card GUID).
+    // Keep the transport correlation ID independent of any domain record ID.
+    bridge.postMessage({id, action, ...fields, _bridgeRequestId:id});
   });
 }

@@ -172,7 +172,11 @@ internal sealed class ReactWindow : Form
             using var msg = JsonDocument.Parse(e.WebMessageAsJson);
             var root = msg.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return;
-            requestId = Text(root, "id", 80);
+            // Card/archive operations legitimately carry their own "id".
+            // Never confuse that SQL identifier with the RPC response key.
+            requestId = Text(root, "_bridgeRequestId", 80);
+            if (requestId.Length == 0)
+                requestId = Text(root, "id", 80);
             string action = Text(root, "action", 40);
             if (string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(action)) return;
             if (action == "cancelRequest")
