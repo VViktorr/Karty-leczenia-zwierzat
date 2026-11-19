@@ -7,6 +7,9 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
+import { defaultPricePrint, normalizePriceSettings, withdrawalText,
+  PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
+import type { PricePrintOptions, PricePrintRow } from "./PricePrint";
 import type { BackupProgress } from "./bridge";
 import type { DocumentKind, DocumentRow, DocumentsResult, DatePeriod } from "./bridge";
 
@@ -651,43 +654,133 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   </>;
 }
 
-function Prices() {
-  const levels = useRemote<PriceLevel[]>("priceLevels",{},[]);
-  const [level,setLevel]=useState<number | null>(null);
+function Prices({onCatalogue}: {onCatalogue: () => void}) {
+  const levels=useRemote<PriceLevel[]>("priceLevels",{},[]);
+  const [level,setLevel]=useState<number|null>(null);
   const [net,setNet]=useState(false);
-  useEffect(() => {
-    if (level !== null || !levels.data?.length) return;
+  useEffect(()=>{
+    if(level!==null||!levels.data?.length)return;
     const retail=levels.data.find(item=>item.name.toLocaleLowerCase("pl").includes("detaliczna"));
     setLevel((retail??levels.data[0]).number);
   },[levels.data,level]);
-  // Do not fire an unnecessary expensive price+stock query for level 1 before
-  // the actual (normally Detaliczna) list of levels has loaded.
-  const prices=useRemote<MedicinePrice[]>("prices",{level,net},[level,net],level!==null);
+  // The C# bridge calculates the six catalogue withdrawal formats from one
+  // cached SQL snapshot; switching display formats below is client-only.
+  const prices=useRemote<PricePrintRow[]>("prices",{level,net},[level,net],level!==null);
+  const [settings,setSettings]=useState<PricePrintOptions>(defaultPricePrint);
+  const [settingsBusy,setSettingsBusy]=useState(true);
+  const [settingsError,setSettingsError]=useState("");
+  const [showSettings,setShowSettings]=useState(false);
+  const [showPreview,setShowPreview]=useState(false);
   const [filter,setFilter]=useState("");
-  const rows=(prices.data ?? []).filter(p => p.name.toLocaleLowerCase("pl").includes(filter.toLocaleLowerCase("pl")));
+  const [onlyMissing,setOnlyMissing]=useState(false);
+  const [excluded,setExcluded]=useState<Set<string>>(()=>new Set());
+  useEffect(()=>{
+    let live=true;
+    void invoke<PricePrintOptions>("getPricePrintSettings")
+      .then(data=>{if(live)setSettings(normalizePriceSettings(data));})
+      .catch(error=>{if(live)setSettingsError(error instanceof Error?error.message:String(error));})
+      .finally(()=>{if(live)setSettingsBusy(false);});
+    return()=>{live=false;};
+  },[]);
+  const all=prices.data??[];
+  const q=filter.trim().toLocaleLowerCase("pl");
+  const rows=all.filter(row=>
+    (!q||row.name.toLocaleLowerCase("pl").includes(q)||row.symbol.toLocaleLowerCase("pl").includes(q))
+    &&(!onlyMissing||row.needsCompletion));
+  const selected=rows.filter(row=>!excluded.has(row.symbol));
+  const missingCount=all.filter(row=>row.needsCompletion).length;
+  const toggle=(symbol:string,value:boolean)=>setExcluded(current=>{
+    const next=new Set(current);
+    if(value)next.delete(symbol);else next.add(symbol);
+    return next;
+  });
+  const priceHeading=net?"Cena netto":"Cena brutto";
+  const columns:ColumnsType<PricePrintRow>=[
+    {title:"Druk",width:65,render:(_value,row)=>
+      <Checkbox checked={!excluded.has(row.symbol)}
+        onChange={e=>toggle(row.symbol,e.target.checked)}/>},
+    {title:"Lek",dataIndex:"name",width:260,
+      sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
+    {title:priceHeading,dataIndex:"gross",width:140,align:"right",
+      render:(n:number|null)=>currency(n)},
+    ...(settings.batch?[{title:"Ostatnia seria",dataIndex:"latestBatch",
+      width:140} as ColumnsType<PricePrintRow>[number]]:[]),
+    {title:"Karencja z katalogu",key:"withdrawal",width:440,ellipsis:true,
+      render:(_value,row)=> {
+        const text=withdrawalText(row,settings);
+        return <span title={text||"Brak karencji w wybranym formacie katalogu SQL"}>
+          {text||<Typography.Text type="secondary">—</Typography.Text>}
+        </span>;
+      }},
+    {title:"Katalog",key:"status",width:135,
+      render:(_value,row)=>row.needsCompletion
+        ? <Tag color="orange">Do uzupełnienia</Tag>
+        : <Tag color="green">Warianty SQL</Tag>}
+  ];
   return <>
-    <div className="page-heading"><Typography.Title level={3}>Cennik leków</Typography.Title>
-      <Button onClick={prices.reload} disabled={level===null} loading={prices.busy}>Odśwież</Button></div>
-    <Card><div className="document-filters">
-      <Select loading={levels.busy} value={level} placeholder="Poziom ceny" onChange={setLevel}
-        options={(levels.data ?? []).map(x => ({label:x.name,value:x.number}))}/>
-      <Input placeholder="Szukaj leku" value={filter} allowClear onChange={e => setFilter(e.target.value)}/>
-      <Space><Switch checked={net} onChange={setNet}/> Cena netto</Space>
-    </div>
-    <ErrorNotice error={levels.error || (level === null ? "" : prices.error)}/>
-    <Table rowKey={(row,index) => row.symbol || String(index)} loading={prices.busy && level !== null} dataSource={rows}
-      pagination={{pageSize:40,showSizeChanger:true}} size="middle" scroll={{x:950,y:"calc(100vh - 390px)"}}
-      columns={[
-        {title:"Lek",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name)},
-        {title:net?"Cena netto":"Cena brutto",dataIndex:"gross",width:160,align:"right",
-          render:(n:number|null)=>currency(n)},
-        {title:"Ostatnia seria",dataIndex:"latestBatch",width:140},
-        {title:"Karencja",dataIndex:"withdrawal",width:320,ellipsis:true}
-      ]}/>
+    <div className="page-heading"><div>
+      <Typography.Title level={3}>Cennik leków</Typography.Title>
       <Typography.Text type="secondary">
-        Ceny i serie są zapamiętywane do 30 sekund, aby nie obciążać SQL podczas zmiany poziomu. Przycisk „Odśwież” pobiera bieżące dane.
+        Ceny i stany z Subiekta; karencje z katalogu SQL KartyLeczenia.
+      </Typography.Text>
+    </div><Space wrap>
+      <Button onClick={prices.reload} disabled={level===null} loading={prices.busy}>Odśwież z SQL</Button>
+      <Button onClick={()=>setShowSettings(true)} disabled={settingsBusy||!all.length}>
+        Ustawienia wydruku
+      </Button>
+      <Button type="primary" disabled={settingsBusy||!selected.length} onClick={()=>setShowPreview(true)}>
+        Drukuj ({selected.length})
+      </Button>
+    </Space></div>
+    <Card>
+      <div className="document-filters">
+        <Select loading={levels.busy} value={level} placeholder="Poziom ceny"
+          onChange={setLevel} options={(levels.data??[]).map(x=>({label:x.name,value:x.number}))}/>
+        <Input.Search placeholder="Szukaj leku lub symbolu" value={filter}
+          allowClear onChange={e=>setFilter(e.target.value)} style={{minWidth:190}}/>
+        <Space><Switch checked={net} onChange={setNet}/> Cena netto</Space>
+        <Select value={settings.withdrawalFormat}
+          onChange={v=>setSettings(old=>({...old,withdrawalFormat:v}))}
+          style={{minWidth:190}}
+          options={[{label:"Karencja pełna",value:0},
+            {label:"Karencja wg wariantów",value:1},
+            {label:"Karencja wg gatunków",value:2}]}/>
+        <Select value={settings.routeCodes?"codes":"full"}
+          onChange={v=>setSettings(old=>({...old,routeCodes:v==="codes"}))}
+          options={[{label:"Drogi — skróty",value:"codes"},
+            {label:"Drogi — pełne nazwy",value:"full"}]} style={{minWidth:180}}/>
+      </div>
+      <ErrorNotice error={levels.error||(level===null?"":prices.error)||settingsError}/>
+      <Space wrap style={{marginBottom:12}}>
+        <Button type={onlyMissing?"primary":"default"}
+          onClick={()=>setOnlyMissing(prev=>!prev)}>
+          Do uzupełnienia ({missingCount})
+        </Button>
+        <Button onClick={onCatalogue}>Otwórz katalog / ChPL</Button>
+        <Button onClick={()=>setExcluded(current=>{
+          const next=new Set(current);rows.forEach(row=>next.delete(row.symbol));return next;
+        })}>Zaznacz widoczne</Button>
+        <Button onClick={()=>setExcluded(current=>{
+          const next=new Set(current);rows.forEach(row=>next.add(row.symbol));return next;
+        })}>Odznacz widoczne</Button>
+      </Space>
+      <Table rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
+        dataSource={rows} columns={columns}
+        pagination={{pageSize:40,showSizeChanger:true}}
+        size="middle" scroll={{x:1180,y:"calc(100vh - 425px)"}}/>
+      <Typography.Text type="secondary">
+        {selected.length} z {rows.length} widocznych pozycji do wydruku.
+        Bufor danych magazynowych: 30 sekund; karencje z SQL: maksymalnie 1 minuta.
+        Zmiana formatu karencji i filtra nie odczytuje ponownie SQL.
       </Typography.Text>
     </Card>
+    {showSettings&&<PricePrintSettingsPanel initial={settings}
+      onSave={setSettings} onClose={()=>setShowSettings(false)}
+      onPreview={values=>{
+        setSettings(values);setShowSettings(false);setShowPreview(true);
+      }}/>}
+    {showPreview&&<PricePrintPreview rows={selected}
+      settings={settings} heading={priceHeading} onClose={()=>setShowPreview(false)}/>}
   </>;
 }
 
@@ -1423,7 +1516,7 @@ export default function App() {
   </div>;
   const content=section==="documents"?<Documents onOpen={next=>{setDraft(next);setSection("treatment");}}/>:
     section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}/>:
-    section==="prices"?<Prices/>:section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}/>:
+    section==="prices"?<Prices onCatalogue={()=>setSection("catalogue")}/>:section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards/>:<SettingsPage/>;
   return <ConfigProvider theme={appearance}>
