@@ -684,6 +684,9 @@ function Prices() {
         {title:"Ostatnia seria",dataIndex:"latestBatch",width:140},
         {title:"Karencja",dataIndex:"withdrawal",width:320,ellipsis:true}
       ]}/>
+      <Typography.Text type="secondary">
+        Ceny i serie są zapamiętywane do 30 sekund, aby nie obciążać SQL podczas zmiany poziomu. Przycisk „Odśwież” pobiera bieżące dane.
+      </Typography.Text>
     </Card>
   </>;
 }
@@ -751,7 +754,7 @@ function Expiry() {
               days(row)!<=30 ? <Tag color="orange">Do 30 dni</Tag> : <Tag color="green">Aktualne</Tag>}
         ]}/>
       <Typography.Text type="secondary">
-        Wyświetlono {rows.length} pozycji. Dane magazynowe są odświeżane ręcznie lub po wygaśnięciu krótkiego bufora.
+        Wyświetlono {rows.length} pozycji. Dane magazynowe są buforowane maksymalnie 30 sekund. „Odśwież z SQL” pomija bufor.
       </Typography.Text>
     </Card>
   </>;
