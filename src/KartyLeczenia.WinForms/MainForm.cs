@@ -2553,30 +2553,33 @@ internal sealed class MainForm : Form
             if (sharedArchive is { } archive) await RefreshClinic(archive);
         };
         form = Section("Kopia zapasowa SQL");
-        Message(form, "Archiwizuj: wybierz plik .bak w oknie „Zapisz jako” (dysk, pulpit lub pendrive). " +
-            "Program zna aktualny serwer i bazę KartyLeczenia. " +
-            "Kopia powstaje najpierw na serwerze SQL i jest przenoszona do wskazanego pliku. " +
-            "Odtwarzanie wymaga uprawnień administratora SQL.", multiline: true);
-        // Credentials are taken exclusively from the current SQL archive connection.
+        Message(form, "Pierwsza archiwizacja tworzy pełną kopię bazy, kolejne — kopie różnicowe SQL. " +
+            "Folder na pendrivie zapamiętywany jest w ustawieniach. " +
+            "Przy zamykaniu wystarczy wybrać Tak i potwierdzić Windows Hello. " +
+            "Zachowaj pełną kopię bazową, ponieważ jest potrzebna do odtwarzania różnicowego.", multiline: true);
         var restoreFile = Field("Plik kopii na serwerze", "", @"np. D:\Kopie\KartyLeczenia.bak");
-
-        // SaveFileDialog works with the workstation's real drives, including
-        // removable USB media. The SQL backup is staged on its own server
-        // and copied to the selected destination only after completion.
-        string? ChooseBackupDestination()
+        var backupLocation = Field("Folder archiwizacji (pendrive)", ArchiveStorageLocation.Resolve() ?? "",
+            "Wskaż folder jeden raz; miejsce zostanie zapamiętane");
+        void ConfigureBackupFolder()
         {
-            using var dialog = new SaveFileDialog
-            {
-                Title = "Zapisz archiwum SQL KartyLeczenia",
-                Filter = "Archiwum SQL Server (*.bak)|*.bak",
-                DefaultExt = "bak",
-                AddExtension = true,
-                OverwritePrompt = true,
-                CheckPathExists = true,
-                FileName = "KartyLeczenia-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm") + ".bak",
-                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-            };
-            return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
+            using var dialog = new FolderBrowserDialog { Description = "Wybierz folder archiwum SQL na pendrivie" };
+            if (Directory.Exists(backupLocation.Text)) dialog.InitialDirectory = backupLocation.Text;
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            ArchiveStorageLocation.Save(dialog.SelectedPath);
+            backupLocation.Text = ArchiveStorageLocation.Resolve() ?? dialog.SelectedPath;
+        }
+        Add("", Action("Wybierz folder archiwum…", () => { ConfigureBackupFolder(); return Task.CompletedTask; }));
+        string? BackupFolder()
+        {
+            string? saved = ArchiveStorageLocation.Resolve();
+            if (saved is not null) { backupLocation.Text = saved; return saved; }
+            if (MessageBox.Show(this,
+                    "Nie znaleziono zapamiętanego nośnika archiwum. Podłącz pendrive albo wybierz folder archiwum.",
+                    "Nośnik archiwum niedostępny", MessageBoxButtons.OKCancel,
+                    MessageBoxIcon.Warning) != DialogResult.OK)
+                return null;
+            ConfigureBackupFolder();
+            return ArchiveStorageLocation.Resolve();
         }
         var maintenanceStatus = Message(form, "", multiline: true);
         bool maintainingArchive = false;
@@ -2603,7 +2606,7 @@ internal sealed class MainForm : Form
             }
             else
             {
-                string? selected = ChooseBackupDestination();
+                string? selected = BackupFolder();
                 if (selected is null) return;
                 path = selected;
             }
@@ -2658,8 +2661,8 @@ internal sealed class MainForm : Form
                 }
                 maintenanceStatus.Text = !restoring
                     ? backupResult!.Verified
-                        ? $"Zapisano i zweryfikowano kopię na serwerze: {backupResult.Path}"
-                        : $"Zapisano kopię na serwerze: {backupResult!.Path}. {backupResult.VerificationNote}"
+                        ? $"Zapisano archiwum: {backupResult.Path}. {backupResult.VerificationNote}"
+                        : $"Zapisano archiwum: {backupResult!.Path}. {backupResult.VerificationNote}"
                     : restoredFrom is null
                         ? $"Odtworzono bazę na {archive.Server}."
                         : $"Odtworzono bazę na {archive.Server}. Kopia sprzed odtworzenia: {restoredFrom}";
@@ -2718,7 +2721,7 @@ internal sealed class MainForm : Form
             status.Text = "Archiwizacja bazy SQL przed zamknięciem…";
             try
             {
-                string? destination = ChooseBackupDestination();
+                string? destination = BackupFolder();
                 if (destination is null) return;
                 DatabaseBackupResult result = await Task.Run(
                     () => archive.BackupToLocalFile(destination));
