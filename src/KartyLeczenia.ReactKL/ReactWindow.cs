@@ -467,6 +467,28 @@ internal sealed class ReactWindow : Form
             subiekt.Save(config, Flag(root, "rememberPassword"));
             return new { saved = true };
         }
+        // Archive browsing and trash management use the program database only.
+        // They must remain available when Subiekt GT is temporarily offline.
+        if (action == "renderSavedCard")
+            return new { html = cards.RenderSaved(Text(root, "id", 40), Flag(root, "trash")) };
+        if (action == "savedCards")
+            return await ReadSavedCards(token, Flag(root, "trash"), Text(root, "query", 120));
+        if (action == "savedCard")
+            return await ReadSavedCard(token, Text(root, "id", 40), Flag(root, "trash"));
+        if (action == "trashCard")
+            return await TrashCard(token, Text(root, "id", 40), Flag(root, "trash"));
+        if (action == "purgeTrashedCard")
+        {
+            string id = Text(root, "id", 40);
+            string confirmation = Text(root, "confirmation", 160);
+            if (!Guid.TryParseExact(id, "N", out var cardId) ||
+                string.IsNullOrWhiteSpace(confirmation))
+                throw new ArgumentException("Wybierz kartę z kosza i potwierdź jej numer.");
+            if (!await WindowsHelloConsent.VerifyAsync(this,
+                    "trwałe usunięcie jednej karty leczenia z kosza"))
+                return new { deleted = false, cancelled = true };
+            return await PurgeTrashedCard(token, cardId, confirmation);
+        }
         var options = subiekt.Load().Options ??
             throw new InvalidOperationException("Brak konfiguracji Subiekta. Uzupełnij ustawienia połączenia.");
         if (action == "searchDocuments")
@@ -578,26 +600,6 @@ internal sealed class ReactWindow : Form
             if (action == "previewDraft")
                 return new { html = cards.RenderDraft(draft, reported, performed, findings) };
             return cards.Save(draft, reported, performed, findings, Flag(root, "confirmDuplicate"));
-        }
-        if (action == "renderSavedCard")
-            return new { html = cards.RenderSaved(Text(root, "id", 40), Flag(root, "trash")) };
-        if (action == "savedCards")
-            return await ReadSavedCards(token, Flag(root, "trash"), Text(root, "query", 120));
-        if (action == "savedCard")
-            return await ReadSavedCard(token, Text(root, "id", 40), Flag(root, "trash"));
-        if (action == "trashCard")
-            return await TrashCard(token, Text(root, "id", 40), Flag(root, "trash"));
-        if (action == "purgeTrashedCard")
-        {
-            string id = Text(root, "id", 40);
-            string confirmation = Text(root, "confirmation", 160);
-            if (!Guid.TryParseExact(id, "N", out var cardId) ||
-                string.IsNullOrWhiteSpace(confirmation))
-                throw new ArgumentException("Wybierz kartę z kosza i potwierdź jej numer.");
-            if (!await WindowsHelloConsent.VerifyAsync(this,
-                    "trwałe usunięcie jednej karty leczenia z kosza"))
-                return new { deleted = false, cancelled = true };
-            return await PurgeTrashedCard(token, cardId, confirmation);
         }
         throw new InvalidOperationException("Nieznana operacja interfejsu: " + action);
     }
