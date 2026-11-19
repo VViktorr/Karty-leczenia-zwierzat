@@ -16,9 +16,11 @@ internal sealed partial class SharedArchive
         return CreateBackup(db, folder, "kopia", compress);
     }
 
-    internal string? RestoreDatabase(ConnectionOptions administrator, string path)
+    internal string? RestoreDatabase(string path)
     {
-        using var db = OpenMaintenance(administrator, restoring: true);
+        // Reuse the same authenticated connection settings as daily work.
+        // SQL Server still enforces sysadmin privilege for destructive restore.
+        using var db = OpenMaintenance(options, restoring: true);
         using (var header = MaintenanceCommand(db, "RESTORE HEADERONLY FROM DISK = @path WITH FILE = 1;", path))
         using (var reader = header.ExecuteReader())
         {
@@ -121,7 +123,7 @@ internal sealed partial class SharedArchive
     SqlConnection OpenMaintenance(ConnectionOptions credentials, bool restoring)
     {
         // BACKUP DATABASE permission is checked in the target database, not
-        // master. RESTORE stays restricted to an explicit sysadmin session.
+        // master. RESTORE stays restricted to a sysadmin session using stored credentials.
         var connectionString = new SqlConnectionStringBuilder((credentials with
         {
             Server = Server,
@@ -137,7 +139,7 @@ internal sealed partial class SharedArchive
             db.Open();
             using var access = MaintenanceCommand(db, restoring ? """
                 IF ISNULL(IS_SRVROLEMEMBER(N'sysadmin'), 0) <> 1
-                    THROW 50010, N'Odtwarzanie wymaga konta administratora SQL Server (sysadmin).', 1;
+                    THROW 50010, N'Aktualnie zalogowane konto SQL nie ma uprawnień do odtwarzania bazy. Wymagana rola sysadmin; archiwizacji i odtwarzania nie można wykonać z pominięciem uprawnień SQL Server.', 1;
                 DECLARE @lockResult int;
                 EXEC @lockResult = sys.sp_getapplock @Resource = N'KartyLeczenia.BackupRestore',
                     @LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0;
