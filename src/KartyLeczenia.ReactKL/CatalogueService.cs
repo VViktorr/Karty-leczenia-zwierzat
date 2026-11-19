@@ -184,11 +184,21 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             product.Variants.Count > 250)
             throw new ArgumentException("Zbyt długie dane kartoteki lub zbyt wiele wariantów.");
 
-        byte[] revision;
-        try { revision = Convert.FromBase64String(product.Revision); }
-        catch (FormatException ex) { throw new ArgumentException("Brak poprawnej wersji kartoteki. Odśwież dane.", ex); }
-        if (revision.Length != 8)
-            throw new ArgumentException("Niepoprawny znacznik wersji. Odśwież dane.");
+        // Null/empty revision means an entirely new catalogue product,
+        // the same INSERT-versus-rowversion rule as the final WinForms.
+        bool creating = string.IsNullOrWhiteSpace(product.Revision);
+        byte[]? revision = null;
+        if (!creating)
+        {
+            try { revision = Convert.FromBase64String(product.Revision); }
+            catch (FormatException ex) { throw new ArgumentException(
+                "Brak poprawnej wersji kartoteki. Odśwież dane.", ex); }
+            if (revision.Length != 8)
+                throw new ArgumentException("Niepoprawny znacznik wersji. Odśwież dane.");
+        }
+        else if (product.Variants.Any(variant => variant.Id is not null))
+            throw new ArgumentException(
+                "Nowa kartoteka nie może modyfikować wariantów istniejących leków.");
 
         var existingIds = new HashSet<int>();
         foreach (var v in product.Variants)
@@ -208,7 +218,13 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         using var db = Open();
         CheckImported(db);
         using var tx = db.BeginTransaction(IsolationLevel.Serializable);
-        using (var command = Command(db, """
+        using (var command = Command(db, creating ? """
+            IF EXISTS(SELECT 1 FROM dbo.catalog_products WITH(UPDLOCK,HOLDLOCK)
+                WHERE UPPER(symbol)=UPPER(@symbol))
+                THROW 50004,N'Kartoteka już istnieje. Wczytaj ją ponownie.',1;
+            INSERT dbo.catalog_products(symbol,name,description,rpl_id,status)
+                VALUES(@symbol,@name,@description,@rpl,N'Wprowadzono w aplikacji');
+            """ : """
             UPDATE dbo.catalog_products SET name=@name,description=@description,rpl_id=@rpl
             WHERE symbol=@symbol AND revision=@revision
               AND COALESCE(decision,N'')<>N'NOT_MEDICINE';
@@ -216,7 +232,8 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             """, tx))
         {
             command.Parameters.Add("@symbol",SqlDbType.NVarChar,128).Value=product.Symbol;
-            command.Parameters.Add("@revision",SqlDbType.Binary,8).Value=revision;
+            if (!creating)
+                command.Parameters.Add("@revision",SqlDbType.Binary,8).Value=revision!;
             command.Parameters.Add("@name",SqlDbType.NVarChar,-1).Value=product.Name;
             command.Parameters.Add("@description",SqlDbType.NVarChar,-1).Value=product.Description;
             command.Parameters.Add("@rpl",SqlDbType.NVarChar,-1).Value=NullIfEmpty(product.RplId);
