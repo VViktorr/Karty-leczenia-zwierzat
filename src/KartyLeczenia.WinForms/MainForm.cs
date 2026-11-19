@@ -373,12 +373,15 @@ internal sealed class MainForm : Form
         };
         periodStart.ValueChanged += async (_, _) => { if (connection is not null) await Run(() => Search(false)); };
         periodEnd.ValueChanged += async (_, _) => { if (connection is not null) await Run(() => Search(false)); };
+        var docColumns = new Button { Text = "Kolumny", AutoSize = true };
+        docColumns.Click += (_, _) => documents.ShowColumnsMenu(docColumns);
         var page = Page("Dokumenty", documents,
             DocumentKindButton(DocumentSearchKinds.Invoices, "Faktury sprzedaży", "Alt+1"),
             DocumentKindButton(DocumentSearchKinds.Receipts, "Paragony", "Alt+2"),
             DocumentKindButton(DocumentSearchKinds.WarehouseReleases, "Wydania zewnętrzne", "Alt+4"),
             new Label { Text = "Okres", AutoSize = true }, period, periodStart, periodEnd,
-            searchField, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument));
+            searchField, Action("Szukaj", () => Search(true)), Action("Otwórz dokument", OpenDocument),
+            docColumns);
         var toolbar = page.Controls.OfType<FlowLayoutPanel>().Single();
         foreach (Control control in toolbar.Controls)
         {
@@ -689,10 +692,12 @@ internal sealed class MainForm : Form
             status.Text = $"Zapisano kartotekę {row.Symbol} w katalogu SQL.";
         }
 
+        var priceColumns = new Button { Text = "Kolumny", AutoSize = true };
+        priceColumns.Click += (_, _) => prices.ShowColumnsMenu(priceColumns);
         var page = Page("Cennik leków", prices, levels, net, Action("Odśwież", LoadPrices),
             missingButton, Action("Dodaj / edytuj w katalogu", () => EditCatalogue()),
             Action("Ustawienia wydruku", () => PreviewPrices()),
-            Action("Drukuj", () => PreviewPrices(direct: true)));
+            Action("Drukuj", () => PreviewPrices(direct: true)), priceColumns);
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab != page || connection is not { } options || sharedArchive is not { } archive) return;
@@ -1895,10 +1900,12 @@ internal sealed class MainForm : Form
         }
 
         var moveCard = Action("Przenieś do kosza", MoveSavedCard);
+        var savedColumns = new Button { Text = "Kolumny", AutoSize = true };
+        savedColumns.Click += (_, _) => grid.ShowColumnsMenu(savedColumns);
         var page = Page("Zapisane karty leczenia", grid, query,
             new Label { Text = "Data leczenia", AutoSize = true }, day,
             Action("Szukaj", RefreshCards), Action("Podgląd / PDF / e-mail", OpenSavedCard),
-            Action("Eksportuj JSON", ExportSavedCard), trash, moveCard);
+            Action("Eksportuj JSON", ExportSavedCard), trash, moveCard, savedColumns);
         trash.CheckedChanged += async (_, _) =>
         {
             moveCard.Text = trash.Checked ? "Przywróć kartę" : "Przenieś do kosza";
