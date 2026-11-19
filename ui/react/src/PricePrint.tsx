@@ -227,6 +227,8 @@ export function PricePrintSettingsPanel({
   }
   const fonts=["","Arial","Calibri","Segoe UI","Tahoma","Times New Roman"];
   const fontOpts=fonts.map(name=>({label:name||"Jak w ustawieniach ogólnych",value:name}));
+  const availableFonts=(current:string)=>current&&!fonts.includes(current)
+    ? [...fontOpts,{label:current,value:current}] : fontOpts;
   return <Modal open width="min(1040px,96vw)" title="Ustawienia wydruku cennika"
     onCancel={onClose} destroyOnClose
     footer={<Space wrap>
@@ -264,7 +266,7 @@ export function PricePrintSettingsPanel({
               {label:"Legenda dróg podania",value:2}]}/>
           <Select value={form.pageFontNames[activePage]||""}
             onChange={v=>arraySet("pageFontNames",activePage,v)}
-            options={fontOpts} style={{width:170}}/>
+            options={availableFonts(form.pageFontNames[activePage])} style={{width:170}}/>
           <label>Rozmiar (pt) <InputNumber min={6} max={48}
             value={form.pageFontSizes[activePage]}
             onChange={v=>arraySet("pageFontSizes",activePage,v??10)}/></label>
@@ -292,7 +294,7 @@ export function PricePrintSettingsPanel({
               label:"Kolumna: "+label,value:i+1}))]} style={{width:190}}/>
           <Select value={form.columnFonts[activeCol]||""}
             onChange={v=>arraySet("columnFonts",activeCol,v)}
-            options={fontOpts} style={{width:175}}/>
+            options={availableFonts(form.columnFonts[activeCol])} style={{width:175}}/>
           <label>Rozmiar (pt) <InputNumber min={6} max={48}
             value={form.columnSizes[activeCol]}
             onChange={v=>arraySet("columnSizes",activeCol,v??10)}/></label>
