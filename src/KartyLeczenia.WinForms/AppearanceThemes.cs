@@ -274,9 +274,9 @@ internal static class AppearanceThemes
         Color active = style switch
         {
             1 => accent,
-            2 => surface,
-            3 or 4 => Blend(surface, accent, dark ? .30f : .14f),
-            _ => Blend(surface, accent, dark ? .18f : .08f)
+            2 => Blend(surface, accent, dark ? .14f : .08f),
+            3 or 4 => Blend(surface, accent, dark ? .36f : .22f),
+            _ => Blend(surface, accent, dark ? .30f : .18f)
         };
         Color selectedFore = style == 1 ? ContrastingText(accent) : accent;
         bool hasBorder = style == 2;
@@ -286,9 +286,9 @@ internal static class AppearanceThemes
         button.Type = AntdUI.TTypeMini.Default;
         button.ToggleType = AntdUI.TTypeMini.Default;
         button.Radius = radius;
-        button.BorderWidth = hasBorder ? 1.25f : 0f;
+        button.BorderWidth = hasBorder ? (button.Toggle ? 2.25f : 1f) : 0f;
         button.DefaultBorderColor = hasBorder
-            ? Blend(surface, ink, dark ? .52f : .32f)
+            ? (button.Toggle ? accent : Blend(surface, ink, dark ? .45f : .22f))
             : Color.Transparent;
         button.Ghost = false;
         button.BackExtend = null;
