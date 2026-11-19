@@ -23,6 +23,11 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
 
     internal sealed record SaveResult(bool Duplicate, string? DuplicateId, string? Number, string? Id);
 
+    // The performance date, not the optional reporting date, controls card numbering
+    // and the treatment date stored in the archive.
+    internal static (int Year, DateTime TreatmentDate) GetCardDate(DateTime performed)
+        => (performed.Year, performed.Date);
+
     internal SaveResult Save(DocumentData source, DateTime? reported, DateTime performed,
         string findings, bool confirmDuplicate)
     {
@@ -90,7 +95,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
                 return new(true, other.ToString("N"), null, null);
             }
         }
-        int year = performed.Year;
+        var (year, treatmentDate) = GetCardDate(performed);
         long sequence;
         using (var next = Cmd(db, tx, """
             SELECT COALESCE(MAX(card_sequence), CONVERT(bigint,0)) + 1
@@ -117,7 +122,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             save.Parameters.Add("@payer", SqlDbType.Int).Value = (object?)source.PayerId ?? DBNull.Value;
             save.Parameters.Add("@client", SqlDbType.NVarChar,-1).Value = client;
             save.Parameters.Add("@document", SqlDbType.NVarChar,-1).Value = source.Number;
-            save.Parameters.Add("@date", SqlDbType.Date).Value = performed.Date;
+            save.Parameters.Add("@date", SqlDbType.Date).Value = treatmentDate;
             save.Parameters.Add("@search", SqlDbType.NVarChar,-1).Value = (client+" "+source.Number).ToUpperInvariant();
             save.Parameters.Add("@card", SqlDbType.NVarChar,-1).Value = json;
             save.Parameters.Add("@print", SqlDbType.NVarChar,-1).Value = json;
