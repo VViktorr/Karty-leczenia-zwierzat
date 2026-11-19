@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Empty,
   Form, Input, InputNumber, Modal, Segmented, Select, Space, Spin, Switch, Table,
-  Tag, Typography, theme, message
+  Tag, Typography, Progress, theme
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
+import type { BackupProgress } from "./bridge";
 import type { DocumentKind, DocumentRow, DocumentsResult, DatePeriod } from "./bridge";
 
 type LayoutName = "classic" | "modern" | "fluent";
@@ -468,6 +469,80 @@ function ArchiveSettingsPanel() {
   </Card>;
 }
 
+interface BackupOptions {
+  destinationFolder:string;workingFolder:string;naming:string;customName:string;
+  overwrite:boolean;compress:boolean;
+}
+interface BackupResult { cancelled:boolean;path?:string;sqlVerified?:boolean;message?:string; }
+function BackupPanel() {
+  const [form]=Form.useForm<BackupOptions>();
+  const [busy,setBusy]=useState(false);
+  const [step,setStep]=useState<BackupProgress | null>(null);
+  const [error,setError]=useState("");
+  const [result,setResult]=useState("");
+  const [verified,setVerified]=useState(false);
+  useEffect(()=>{
+    invoke<BackupOptions>("getBackupSettings").then(data=>form.setFieldsValue(data))
+      .catch(e=>setError(String(e)));
+  },[form]);
+  const browse=async()=>{
+    try {
+      const result=await invoke<{folder:string}>("chooseArchiveFolder");
+      if(result.folder)form.setFieldValue("destinationFolder",result.folder);
+    } catch(e){setError(e instanceof Error?e.message:String(e));}
+  };
+  const save=async()=>{
+    setError("");setResult("");
+    try {await form.validateFields();await invoke("saveBackupSettings",form.getFieldsValue(true));setResult("Zapisano ustawienia archiwizacji.");}
+    catch(e){setError(e instanceof Error?e.message:String(e));}
+  };
+  const run=async()=>{
+    setBusy(true);setError("");setResult("");setStep(null);
+    try {
+      await form.validateFields();
+      await invoke("saveBackupSettings",form.getFieldsValue(true));
+      const outcome=await invoke<BackupResult>("backupDatabase",{},setStep);
+      if(outcome.cancelled)setResult("Archiwizacja anulowana w Windows Hello.");
+      else {setResult("Plik: "+outcome.path+"\n"+outcome.message);setVerified(!!outcome.sqlVerified);}
+    } catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy(false);}
+  };
+  return <Card className="settings-card">
+    <Typography.Title level={4}>Archiwizacja pełnej bazy SQL</Typography.Title>
+    <Typography.Paragraph type="secondary">
+      Jedna pełna kopia .bak na pendrivie, folder roboczy serwera, kontrola SHA-256
+      i czyszczenie po pomyślnym przeniesieniu. Wymagane potwierdzenie Windows Hello.
+    </Typography.Paragraph>
+    <ErrorNotice error={error}/>
+    {result&&<Alert className="notice" type={verified?"success":"info"} showIcon
+      message={<span style={{whiteSpace:"pre-wrap"}}>{result}</span>}/>}
+    <Form form={form} layout="vertical" initialValues={{naming:"daily",overwrite:true,compress:false,customName:"KartyLeczenia"}}>
+      <Form.Item label="Folder archiwum — pendrive" name="destinationFolder" rules={[{required:true,message:"Wybierz folder"}]}>
+        <Input placeholder="E:\archiwum" addonAfter={<Button type="link" size="small" onClick={()=>{void browse();}}>Przeglądaj</Button>}/>
+      </Form.Item>
+      <Form.Item label="Folder roboczy serwera SQL (puste = domyślny folder SQL)" name="workingFolder">
+        <Input placeholder="C:\SQLBackups"/>
+      </Form.Item>
+      <Form.Item name="naming" label="Nazwa archiwum">
+        <Select options={[
+          {label:"Nazwa i data",value:"daily"}, {label:"Stała nazwa",value:"fixed"},
+          {label:"Nazwa i miesiąc",value:"monthly"}, {label:"Własna nazwa",value:"custom"}]}/>
+      </Form.Item>
+      <Form.Item label="Własna nazwa pliku" name="customName"><Input/></Form.Item>
+      <Form.Item name="overwrite" valuePropName="checked"><Checkbox>Nadpisuj archiwa o tej samej nazwie dopiero po weryfikacji</Checkbox></Form.Item>
+      <Form.Item name="compress" valuePropName="checked"><Checkbox>Kompresja SQL Server</Checkbox></Form.Item>
+      <Space><Button onClick={()=>{void save();}} disabled={busy}>Zapisz ustawienia</Button>
+        <Button type="primary" loading={busy} onClick={()=>{void run();}}>Archiwizuj teraz</Button></Space>
+    </Form>
+    {busy && <div className="backup-progress">
+      <Typography.Text strong>{step?.stage || "Przygotowanie archiwizacji"}</Typography.Text>
+      <Progress percent={step?.percent??0} status="active"
+        format={step?.percent==null?()=> "…":undefined}/>
+      <Typography.Text type="secondary">{step?.detail||"Trwa operacja SQL..."}</Typography.Text>
+    </div>}
+  </Card>;
+}
+
 function SettingsPage() {
   const [form]=Form.useForm();
   const [busy,setBusy]=useState(false);
@@ -513,6 +588,7 @@ function SettingsPage() {
     </Card>
     <ClinicSettingsPanel/>
     <ArchiveSettingsPanel/>
+    <BackupPanel/>
   </>;
 }
 
