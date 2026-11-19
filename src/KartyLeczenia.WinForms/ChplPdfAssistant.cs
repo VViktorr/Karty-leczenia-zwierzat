@@ -72,8 +72,6 @@ internal static class ChplPdfAssistant
 
         // Multi-species documents: associate data only when a species has an
         // explicit own heading/label. Do not apply whole-page doses to all.
-        string pattern = Species.First(x => x.Name == species).Pattern.TrimStart('\\', 'b');
-        _ = pattern; // Keep the lexicon separate from label detection.
         string label = species switch
         {
             "Bydło" => "Bydło|Cielęta|Krowy",
