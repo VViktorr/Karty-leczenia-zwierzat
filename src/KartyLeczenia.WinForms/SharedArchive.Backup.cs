@@ -23,15 +23,15 @@ internal sealed partial class SharedArchive
     // Always a self-contained full SQL backup. The server-side .bak is staging only.
     // Never delete a previous valid destination until the new copy is verified.
     internal DatabaseBackupResult BackupToLocalFile(
-        BackupPreferences options, IProgress<BackupProgressInfo>? progress = null)
+        BackupPreferences preferences, IProgress<BackupProgressInfo>? progress = null)
     {
-        string folder = options.DestinationFolder;
+        string folder = preferences.DestinationFolder;
         if (!Path.IsPathFullyQualified(folder) || !Directory.Exists(folder))
             throw new DirectoryNotFoundException("Pendrive lub folder archiwum jest niedostępny: " + folder);
 
         progress?.Report(new("Kontrola lokalizacji", null, folder));
-        string target = Path.Combine(folder, options.FileName());
-        if (!options.Overwrite && File.Exists(target))
+        string target = Path.Combine(folder, preferences.FileName());
+        if (!preferences.Overwrite && File.Exists(target))
         {
             string stem = Path.GetFileNameWithoutExtension(target);
             int i = 1;
@@ -51,9 +51,9 @@ internal sealed partial class SharedArchive
         try
         {
             progress?.Report(new("Tworzenie pełnej kopii bazy SQL", null, "KartyLeczenia"));
-            using var db = OpenMaintenance(this.options, restoring: false);
+            using var db = OpenMaintenance(options, restoring: false);
             // WorkingFolder is a folder on the SQL host, visible to its service.
-            var created = CreateBackup(db, options.WorkingFolder, "robocza", compress: options.Compress);
+            var created = CreateBackup(db, preferences.WorkingFolder, "robocza", compress: preferences.Compress);
             serverPath = created.Path;
             source = ResolveBackupSource(serverPath);
             if (source is null)
@@ -96,7 +96,7 @@ internal sealed partial class SharedArchive
                     throw new IOException("Błąd zgodności SHA-256. Poprzednie archiwum pozostaje bez zmian.");
 
             // Replace only after verification; never truncate an existing valid archive.
-            File.Move(staging, target, overwrite: options.Overwrite);
+            File.Move(staging, target, overwrite: preferences.Overwrite);
             moved = true;
             progress?.Report(new("Usuwanie kopii roboczej", null));
             File.Delete(source);
