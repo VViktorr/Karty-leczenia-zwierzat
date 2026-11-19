@@ -7,6 +7,7 @@ import type { ColumnsType } from "antd/es/table";
 import { invoke } from "./bridge";
 
 interface CatalogueListing { symbol: string; name: string; status: string; variants: number; }
+interface MissingMedicine { symbol:string; name:string; }
 interface CatalogueVariant {
   id: number | null;
   species: string; indication: string; route: string; dose: string;
@@ -71,6 +72,10 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
   const [pdfName, setPdfName] = useState("");
   const [proposal, setProposal] = useState<PendingChplProposal | null>(null);
   const [version, setVersion] = useState(0);
+  const [missingRows,setMissingRows]=useState<MissingMedicine[]|null>(null);
+  const [missingOpen,setMissingOpen]=useState(false);
+  const [missingBusy,setMissingBusy]=useState(false);
+  const [missingTotal,setMissingTotal]=useState(0);
   const [msgApi, contextHolder] = message.useMessage();
 
   useEffect(() => {
@@ -133,6 +138,46 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
       revision:"",variants:[]});
     setVariants([]);setSelected([]);setSavedNotice("");
     setError("");setDirty(true);
+  }
+
+  async function checkMissing() {
+    if(missingBusy)return;
+    setMissingBusy(true);setError("");
+    try{
+      const data=await invoke<{items:MissingMedicine[];count:number;total:number}>(
+        "missingCatalogueProducts",{refresh:true});
+      setMissingRows(data.items);setMissingTotal(data.total);setMissingOpen(true);
+    }catch(error){setError(error instanceof Error?error.message:String(error));}
+    finally{setMissingBusy(false);}
+  }
+
+  async function editMissing(item:MissingMedicine,force=false) {
+    if(dirty&&!force){
+      Modal.confirm({
+        title:"Niezapisane zmiany katalogu",
+        content:"Odrzucić bieżące zmiany i przejść do wskazanego produktu Subiekta?",
+        okText:"Odrzuć i przejdź",cancelText:"Pozostań",
+        onOk:()=>{void editMissing(item,true);}
+      });
+      return;
+    }
+    setMissingOpen(false);setWorking(true);setError("");
+    try{
+      const existing=await invoke<CatalogueProduct>(
+        "readCatalogueProduct",{symbol:item.symbol});
+      loadProduct(existing);
+    }catch(error){
+      const reason=error instanceof Error?error.message:String(error);
+      if(reason.includes("Nie znaleziono kartoteki.")){
+        // WinForms creates a new SQL catalogue record only after the
+        // operator explicitly saves; no clinical data are fabricated.
+        setOriginal(null);
+        setEditing({symbol:item.symbol,name:item.name,rplId:"",
+          description:"",revision:"",variants:[]});
+        setVariants([]);setSelected([]);setDirty(true);
+        setSavedNotice("");
+      }else setError(reason);
+    }finally{setWorking(false);}
   }
 
   function changeField(field: "symbol" | "name" | "rplId" | "description", value: string) {
@@ -327,6 +372,8 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
         </Typography.Text>
       </div>
       <Space wrap>
+        <Button disabled={missingBusy||working} loading={missingBusy}
+          onClick={()=>{void checkMissing();}}>Sprawdź braki w katalogu</Button>
         <Button type="primary" disabled={working}
           onClick={()=>startNewProduct()}>Nowa kartoteka</Button>
         <Button onClick={() => setVersion(value => value + 1)}
@@ -432,6 +479,25 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
         </>}
       </Card>
     </div>
+    <Modal className="kl-dialog-catalogue-missing" open={missingOpen}
+      title={"Leki do uzupełnienia ("+(missingRows?.length??0)+" / "+missingTotal+")"}
+      width={900} onCancel={()=>setMissingOpen(false)}
+      footer={<Button onClick={()=>setMissingOpen(false)}>Zamknij</Button>}>
+      <Typography.Paragraph type="secondary">
+        Lista obejmuje grupę leków z Subiekta, również produkty bez stanu w magazynie.
+        Otwórz produkt, aby uzupełnić istniejącą kartotekę lub przygotować nową.
+        Bez Twojego zatwierdzenia nic nie zapisuje się w SQL.
+      </Typography.Paragraph>
+      <Table<MissingMedicine> rowKey="symbol" size="small"
+        dataSource={missingRows??[]} pagination={{pageSize:20}}
+        scroll={{y:420}} columns={[
+          {title:"Symbol Subiekta",dataIndex:"symbol",width:210},
+          {title:"Nazwa leku",dataIndex:"name"},
+          {title:"Otwórz",key:"open",width:105,
+            render:(_value,row)=><Button size="small"
+              onClick={()=>{void editMissing(row);}}>Uzupełnij</Button>}
+        ]}/>
+    </Modal>
     <Modal className="kl-dialog-catalogue-proposal" open={proposal !== null}
       title={"Sprawdź odczyt ChPL — " + (proposal?.filename ?? "")}
       width="90vw"
