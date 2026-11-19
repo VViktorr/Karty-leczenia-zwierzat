@@ -19,11 +19,14 @@ internal sealed class ReactWindow : Form
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "KartyLeczenia", "archive-connection.json"));
     private readonly DocumentService documents = new();
+    private readonly CardArchiveService cards;
+
     private readonly Dictionary<string, CancellationTokenSource> active = [];
     private readonly Dictionary<string, DocumentData> drafts = [];
 
     internal ReactWindow()
     {
+        cards = new CardArchiveService(archive);
         Text = "KartyLeczenia — ReactKL";
         MinimumSize = new Size(900, 600);
         Size = new Size(1400, 850);
@@ -106,6 +109,51 @@ internal sealed class ReactWindow : Form
 
     private async Task<object> Handle(string action, JsonElement root, CancellationToken token)
     {
+        if (action == "getClinic")
+        {
+            var clinic = ClinicSettingsStore.Load();
+            return new {clinic.Name, clinic.Address, clinic.Doctor, clinic.Phone};
+        }
+        if (action == "saveClinic")
+        {
+            var clinic = new ClinicSettings(Text(root, "name", 200),
+                Text(root, "address", 500), Text(root, "doctor", 200))
+            { Phone = Text(root, "phone", 100) };
+            ClinicSettingsStore.Save(clinic);
+            return new { saved = true };
+        }
+        if (action == "getArchiveSettings")
+        {
+            var setting = archive.Load().Options;
+            return new
+            {
+                configured = setting is not null,
+                server = setting?.Server ?? "",
+                windowsAuthentication = setting?.WindowsAuthentication ?? true,
+                userName = setting?.UserName ?? "",
+                trustCertificate = setting?.TrustCertificate ?? false
+            };
+        }
+        if (action == "saveArchiveSettings")
+        {
+            string server = Text(root, "server", 200);
+            string userName = Text(root, "userName", 200);
+            bool windows = Flag(root, "windowsAuthentication");
+            string password = Text(root, "password", 200);
+            var current = archive.Load().Options;
+            if (!windows && password.Length == 0 && current?.Server == server &&
+                current.UserName == userName) password = current.Password;
+            var setting = new ConnectionOptions(server, "KartyLeczenia", windows,
+                userName, password, Flag(root, "trustCertificate"));
+            await using var db = new SqlConnection(new SqlConnectionStringBuilder(
+                setting.BuildConnectionString("KartyLeczenia"))
+                { ApplicationIntent = ApplicationIntent.ReadWrite }.ConnectionString);
+            await db.OpenAsync(token);
+            using var check = new SqlCommand("SELECT TOP (1) id FROM dbo.treatment_cards", db);
+            _ = await check.ExecuteScalarAsync(token);
+            archive.Save(setting, Flag(root, "rememberPassword"));
+            return new { saved = true };
+        }
         if (action == "getSettings")
         {
             var (saved, _, warning) = subiekt.Load();
@@ -203,6 +251,29 @@ internal sealed class ReactWindow : Form
         }
         if (action == "expiries")
             return await MedicineStockService.Expiries(options, token);
+        if (action == "saveDraft" || action == "previewDraft")
+        {
+            string draftId = Text(root, "draftId", 30);
+            if (!drafts.TryGetValue(draftId, out var draft))
+                throw new InvalidOperationException("Ponownie otwórz dokument przed zapisaniem.");
+            static DateTime RequiredDate(JsonElement element, string name)
+            {
+                string text = Text(element, name, 35);
+                if (!DateTime.TryParseExact(text, "yyyy-MM-ddTHH:mm",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var date))
+                    throw new ArgumentException("Podaj datę i godzinę: " + name);
+                return date;
+            }
+            var reported = RequiredDate(root, "reported");
+            var performed = RequiredDate(root, "performed");
+            string findings = Text(root, "findings", 2000);
+            if (action == "previewDraft")
+                return new { html = cards.RenderDraft(draft, reported, performed, findings) };
+            return cards.Save(draft, reported, performed, findings, Flag(root, "confirmDuplicate"));
+        }
+        if (action == "renderSavedCard")
+            return new { html = cards.RenderSaved(Text(root, "id", 40), Flag(root, "trash")) };
         if (action == "savedCards")
             return await ReadSavedCards(token, Flag(root, "trash"), Text(root, "query", 120));
         if (action == "savedCard")
