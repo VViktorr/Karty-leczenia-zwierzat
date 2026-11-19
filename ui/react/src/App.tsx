@@ -7,6 +7,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
+import DialogPlacement from "./DialogPlacement";
 import { defaultPricePrint, normalizePriceSettings, withdrawalText,
   PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
 import type { PricePrintOptions, PricePrintRow } from "./PricePrint";
@@ -1874,6 +1875,7 @@ export default function App() {
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards/>:<SettingsPage/>;
   return <ConfigProvider theme={appearance}>
+    <DialogPlacement/>
     <AutomaticUpdateCheck/>
     <div className={"app-shell layout-"+layout+" palette-"+palette}>
       {layout!=="classic"&&<aside className="sidebar">

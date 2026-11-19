@@ -63,3 +63,20 @@
 .chpl-evidence{max-height:32vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;
   border:1px solid var(--line);border-radius:8px;padding:14px 16px;
   background:var(--shell-bg);color:var(--text);font:12px/1.55 Consolas,"Cascadia Code",monospace}
+
+
+/* All ReactKL dialogs: independent, workstation-local movable/resizable windows.
+   Keeps AntD buttons accessible while allowing large ChPL/print previews. */
+.kl-movable-modal{
+  position:absolute!important;
+  margin:0!important;
+  padding-bottom:0!important;
+  max-width:calc(100vw - 16px)!important;
+  min-width:min(320px,calc(100vw - 16px));
+  min-height:190px;
+  max-height:calc(100vh - 16px);
+  resize:both;
+  overflow:auto;
+}
+.kl-movable-modal .ant-modal-header{cursor:move;touch-action:none;user-select:none}
+.kl-movable-modal .ant-modal-title{user-select:none}
