@@ -112,7 +112,8 @@ IF @@ROWCOUNT=0
     $stream = $null
     if ($Pending) { Remove-Item -LiteralPath $file.FullName -Force }
     Add-Content -LiteralPath $log -Encoding UTF8 -Value "[$(Get-Date -Format s)] Published ReactKL $Version to dbo.program_update on $Server."
-    Write-Host "Opublikowano ReactKL $Version w SQL (SHA-256: $([BitConverter]::ToString($hash).Replace("-", "")))."
+    $hashHex = [BitConverter]::ToString($hash).Replace('-', '')
+    Write-Host ('Opublikowano ReactKL {0} w SQL (SHA-256: {1}).' -f $Version, $hashHex)
 } catch {
     try { Add-Content -LiteralPath $log -Encoding UTF8 -Value "[$(Get-Date -Format s)] ERROR publishing ${Version}: $_" } catch {}
     Write-Error -ErrorAction Continue $_
