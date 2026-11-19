@@ -201,3 +201,11 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 - Przeciąganie kolumn oraz trwałe szerokości pozostają osobnymi zadaniami.
 - Skala i panel kolumn wymagają testu UX na Windows/WebView2, szczególnie przy 175–200%.
 - Legacy `treatment_choices`: aktualny indeksowany odczyt SHA256 pozostaje aktywny; starsze wpisy `product != ''` wymagają wydajnej migracji lub odrębnego odczytu. Nie wykonywano migracji danych ani pełnych skanów SQL.
+
+### P1/P2: parametry kolumn — kolejność i szerokość (19.11.2026)
+
+- Actions #194 i #195 wykryły błąd TypeScript `TS2339` w filtrowaniu kolumn; naprawiono sprawdzanie `dataIndex` na typie grupowym w `58cfa23`.
+- `1e11676`: edytor karty obsługuje trwałą kolejność i szerokości kolumn w pikselach (60–800), lokalne klucze `kl.treatmentColumnOrder` i `kl.treatmentColumnWidths`. Przyciski ←/→ w panelu `Ctrl+Shift+L` przenoszą pola, a przywracanie domyślnych resetuje układ i szerokości.
+- „Druk” i „Produkt” są przypięte na początku dla zachowania bezpieczeństwa wyboru pozycji. Nie modyfikuje to danych karty, SQL ani wydruku.
+- **Ograniczenie:** na razie zmiana kolejności odbywa się przyciskami panelu, nie przeciąganiem nagłówka w tabeli. Ciągłe przeciąganie i dodatkowe ustawienia typografii pozostają do wykonania.
+- **CI:** po poprawkach wymagane sprawdzenie przebiegów #196 i #197 przed oznaczeniem jako ukończone.
