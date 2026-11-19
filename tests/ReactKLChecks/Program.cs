@@ -73,6 +73,39 @@ static class Program
             Check(otherYear == 2026 && otherDate == new DateTime(2026, 12, 31),
                 "card year must not follow an earlier or optional reporting date");
 
+            var localClinic = new KartyLeczenia.ClinicSettings(
+                "Przychodnia", "Warszawa", "lek. wet. Test")
+            { Phone = "123456789" };
+            Check(!SharedClinicService.HasDetails(new KartyLeczenia.ClinicSettings()),
+                "empty SQL clinic settings must be distinguished from existing data");
+            Check(SharedClinicService.ShouldImportLocal(null, localClinic),
+                "old local clinic can be seeded only into missing SQL row");
+            Check(SharedClinicService.ShouldImportLocal(new KartyLeczenia.ClinicSettings(), localClinic),
+                "old local clinic can be seeded into blank SQL row");
+            Check(!SharedClinicService.ShouldImportLocal(localClinic, new KartyLeczenia.ClinicSettings()),
+                "empty local settings must never erase existing SQL settings");
+            Check(!SharedClinicService.ShouldImportLocal(localClinic,
+                localClinic with { Doctor = "Inny lekarz" }),
+                "local settings must never overwrite populated SQL clinic");
+            Check(SharedClinicService.Revision(localClinic) ==
+                  SharedClinicService.Revision(localClinic with { }),
+                "unchanged clinic revision is reproducible");
+            Check(SharedClinicService.Revision(localClinic) !=
+                  SharedClinicService.Revision(localClinic with { Doctor = "Inny lekarz" }),
+                "concurrent doctor changes must invalidate stale revision");
+            bool invalidPngRejected = false;
+            try { SharedClinicService.ValidatePng([1, 2, 3, 4], "lecznicy"); }
+            catch (InvalidDataException) { invalidPngRejected = true; }
+            Check(invalidPngRejected, "invalid stamp data must not enter SQL");
+            bool missingStampRejected = false;
+            try
+            {
+                SharedClinicService.VerifyStamps(localClinic with { UseDoctorStamp = true });
+            }
+            catch (InvalidOperationException) { missingStampRejected = true; }
+            Check(missingStampRejected,
+                "enabled doctor stamp without PNG must be rejected");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
