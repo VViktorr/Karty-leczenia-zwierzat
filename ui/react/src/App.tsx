@@ -1695,6 +1695,10 @@ function SettingsPage() {
 export default function App() {
   const [layout,setLayout]=useState<LayoutName>(()=>saved("kl.layout",layouts,"modern"));
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
+  const [uiScale,setUiScale]=useState<number>(()=>{
+    try{const value=Number(localStorage.getItem("kl.uiScale"));return Number.isFinite(value)&&value>=80&&value<=200?value:100;}
+    catch{return 100;}
+  });
   const [section,setSection]=useState<Section>("documents");
   const [draft,setDraft]=useState<Draft|null>(null);
   const [catalogueDirty,setCatalogueDirty]=useState(false);
@@ -1713,6 +1717,14 @@ export default function App() {
   };
   useEffect(()=>{try{localStorage.setItem("kl.layout",layout);}catch{/* no storage */}},[layout]);
   useEffect(()=>{try{localStorage.setItem("kl.palette",palette);}catch{/* no storage */}},[palette]);
+  useEffect(()=>{
+    // Chromium WebView2 CSS zoom scales React and Ant Design controls together;
+    // reset on unmount, without changing Windows DPI or persisted SQL settings.
+    const previous=document.documentElement.style.zoom;
+    document.documentElement.style.zoom=uiScale+"%";
+    try{localStorage.setItem("kl.uiScale",String(uiScale));}catch{/* no storage */}
+    return()=>{document.documentElement.style.zoom=previous;};
+  },[uiScale]);
   const primary=palette==="sea"?"#15836f":palette==="dark"?"#78a5fa":"#1768d8";
   const appearance=useMemo(()=>({
     algorithm:palette==="dark"?theme.darkAlgorithm:theme.defaultAlgorithm,
@@ -1732,6 +1744,8 @@ export default function App() {
       {label:"Fluent — Windows 11",value:"fluent"}]}/>
     <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
       {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
+    <Select aria-label="Skalowanie interfejsu" value={uiScale} style={{minWidth:100}}
+      onChange={setUiScale} options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
   </div>;
   const content=section==="documents"?<Documents onOpen={next=>{setDraft(next);setSection("treatment");}}/>:
     section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}/>:
@@ -1759,7 +1773,7 @@ export default function App() {
           {content}
         </main>
         <footer className="statusline"><span>ReactKL — WebView2 / C#</span>
-          <span>Układ {layout} · motyw {palette}</span></footer>
+          <span>Układ {layout} · motyw {palette} · skala {uiScale}%</span></footer>
       </div>
     </div>
   </ConfigProvider>;
