@@ -320,6 +320,54 @@ static class Program
             catch (ArgumentException) { invalidPrintRejected = true; }
             Check(invalidPrintRejected, "invalid print widths must not be saved");
 
+            // ReactKL species filter must match the final WinForms group rules.
+            Check(TreatmentSpeciesGroup.Matches("cattle", ["Cielęta"]) &&
+                  TreatmentSpeciesGroup.Matches("cattle", ["Bydło", "Konie"]) &&
+                  TreatmentSpeciesGroup.Matches("cattle", ["Krowy"]),
+                "calves/cows must be classified under cattle");
+            Check(TreatmentSpeciesGroup.Matches("swine", ["Prosięta"]) &&
+                  TreatmentSpeciesGroup.Matches("swine", ["Świnie"]) &&
+                  TreatmentSpeciesGroup.Matches("swine", ["Tuczniki"]),
+                "swine must include piglets and fatteners");
+            Check(TreatmentSpeciesGroup.Matches("poultry", ["Kury"]) &&
+                  TreatmentSpeciesGroup.Matches("poultry", ["Indyki"]) &&
+                  TreatmentSpeciesGroup.Matches("poultry", ["Kaczki"]),
+                "poultry must include hens, turkeys, ducks");
+            Check(TreatmentSpeciesGroup.Matches("dog", ["Psy"]) &&
+                  TreatmentSpeciesGroup.Matches("cat", ["Koty"]) &&
+                  !TreatmentSpeciesGroup.Matches("dog", ["Koty"]),
+                "dogs and cats must not be mixed");
+            Check(!TreatmentSpeciesGroup.Matches("cattle", ["Koty", "Psy"]) &&
+                  TreatmentSpeciesGroup.Matches("all", ["Koty"]),
+                "incompatible medicines must be separated in cattle mode");
+            Check(TreatmentSpeciesGroup.CompatibleGroups(
+                      ["WARIANT DO WERYFIKACJI — bydło", "ZAWIESZONE — kury"])
+                      .Length == 0,
+                "unverified or suspended catalogue variants must be excluded");
+            Check(TreatmentSpeciesGroup.CompatibleGroups(
+                      ["Kury", "Bydło", "Kury"]).SequenceEqual(["cattle","poultry"]),
+                "compatible groups must be stable and deduplicated");
+            Check(!TreatmentSpeciesGroup.Matches("not-a-species", ["Bydło"]),
+                "unknown species group must not silently select clinical rows");
+
+            byte[] choiceKey = TreatmentChoiceService.ChoiceKey(
+                "SQLSERVER|Subiekt", "lek-123");
+            Check(choiceKey.Length == 32 &&
+                  choiceKey.SequenceEqual(TreatmentChoiceService.ChoiceKey(
+                      "SQLSERVER|Subiekt", " LEK-123 ")) &&
+                  !choiceKey.SequenceEqual(TreatmentChoiceService.ChoiceKey(
+                      "OTHER|Subiekt", "LEK-123")) &&
+                  !choiceKey.SequenceEqual(TreatmentChoiceService.ChoiceKey(
+                      "SQLSERVER|Subiekt", "LEK-456")),
+                "remembered medicine choices must use scope+symbol WinForms SHA256 identity");
+            Check(TreatmentChoiceService.NormalizeSymbol(" lek-123 ") == "LEK-123",
+                "legacy WinForms medicine-choice symbol normalization");
+            bool missingChoiceRejected = false;
+            try { _ = TreatmentChoiceService.ChoiceKey("", "LEK"); }
+            catch (ArgumentException) { missingChoiceRejected = true; }
+            Check(missingChoiceRejected,
+                "preferences with no source scope must never be shared across databases");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);

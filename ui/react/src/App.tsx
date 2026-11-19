@@ -36,7 +36,21 @@ interface TreatmentSuggestion {
   variantId:number|null;species:string;route:string;dosing:string;
   withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;
 }
-interface TreatmentSuggestionList { items:TreatmentSuggestion[]; }
+interface TreatmentSuggestionList {
+  items:TreatmentSuggestion[];
+  compatibility:Array<{index:number;groups:SpeciesGroup[]}>;
+}
+type SpeciesGroup="all"|"cattle"|"swine"|"poultry"|"dog"|"cat";
+interface SavedChoice {symbol:string;species:string;route:string;}
+interface SavedChoiceList {items:SavedChoice[];}
+const speciesGroups:Array<{value:SpeciesGroup;label:string}>=[
+  {value:"all",label:"Wszystkie gatunki"},
+  {value:"cattle",label:"Bydło (także cielęta)"},
+  {value:"swine",label:"Świnie"},
+  {value:"poultry",label:"Drób"},
+  {value:"dog",label:"Pies"},
+  {value:"cat",label:"Kot"}
+];
 interface TreatmentBulkResult {
   applied:Array<{index:number;species:string;route:string;dosing:string;
     withdrawal:string;indication:string;description:string}>;
@@ -266,20 +280,75 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   const [applyBusy,setApplyBusy]=useState(false);
   const [autofillMessage,setAutofillMessage]=useState("");
   const [suggestTick,setSuggestTick]=useState(0);
+  const [speciesGroup,setSpeciesGroup]=useState<SpeciesGroup>("cattle");
+  const [compatibility,setCompatibility]=useState<Record<number,SpeciesGroup[]>>({});
+  const [compatibilityDraftId,setCompatibilityDraftId]=useState("");
+  const desiredChecks=useRef<Map<number,boolean>>(new Map());
+  const [remember,setRemember]=useState(()=>{
+    try{return localStorage.getItem("ReactKL.rememberTreatmentChoices")==="true";}
+    catch{return false;}
+  });
+  const [savedChoices,setSavedChoices]=useState<Record<string,SavedChoice>>({});
+  const [choiceError,setChoiceError]=useState("");
+  const [selectionBusy,setSelectionBusy]=useState(false);
   useEffect(() => {
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
+    desiredChecks.current=new Map((draft?.rows??[]).map(row=>[row.index,row.selected]));
+    setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});
+    setSavedChoices({});
   }, [draft]);
   useEffect(()=>{
     if(!draft){setSuggestions([]);return;}
     let cancelled=false;
     setSuggestBusy(true);setSuggestError("");setSuggestions([]);
     invoke<TreatmentSuggestionList>("treatmentSuggestions",{draftId:draft.draftId})
-      .then(result=>{if(!cancelled)setSuggestions(result.items);})
+      .then(result=>{
+        if(cancelled)return;
+        setSuggestions(result.items);
+        const groups:Record<number,SpeciesGroup[]>={};
+        for(const item of result.compatibility??[])groups[item.index]=item.groups;
+        setCompatibility(groups);
+        setCompatibilityDraftId(draft.draftId);
+      })
       .catch(e=>{if(!cancelled){setSuggestions([]);setSuggestError(
         e instanceof Error?e.message:String(e));}})
       .finally(()=>{if(!cancelled)setSuggestBusy(false);});
     return()=>{cancelled=true;};
   },[draft,suggestTick]);
+  useEffect(()=>{
+    if(!draft||!remember){setSavedChoices({});setChoiceError("");return;}
+    let active=true;
+    void invoke<SavedChoiceList>("readTreatmentChoices",{draftId:draft.draftId})
+      .then(data=>{
+        if(!active)return;
+        const preferences:Record<string,SavedChoice>={};
+        for(const item of data.items)preferences[item.symbol.trim().toUpperCase()]=item;
+        setSavedChoices(preferences);setChoiceError("");
+      })
+      .catch(error=>{if(active)setChoiceError(error instanceof Error?error.message:String(error));});
+    return()=>{active=false;};
+  },[draft?.draftId,remember]);
+
+  useEffect(()=>{
+    if(!draft||compatibilityDraftId!==draft.draftId)return;
+    const belongs=(index:number)=>speciesGroup==="all"||
+      (compatibility[index]??[]).includes(speciesGroup);
+    const planned=rows.map(row=>({...row,selected:belongs(row.index)&&
+      (desiredChecks.current.get(row.index)??row.selected)}));
+    setRows(planned);setSavedNumber("");setSelectionBusy(true);
+    void invoke("setDraftSelections",{draftId:draft.draftId,
+      selections:planned.map(row=>({index:row.index,symbol:row.symbol,selected:row.selected}))})
+      .catch(error=>setError(error instanceof Error?error.message:String(error)))
+      .finally(()=>setSelectionBusy(false));
+    // Changing the filter uses catalogue compatibility already loaded once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[speciesGroup,compatibility,compatibilityDraftId,draft]);
+
+  function changeRemember(next:boolean){
+    setRemember(next);
+    try{localStorage.setItem("ReactKL.rememberTreatmentChoices",String(next));}
+    catch{/* Current session still works without storage. */}
+  }
   useEffect(()=>()=>{if(variantPdfUrl)URL.revokeObjectURL(variantPdfUrl);},[variantPdfUrl]);
   // Do not silently print an incomplete treatment card. The warning review
   // covers both SQL save and draft preview, without changing clinician entries.
@@ -454,7 +523,16 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     try{
       const result=await invoke<Pick<DraftRow,"species"|"route"|"dosing"|"withdrawal"|"indication"|"description">>(
         "applyTreatmentVariant",{draftId:draft.draftId,
-          index:variantModal.index,variantId:id});
+          index:variantModal.index,variantId:id,remember});
+      if(remember){
+        const chosen=variantModal.variants.find(item=>item.id===id);
+        if(chosen){
+          const symbol=variantModal.symbol.trim().toUpperCase();
+          setSavedChoices(current=>({...current,[symbol]:{
+            symbol,species:chosen.species,route:chosen.route
+          }}));
+        }
+      }
       setRows(current=>current.map(row=>row.index===variantModal.index
         ? {...row,...result} : row));
       setVariantModal(null);
@@ -473,6 +551,8 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     </Empty></Card>;
   const update = async (index: number, key: keyof DraftRow, value: string | boolean) => {
     const field = key === "selected" ? "Drukuj" : editable.find(x => x.key === key)?.field;
+    if(key==="selected" && typeof value==="boolean")
+      desiredChecks.current.set(index,value);
     if (!field || applyBusy) return;
     const previous = rows;
     setRows(current => current.map(row => row.index === index ? {...row,[key]:value} : row));
@@ -485,9 +565,16 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       ...(key === "selected" ? {checked:value} : {value})}); setError(""); }
     catch (e) { setRows(previous); setError(e instanceof Error ? e.message : String(e)); }
   };
+  const isCompatible=(row:DraftRow)=>speciesGroup==="all" ||
+    (compatibility[row.index]??[]).includes(speciesGroup);
+  const sortedRows=rows.slice().sort((a,b)=>
+    Number(isCompatible(b))-Number(isCompatible(a))||a.index-b.index);
   const columns: ColumnsType<DraftRow> = [
     {title:"Druk",dataIndex:"selected",width:63,render:(value:boolean,row) =>
-      <Checkbox checked={value} disabled={applyBusy} onChange={e => {void update(row.index,"selected",e.target.checked);}}/>},
+      <Checkbox checked={value}
+        disabled={applyBusy||selectionBusy||!isCompatible(row)}
+        title={!isCompatible(row)?"Brak wariantu ChPL dla wybranego gatunku":undefined}
+        onChange={e => {void update(row.index,"selected",e.target.checked);}}/>},
     {title:"Produkt",dataIndex:"product",width:240,ellipsis:true,fixed:"left"},
     {title:"Dopasowanie z SQL",key:"suggestion",width:185,
       render:(_value:unknown,row:DraftRow)=>{
@@ -559,6 +646,21 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       {autofillMessage&&<Alert type="info" showIcon className="notice"
         message={autofillMessage}/>}
     </Card>
+    <Card className="treatment-species">
+      <Space wrap>
+        <Typography.Text strong>Filtr gatunku</Typography.Text>
+        <Select value={speciesGroup} style={{minWidth:210}}
+          disabled={suggestBusy||selectionBusy||applyBusy}
+          options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/>
+        <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
+          Zapamiętuj gatunki i drogi podania w SQL
+        </Checkbox>
+        <Typography.Text type="secondary">
+          Niezgodne leki są odznaczane i przenoszone na koniec. Poprzedni wybór wraca po zmianie filtra.
+        </Typography.Text>
+      </Space>
+      {choiceError&&<Alert type="warning" className="notice" showIcon message={choiceError}/>}
+    </Card>
     <Card className="treatment-meta">
       <Space wrap>
         <label>Data zgłoszenia (opcjonalnie) <Input type="datetime-local" value={reported} onChange={e=>setReported(e.target.value)}/></label>
@@ -568,9 +670,11 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     </Card>
     {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
-    <Card><Table<DraftRow> rowKey="index" dataSource={rows} columns={columns} size="small"
+    <Card><Table<DraftRow> rowKey="index" dataSource={sortedRows} columns={columns} size="small"
+      rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
       scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
-      <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}</Typography.Text>
+      <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
+        {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>
     <Modal width="90vw" open={suggestReviewOpen}
       title="Potwierdź uzupełnienie jednoznacznych wariantów ChPL"
@@ -614,6 +718,12 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       <Alert className="notice" type="warning" showIcon
         message="Zweryfikuj gatunek, dawkowanie i karencję z aktualną urzędową ChPL."
         description="Wybór zastąpi dotychczasowy gatunek, drogę podania i dawkowanie; pełną karencję zmieni tylko, gdy katalog zawiera jej dane. Nic nie jest automatycznie zapisywane do archiwum kart."/>
+      {remember&&variantModal?.symbol&&savedChoices[variantModal.symbol.trim().toUpperCase()]&&
+        <Alert className="notice" type="info" showIcon
+          message={"Ostatnio wybrano: "+
+            savedChoices[variantModal.symbol.trim().toUpperCase()].species+" / "+
+            savedChoices[variantModal.symbol.trim().toUpperCase()].route}
+          description="Zapamiętany wybór to wskazówka. Potwierdź konkretny aktualny wariant ChPL, aby wypełnić kartę."/>}
       <ErrorNotice error={variantError}/>
       <Table<TreatmentVariantChoice> rowKey="id" loading={variantBusy}
         dataSource={variantModal?.variants??[]} size="small"
@@ -630,11 +740,17 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
               ? <Button size="small" disabled={variantBusy}
                   onClick={()=>{void viewVariantPdf(value);}}>Otwórz ChPL</Button>
               : "Brak"},
-          {title:"Wybór",width:130,
+          {title:"Wybór",width:190,
             render:(_value:unknown,row:TreatmentVariantChoice)=>
-              <Button type="primary" size="small" disabled={variantBusy ||
+              <Space>
+                {remember && variantModal?.symbol &&
+                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.species===row.species &&
+                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.route===row.route &&
+                  <Tag color="blue">Ostatni wybór</Tag>}
+                <Button type="primary" size="small" disabled={variantBusy ||
                 !row.species?.trim() || !row.route?.trim() || !row.dose?.trim()}
-                onClick={()=>{void applyVariant(row.id);}}>Wybierz</Button>}
+                onClick={()=>{void applyVariant(row.id);}}>Wybierz</Button>
+              </Space>}
         ]}/>
     </Modal>
     <Modal width="94vw" open={variantPdfUrl!==null}

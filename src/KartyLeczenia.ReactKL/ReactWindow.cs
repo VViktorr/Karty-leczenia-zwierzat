@@ -31,6 +31,7 @@ internal sealed class ReactWindow : Form
     private readonly PriceCatalogueService priceCatalogueService;
     private readonly CardArchiveService cards;
     private readonly SharedClinicService clinicService;
+    private readonly TreatmentChoiceService treatmentChoices;
     private byte[]? stagedClinicStamp;
     private byte[]? stagedDoctorStamp;
     private readonly SqlBackupService backups;
@@ -51,6 +52,7 @@ internal sealed class ReactWindow : Form
     {
         cards = new CardArchiveService(archive);
         clinicService = new SharedClinicService(archive);
+        treatmentChoices = new TreatmentChoiceService(archive);
         backups = new SqlBackupService(archive);
         restores = new SqlRestoreService(archive);
         updates = new ReactUpdateService(archive);
@@ -688,7 +690,20 @@ internal sealed class ReactWindow : Form
                     entries ?? []);
             }).ToArray();
             if (action == "treatmentSuggestions")
-                return new { items = proposals };
+                return new
+                {
+                    items = proposals,
+                    compatibility = draft.Rows.Select((row, index) =>
+                    {
+                        variants.TryGetValue(row.Get("Symbol Subiekta").Trim(), out var entries);
+                        return new
+                        {
+                            index,
+                            groups = TreatmentSpeciesGroup.CompatibleGroups(
+                                (entries ?? []).Select(variant => variant.Species))
+                        };
+                    }).ToArray()
+                };
 
             if (!root.TryGetProperty("candidates", out var requested) ||
                 requested.ValueKind != JsonValueKind.Array ||
@@ -754,6 +769,38 @@ internal sealed class ReactWindow : Form
             }
             return new { applied, skipped };
         }
+        if (action == "readTreatmentChoices")
+        {
+            string id = Text(root, "draftId", 30);
+            if (!drafts.TryGetValue(id, out var draft))
+                throw new InvalidOperationException("Ponownie otwórz dokument.");
+            var saved = await treatmentChoices.ReadAsync(draft.Scope,
+                draft.Rows.Select(row => row.Get("Symbol Subiekta")), token);
+            return new { items = saved };
+        }
+        if (action == "setDraftSelections")
+        {
+            string id = Text(root, "draftId", 30);
+            if (!drafts.TryGetValue(id, out var draft))
+                throw new InvalidOperationException("Ponownie otwórz dokument.");
+            if (!root.TryGetProperty("selections", out var chosen) ||
+                chosen.ValueKind != JsonValueKind.Array ||
+                chosen.GetArrayLength() != draft.Rows.Count ||
+                draft.Rows.Count > 500)
+                throw new ArgumentException("Nieprawidłowa lista wybranych leków.");
+            var inputs = chosen.EnumerateArray().ToArray();
+            // Validate the entire snapshot before mutating any row.
+            for (int index = 0; index < inputs.Length; index++)
+                if (Int(inputs[index], "index") != index ||
+                    !string.Equals(Text(inputs[index], "symbol", 128),
+                        draft.Rows[index].Get("Symbol Subiekta").Trim(),
+                        StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        "Stan dokumentu się zmienił. Ponownie otwórz dokument.");
+            for (int index = 0; index < inputs.Length; index++)
+                draft.Rows[index].Set("Drukuj", Flag(inputs[index], "selected").ToString());
+            return new { updated = inputs.Length };
+        }
         if (action == "treatmentVariants" || action == "applyTreatmentVariant")
         {
             string draftId = Text(root,"draftId",30);
@@ -780,6 +827,11 @@ internal sealed class ReactWindow : Form
                 string.IsNullOrWhiteSpace(choice.Route) || string.IsNullOrWhiteSpace(choice.Dose))
                 throw new InvalidOperationException(
                     "Wybrany wariant jest niekompletny lub nie istnieje. Nie zmieniono karty.");
+            // Save only after an explicit variant choice and opt-in; the
+            // remembered species/route never changes clinical values itself.
+            if (Flag(root, "remember"))
+                await treatmentChoices.SaveAsync(draft.Scope, symbol,
+                    choice.Species, choice.Route, token);
             return TreatmentVariantApplier.Apply(row, choice);
         }
         if (action == "updateDraft")

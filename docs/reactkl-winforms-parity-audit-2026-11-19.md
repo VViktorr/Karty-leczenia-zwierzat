@@ -169,3 +169,14 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 - CI sprawdza składnię `Configure-SharedArchive.ps1` dla Windows PowerShell 5.1, obecność ścieżki provisioningowej i kompiluje Inno Setup z **testową, nieprodukcyjną** paczką ZIP. Żaden test CI nie uruchamia inicjalizacji prawdziwej bazy.
 - **Do sprawdzenia na Windows 11 i rzeczywistym SQL:** nowy serwer z pustą bazą, istniejąca instancja z poprawnym katalogiem, aktualizacja już działającego serwera bez importu, nowa instalacja klienta, kreator uprawnień, obecność PDF i publikacja instalatora do `dbo.program_update`. CI może potwierdzić budowę, ale nie tę integrację.
 
+
+### P1: filtrowanie gatunków i pamięć wybranych wariantów — kod ReactKL
+
+- Zgodnie z końcowym WinForms: filtr **Wszystkie / Bydło (cielęta) / Świnie / Drób / Pies / Kot**, z domyślnym bydłem; zgodność ustalana na podstawie wariantów katalogu SQL, a nie tylko obecnego tekstu komórki. Warianty oznaczone do weryfikacji / zawieszone nie potwierdzają zgodności.
+- Niepasujące produkty są przenoszone na koniec i tymczasowo odznaczane; indywidualny stan zaznaczeń jest zachowany w edytorze i przywracany po powrocie do pasującego gatunku. Stan wybranych wierszy jest synchronizowany z wersją roboczą w pamięci hosta, bez dodatkowych zapytań SQL.
+- Jedno grupowe odczytanie wariantów dla dokumentu (`treatmentSuggestions`) zwraca także grupy kompatybilności. Zmiana filtra nie odczytuje ponownie katalogu ani dokumentu.
+- Opcjonalne **Zapamiętuj gatunki i drogi podania** korzysta z tej samej tabeli `dbo.treatment_choices` i klucza SHA-256(scope, symbol) co WinForms. Indeksowane odczyty obejmują wyłącznie symbole z aktualnego dokumentu i bieżący `source_scope`.
+- Pamiętany gatunek/droga jest pokazywany tylko jako **wskazówka** w oknie wariantów. Zapis wyboru do SQL następuje wyłącznie po świadomym wybraniu kompletnego wariantu i włączeniu pamiętania. Nie autouzupełnia to automatycznie dawkowania ani karencji z innej ChPL.
+- Testy bez SQL sprawdzają rozpoznawanie gatunków (w tym cielęta), odrzucanie niezgodnych i niezweryfikowanych wariantów oraz rozdzielenie kluczy preferencji pomiędzy różnymi źródłami.
+- **Do potwierdzenia:** kompilacja nowego commit-u w CI, rzeczywiste odczyty/upserty `treatment_choices`, przełączanie grup po ręcznym zaznaczeniu/odznaczeniu wiersza, praca na wielu stanowiskach oraz zachowanie odznaczeń po zapisie.
+
