@@ -2553,33 +2553,33 @@ internal sealed class MainForm : Form
             if (sharedArchive is { } archive) await RefreshClinic(archive);
         };
         form = Section("Kopia zapasowa SQL");
-        Message(form, "Pierwsza archiwizacja tworzy pełną kopię bazy, kolejne — kopie różnicowe SQL. " +
-            "Folder na pendrivie zapamiętywany jest w ustawieniach. " +
-            "Przy zamykaniu wystarczy wybrać Tak i potwierdzić Windows Hello. " +
-            "Zachowaj pełną kopię bazową, ponieważ jest potrzebna do odtwarzania różnicowego.", multiline: true);
+        Message(form, "Każda archiwizacja zapisuje pełną, samodzielną kopię .bak w zapamiętanym folderze. " +
+            "SQL używa jednego tymczasowego pliku w folderze roboczym; po przeniesieniu i sprawdzeniu SHA-256 " +
+            "plik roboczy jest usuwany. Przy zamykaniu program użyje zapisanych ustawień.", multiline: true);
         var restoreFile = Field("Plik kopii na serwerze", "", @"np. D:\Kopie\KartyLeczenia.bak");
         var backupLocation = Field("Folder archiwizacji (pendrive)", ArchiveStorageLocation.Resolve() ?? "",
-            "Wskaż folder jeden raz; miejsce zostanie zapamiętane");
-        void ConfigureBackupFolder()
+            "Lokalizacja jest zapamiętywana");
+        void ConfigureBackup()
         {
-            using var dialog = new FolderBrowserDialog { Description = "Wybierz folder archiwum SQL na pendrivie" };
-            if (Directory.Exists(backupLocation.Text)) dialog.InitialDirectory = backupLocation.Text;
-            if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            ArchiveStorageLocation.Save(dialog.SelectedPath);
-            backupLocation.Text = ArchiveStorageLocation.Resolve() ?? dialog.SelectedPath;
+            using var dialog = new ArchiveBackupSettingsDialog(ArchiveStorageLocation.LoadPreferences());
+            if (DialogPlacement.Show(dialog, this, "database-backup-settings") == DialogResult.OK)
+                backupLocation.Text = ArchiveStorageLocation.Resolve() ?? "";
         }
-        Add("", Action("Wybierz folder archiwum…", () => { ConfigureBackupFolder(); return Task.CompletedTask; }));
-        string? BackupFolder()
+        Add("", Action("Ustawienia archiwizacji…", () => { ConfigureBackup(); return Task.CompletedTask; }));
+        BackupPreferences? BackupSettings()
         {
-            string? saved = ArchiveStorageLocation.Resolve();
-            if (saved is not null) { backupLocation.Text = saved; return saved; }
-            if (MessageBox.Show(this,
-                    "Nie znaleziono zapamiętanego nośnika archiwum. Podłącz pendrive albo wybierz folder archiwum.",
-                    "Nośnik archiwum niedostępny", MessageBoxButtons.OKCancel,
-                    MessageBoxIcon.Warning) != DialogResult.OK)
-                return null;
-            ConfigureBackupFolder();
-            return ArchiveStorageLocation.Resolve();
+            var saved = ArchiveStorageLocation.ResolvePreferences();
+            if (saved is not null) return saved;
+            // Initial setup or absent USB: do not silently choose another disk.
+            ConfigureBackup();
+            return ArchiveStorageLocation.ResolvePreferences();
+        }
+        DatabaseBackupResult RunBackup(SharedArchive archive, BackupPreferences preferences)
+        {
+            using var dialog = new ArchiveBackupProgressDialog(archive, preferences);
+            DialogPlacement.Show(dialog, this, "database-backup-progress");
+            if (dialog.Failure is { } failure) throw new InvalidOperationException(failure.Message, failure);
+            return dialog.Result ?? throw new InvalidOperationException("Archiwizacja nie została wykonana.");
         }
         var maintenanceStatus = Message(form, "", multiline: true);
         bool maintainingArchive = false;
@@ -2606,9 +2606,9 @@ internal sealed class MainForm : Form
             }
             else
             {
-                string? selected = BackupFolder();
+                var selected = BackupSettings();
                 if (selected is null) return;
-                path = selected;
+                path = selected.DestinationFolder;
             }
             if (restoring && !path.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Podaj pełną ścieżkę do pliku .bak dostępnego z serwera SQL.");
@@ -2642,7 +2642,7 @@ internal sealed class MainForm : Form
                 if (restoring)
                     restoredFrom = await Task.Run(() => archive.RestoreDatabase(path));
                 else
-                    backupResult = await Task.Run(() => archive.BackupToLocalFile(path));
+                    backupResult = RunBackup(archive, ArchiveStorageLocation.ResolvePreferences()!);
                 if (restoring && ReferenceEquals(archive, sharedArchive))
                 {
                     sharedClinic = null;
@@ -2721,10 +2721,9 @@ internal sealed class MainForm : Form
             status.Text = "Archiwizacja bazy SQL przed zamknięciem…";
             try
             {
-                string? destination = BackupFolder();
-                if (destination is null) return;
-                DatabaseBackupResult result = await Task.Run(
-                    () => archive.BackupToLocalFile(destination));
+                BackupPreferences? preferences = BackupSettings();
+                if (preferences is null) return;
+                DatabaseBackupResult result = RunBackup(archive, preferences);
                 if (IsDisposed) return;
                 status.Text = result.Verified
                     ? $"Kopia wykonana i zweryfikowana: {result.Path}"
