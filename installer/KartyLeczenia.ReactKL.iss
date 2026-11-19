@@ -106,6 +106,10 @@ end;
 function InstallerArchiveServer(Param: String): String;
 begin
   Result := Trim(ServerPage.Values[0]);
+  // Preserve the former client installer behaviour for plain server names.
+  if (RolePage.SelectedValueIndex = 1) and (Pos(',', Result) = 0)
+     and (Pos('\', Result) = 0) then
+    Result := Result + ',51433';
 end;
 
 function IsServerInstall: Boolean;
