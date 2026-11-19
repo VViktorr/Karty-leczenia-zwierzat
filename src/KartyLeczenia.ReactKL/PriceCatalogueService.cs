@@ -52,6 +52,14 @@ internal sealed class PriceCatalogueSnapshot(
         return new(dictionary);
     }
 
+    internal bool NeedsCompletion(string symbol)
+    {
+        if(!variants.TryGetValue(symbol.Trim(),out var all) || all.Count==0)
+            return true;
+        return all.Any(variant=>variant.Incomplete) ||
+            !all.Any(variant=>variant.Withdrawal.Length>0);
+    }
+
     internal PricePresentation Format(MedicinePrice price)
     {
         if (!variants.TryGetValue(price.Symbol.Trim(), out var all)) all = [];
@@ -80,8 +88,7 @@ internal sealed class PriceCatalogueSnapshot(
             Compose(0, true), Compose(0, false),
             Compose(1, true), Compose(1, false),
             Compose(2, true), Compose(2, false),
-            all.Count == 0 || all.Any(v => v.Incomplete) ||
-            !all.Any(v => v.Withdrawal.Length > 0));
+            NeedsCompletion(price.Symbol));
     }
 
     internal PricePresentation[] FormatPrices(IEnumerable<MedicinePrice> items)
