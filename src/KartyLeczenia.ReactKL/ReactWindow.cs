@@ -568,7 +568,10 @@ internal sealed class ReactWindow : Form
             row.Set("Gatunek",choice.Species);
             row.Set("Droga podania",choice.Route);
             row.Set("Dawkowanie i okres stosowania",choice.Dose);
-            if (withdrawal.Length>0) row.Set("Karencja",withdrawal);
+            // Never keep a previous species/variant's withdrawal time when the
+            // newly selected ChPL variant contains no withdrawal value.
+            // An empty result must be reviewed and completed manually.
+            row.Set("Karencja",withdrawal);
             row.Set("Wskazanie ChPL",choice.Indication);
             row.Set("Źródło karencji",choice.Source);
             row.Set("Status karencji","Wariant katalogu SQL — zweryfikuj z aktualną ChPL");
