@@ -665,6 +665,13 @@ static class Program
             Check(CardArchiveService.SafeJsonFileName("K/14/2026")=="K_14_2026" &&
                   CardArchiveService.SafeJsonFileName(" : / ")=="Karta-leczenia",
                 "saved-card JSON filenames must be Windows-safe");
+            Check(CardPdfService.AttachmentName("FS/123/2026") ==
+                    "karta-leczenia-FS-123-2026.pdf" &&
+                  CardPdfService.AttachmentName("PA:12*34?") ==
+                    "karta-leczenia-PA-12-34-.pdf" &&
+                  CardPdfService.AttachmentName("") == "karta-leczenia.pdf" &&
+                  CardPdfService.AttachmentName("   ") == "karta-leczenia.pdf",
+                "PDF attachments must use the source document number and Windows-safe characters");
             Console.WriteLine($"ReactKL regression checks passed: {checks}");
         }
         finally
