@@ -32,6 +32,8 @@ internal static class ReactInstallUpdates
         return null;
     }
 
+    internal static bool IsInstalled => File.Exists(InstallFile) &&
+        Version.TryParse(Read("AppVersion"), out _);
     internal static bool IsServer => string.Equals(Read("Role"), "server", StringComparison.OrdinalIgnoreCase);
     internal static string? Server => Read("Server");
 
