@@ -26,6 +26,9 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
         }
     }
 
+    private static Version Normalize(Version value) => new(value.Major,value.Minor,
+        Math.Max(0,value.Build),Math.Max(0,value.Revision));
+
     private SqlConnection Connection()
     {
         var options = store.Load().Options ??
@@ -53,7 +56,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
             if(hash.Length!=32)throw new InvalidDataException("Błędna suma SHA-256 aktualizacji SQL.");
             Version current=Version.TryParse(CurrentVersion,out var local)?local:new Version(0,0);
             return new(reader.GetGuid(0),release.ToString(),CurrentVersion,
-                Convert.ToHexString(hash),release>current,reader.GetDateTime(3));
+                Convert.ToHexString(hash),Normalize(release)>Normalize(current),reader.GetDateTime(3));
         }
         catch(SqlException ex) when(ex.Number==208)
         {
@@ -65,7 +68,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
     internal async Task<string> Download(ReactUpdateInfo release, CancellationToken token)
     {
         Version current=Version.TryParse(CurrentVersion,out var local)?local:new Version(0,0);
-        if (!Version.TryParse(release.Version,out var advertised)||advertised<=current)
+        if (!Version.TryParse(release.Version,out var advertised)||Normalize(advertised)<=Normalize(current))
             throw new InvalidOperationException("Brak nowszej wersji ReactKL do zainstalowania.");
         if(release.Sha256.Length!=64 || !Convert.TryFromHexString(release.Sha256,new byte[32],out int parsed) || parsed!=32)
             throw new InvalidDataException("Nieprawidłowy skrót SHA-256 publikacji.");
@@ -102,7 +105,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
             if(!CryptographicOperations.FixedTimeEquals(digest,Convert.FromHexString(release.Sha256)))
                 throw new InvalidDataException("Błędna suma SHA-256 pobranego instalatora. Nie uruchomiono aktualizacji.");
             var actualFileVersion=FileVersionInfo.GetVersionInfo(installer).FileVersion;
-            if (!Version.TryParse(actualFileVersion,out var fileVersion) || fileVersion!=advertised)
+            if (!Version.TryParse(actualFileVersion,out var fileVersion) || Normalize(fileVersion)!=Normalize(advertised))
                 throw new InvalidDataException("Pobrany plik ma inną wersję niż opublikowana. Nie uruchomiono aktualizacji.");
             using(var stream=File.OpenRead(installer))
                 if(stream.ReadByte()!='M' || stream.ReadByte()!='Z')
