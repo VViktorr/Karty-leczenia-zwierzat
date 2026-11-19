@@ -81,7 +81,8 @@ const date = (value: string | null) => value
 function ErrorNotice({error}: {error: string}) {
   return error ? <Alert className="notice" type="error" showIcon message={error}/> : null;
 }
-function useRemote<T>(action: string, payload: Record<string, unknown>, deps: unknown[]): {
+function useRemote<T>(action: string, payload: Record<string, unknown>, deps: unknown[],
+  enabled = true): {
   data: T | null; busy: boolean; error: string; reload: () => void;
 } {
   const [data, setData] = useState<T | null>(null);
@@ -93,6 +94,7 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   const key = JSON.stringify(deps);
   useEffect(() => {
     let expired = false;
+    if (!enabled) {setBusy(false);return;}
     const refresh = forceRefresh.current;
     forceRefresh.current = false;
     setBusy(true); setError("");
@@ -102,7 +104,7 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
       .finally(() => { if (!expired) setBusy(false); });
     return () => { expired = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action, key, tick]);
+  }, [action, key, tick, enabled]);
   return {data, busy, error, reload: () => {
     forceRefresh.current = true;
     setTick(n => n + 1);
@@ -652,13 +654,19 @@ function Prices() {
   const levels = useRemote<PriceLevel[]>("priceLevels",{},[]);
   const [level,setLevel]=useState<number | null>(null);
   const [net,setNet]=useState(false);
-  useEffect(() => { if (level === null && levels.data?.length) setLevel(levels.data[0].number); },[levels.data,level]);
-  const prices=useRemote<MedicinePrice[]>("prices",{level,net},[level,net]);
+  useEffect(() => {
+    if (level !== null || !levels.data?.length) return;
+    const retail=levels.data.find(item=>item.name.toLocaleLowerCase("pl").includes("detaliczna"));
+    setLevel((retail??levels.data[0]).number);
+  },[levels.data,level]);
+  // Do not fire an unnecessary expensive price+stock query for level 1 before
+  // the actual (normally Detaliczna) list of levels has loaded.
+  const prices=useRemote<MedicinePrice[]>("prices",{level,net},[level,net],level!==null);
   const [filter,setFilter]=useState("");
   const rows=(prices.data ?? []).filter(p => p.name.toLocaleLowerCase("pl").includes(filter.toLocaleLowerCase("pl")));
   return <>
     <div className="page-heading"><Typography.Title level={3}>Cennik leków</Typography.Title>
-      <Button onClick={prices.reload}>Odśwież</Button></div>
+      <Button onClick={prices.reload} disabled={level===null} loading={prices.busy}>Odśwież</Button></div>
     <Card><div className="document-filters">
       <Select loading={levels.busy} value={level} placeholder="Poziom ceny" onChange={setLevel}
         options={(levels.data ?? []).map(x => ({label:x.name,value:x.number}))}/>
