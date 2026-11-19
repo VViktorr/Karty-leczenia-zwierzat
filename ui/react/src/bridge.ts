@@ -11,7 +11,9 @@ export interface DocumentDetail {
   rows: Array<{product: string; quantity: string; batch: string; species: string; route: string;}>;
 }
 interface RequestMessage { id: string; action: string; [key: string]: unknown; }
-interface ResponseMessage { id: string; ok: boolean; data?: unknown; error?: string; }
+export interface BackupProgress {stage:string;percent:number|null;detail:string;}
+interface ResponseMessage { id: string; ok: boolean; data?: unknown; error?: string;
+  event?: "progress";stage?:string;percent?:number|null;detail?:string; }
 interface WebView {
   postMessage(message: RequestMessage): void;
   addEventListener(type: "message", listener: (event: MessageEvent<ResponseMessage>) => void): void;
@@ -20,6 +22,7 @@ declare global { interface Window { chrome?: { webview?: WebView } } }
 const pending = new Map<string, {
   resolve: (value: unknown) => void; reject: (reason: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
+  onProgress?: (progress: BackupProgress) => void;
 }>();
 let sequence = 0;
 if (window.chrome?.webview) {
@@ -28,6 +31,11 @@ if (window.chrome?.webview) {
     if (!response || typeof response.id !== "string") return;
     const request = pending.get(response.id);
     if (!request) return;
+    if (response.event === "progress") {
+      request.onProgress?.({stage:response.stage ?? "",percent:response.percent ?? null,
+        detail:response.detail ?? ""});
+      return;
+    }
     pending.delete(response.id);
     clearTimeout(request.timeout);
     if (response.ok) request.resolve(response.data);
@@ -35,7 +43,8 @@ if (window.chrome?.webview) {
   });
 }
 export function isDesktop() { return !!window.chrome?.webview; }
-export function invoke<T>(action: string, fields: Record<string, unknown> = {}): Promise<T> {
+export function invoke<T>(action: string, fields: Record<string, unknown> = {},
+  onProgress?: (progress: BackupProgress) => void): Promise<T> {
   const bridge = window.chrome?.webview;
   if (!bridge) return Promise.reject(new Error(
     "Dane Subiekta są dostępne po uruchomieniu desktopowego WebView2 z parametrem --react."
@@ -45,8 +54,8 @@ export function invoke<T>(action: string, fields: Record<string, unknown> = {}):
     const timeout = setTimeout(() => {
       pending.delete(id);
       reject(new Error("Serwer nie odpowiedział w wyznaczonym czasie."));
-    }, 40000);
-    pending.set(id, {resolve: value => resolve(value as T), reject, timeout});
+    }, action === "backupDatabase" ? 1800000 : 40000);
+    pending.set(id, {resolve: value => resolve(value as T), reject, timeout, onProgress});
     bridge.postMessage({id, action, ...fields});
   });
 }
