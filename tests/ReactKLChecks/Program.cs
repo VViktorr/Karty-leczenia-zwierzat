@@ -423,6 +423,27 @@ static class Program
                 [workArea], fallback, minSize) == fallback,
                 "invalid saved window dimensions must be ignored");
 
+            var legacy = new LegacyTreatmentChoice[] {
+                new("LEK-A","Stary produkt A","Bydło","domięśniowo"),
+                new("LEK-A","Stary produkt B","Bydło","domięśniowo"),
+                new("LEK-B","Stary B","Bydło","doustnie"),
+                new("LEK-B","Nowy B","Świnie","doustnie"),
+                new("LEK-C","Stary C","Świnie","doustnie"),
+                new("LEK-C","","Bydło","podskórnie"),
+                new("LEK-D","","Bydło","domięśniowo"),
+                new("LEK-D","","Świnie","domięśniowo")
+            };
+            var resolved = TreatmentChoiceService.ResolveLegacy(
+                legacy, [" lek-a ","LEK-B","LEK-C","LEK-D"]);
+            Check(resolved.Length == 2 &&
+                  resolved.Any(item => item.Symbol == "LEK-A" &&
+                      item.Species == "Bydło" && item.Route == "domięśniowo") &&
+                  resolved.Any(item => item.Symbol == "LEK-C" &&
+                      item.Species == "Bydło" && item.Route == "podskórnie"),
+                "legacy choices must prefer symbol records and reject ambiguous variants");
+            Check(TreatmentChoiceService.ResolveLegacy(legacy, ["NIE-ZNANY"]).Length == 0,
+                "legacy choices must never leak into unrelated document symbols");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
