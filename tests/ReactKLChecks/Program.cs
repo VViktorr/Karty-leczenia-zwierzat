@@ -140,6 +140,20 @@ static class Program
                   .Status=="ready",
                 "exact matching species and route may offer a single verified variant");
             Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                  [swine with {Species="Bydło",Milk=""}]).Status=="noMatch",
+                "incompatible cattle must not be chosen for explicit swine selection");
+            var defaultCattle = new KartyLeczenia.TreatmentRow();
+            defaultCattle.Set("Symbol Subiekta","VET-123",false);
+            Check(TreatmentAutofillPlanner.Propose(0, defaultCattle,
+                  [swine with {Species="Bydło",Milk=""}]).Status=="review",
+                "cattle without milk withdrawal needs manual review");
+            Check(TreatmentAutofillPlanner.Propose(0, defaultCattle,
+                  [swine with {Species="Kury",Milk=""}]).Status=="review",
+                "poultry eggs restrictions require manual review");
+            Check(TreatmentAutofillPlanner.Propose(0, defaultCattle,
+                  [swine with {Tissues="",Milk="36 godzin"}]).Status=="review",
+                "milk-only entry must not bulk-apply without edible tissue withdrawal");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
                   [swine with {Pdf=""}]).Status=="review",
                 "missing official ChPL PDF must prevent bulk autofill");
             Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
