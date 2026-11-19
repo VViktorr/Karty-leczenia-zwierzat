@@ -29,6 +29,15 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
     private static Version Normalize(Version value) => new(value.Major,value.Minor,
         Math.Max(0,value.Build),Math.Max(0,value.Revision));
 
+    internal static bool IsNewer(string published, string installed)
+    {
+        if (!Version.TryParse(published, out var candidate))
+            throw new InvalidDataException("Niepoprawna wersja instalatora opublikowanego w SQL.");
+        var current = Version.TryParse(installed, out var parsed)
+            ? parsed : new Version(0,0);
+        return Normalize(candidate) > Normalize(current);
+    }
+
     private SqlConnection Connection()
     {
         var options = store.Load().Options ??
@@ -54,9 +63,9 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
                 throw new InvalidDataException("Niepoprawny numer wersji publikacji w SQL.");
             var hash=reader.GetFieldValue<byte[]>(2);
             if(hash.Length!=32)throw new InvalidDataException("Błędna suma SHA-256 aktualizacji SQL.");
-            Version current=Version.TryParse(CurrentVersion,out var local)?local:new Version(0,0);
-            return new(reader.GetGuid(0),release.ToString(),CurrentVersion,
-                Convert.ToHexString(hash),Normalize(release)>Normalize(current),reader.GetDateTime(3));
+            string installedVersion = CurrentVersion;
+            return new(reader.GetGuid(0),release.ToString(),installedVersion,
+                Convert.ToHexString(hash),IsNewer(release.ToString(),installedVersion),reader.GetDateTime(3));
         }
         catch(SqlException ex) when(ex.Number==208)
         {
