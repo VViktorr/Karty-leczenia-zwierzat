@@ -363,6 +363,9 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
   const [performed, setPerformed] = useState(() => localDateTime());
   const [findings, setFindings] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
+  const [previewSavedId,setPreviewSavedId]=useState<string|null>(null);
+  const [pdfBusy,setPdfBusy]=useState<"pdf"|"mail"|null>(null);
+  const [pdfMessage,setPdfMessage]=useState("");
   const previewFrame = useRef<HTMLIFrameElement>(null);
   const [variantModal,setVariantModal]=useState<{
     index:number;product:string;symbol:string;variants:TreatmentVariantChoice[];
@@ -582,6 +585,8 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
       } else {
         setSavedNumber(result.number ?? "");
         if (result.id) {
+          setPreviewSavedId(result.id);
+          setPdfMessage("");
           try {
             const printable=await invoke<{html:string}>("renderSavedCard",{
               id:result.id,trash:false
@@ -596,6 +601,23 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
     } catch (e) {setError(e instanceof Error ? e.message : String(e));}
     finally {setBusy(false);}
   }
+  async function pdfFromPreview(mail:boolean) {
+    if(!draft||pdfBusy)return;
+    setPdfBusy(mail?"mail":"pdf");setPdfMessage("");
+    try{
+      const request=previewSavedId
+        ? {id:previewSavedId,trash:false}
+        : {draftId:draft.draftId,reported,performed,findings,rows};
+      const result=await invoke<{cancelled:boolean;fileName:string;recipient:string}>(
+        mail?"emailCardPdf":"saveCardPdf",request);
+      if(!result.cancelled)setPdfMessage(mail
+        ? "Przygotowano wiadomość z PDF „"+result.fileName+
+          "”. Adres płatnika: "+(result.recipient||"brak — wprowadź ręcznie")+
+          ". Przed wysłaniem sprawdź wiadomość w programie pocztowym."
+        : "Zapisano plik PDF: "+result.fileName);
+    }catch(e){setPdfMessage(e instanceof Error?e.message:String(e));}
+    finally{setPdfBusy(null);}
+  }
   async function printPreview() {
     if (!draft || busy || applyBusy || selectionBusy) return;
     if (!await reviewBefore("preview")) return;
@@ -604,6 +626,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
       const data = await invoke<{html:string}>("previewDraft", {
         draftId:draft.draftId, reported, performed, findings, rows
       });
+      setPreviewSavedId(null);setPdfMessage("");
       setPreview(data.html); setError("");
     } catch(e) {setError(e instanceof Error ? e.message : String(e));}
     finally {setBusy(false);}
@@ -1014,8 +1037,15 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
         style={{width:"100%",height:"76vh",border:0,background:"#fff"}}/>}
     </Modal>
     <Modal className="kl-dialog-treatment-preview" width="92vw" open={preview!==null} title="Podgląd karty leczenia" onCancel={()=>setPreview(null)}
-      footer={<Space><Button onClick={()=>setPreview(null)}>Zamknij</Button>
-        <Button type="primary" onClick={()=>previewFrame.current?.contentWindow?.print()}>Drukuj</Button></Space>}>
+      footer={<Space wrap>
+        <Button onClick={()=>setPreview(null)}>Zamknij</Button>
+        <Button loading={pdfBusy==="pdf"} disabled={!!pdfBusy}
+          onClick={()=>{void pdfFromPreview(false);}}>Zapisz PDF</Button>
+        <Button loading={pdfBusy==="mail"} disabled={!!pdfBusy}
+          onClick={()=>{void pdfFromPreview(true);}}>Wyślij mailem</Button>
+        <Button type="primary" onClick={()=>previewFrame.current?.contentWindow?.print()}>Drukuj</Button>
+      </Space>}>
+      {pdfMessage&&<Alert className="notice" type="info" showIcon message={pdfMessage}/>}
       {preview && <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
         style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
     </Modal>
