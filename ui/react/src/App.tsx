@@ -185,9 +185,12 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   }|null>(null);
   const [variantBusy,setVariantBusy]=useState(false);
   const [variantError,setVariantError]=useState("");
+  const [variantPdfUrl,setVariantPdfUrl]=useState<string|null>(null);
+  const [variantPdfName,setVariantPdfName]=useState("");
   useEffect(() => {
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
   }, [draft]);
+  useEffect(()=>()=>{if(variantPdfUrl)URL.revokeObjectURL(variantPdfUrl);},[variantPdfUrl]);
   async function saveCard(confirmDuplicate = false) {
     if (!draft || busy) return;
     setBusy(true); setError("");
@@ -229,6 +232,20 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       setVariantModal({index:row.index,product:found.product,
         symbol:found.symbol,variants:found.variants});
     }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setVariantBusy(false);}
+  }
+  async function viewVariantPdf(path:string){
+    if(!path||variantBusy)return;
+    setVariantBusy(true);setVariantError("");
+    try{
+      const pdf=await invoke<{base64:string;name:string}>("readCataloguePdf",{path});
+      const binary=atob(pdf.base64);
+      const bytes=new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+      setVariantPdfName(pdf.name);
+      setVariantPdfUrl(url);
+    }catch(e){setVariantError(e instanceof Error?e.message:String(e));}
     finally{setVariantBusy(false);}
   }
   async function applyVariant(id:number){
@@ -328,14 +345,25 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
           {title:"Karencja — tkanki",dataIndex:"tissues",width:180,ellipsis:true},
           {title:"Karencja — mleko",dataIndex:"milk",width:145,ellipsis:true},
           {title:"Wskazanie",dataIndex:"indication",width:225,ellipsis:true},
-          {title:"PDF ChPL",dataIndex:"pdf",width:110,
-            render:(value:string)=>value?"Przypisany":"Brak"},
+          {title:"PDF ChPL",dataIndex:"pdf",width:130,
+            render:(value:string)=>value
+              ? <Button size="small" disabled={variantBusy}
+                  onClick={()=>{void viewVariantPdf(value);}}>Otwórz ChPL</Button>
+              : "Brak"},
           {title:"Wybór",width:130,
             render:(_value:unknown,row:TreatmentVariantChoice)=>
               <Button type="primary" size="small" disabled={variantBusy ||
                 !row.species?.trim() || !row.route?.trim() || !row.dose?.trim()}
                 onClick={()=>{void applyVariant(row.id);}}>Wybierz</Button>}
         ]}/>
+    </Modal>
+    <Modal width="94vw" open={variantPdfUrl!==null}
+      title={"Dokument ChPL — "+variantPdfName}
+      onCancel={()=>setVariantPdfUrl(null)}
+      footer={<Button onClick={()=>setVariantPdfUrl(null)}>Zamknij dokument</Button>}>
+      {variantPdfUrl&&<iframe src={variantPdfUrl} title="ChPL wybranego wariantu"
+        referrerPolicy="no-referrer"
+        style={{width:"100%",height:"76vh",border:0,background:"#fff"}}/>}
     </Modal>
     <Modal width="92vw" open={preview!==null} title="Podgląd karty leczenia" onCancel={()=>setPreview(null)}
       footer={<Space><Button onClick={()=>setPreview(null)}>Zamknij</Button>
