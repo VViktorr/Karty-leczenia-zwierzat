@@ -121,3 +121,32 @@ instalatora. Samo przejście CI nie potwierdza wykonania operacji na żywym SQL.
 czytelność okna wyboru przy wielu wariantach, poprawność każdego wskazania
 i karencji względem oficjalnej ChPL. Testy automatyczne nie dokonują
 weterynaryjnej walidacji dawkowania i nie kontaktują się z produkcyjnym SQL.
+
+## Bezpieczne podpowiedzi wariantów po otwarciu dokumentu
+
+- React automatycznie **wyszukuje propozycje**, ale nie zapisuje zmian klinicznych bez zgody.
+  Łączy pozycje z katalogiem SQL wyłącznie po symbolu towaru Subiekta,
+  nie zgaduje dopasowania po podobnej nazwie. Zapytanie do katalogu jest grupowe,
+  zamiast tworzyć oddzielne połączenie SQL dla każdego leku.
+- Domyślny gatunek „Bydło” nie ogranicza wyszukiwania; jeżeli istnieje kilka
+  wariantów, program wymaga wybrania jednego ręcznie. Jawnie ustawiony gatunek
+  oraz droga podania ograniczają listę zgodnych propozycji.
+- Proponowane dane można porównać w nowym oknie „Przejrzyj i uzupełnij”;
+  widoczne są dawkowanie, pełna karencja, źródło i przycisk otwarcia PDF ChPL.
+  Po zatwierdzeniu zmiany trafiają tylko do edytora. Zapis karty do SQL jest osobny.
+- Zbiorczo można zatwierdzić tylko **jednoznaczne, kompletne** warianty z PDF,
+  źródłem i karencją tkanek. Brak karencji mleka u bydła/owiec/kóz, nieopisane
+  ograniczenia dla drobiu i jaj, teksty „do weryfikacji” albo brak PDF
+  wymuszają wybór ręczny. Dane kliniczne już wpisane w karcie są zachowywane.
+- Przy zatwierdzeniu następuje ponowny odczyt SQL; musi zgadzać się
+  identyfikator wariantu oraz dawka, karencja, źródło i **dokładna ścieżka PDF**
+  pokazane operatorowi. Zmiana wprowadzona na innym stanowisku blokuje
+  automatyczne uzupełnienie nieaktualną propozycją.
+- Testy `tests/ReactKLChecks` obejmują wielowariantowość, domyślny gatunek,
+  ręczne dane, brak ChPL, karencje mleka/jaj, a także zmianę źródła lub
+  dawkowania w czasie zatwierdzania.
+
+**Ważne:** mechanizm jest pomocą przy uzupełnianiu dokumentu, nie weryfikatorem
+klinicznym i nie zastępuje sprawdzenia oficjalnej, aktualnej ChPL.
+Testy automatyczne używają danych przykładowych — połączenie z prawdziwym
+SQL, Subiektem i rzeczywiste warianty należy potwierdzić na Windows.
