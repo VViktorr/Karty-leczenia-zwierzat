@@ -308,7 +308,9 @@ function restoreColumnWidths():Record<string,number> {
   }catch{/* Use default widths. */}
   return {};
 }
-function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () => void}) {
+function Treatment({draft, onDocuments, onOpenSaved}: {
+  draft: Draft | null; onDocuments: () => void; onOpenSaved: (id:string)=>void;
+}) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
   const [showColumns,setShowColumns]=useState(false);
   const [columnOrder,setColumnOrder]=useState<string[]>(restoreColumnOrder);
@@ -355,6 +357,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedNumber, setSavedNumber] = useState("");
+  const [duplicateId,setDuplicateId]=useState<string|null>(null);
   const [reported, setReported] = useState("");
   const [performed, setPerformed] = useState(() => localDateTime());
   const [findings, setFindings] = useState("");
@@ -396,6 +399,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   const selectionVersion=useRef(0);
   useEffect(() => {
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
+    setDuplicateId(null);
     desiredChecks.current=new Map((draft?.rows??[]).map(row=>[row.index,row.selected]));
     setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});
     setSavedChoices({});setAnimalDescriptions([]);setAnimalError("");
@@ -572,12 +576,8 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
         draftId:draft.draftId, reported, performed, findings, confirmDuplicate, rows
       });
       if (result.duplicate) {
-        Modal.confirm({
-          title:"Karta z tego dokumentu już istnieje",
-          content:"Czy na pewno utworzyć kolejną kartę leczenia z tego samego dokumentu?",
-          okText:"Zapisz kolejną", cancelText:"Anuluj",
-          onOk:() => {void saveCard(true);}
-        });
+        if(result.duplicateId)setDuplicateId(result.duplicateId);
+        else setError("Wykryto istniejącą kartę, ale brak jej identyfikatora w archiwum SQL.");
       } else {
         setSavedNumber(result.number ?? "");
         if (result.id) {
@@ -866,6 +866,23 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>
+    <Modal className="kl-dialog-treatment-duplicate" open={duplicateId!==null}
+      title="Karta z tego dokumentu już istnieje" onCancel={()=>setDuplicateId(null)}
+      footer={<Space wrap>
+        <Button onClick={()=>setDuplicateId(null)}>Anuluj</Button>
+        <Button onClick={()=>{
+          const id=duplicateId;setDuplicateId(null);
+          if(id)onOpenSaved(id);
+        }}>Otwórz / zaktualizuj istniejącą</Button>
+        <Button type="primary" onClick={()=>{setDuplicateId(null);void saveCard(true);}}>
+          Zapisz kolejną kartę
+        </Button>
+      </Space>}>
+      <Typography.Paragraph>
+        Możesz otworzyć dotychczasową kartę i poprawić jej treść bez zmiany numeru,
+        zapisać kolejną kartę z nowym numerem lub anulować operację.
+      </Typography.Paragraph>
+    </Modal>
     <Modal className="kl-dialog-treatment-columns" open={showColumns} title="Parametry listy — karta leczenia"
       onCancel={()=>setShowColumns(false)} onOk={()=>setShowColumns(false)}
       okText="Gotowe" cancelButtonProps={{style:{display:"none"}}}>
@@ -1213,7 +1230,9 @@ function Expiry() {
   </>;
 }
 
-function SavedCards() {
+function SavedCards({initialCardId,onInitialCardOpened}:{
+  initialCardId:string|null;onInitialCardOpened:()=>void;
+}) {
   const [trash,setTrash]=useState(false);
   const [query,setQuery]=useState("");
   const [search,setSearch]=useState("");
@@ -1237,6 +1256,28 @@ function SavedCards() {
   const [notice,setNotice]=useState("");
   const remote=useRemote<SavedCard[]>("savedCards",
     {trash,query:search,date:treatmentDate},[trash,search,treatmentDate]);
+  useEffect(()=>{
+    if(!initialCardId)return;
+    let active=true;
+    setTrash(false);setSelected(null);setCard(null);setEditDraft(null);setEditing(false);
+    void invoke<StoredCard>("savedCard",{id:initialCardId,trash:false})
+      .then(loaded=>{
+        if(!active)return;
+        setSelected({
+          id:initialCardId,number:loaded.fields["Nr karty"]||"",
+          date:loaded.fields["Wykonanie — data i godzina"]||"",
+          client:loaded.fields["Właściciel i adres"]||"",
+          document:loaded.fields["Dokument źródłowy"]||""
+        });
+        setCard(loaded);setError("");onInitialCardOpened();
+      })
+      .catch(reason=>{
+        if(active){setError(reason instanceof Error?reason.message:String(reason));
+          onInitialCardOpened();}
+      });
+    return()=>{active=false;};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[initialCardId]);
   const open=async (row: SavedCard) => {
     setEditing(false);setEditDraft(null);setCard(null);setSelected(row);
     try{
@@ -1956,6 +1997,7 @@ export default function App() {
     catch{return 100;}
   });
   const [section,setSection]=useState<Section>("documents");
+  const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
   const [draft,setDraft]=useState<Draft|null>(null);
   const [catalogueDirty,setCatalogueDirty]=useState(false);
   const navigate=(next:Section)=>{
@@ -2004,10 +2046,12 @@ export default function App() {
       onChange={setUiScale} options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
   </div>;
   const content=section==="documents"?<Documents onOpen={next=>{setDraft(next);setSection("treatment");}}/>:
-    section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}/>:
+    section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}
+      onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>:
     section==="prices"?<Prices onCatalogue={()=>setSection("catalogue")}/>:section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}/>:
     section==="expiry"?<Expiry/>:
-    section==="saved"?<SavedCards/>:<SettingsPage/>;
+    section==="saved"?<SavedCards initialCardId={savedCardToOpen}
+      onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage/>;
   return <ConfigProvider theme={appearance}>
     <DialogPlacement/>
     <AutomaticUpdateCheck/>
