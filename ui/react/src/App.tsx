@@ -211,7 +211,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   useEffect(()=>{
     if(!draft){setSuggestions([]);return;}
     let cancelled=false;
-    setSuggestBusy(true);setSuggestError("");
+    setSuggestBusy(true);setSuggestError("");setSuggestions([]);
     invoke<TreatmentSuggestionList>("treatmentSuggestions",{draftId:draft.draftId})
       .then(result=>{if(!cancelled)setSuggestions(result.items);})
       .catch(e=>{if(!cancelled){setSuggestions([]);setSuggestError(
@@ -221,7 +221,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   },[draft,suggestTick]);
   useEffect(()=>()=>{if(variantPdfUrl)URL.revokeObjectURL(variantPdfUrl);},[variantPdfUrl]);
   async function saveCard(confirmDuplicate = false) {
-    if (!draft || busy) return;
+    if (!draft || busy || applyBusy) return;
     setBusy(true); setError("");
     try {
       const result = await invoke<SaveResult>("saveDraft", {
@@ -252,7 +252,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     finally {setBusy(false);}
   }
   async function printPreview() {
-    if (!draft || busy) return;
+    if (!draft || busy || applyBusy) return;
     setBusy(true);
     try {
       const data = await invoke<{html:string}>("previewDraft", {
@@ -295,7 +295,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   }
 
   async function openVariants(row:DraftRow){
-    if(!draft || variantBusy)return;
+    if(!draft || variantBusy || applyBusy)return;
     setVariantBusy(true);setVariantError("");setError("");
     try{
       const found=await invoke<TreatmentVariantList>("treatmentVariants",{
@@ -347,7 +347,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     </Empty></Card>;
   const update = async (index: number, key: keyof DraftRow, value: string | boolean) => {
     const field = key === "selected" ? "Drukuj" : editable.find(x => x.key === key)?.field;
-    if (!field) return;
+    if (!field || applyBusy) return;
     const previous = rows;
     setRows(current => current.map(row => row.index === index ? {...row,[key]:value} : row));
     if(["species","route","dosing","withdrawal"].includes(String(key))){
@@ -361,7 +361,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   };
   const columns: ColumnsType<DraftRow> = [
     {title:"Druk",dataIndex:"selected",width:63,render:(value:boolean,row) =>
-      <Checkbox checked={value} onChange={e => {void update(row.index,"selected",e.target.checked);}}/>},
+      <Checkbox checked={value} disabled={applyBusy} onChange={e => {void update(row.index,"selected",e.target.checked);}}/>},
     {title:"Produkt",dataIndex:"product",width:240,ellipsis:true,fixed:"left"},
     {title:"Dopasowanie z SQL",key:"suggestion",width:185,
       render:(_value:unknown,row:DraftRow)=>{
@@ -378,7 +378,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       }},
     {title:"Wariant ChPL",key:"variant",width:150,
       render:(_value:unknown,row:DraftRow)=><Button size="small"
-        disabled={!row.symbol || variantBusy}
+        disabled={!row.symbol || variantBusy || applyBusy}
         onClick={()=>{void openVariants(row);}}>
         Wybierz wariant
       </Button>},
@@ -389,11 +389,11 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       title, dataIndex:key, width:key==="section" ? 125 : key==="dosing" || key==="withdrawal" ? 245 : 170,
       render:(value:string,row:DraftRow) => key==="section"
         ? <Select aria-label={"Sekcja karty leczenia — "+row.product}
-            value={value==="III"?"III":"II"} style={{width:"100%"}}
+            value={value==="III"?"III":"II"} disabled={applyBusy} style={{width:"100%"}}
             options={[{label:"II",value:"II"},{label:"III",value:"III"}]}
             onChange={next=>{void update(row.index,"section",next);}}/>
         : <Input.TextArea autoSize={{minRows:1,maxRows:3}}
-        aria-label={title} value={value}
+        aria-label={title} value={value} disabled={applyBusy}
         onChange={e => {
           const next=e.target.value;
           setRows(current => current.map(item => item.index===row.index ? {...item,[key]:next} : item));
@@ -407,8 +407,8 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       <Typography.Text type="secondary">{draft.payer.split("\n")[0]}</Typography.Text>
     </div><Space>
       <Button onClick={onDocuments}>Dokumenty</Button>
-      <Button onClick={()=>{void printPreview();}} loading={busy}>Podgląd wydruku</Button>
-      <Button type="primary" onClick={()=>{void saveCard();}} loading={busy}>Zapisz kartę do SQL</Button>
+      <Button onClick={()=>{void printPreview();}} loading={busy} disabled={applyBusy}>Podgląd wydruku</Button>
+      <Button type="primary" onClick={()=>{void saveCard();}} loading={busy} disabled={applyBusy}>Zapisz kartę do SQL</Button>
     </Space></div>
     <Card className="treatment-autofill">
       <Space wrap>
