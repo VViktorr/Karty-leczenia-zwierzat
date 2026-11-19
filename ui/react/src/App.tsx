@@ -667,6 +667,7 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
   // cached SQL snapshot; switching display formats below is client-only.
   const prices=useRemote<PricePrintRow[]>("prices",{level,net},[level,net],level!==null);
   const [settings,setSettings]=useState<PricePrintOptions>(defaultPricePrint);
+  const printSettingsWrites=useRef<Promise<unknown>>(Promise.resolve());
   const [settingsBusy,setSettingsBusy]=useState(true);
   const [settingsError,setSettingsError]=useState("");
   const [showSettings,setShowSettings]=useState(false);
@@ -694,6 +695,15 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
     if(value)next.delete(symbol);else next.add(symbol);
     return next;
   });
+  function changeFormat(patch:Partial<PricePrintOptions>){
+    const next={...settings,...patch};
+    setSettings(next);
+    // Chain writes so rapid changes cannot be persisted in reverse order.
+    // This does not access either database: settings are per-station JSON.
+    printSettingsWrites.current=printSettingsWrites.current.catch(()=>{}).then(()=>
+      invoke("savePricePrintSettings",{settings:next})
+    ).catch(error=>setSettingsError(error instanceof Error?error.message:String(error)));
+  }
   const priceHeading=net?"Cena netto":"Cena brutto";
   const columns:ColumnsType<PricePrintRow>=[
     {title:"Druk",width:65,render:(_value,row)=>
@@ -740,13 +750,13 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
           allowClear onChange={e=>setFilter(e.target.value)} style={{minWidth:190}}/>
         <Space><Switch checked={net} onChange={setNet}/> Cena netto</Space>
         <Select value={settings.withdrawalFormat}
-          onChange={v=>setSettings(old=>({...old,withdrawalFormat:v}))}
+          onChange={v=>changeFormat({withdrawalFormat:v})}
           style={{minWidth:190}}
           options={[{label:"Karencja pełna",value:0},
             {label:"Karencja wg wariantów",value:1},
             {label:"Karencja wg gatunków",value:2}]}/>
         <Select value={settings.routeCodes?"codes":"full"}
-          onChange={v=>setSettings(old=>({...old,routeCodes:v==="codes"}))}
+          onChange={v=>changeFormat({routeCodes:v==="codes"})}
           options={[{label:"Drogi — skróty",value:"codes"},
             {label:"Drogi — pełne nazwy",value:"full"}]} style={{minWidth:180}}/>
       </div>
