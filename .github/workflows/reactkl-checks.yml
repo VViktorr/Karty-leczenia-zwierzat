@@ -17,6 +17,9 @@ jobs:
       - name: Install React dependencies
         working-directory: ui/react
         run: npm install --no-audit --no-fund
+      - name: Validate expiry lot grouping (no SQL required)
+        working-directory: ui/react
+        run: npm run test:expiry
       - name: Build React frontend
         working-directory: ui/react
         run: npm run build
