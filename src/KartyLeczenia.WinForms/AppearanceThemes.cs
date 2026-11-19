@@ -413,6 +413,7 @@ internal static class AppearanceThemes
             return next;
         });
         state.Options = appearance;
+        float scale = InterfaceScale.Load() / 100f;
         float scaledFontSize = appearance.TableFontSize * scale;
         var font = state.ThemeFonts.FirstOrDefault(existing =>
             Math.Abs(existing.SizeInPoints - scaledFontSize) < .01f &&
@@ -426,7 +427,6 @@ internal static class AppearanceThemes
         state.ThemeFont = font;
         // Set the new font before triggering AntdUI's synchronous row re-layout.
         table.Font = font;
-        float scale = InterfaceScale.Load() / 100f;
         table.RowHeight = Math.Max(18, (int)Math.Round(appearance.RowHeight * scale));
         table.Invalidate();
     }
