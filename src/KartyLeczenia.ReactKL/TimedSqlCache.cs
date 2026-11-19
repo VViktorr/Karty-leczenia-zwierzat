@@ -8,7 +8,10 @@ namespace KartyLeczenia.ReactKL;
 internal sealed class TimedSqlCache<T>(TimeSpan lifetime, int maxEntries = 16,
     Func<DateTimeOffset>? clock = null)
 {
-    internal sealed record Snapshot(T Value, DateTimeOffset ReadAt, bool Cached);
+    internal sealed record Snapshot(T Value, DateTimeOffset ReadAt, bool Cached)
+    {
+        internal long InsertionOrder { get; init; }
+    }
     private sealed class Flight
     {
         internal readonly CancellationTokenSource Source = new(TimeSpan.FromSeconds(25));
@@ -19,6 +22,7 @@ internal sealed class TimedSqlCache<T>(TimeSpan lifetime, int maxEntries = 16,
     }
 
     private readonly object gate = new();
+    private long nextInsertionOrder;
     private readonly Func<DateTimeOffset> now = clock ?? (() => DateTimeOffset.UtcNow);
     private readonly Dictionary<string, Snapshot> saved = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Flight> running = new(StringComparer.Ordinal);
@@ -81,10 +85,11 @@ internal sealed class TimedSqlCache<T>(TimeSpan lifetime, int maxEntries = 16,
                 var snapshot = new Snapshot(value, now(), false);
                 lock (gate)
                 {
+                    snapshot = snapshot with { InsertionOrder = ++nextInsertionOrder };
                     saved[key] = snapshot;
                     if (saved.Count > maxEntries)
                     {
-                        var oldest = saved.MinBy(item => item.Value.ReadAt);
+                        var oldest = saved.MinBy(item => item.Value.InsertionOrder);
                         saved.Remove(oldest.Key);
                     }
                 }
