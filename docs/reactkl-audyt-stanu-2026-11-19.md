@@ -67,3 +67,22 @@ Nie ma dowodu, że przeprowadzono produkcyjny test dwóch stanowisk SQL, drukark
 **Przenosić tylko funkcje potwierdzone w końcowym `winforms-backup-2026-11-19`.** Funkcje nowe zgłaszać najpierw do akceptacji. Wszelkie już istniejące, lecz niepotwierdzone w WinForms elementy React powinny pozostać bez dalszej rozbudowy do czasu decyzji. Nie kopiować motywów/wyglądu starego WinForms.
 
 **Źródła w repo:** `src/KartyLeczenia.WinForms/MainForm.cs`, `ExpiryTable.cs`, `ListParameters.cs` na gałęzi kopii oraz `ui/react/src/App.tsx`, `CataloguePage.tsx`, `PricePrint.tsx`, `src/KartyLeczenia.ReactKL/*.cs`, `installer/KartyLeczenia.ReactKL.iss`, `.github/workflows/reactkl-checks.yml` na gałęzi ReactKL.
+
+## Postęp wdrażania funkcji po audycie — 19.11.2026
+
+Poniższe wpisy aktualizują wcześniejsze statusy; nie dotyczą wyglądu ani motywów WinForms.
+
+| Obszar | Zmiana w ReactKL | Pozostałe sprawdzenie |
+|---|---|---|
+| PDF karty | `1dff70e` — niezależny renderer WebView2 z A4 poziomo i weryfikacją nagłówka PDF; zapis przez dialog Windows | Faktyczny druk PDF na docelowej instalacji WebView2 i kontrola układu strony |
+| E-mail karty | `d7dd1a3`, `adb56ab` — MAPI znane z WinForms, załącznik z numerem **dokumentu źródłowego**, adres aktualnego **płatnika** Subiekta; przy braku adresu pozostaje pusty | Test z używanym klientem pocztowym, działanie przy braku MAPI/SQL |
+| PDF z podglądu bieżącej karty | `cb73ee5`, `6debe7f` — zapis i wiadomość również dla niezapisanego podglądu, bez nadawania numeru i bez zapisu SQL | Test podglądu przed zapisem i po zapisie |
+| Wysłanie/odczyt zapisanych kart | `dee004a` — rozdzielono identyfikator transportowego żądania React WebView2 i identyfikator rekordu SQL; wcześniej kolidowały | Test interakcji na prawdziwych zapisanych kartach |
+| Nowa kartoteka SQL | `df2c0ea`, `a9100c1` — formularz nowej kartoteki, transakcja SQL i sprawdzenie duplikatu symbolu jak w WinForms; nie nadpisuje istniejącego leku | Nowy symbol, kolizja, nowy wariant i powiązanie PDF w rzeczywistym SQL |
+| Braki w katalogu | `be34957`, `35cb836`, `0cdbc7d`, `3b79ab4` — jawne sprawdzenie całej grupy leków Subiekta, porównanie z buforowanymi wariantami SQL, lista do uzupełnienia | Test zakresu grupy i wydajności na prawdziwej bazie; nie wykonywać skanu przy wpisywaniu |
+| Parametry list | `e0c9f0b`, `7b723ea`, `35e627a` — pamięć widoczności, kolejności i szerokości kolumn w dokumentach, cenniku i zapisanych kartach, osobno dla stanowiska | Dalsze formatowanie czcionek/nagłówków zgodne z WinForms, przeciąganie kolumn w samych tabelach, test DPI |
+| Testy automatyczne | `b786761` — bezpieczna nazwa PDF; `304edc1` — klasyfikacja braków katalogu; `d96fc83` — nowy test korelacji komunikatów WebView2 (weryfikacja CI w toku) | Testy integracyjne SQL/Windows nadal konieczne |
+
+**Nadal niezweryfikowane produkcyjnie (P0):** instalacja na czystym Windows, import bazy i urzędowych PDF, pełny cykl aktualizacji ze stanowiska SQL do innych komputerów, wykonanie i odtworzenie `.bak` z Windows Hello, faktyczny wydruk PDF i e-mail oraz jednoczesna edycja na dwóch stanowiskach. Nie oznaczać tych etapów jako zakończonych na podstawie samego CI.
+
+**Zasada stała:** wdrażać wyłącznie funkcje potwierdzone w `winforms-backup-2026-11-19`, nie porównywać skórek/motywów poprzedniego interfejsu.
