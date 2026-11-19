@@ -64,6 +64,15 @@ static class Program
             catch (InvalidDataException) { bad = true; }
             Check(bad, "malformed published SQL version must be rejected");
 
+            var (year, treatmentDate) = CardArchiveService.GetCardDate(
+                new DateTime(2027, 1, 1, 0, 15, 0));
+            Check(year == 2027 && treatmentDate == new DateTime(2027, 1, 1),
+                "card number year and archive treatment date must follow performance across New Year");
+            var (otherYear, otherDate) = CardArchiveService.GetCardDate(
+                new DateTime(2026, 12, 31, 23, 59, 0));
+            Check(otherYear == 2026 && otherDate == new DateTime(2026, 12, 31),
+                "card year must not follow an earlier or optional reporting date");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
