@@ -384,9 +384,10 @@ internal sealed class MainForm : Form
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        if (keyData == (Keys.Control | Keys.Shift | Keys.L) && ActiveGrid() is { } grid)
+        if (keyData == (Keys.Control | Keys.Shift | Keys.L) &&
+            tabs.SelectedIndex == 3 && treatmentView is { } cardTable)
         {
-            ListParameters.Show(this, grid);
+            cardTable.ShowColumnsMenu(cardTable);
             return true;
         }
         if (keyData == Keys.F5 && tabs.SelectedIndex == 0)
@@ -408,10 +409,6 @@ internal sealed class MainForm : Form
         }
         return base.ProcessCmdKey(ref msg, keyData);
     }
-
-    // Legacy list parameters are only available for the editable WinForms grid.
-    // Documents, prices, expiry and saved cards use their own AntdUI column controls.
-    DataGridView? ActiveGrid() => tabs.SelectedIndex == 3 ? treatment : null;
 
     Task SelectKind(DocumentSearchKinds selected)
     {
@@ -2971,11 +2968,11 @@ internal sealed class MainForm : Form
             }
         };
 
-        foreach (var grid in new[] { treatment })
+        if (treatmentView is { } cardTable)
         {
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Parametry listy…", null, (_, _) => ListParameters.Show(this, grid));
-            grid.ContextMenuStrip = menu;
+            menu.Items.Add("Kolumny tabeli…", null, (_, _) => cardTable.ShowColumnsMenu(cardTable));
+            cardTable.ContextMenuStrip = menu;
         }
     }
 }
