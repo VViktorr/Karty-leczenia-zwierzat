@@ -38,9 +38,13 @@ internal static class WindowsHelloConsent
             if (outcome == UserConsentVerificationResult.Verified)
                 return true;
 
+            // The user simply dismissed the Windows prompt. Return to the form
+            // without starting the operation or showing another modal window.
+            if (outcome == UserConsentVerificationResult.Canceled)
+                return false;
+
             MessageBox.Show(owner, outcome switch
             {
-                UserConsentVerificationResult.Canceled => "Anulowano potwierdzenie Windows Hello.",
                 UserConsentVerificationResult.RetriesExhausted => "Przekroczono limit prób potwierdzenia Windows Hello.",
                 UserConsentVerificationResult.DeviceBusy => "Urządzenie Windows Hello jest zajęte.",
                 UserConsentVerificationResult.DeviceNotPresent => "Windows Hello nie jest dostępny.",
