@@ -76,9 +76,15 @@ Name: "{commondesktop}\SQL KartyLeczenia"; Filename: "{app}\KartyLeczenia.ReactK
 Filename: "{app}\KartyLeczenia.ReactKL.exe"; Description: "Uruchom SQL KartyLeczenia (React)"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [Code]
+const
+  WebView2Key = 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  WebView2Url = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
+  WebView2Package = 'MicrosoftEdgeWebview2Setup.exe';
+
 var
   RolePage: TInputOptionWizardPage;
   ServerPage: TInputQueryWizardPage;
+  DownloadPage: TDownloadWizardPage;
   ExistingInstallAtStart: Boolean;
 
 function ExistingArchiveConfiguration: Boolean;
@@ -127,6 +133,8 @@ begin
     'Przykład: SERWER,51433 lub SERWER\INSTANCJA');
   ServerPage.Add('Serwer:',False);
   ServerPage.Values[0] := '';
+  DownloadPage := CreateDownloadPage('Microsoft WebView2 Runtime',
+    'Pobieranie brakującego składnika niezbędnego do uruchomienia ReactKL.', nil);
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -150,4 +158,56 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
     ExistingInstallAtStart := ExistingArchiveConfiguration;
+end;
+
+function HasWebView2Version(RootKey: Integer): Boolean;
+var
+  Version: String;
+begin
+  Result := RegQueryStringValue(RootKey, WebView2Key, 'pv', Version)
+    and (Trim(Version) <> '') and (Trim(Version) <> '0.0.0.0');
+end;
+
+function NeedsWebView2: Boolean;
+begin
+  Result := not (HasWebView2Version(HKLM32) or
+    HasWebView2Version(HKLM64) or HasWebView2Version(HKCU));
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExitCode: Integer;
+  PackagePath: String;
+begin
+  Result := '';
+  if not NeedsWebView2 then Exit;
+  try
+    DownloadPage.Clear;
+    DownloadPage.Add(WebView2Url, WebView2Package, '');
+    if not WizardSilent then DownloadPage.Show;
+    try
+      DownloadPage.Download;
+    finally
+      if not WizardSilent then DownloadPage.Hide;
+    end;
+    PackagePath := ExpandConstant('{tmp}\') + WebView2Package;
+    if not Exec(PackagePath, '/silent /install', '', SW_HIDE,
+       ewWaitUntilTerminated, ExitCode) then
+    begin
+      Result := 'Nie udało się uruchomić instalatora Microsoft WebView2 Runtime.';
+      Exit;
+    end;
+    if ExitCode = 3010 then
+    begin
+      NeedsRestart := True;
+      Result := 'WebView2 wymaga restartu Windows przed instalacją ReactKL.';
+      Exit;
+    end;
+    if (ExitCode <> 0) or NeedsWebView2 then
+      Result := 'Instalacja Microsoft WebView2 Runtime nie powiodła się. Kod: ' +
+        IntToStr(ExitCode);
+  except
+    Result := 'Nie udało się pobrać lub przygotować WebView2 Runtime: ' +
+      GetExceptionMessage;
+  end;
 end;
