@@ -2604,9 +2604,12 @@ internal sealed class MainForm : Form
                 : "Wykonywanie i sprawdzanie kopii bazy KartyLeczenia…";
             try
             {
-                string? backup = await Task.Run(() => restoring
-                    ? archive.RestoreDatabase(path)
-                    : archive.BackupDatabase(path, compressBackup));
+                string? restoredFrom = null;
+                DatabaseBackupResult? backupResult = null;
+                if (restoring)
+                    restoredFrom = await Task.Run(() => archive.RestoreDatabase(path));
+                else
+                    backupResult = await Task.Run(() => archive.BackupDatabase(path, compressBackup));
                 if (restoring && ReferenceEquals(archive, sharedArchive))
                 {
                     sharedClinic = null;
@@ -2621,13 +2624,15 @@ internal sealed class MainForm : Form
                 }
                 else if (!restoring)
                 {
-                    restoreFile.Text = backup ?? "";
+                    restoreFile.Text = backupResult?.Path ?? "";
                 }
                 maintenanceStatus.Text = !restoring
-                    ? $"Zapisano i sprawdzono kopię na serwerze: {backup}"
-                    : backup is null
+                    ? backupResult!.Verified
+                        ? $"Zapisano i zweryfikowano kopię na serwerze: {backupResult.Path}"
+                        : $"Zapisano kopię na serwerze: {backupResult!.Path}. {backupResult.VerificationNote}"
+                    : restoredFrom is null
                         ? $"Odtworzono bazę na {archive.Server}."
-                        : $"Odtworzono bazę na {archive.Server}. Kopia sprzed odtworzenia: {backup}";
+                        : $"Odtworzono bazę na {archive.Server}. Kopia sprzed odtworzenia: {restoredFrom}";
                 status.Text = restoring ? "Odtworzono bazę KartyLeczenia." : "Zapisano kopię bazy KartyLeczenia.";
             }
             catch (Exception ex)
@@ -2645,6 +2650,75 @@ internal sealed class MainForm : Form
 
         Add("", Action("Archiwizuj bazę", () => MaintainArchive(restoring: false)));
         Add("", Action("Odtwórz bazę z kopii…", () => MaintainArchive(restoring: true)));
+
+        // Subiekt-style closing workflow: never silently skip the operator's
+        // decision, and never exit when a requested backup fails.
+        bool closingAfterBackup = false;
+        bool exitBackupRunning = false;
+        FormClosing += async (_, e) =>
+        {
+            if (maintainingArchive || exitBackupRunning)
+            {
+                e.Cancel = true;
+                return;
+            }
+            if (closingAfterBackup || e.CloseReason != CloseReason.UserClosing ||
+                sharedArchive is null)
+                return;
+
+            var answer = MessageBox.Show(this,
+                "Czy przed zamknięciem programu wykonać kopię zapasową bazy SQL KartyLeczenia?\n\n" +
+                "Tak — archiwizuj i zamknij.\n" +
+                "Nie — zamknij bez archiwizacji.\n" +
+                "Anuluj — wróć do programu.",
+                "Archiwizacja przy zamykaniu",
+                MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button1);
+            if (answer == DialogResult.No) return;
+            e.Cancel = true;
+            if (answer != DialogResult.Yes) return;
+
+            var archive = sharedArchive;
+            exitBackupRunning = true;
+            tabs.Enabled = false;
+            UseWaitCursor = true;
+            status.Text = "Archiwizacja bazy SQL przed zamknięciem…";
+            try
+            {
+                DatabaseBackupResult result = await Task.Run(
+                    () => archive.BackupDatabase(backupFolder.Text.Trim()));
+                if (IsDisposed) return;
+                status.Text = result.Verified
+                    ? $"Kopia wykonana i zweryfikowana: {result.Path}"
+                    : $"Kopia wykonana (bez RESTORE VERIFYONLY): {result.Path}";
+                if (!result.Verified)
+                    MessageBox.Show(this, result.VerificationNote + "\n\nPlik: " + result.Path,
+                        "Kopia utworzona — ograniczona weryfikacja",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                closingAfterBackup = true;
+                BeginInvoke(new Action(Close));
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write("SqlBackup.OnExit", ex);
+                if (!IsDisposed)
+                {
+                    status.Text = "Archiwizacja nie powiodła się — program pozostaje otwarty.";
+                    MessageBox.Show(this, "Nie udało się wykonać kopii bazy SQL.\n\n" +
+                        ex.Message + "\n\nProgram pozostaje otwarty.",
+                        "Błąd archiwizacji", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            finally
+            {
+                exitBackupRunning = false;
+                if (!IsDisposed)
+                {
+                    tabs.Enabled = true;
+                    UseWaitCursor = false;
+                }
+            }
+        };
 
         form = Section("Aktualizacje");
         Add("Zainstalowana wersja", new Label { Text = ServerUpdateGate.InstalledVersion, AutoSize = true });
