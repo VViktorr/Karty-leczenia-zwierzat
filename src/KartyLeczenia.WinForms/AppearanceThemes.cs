@@ -41,9 +41,9 @@ internal sealed record AppearanceOptions
         "Antd Pomarańczowy" => new() { Preset = name, RowHeight = 30, AccentArgb = Color.FromArgb(250, 140, 22).ToArgb() },
         "Antd Grafitowy" => new() { Preset = name, RowHeight = 28, AccentArgb = Color.FromArgb(93, 122, 150).ToArgb() },
         // Material-inspired palette on AntdUI controls, not a second UI toolkit.
-        "Material 3 Jasny" => new() { Preset = name, SwitchStyle = 3, RowHeight = 32, CornerRadius = 16, AccentArgb = Color.FromArgb(103, 80, 164).ToArgb() },
-        "Material 3 Ciemny" => new() { Preset = name, SwitchStyle = 3, RowHeight = 32, CornerRadius = 16, AccentArgb = Color.FromArgb(208, 188, 255).ToArgb() },
-        "Klasyczny" => new() { Preset = name },
+        "Material 3 Jasny" => new() { Preset = name, SwitchStyle = 3, MainTabStyle = 2, RowHeight = 32, CornerRadius = 16, AccentArgb = Color.FromArgb(103, 80, 164).ToArgb() },
+        "Material 3 Ciemny" => new() { Preset = name, SwitchStyle = 3, MainTabStyle = 2, RowHeight = 32, CornerRadius = 16, AccentArgb = Color.FromArgb(208, 188, 255).ToArgb() },
+        "Klasyczny" => new() { Preset = name, MainTabStyle = 3, SwitchStyle = 0 },
         _ => ForPreset("Antd Jasny")
     };
 }
