@@ -11,7 +11,8 @@ internal sealed class MainForm : Form
         Padding = new Point(30, 9)
     };
     readonly DocumentGrid documents = NewGrid<DocumentGrid>();
-    readonly DataGridView prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
+    readonly DataGridView prices = NewGrid(), treatment = NewGrid();
+    readonly ExpiryTable expiryTable;
     readonly TextBox search = new();
     Font? boldDocumentKindFont;
     readonly Dictionary<DocumentSearchKinds, ThemeSelector> documentKinds = new();
@@ -54,6 +55,7 @@ internal sealed class MainForm : Form
     internal MainForm(bool openSettings, int interfaceScale)
     {
         this.interfaceScale = interfaceScale;
+        expiryTable = new ExpiryTable(interfaceScale);
         Text = $"KartyLeczenia — wersja {ServerUpdateGate.InstalledVersion}";
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(850, 550);
@@ -101,7 +103,7 @@ internal sealed class MainForm : Form
         var tables = new Dictionary<string, DataGridView>
         {
             ["documents"] = documents, ["prices"] = prices,
-            ["expiry"] = expiry, ["treatment"] = treatment
+            ["treatment"] = treatment
         };
         if (interfaceScale != 100) ScaleInterface(tables.Values.Append(savedCardsGrid));
         var layout = new WindowLayout(this, rememberTreatment, tables, interfaceScale);
@@ -474,7 +476,7 @@ internal sealed class MainForm : Form
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    DataGridView? ActiveGrid() => tabs.SelectedIndex switch { 0 => documents, 1 => prices, 2 when expiry.Visible => expiry, 3 => treatment, _ => null };
+    DataGridView? ActiveGrid() => tabs.SelectedIndex switch { 0 => documents, 1 => prices, 3 => treatment, _ => null };
 
     Task SelectKind(DocumentSearchKinds selected)
     {
@@ -769,23 +771,9 @@ internal sealed class MainForm : Form
 
     void ConfigureExpiry()
     {
-        Column(expiry, "Lek", "Name", 340);
-        Column(expiry, "Seria", "Batch", 150);
-        Column(expiry, "Przyjęcie", "Received", 120, "dd.MM.yyyy");
-        Column(expiry, "Ważność", "Expires", 120, "dd.MM.yyyy");
-        Column(expiry, "Pozostało", "Remaining", 115, "0.####");
-        var antTable = new ExpiryTable(interfaceScale);
-        var viewToggle = new CheckBox { Text = "Tabela AntdUI", AutoSize = true, Checked = antTable.ShowAntd };
-        var tableHost = new Panel { Dock = DockStyle.Fill };
-        tableHost.Controls.AddRange([expiry, antTable]);
-        void ApplyExpiryView()
-        {
-            expiry.Visible = !viewToggle.Checked;
-            antTable.Visible = viewToggle.Checked;
-        }
-        viewToggle.CheckedChanged += (_, _) => ApplyExpiryView();
-        FormClosed += (_, _) => antTable.SaveLayout(viewToggle.Checked);
-        ApplyExpiryView();
+        // AntdUI is now the only expiry view. The table manages column sizes,
+        // ordering and sorting independently from legacy DataGridView layouts.
+        FormClosed += (_, _) => expiryTable.SaveLayout();
 
         ConnectionOptions? loadingFor = null;
         ConnectionOptions? loadedFor = null;
@@ -808,8 +796,7 @@ internal sealed class MainForm : Form
                 .ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(row => row.Batch, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
-            expiry.DataSource = rows;
-            antTable.ShowRows(rows);
+            expiryTable.ShowRows(rows);
             if (tabs.SelectedTab == page) status.Text = $"Dostawy: {rows.Count} / {deliveries.Count}";
         }
 
@@ -865,12 +852,12 @@ internal sealed class MainForm : Form
             };
         }
 
-        page = Page("Terminy ważności", tableHost, Action("Odśwież", LoadExpiries),
-            filters[0].Button, filters[1].Button, filters[2].Button, filters[3].Button, viewToggle);
+        page = Page("Terminy ważności", expiryTable, Action("Odśwież", LoadExpiries),
+            filters[0].Button, filters[1].Button, filters[2].Button, filters[3].Button);
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab != page || connection is null) return;
-            if (expiry.DataSource is null || !ReferenceEquals(connection, loadedFor)) await Run(LoadExpiries);
+            if (!ReferenceEquals(connection, loadedFor)) await Run(LoadExpiries);
             else ShowExpiries();
         };
     }
@@ -2394,7 +2381,8 @@ internal sealed class MainForm : Form
             cache.Clear();
             displayedDocuments = null;
             UpdateRefreshLabel();
-            documents.DataSource = prices.DataSource = expiry.DataSource = null;
+            documents.DataSource = prices.DataSource = null;
+            expiryTable.ShowRows([]);
             selectedTreatmentVariants.Clear();
             excludedTreatmentRows.Clear();
             treatment.Rows.Clear();
@@ -2807,7 +2795,7 @@ internal sealed class MainForm : Form
             }
         };
 
-        foreach (var grid in new[] { documents, prices, expiry, treatment })
+        foreach (var grid in new[] { documents, prices, treatment })
         {
             var menu = new ContextMenuStrip();
             menu.Items.Add("Parametry listy…", null, (_, _) => ListParameters.Show(this, grid));
