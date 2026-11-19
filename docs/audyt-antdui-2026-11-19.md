@@ -12,7 +12,8 @@ Przeprowadzono przegląd statyczny kodu i automatyczne kontrole GitHub Actions. 
 | Cennik | `PriceTable : AntdUI.Table` | AntdUI |
 | Terminy ważności | `ExpiryTable : AntdUI.Table` | AntdUI |
 | Zapisane karty | `SavedCardsTable : AntdUI.Table` | AntdUI |
-| **Karta leczenia** | **`TreatmentTable : AntdUI.Table`** | Nowy widoczny widok AntdUI; stan danych i część logiki nadal obsługuje ukryty `DataGridView` |
+| **Karta leczenia** | **`TreatmentTable : AntdUI.Table`** | Widoczny widok AntdUI; stan danych i część logiki nadal obsługuje ukryty `DataGridView` |
+| **Edytor wariantów leków** | **`CatalogueVariantsTable : AntdUI.Table`** | Widoczna edytowalna tabela AntdUI, zapis i warianty PDF nadal korzystają z modelu ukrytego `DataGridView` |
 
 ### Karta leczenia — zachowanie danych
 - Wybór pozycji w tabeli AntdUI kieruje do odpowiadającego wiersza modelu karty.
@@ -31,7 +32,7 @@ Przeprowadzono przegląd statyczny kodu i automatyczne kontrole GitHub Actions. 
 - Karty główne i karty Ustawień nadal wykorzystują natywny `TabControl` WinForms z własnym rysowaniem (`MainTabPainter`); nie jest to natywna kontrolka `AntdUI.Tabs`.
 
 ## Miejsca jeszcze niew pełni przeniesione
-- `CatalogueEditor.variants` — edytowalny `DataGridView` wariantów katalogu. Nie zastępowano go w tym przebiegu ze względu na wielopolową edycję i zachowanie ręcznych zmian ChPL/SQL.
+- `CatalogueEditor.variants` — ukryty `DataGridView` zachowany jako model; edytowalny widok to obecnie `CatalogueVariantsTable : AntdUI.Table`. Konieczny test zapisu, wielokrotnego zaznaczenia i przypisywania PDF z rzeczywistą bazą.
 - `CatalogueProductPicker` — natywny `ListBox`.
 - `ListParameters` — starsze okno parametrów i wybór kolumn `CheckedListBox/ListBox` dla `DataGridView`.
 - W karcie leczenia ukryty `DataGridView` pozostaje modelem migracyjnym; edycja tekstu odbywa się obecnie w osobnych oknach, a nie natywnie w komórce AntdUI.
@@ -43,8 +44,9 @@ Przeprowadzono przegląd statyczny kodu i automatyczne kontrole GitHub Actions. 
 3. Edycja karencji, dawkowania, liczby i opisu zwierząt; zapis i ponowne otwarcie karty.
 4. Przełączanie 10 motywów oraz stylów wypełnienia, także w ciemnym motywie.
 5. Skalowanie 80%, 100%, 125%, 150%, 200% i zmiana kolejności/szerokości kolumn.
-6. Zapisana karta, kosz, terminy ważności, cennik i podglądy wydruków.
-7. Test długotrwałego przełączania motywów z logowaniem błędów AntdUI.
+6. Edytor wariantów: zmiany w pojedynczych komórkach AntdUI, import ChPL, przypisanie PDF wielu wierszom i zapis SQL.
+7. Zapisana karta, kosz, terminy ważności, cennik i podglądy wydruków.
+8. Test długotrwałego przełączania motywów z logowaniem błędów AntdUI.
 
 ## Bezpieczeństwo zmian
 Nie modyfikowano tabel SQL, kartoteki leków, PDF-ów ani numeracji instalatora. Zmiany dotyczą tylko interfejsu.
