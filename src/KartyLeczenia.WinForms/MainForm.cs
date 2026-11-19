@@ -1551,7 +1551,7 @@ internal sealed class MainForm : Form
             new Label { Text = "Data leczenia", AutoSize = true, Anchor = AnchorStyles.Left }, treatmentDate,
             Action("Otwórz ChPL", async () =>
             {
-                var row = treatment.CurrentRow;
+                var row = treatmentView?.SelectedModelRow ?? treatment.CurrentRow;
                 if (row?.Tag is not TreatmentRow entry)
                 {
                     status.Text = "Zaznacz pozycję na karcie leczenia.";
