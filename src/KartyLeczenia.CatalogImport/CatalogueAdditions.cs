@@ -1,4 +1,5 @@
 using System.Data;
+using KartyLeczenia;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
@@ -109,9 +110,14 @@ internal static class CatalogueAdditions
                         string.IsNullOrWhiteSpace(variant.Indication))
                         throw new InvalidDataException($"Niepełny wariant dla {item.Symbol}");
 
+                    // New variant records store canonical upper-case route codes.
+                    // Match both the original wording and the code so an older
+                    // release does not create duplicates on subsequent updates.
+                    string routeCode = AdministrationRouteLegend.Abbreviate(variant.Route);
                     using var insert = new SqlCommand("""
                         IF EXISTS (SELECT 1 FROM dbo.catalog_variants WITH (UPDLOCK, HOLDLOCK)
-                            WHERE symbol = @symbol AND species = @species AND route = @route)
+                            WHERE symbol = @symbol AND species = @species
+                              AND (route = @route OR route = @sourceRoute))
                             SELECT CAST(0 AS int);
                         ELSE
                         BEGIN
@@ -128,7 +134,8 @@ internal static class CatalogueAdditions
                     insert.Parameters.Add("@name", SqlDbType.NVarChar, -1).Value = item.Name;
                     insert.Parameters.Add("@rpl", SqlDbType.NVarChar, -1).Value = item.RplId;
                     insert.Parameters.Add("@species", SqlDbType.NVarChar, -1).Value = variant.Species;
-                    insert.Parameters.Add("@route", SqlDbType.NVarChar, -1).Value = variant.Route;
+                    insert.Parameters.Add("@route", SqlDbType.NVarChar, -1).Value = routeCode;
+                    insert.Parameters.Add("@sourceRoute", SqlDbType.NVarChar, -1).Value = variant.Route;
                     insert.Parameters.Add("@dose", SqlDbType.NVarChar, -1).Value = variant.Dose;
                     insert.Parameters.Add("@indication", SqlDbType.NVarChar, -1).Value = variant.Indication;
                     insert.Parameters.Add("@tissues", SqlDbType.NVarChar, -1).Value = variant.Tissues;
