@@ -229,7 +229,7 @@ export function PricePrintSettingsPanel({
   const fontOpts=fonts.map(name=>({label:name||"Jak w ustawieniach ogólnych",value:name}));
   const availableFonts=(current:string)=>current&&!fonts.includes(current)
     ? [...fontOpts,{label:current,value:current}] : fontOpts;
-  return <Modal open width="min(1040px,96vw)" title="Ustawienia wydruku cennika"
+  return <Modal className="kl-dialog-price-settings" open width="min(1040px,96vw)" title="Ustawienia wydruku cennika"
     onCancel={onClose} destroyOnClose
     footer={<Space wrap>
       <Button onClick={onClose}>Zamknij</Button>
@@ -338,7 +338,7 @@ export function PricePrintPreview({
 }:{rows:PricePrintRow[];settings:PricePrintOptions;heading:string;onClose:()=>void}){
   const frame=useRef<HTMLIFrameElement>(null);
   const documentText=useMemo(()=>pricePrintHtml(rows,settings,heading),[rows,settings,heading]);
-  return <Modal open width="96vw" title={"Podgląd wielostronicowy — "+rows.length+" leków"}
+  return <Modal className="kl-dialog-price-preview" open width="96vw" title={"Podgląd wielostronicowy — "+rows.length+" leków"}
     onCancel={onClose} destroyOnClose
     footer={<Space>
       <Typography.Text type="secondary">Każda kartka ma własny nagłówek tabeli i numer strony.</Typography.Text>

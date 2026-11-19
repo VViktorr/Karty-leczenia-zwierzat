@@ -5,7 +5,12 @@ const storagePrefix="kl.dialogPlacement.v1.";
 
 function dialogKey(modal:HTMLElement):string {
   // One set of window preferences for each dialog type, not each patient/product.
-  const title=modal.querySelector<HTMLElement>(".ant-modal-title")?.textContent?.trim()??"Okno";
+  // Stable IDs keep positions separate even when a patient, medicine or PDF
+  // filename changes in the dialog title between openings.
+  const explicit=Array.from(modal.classList).find(name=>name.startsWith("kl-dialog-"));
+  if(explicit)return storagePrefix+explicit;
+  const title=modal.querySelector<HTMLElement>(
+    ".ant-modal-title, .ant-modal-confirm-title")?.textContent?.trim()??"Okno";
   const kind=title.split(/\s+[—–]\s+/)[0].replace(/\s+/g," ").slice(0,100);
   let hash=2166136261;
   for(const character of kind){
@@ -56,7 +61,10 @@ export default function DialogPlacement(){
         if(initialized.has(modal))return;
         const wrapper=modal.closest<HTMLElement>(".ant-modal-wrap");
         if(!wrapper||wrapper.getClientRects().length===0)return;
-        const header=modal.querySelector<HTMLElement>(".ant-modal-header");
+        // Ant Design's programmatic Modal.confirm has no .ant-modal-header.
+        // Use its title as the drag handle too (never the confirmation buttons).
+        const header=modal.querySelector<HTMLElement>(
+          ".ant-modal-header, .ant-modal-confirm-title");
         if(!header)return;
         initialized.add(modal);
         const key=dialogKey(modal);
@@ -99,6 +107,10 @@ export default function DialogPlacement(){
         header.addEventListener("pointermove",onMove);
         header.addEventListener("pointerup",onUp);
         header.addEventListener("pointercancel",onUp);
+        // Native CSS resize may finish outside the element. Persist on the
+        // next pointer release even if ResizeObserver was not called yet.
+        const onRelease=()=>{if(!moving)persist();};
+        window.addEventListener("pointerup",onRelease);
         const resize=new ResizeObserver(()=>{if(!active)persist();});
         resize.observe(modal);
         active=true;
@@ -110,6 +122,7 @@ export default function DialogPlacement(){
           header.removeEventListener("pointermove",onMove);
           header.removeEventListener("pointerup",onUp);
           header.removeEventListener("pointercancel",onUp);
+          window.removeEventListener("pointerup",onRelease);
         });
       });
     };

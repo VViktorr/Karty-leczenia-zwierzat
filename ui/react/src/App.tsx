@@ -847,7 +847,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>
-    <Modal open={showColumns} title="Parametry listy — karta leczenia"
+    <Modal className="kl-dialog-treatment-columns" open={showColumns} title="Parametry listy — karta leczenia"
       onCancel={()=>setShowColumns(false)} onOk={()=>setShowColumns(false)}
       okText="Gotowe" cancelButtonProps={{style:{display:"none"}}}>
       <Typography.Paragraph type="secondary">
@@ -891,7 +891,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
           setColumnWidths({});
         }}>Przywróć domyślne kolumny</Button>
     </Modal>
-    <Modal width="90vw" open={suggestReviewOpen}
+    <Modal className="kl-dialog-treatment-review" width="90vw" open={suggestReviewOpen}
       title="Potwierdź uzupełnienie jednoznacznych wariantów ChPL"
       onCancel={()=>{if(!applyBusy)setSuggestReviewOpen(false);}}
       footer={<Space>
@@ -924,7 +924,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
               : "Brak"}
         ]}/>
     </Modal>
-    <Modal width="90vw" open={variantModal!==null}
+    <Modal className="kl-dialog-treatment-variant" width="90vw" open={variantModal!==null}
       title={"Dobór wariantu leku — "+(variantModal?.product||"")}
       onCancel={()=>{if(!variantBusy)setVariantModal(null);}}
       footer={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>
@@ -968,7 +968,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
               </Space>}
         ]}/>
     </Modal>
-    <Modal width="94vw" open={variantPdfUrl!==null}
+    <Modal className="kl-dialog-treatment-pdf" width="94vw" open={variantPdfUrl!==null}
       title={"Dokument ChPL — "+variantPdfName}
       onCancel={()=>setVariantPdfUrl(null)}
       footer={<Button onClick={()=>setVariantPdfUrl(null)}>Zamknij dokument</Button>}>
@@ -976,7 +976,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
         referrerPolicy="no-referrer"
         style={{width:"100%",height:"76vh",border:0,background:"#fff"}}/>}
     </Modal>
-    <Modal width="92vw" open={preview!==null} title="Podgląd karty leczenia" onCancel={()=>setPreview(null)}
+    <Modal className="kl-dialog-treatment-preview" width="92vw" open={preview!==null} title="Podgląd karty leczenia" onCancel={()=>setPreview(null)}
       footer={<Space><Button onClick={()=>setPreview(null)}>Zamknij</Button>
         <Button type="primary" onClick={()=>previewFrame.current?.contentWindow?.print()}>Drukuj</Button></Space>}>
       {preview && <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
@@ -1270,7 +1270,7 @@ function SavedCards() {
           </Space>}
         ]}/>
     </Card>
-    <Modal open={purgeTarget!==null} title="Trwale usunąć kartę leczenia?"
+    <Modal className="kl-dialog-permanent-delete" open={purgeTarget!==null} title="Trwale usunąć kartę leczenia?"
       onCancel={()=>{if(!purgeBusy){setPurgeTarget(null);setPurgeConfirmation("");}}}
       closable={!purgeBusy} maskClosable={!purgeBusy} keyboard={!purgeBusy}
       footer={<Space>
@@ -1292,7 +1292,7 @@ function SavedCards() {
         onChange={e=>setPurgeConfirmation(e.target.value)}
         placeholder={purgeTarget?.number||purgeTarget?.document||""}/>
     </Modal>
-    <Modal open={!!selected} title={selected?.number||"Karta leczenia"}
+    <Modal className="kl-dialog-saved-card" open={!!selected} title={selected?.number||"Karta leczenia"}
       width={1100} footer={<Button onClick={()=>{setSelected(null);setCard(null);}}>Zamknij</Button>}
       onCancel={()=>{setSelected(null);setCard(null);}}>
       {!card ? <Spin/> : <>
@@ -1309,7 +1309,7 @@ function SavedCards() {
           ]}/>
       </>}
     </Modal>
-    <Modal width="92vw" open={printHtml!==null} title="Podgląd zapisanej karty leczenia"
+    <Modal className="kl-dialog-saved-preview" width="92vw" open={printHtml!==null} title="Podgląd zapisanej karty leczenia"
       onCancel={()=>setPrintHtml(null)} footer={<Space>
         <Button onClick={()=>setPrintHtml(null)}>Zamknij</Button>
         <Button type="primary" onClick={()=>printFrame.current?.contentWindow?.print()}>Drukuj</Button>

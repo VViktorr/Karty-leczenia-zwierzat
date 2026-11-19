@@ -400,7 +400,7 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
         </>}
       </Card>
     </div>
-    <Modal open={proposal !== null}
+    <Modal className="kl-dialog-catalogue-proposal" open={proposal !== null}
       title={"Sprawdź odczyt ChPL — " + (proposal?.filename ?? "")}
       width="90vw"
       onCancel={() => setProposal(null)}
@@ -434,7 +434,7 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
         <pre className="chpl-evidence">{proposal.evidence}</pre>
       </>}
     </Modal>
-    <Modal open={pdfUrl !== null} title={"ChPL — " + pdfName}
+    <Modal className="kl-dialog-catalogue-pdf" open={pdfUrl !== null} title={"ChPL — " + pdfName}
       width="94vw" destroyOnClose
       onCancel={closePdf}
       footer={<Button onClick={closePdf}>Zamknij podgląd</Button>}>

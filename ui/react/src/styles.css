@@ -78,5 +78,6 @@
   resize:both;
   overflow:auto;
 }
-.kl-movable-modal .ant-modal-header{cursor:move;touch-action:none;user-select:none}
+.kl-movable-modal .ant-modal-header,
+.kl-movable-modal .ant-modal-confirm-title{cursor:move;touch-action:none;user-select:none}
 .kl-movable-modal .ant-modal-title{user-select:none}
