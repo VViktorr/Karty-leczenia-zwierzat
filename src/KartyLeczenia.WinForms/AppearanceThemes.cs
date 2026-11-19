@@ -16,8 +16,8 @@ internal sealed record AppearanceOptions
     public bool StartMaximized { get; set; }
     public bool ShowToolTips { get; set; } = true;
     public bool WideTabs { get; set; }
-    // 0 = AntdUI-style line, 1 = Card, 2 = tonal cards, 3 = classic tabs.
-    public int MainTabStyle { get; set; } = 0;
+    // 0 = line, 1 = filled card, 2 = tonal card, 3 = minimal contrast card.
+    public int MainTabStyle { get; set; } = 1;
     public int MainTabPosition { get; set; } = 0; // top or bottom
     public int MainTabSpacing { get; set; } = 8;
     public bool UseCustomAccent { get; set; }
@@ -493,7 +493,7 @@ internal static class AppearanceEditor
         var customAccent = new CheckBox { Text = "Własny kolor zaznaczenia i przełączników", AutoSize = true };
         var switchStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
         var tabStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
-        tabStyle.Items.AddRange(["Linia (AntdUI Line)", "Karty (AntdUI Card)", "Karty tonalne", "Klasyczne"]);
+        tabStyle.Items.AddRange(["Linia z wyróżnieniem", "Wyraźna aktywna karta", "Karty tonalne", "Minimalne kontrastowe"]);
         var tabPosition = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
         tabPosition.Items.AddRange(["U góry", "Na dole"]);
         var tabSpacing = new NumericUpDown { Minimum = 2, Maximum = 24, Width = 80 };
