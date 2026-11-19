@@ -70,13 +70,13 @@ internal static class ListParameters
                 size.Value = Math.Clamp((decimal)style.Size, 1, 200);
                 fontButton.Text = $"{style.Family}, {style.Size:g} pkt";
             };
-            var colorButton = new Button { AutoSize = true, Text = "Kolor tekstu", ForeColor = Color.FromArgb(style.Argb) };
+            var colorButton = new Button { AutoSize = true, Text = $"Kolor tekstu · #{style.Argb & 0xFFFFFF:X6}" };
             colorButton.Click += (_, _) =>
             {
-                using var picker = new ColorDialog { Color = colorButton.ForeColor, FullOpen = true };
+                using var picker = new ColorDialog { Color = Color.FromArgb(style.Argb), FullOpen = true };
                 if (picker.ShowDialog(editor) != DialogResult.OK) return;
                 style = style with { Argb = picker.Color.ToArgb() };
-                colorButton.ForeColor = picker.Color;
+                colorButton.Text = $"Kolor tekstu · #{picker.Color.R:X2}{picker.Color.G:X2}{picker.Color.B:X2}";
                 colorChanged = true;
             };
             var alignment = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };

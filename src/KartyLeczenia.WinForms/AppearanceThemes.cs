@@ -249,14 +249,15 @@ internal static class AppearanceThemes
 
         button.ColorScheme = dark ? AntdUI.TAMode.Dark : AntdUI.TAMode.Light;
         button.Radius = neutral ? 4 : options.CornerRadius;
-        button.BorderWidth = selected && outlined ? 2 : 1;
+        button.Type = filled ? AntdUI.TTypeMini.Primary : AntdUI.TTypeMini.Default;
+        button.BorderWidth = filled ? 0 : selected && outlined ? 2 : 1;
         button.DefaultBorderColor = selected ? edge : Blend(surface, neutral ? ink : edge, .30f);
-        button.DefaultBack = fill;
-        button.ForeColor = filled ? ContrastingText(fill) : ink;
-        button.ForeHover = filled ? ContrastingText(hover) : ink;
-        button.ForeActive = filled ? ContrastingText(pressed) : ink;
-        button.BackHover = filled ? hover : edge;
-        button.BackActive = filled ? pressed : edge;
+        button.DefaultBack = button.BackColor = button.ToggleBack = fill;
+        button.ForeColor = button.ToggleFore = filled ? ContrastingText(fill) : ink;
+        button.ForeHover = button.ToggleForeHover = filled ? ContrastingText(hover) : ink;
+        button.ForeActive = button.ToggleForeActive = filled ? ContrastingText(pressed) : ink;
+        button.BackHover = button.ToggleBackHover = filled ? hover : edge;
+        button.BackActive = button.ToggleBackActive = filled ? pressed : edge;
         if (button.Tag is string shortcut)
             button.AccessibleDescription = selected ? shortcut + " · wybrano" : shortcut;
         button.Invalidate();
@@ -280,6 +281,12 @@ internal static class AppearanceThemes
                 check.ColorScheme = dark ? AntdUI.TAMode.Dark : AntdUI.TAMode.Light;
                 check.ForeColor = classic ? SystemColors.ControlText : Ink(appearance);
                 check.Fill = classic ? SystemColors.Highlight : Accent(appearance);
+                break;
+            case DateTimePicker date:
+                date.CalendarMonthBackground = classic ? SystemColors.Window : Canvas(appearance);
+                date.CalendarForeColor = classic ? SystemColors.WindowText : Ink(appearance);
+                date.CalendarTitleBackColor = classic ? SystemColors.ActiveCaption : Accent(appearance);
+                date.CalendarTitleForeColor = classic ? SystemColors.ActiveCaptionText : ContrastingText(Accent(appearance));
                 break;
             case Form or Panel or TabPage or TabControl or Label or GroupBox or ToolStrip
                 or TextBoxBase or ListControl or NumericUpDown:
