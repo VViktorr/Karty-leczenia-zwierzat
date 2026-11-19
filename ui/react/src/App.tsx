@@ -270,7 +270,10 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
           index:variantModal.index,variantId:id});
       setRows(current=>current.map(row=>row.index===variantModal.index
         ? {...row,...result} : row));
-      setVariantModal(null);setError("");
+      setVariantModal(null);
+      setError(!result.withdrawal?.trim()
+        ? "Wybrany wariant nie zawiera pełnej karencji w katalogu SQL. Zweryfikuj ChPL i uzupełnij karencję ręcznie przed zapisem karty, jeżeli jest wymagana."
+        : "");
     }catch(e){setVariantError(e instanceof Error?e.message:String(e));}
     finally{setVariantBusy(false);}
   }
