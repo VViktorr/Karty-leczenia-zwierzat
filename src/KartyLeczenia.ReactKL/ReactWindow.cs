@@ -535,6 +535,84 @@ internal sealed class ReactWindow : Form
                     section = r.Get("Sekcja (II lub III)"),
                     selected = r.Printed }).ToArray() };
         }
+        if (action == "treatmentSuggestions" || action == "applyTreatmentSuggestions")
+        {
+            string draftId = Text(root, "draftId", 30);
+            if (!drafts.TryGetValue(draftId, out var draft))
+                throw new InvalidOperationException("Ponownie otwórz dokument przed doborem wariantów.");
+            if (draft.Rows.Count > 500)
+                throw new InvalidOperationException(
+                    "Dokument ma zbyt wiele pozycji do zbiorczych propozycji.");
+            var variants = await Task.Run(() =>
+                catalogue.VariantsForSymbols(draft.Rows.Select(row =>
+                    row.Get("Symbol Subiekta"))), token);
+            var proposals = draft.Rows.Select((row, index) =>
+            {
+                variants.TryGetValue(row.Get("Symbol Subiekta").Trim(), out var entries);
+                return TreatmentAutofillPlanner.Propose(index, row,
+                    entries ?? []);
+            }).ToArray();
+            if (action == "treatmentSuggestions")
+                return new { items = proposals };
+
+            if (!root.TryGetProperty("candidates", out var requested) ||
+                requested.ValueKind != JsonValueKind.Array ||
+                requested.GetArrayLength() > 300)
+                throw new ArgumentException("Brak zatwierdzonych propozycji do zastosowania.");
+            if (!root.TryGetProperty("rows", out var snapshot) ||
+                snapshot.ValueKind != JsonValueKind.Array ||
+                snapshot.GetArrayLength() != draft.Rows.Count)
+                throw new InvalidOperationException(
+                    "Stan edytora się zmienił. Odśwież propozycje katalogu.");
+
+            var snapshots = snapshot.EnumerateArray().ToArray();
+            var accepted = requested.EnumerateArray().ToArray();
+            var seen = new HashSet<int>();
+            var applied = new List<object>();
+            var skipped = new List<string>();
+            foreach (var request in accepted)
+            {
+                int index = Int(request, "index") ?? -1;
+                int variantId = Int(request, "variantId") ?? -1;
+                if (index < 0 || index >= draft.Rows.Count || !seen.Add(index))
+                    throw new ArgumentException("Nieprawidłowe lub powtórzone indeksy propozycji.");
+                var row = draft.Rows[index];
+                var proposal = proposals[index];
+                var current = snapshots[index];
+                bool unchanged = Int(current, "index") == index &&
+                    string.Equals(Text(current, "symbol", 128),
+                        row.Get("Symbol Subiekta").Trim(), StringComparison.Ordinal) &&
+                    string.Equals(Text(current, "species", 3000),
+                        row.Get("Gatunek").Trim(), StringComparison.Ordinal) &&
+                    string.Equals(Text(current, "route", 3000),
+                        row.Get("Droga podania").Trim(), StringComparison.Ordinal) &&
+                    string.Equals(Text(current, "dosing", 3000),
+                        row.Get("Dawkowanie i okres stosowania").Trim(), StringComparison.Ordinal) &&
+                    string.Equals(Text(current, "withdrawal", 3000),
+                        row.Get("Karencja").Trim(), StringComparison.Ordinal) &&
+                    Flag(current, "selected") == row.Printed;
+                if (!unchanged || proposal.Status != "ready" ||
+                    proposal.VariantId != variantId ||
+                    !variants.TryGetValue(proposal.Symbol, out var matches))
+                {
+                    skipped.Add($"Pozycja {index + 1}: zmieniły się dane lub wariant wymaga ręcznej kontroli.");
+                    continue;
+                }
+                var chosen = matches.SingleOrDefault(entry => entry.Id == variantId);
+                if (chosen is null)
+                {
+                    skipped.Add($"Pozycja {index + 1}: wariant nie jest już dostępny.");
+                    continue;
+                }
+                var value = TreatmentVariantApplier.Apply(row, chosen);
+                applied.Add(new
+                {
+                    index, value.Species, value.Route, value.Dosing,
+                    value.Withdrawal, value.Indication, value.Description
+                });
+            }
+            return new { applied, skipped };
+        }
         if (action == "treatmentVariants" || action == "applyTreatmentVariant")
         {
             string draftId = Text(root,"draftId",30);
