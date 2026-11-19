@@ -24,6 +24,7 @@ internal sealed class ReactWindow : Form
     private readonly SqlRestoreService restores;
     private readonly ReactUpdateService updates;
     private ReactUpdateInfo? checkedUpdate;
+    private string? startupPublicationError;
     private string? selectedRestoreFile;
     private bool restoreRunning;
     private readonly CatalogueService catalogue;
@@ -45,7 +46,11 @@ internal sealed class ReactWindow : Form
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;
         Controls.Add(web);
-        Shown += async (_, _) => await StartAsync();
+        Shown += async (_, _) =>
+        {
+            await StartAsync();
+            await PublishServerUpdateOnStartup();
+        };
         FormClosing += (_, e) =>
         {
             if (backupRunning || restoreRunning)
@@ -59,10 +64,47 @@ internal sealed class ReactWindow : Form
         };
     }
 
+    private void LoadInstallationConnection()
+    {
+        // A fresh client installation contains only archive-installation.ini.
+        // Keep existing DPAPI settings from the previous installation untouched.
+        if (archive.Load().Options is not null) return;
+        string? sqlServer = ReactInstallUpdates.Server;
+        if (string.IsNullOrWhiteSpace(sqlServer)) return;
+        try
+        {
+            archive.Save(new ConnectionOptions(sqlServer, "KartyLeczenia",
+                WindowsAuthentication: true, UserName: "", Password: "",
+                TrustCertificate: true), rememberPassword: false);
+        }
+        catch (Exception ex) { CrashLog.Write("ReactKL.InitialArchiveConnection", ex); }
+    }
+
+    private async Task PublishServerUpdateOnStartup()
+    {
+        if (!ReactInstallUpdates.HasPendingPublication) return;
+        try
+        {
+            await ReactInstallUpdates.PublishPending();
+            startupPublicationError = null;
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("ReactKL.PublishStartup", ex);
+            startupPublicationError = ex.Message;
+            if (!IsDisposed)
+                MessageBox.Show(this,
+                    "Instalator ReactKL nie został opublikowany w SQL:\n" + ex.Message +
+                    "\nMożesz ponowić publikację w Ustawieniach → Aktualizacje.",
+                    "Aktualizacja KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
     private async Task StartAsync()
     {
         try
         {
+            LoadInstallationConnection();
             string dist = Path.Combine(AppContext.BaseDirectory, "react-ui");
             if (!File.Exists(Path.Combine(dist, "index.html")))
                 throw new DirectoryNotFoundException("Brak interfejsu React w folderze react-ui. Zbuduj frontend przed publikacją.");
@@ -219,6 +261,23 @@ internal sealed class ReactWindow : Form
             byte[] data = pendingCataloguePdfs.TryGetValue(path, out var pending)
                 ? pending : await Task.Run(() => catalogue.ReadPdf(path), token);
             return new { base64 = Convert.ToBase64String(data), name = Path.GetFileName(path) };
+        }
+        if (action == "getUpdateStatus")
+            return new
+            {
+                isServer = ReactInstallUpdates.IsServer,
+                pending = ReactInstallUpdates.HasPendingPublication,
+                installedVersion = ReactInstallUpdates.InstalledVersion,
+                server = ReactInstallUpdates.Server ?? "",
+                publicationError = startupPublicationError
+            };
+        if (action == "publishPendingUpdate")
+        {
+            if (!ReactInstallUpdates.IsServer)
+                throw new InvalidOperationException("Publikacja instalatora jest dostępna tylko na serwerze SQL.");
+            await ReactInstallUpdates.PublishPending(token);
+            startupPublicationError = null;
+            return new { published = true, version = ReactInstallUpdates.InstalledVersion };
         }
         if (action == "checkUpdate")
         {
