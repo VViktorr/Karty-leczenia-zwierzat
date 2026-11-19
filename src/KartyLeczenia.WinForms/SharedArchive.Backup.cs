@@ -3,14 +3,16 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia.Windows;
 
+internal sealed record DatabaseBackupResult(string Path, bool Verified, string VerificationNote);
+
 internal sealed partial class SharedArchive
 {
     // An ordinary KartyLeczenia SQL login may create a verified backup
     // when granted BACKUP DATABASE. No sysadmin server role is required.
-    internal string BackupDatabase(string folder, bool compress = false)
+    internal DatabaseBackupResult BackupDatabase(string folder, bool compress = false)
         => BackupDatabase(options, folder, compress);
 
-    internal string BackupDatabase(ConnectionOptions credentials, string folder, bool compress = false)
+    internal DatabaseBackupResult BackupDatabase(ConnectionOptions credentials, string folder, bool compress = false)
     {
         using var db = OpenMaintenance(credentials, restoring: false);
         return CreateBackup(db, folder, "kopia", compress);
@@ -52,7 +54,7 @@ internal sealed partial class SharedArchive
             return null;
         }
 
-        string safetyCopy = CreateBackup(db, "", "przed-odtworzeniem");
+        string safetyCopy = CreateBackup(db, "", "przed-odtworzeniem").Path;
         try
         {
             using var restore = MaintenanceCommand(db, $"""
@@ -165,7 +167,7 @@ internal sealed partial class SharedArchive
         }
     }
 
-    static string CreateBackup(SqlConnection db, string folder, string label, bool compress = false)
+    static DatabaseBackupResult CreateBackup(SqlConnection db, string folder, string label, bool compress = false)
     {
         if (folder.Length == 0)
         {
@@ -181,9 +183,28 @@ internal sealed partial class SharedArchive
             : "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM, NO_COMPRESSION;";
         using (var backup = MaintenanceCommand(db, backupSql, path))
             backup.ExecuteNonQuery();
-        using (var verify = MaintenanceCommand(db, "RESTORE VERIFYONLY FROM DISK = @path WITH FILE = 1, CHECKSUM;", path))
+        // A database backup operator can create a valid CHECKSUM backup, but
+        // RESTORE VERIFYONLY additionally requires CREATE DATABASE permission
+        // on the instance. Do not elevate the operator just for verification.
+        try
+        {
+            using var verify = MaintenanceCommand(db,
+                "RESTORE VERIFYONLY FROM DISK = @path WITH FILE = 1, CHECKSUM;", path);
             verify.ExecuteNonQuery();
-        return path;
+            return new(path, true, "");
+        }
+        catch (SqlException ex) when (ex.Number is 262 or 229 or 15247)
+        {
+            CrashLog.Write("SqlBackup.VerifyPermission", ex);
+            return new(path, false,
+                "Kopia została utworzona z CHECKSUM, ale konto nie ma uprawnienia CREATE DATABASE do wykonania RESTORE VERIFYONLY. " +
+                "Kopię należy okresowo przetestować poprzez odtworzenie na osobnej instancji testowej.");
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Plik kopii powstał na serwerze: {path}. Weryfikacja RESTORE VERIFYONLY nie powiodła się: {ex.Message}", ex);
+        }
     }
 
     static string ServerPath(string folder, string filename)
