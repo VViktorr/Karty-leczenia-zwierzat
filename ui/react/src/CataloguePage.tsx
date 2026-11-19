@@ -118,7 +118,25 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
     } finally { setWorking(false); }
   }
 
-  function changeField(field: "name" | "rplId" | "description", value: string) {
+  function startNewProduct(force=false) {
+    if(dirty&&!force){
+      Modal.confirm({
+        title:"Niezapisane zmiany katalogu",
+        content:"Odrzucić aktualne zmiany i rozpocząć nową kartotekę?",
+        okText:"Odrzuć i dodaj",cancelText:"Pozostań",
+        onOk:()=>startNewProduct(true)
+      });
+      return;
+    }
+    setOriginal(null);
+    setEditing({symbol:"",name:"",rplId:"",description:"",
+      revision:"",variants:[]});
+    setVariants([]);setSelected([]);setSavedNotice("");
+    setError("");setDirty(true);
+  }
+
+  function changeField(field: "symbol" | "name" | "rplId" | "description", value: string) {
+    if(field==="symbol"&&original)return;
     setEditing(current => current ? { ...current, [field]: value } : current);
     setDirty(true);
   }
@@ -240,7 +258,11 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
   }
 
   async function saveProduct() {
-    if (!editing || !original) return;
+    if (!editing) return;
+    if(!editing.symbol.trim()||!editing.name.trim()){
+      setError("Wpisz symbol i nazwę kartoteki leku.");
+      return;
+    }
     if (variants.some(v => v.id === null && (!v.species.trim() || !v.route.trim() || !v.dose.trim()))) {
       setError("Nowy wariant musi zawierać gatunek, drogę podania i dawkowanie.");
       return;
@@ -304,8 +326,12 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
           Dane wariantów i dokumenty urzędowe z bazy KartyLeczenia SQL.
         </Typography.Text>
       </div>
-      <Button onClick={() => setVersion(value => value + 1)}
-        loading={listBusy}>Odśwież katalog</Button>
+      <Space wrap>
+        <Button type="primary" disabled={working}
+          onClick={()=>startNewProduct()}>Nowa kartoteka</Button>
+        <Button onClick={() => setVersion(value => value + 1)}
+          loading={listBusy}>Odśwież katalog</Button>
+      </Space>
     </div>
     <Alert className="notice" showIcon type="info"
       message="Zmiana danych klinicznych wymaga ręcznej weryfikacji z aktualną ChPL."
@@ -341,7 +367,7 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
           <div className="catalogue-editor-heading">
             <div>
               <Typography.Title level={4} style={{ marginBottom: 4 }}>
-                {editing.name}
+                {editing.name || (original?"Kartoteka leku":"Nowa kartoteka leku")}
               </Typography.Title>
               <Space>
                 <Tag>{editing.symbol}</Tag>
@@ -352,12 +378,18 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
             <Space>
               <Button disabled={working} onClick={() => {
                 if (original) loadProduct(original);
+                else {setEditing(null);setVariants([]);setDirty(false);}
               }}>Cofnij zmiany</Button>
               <Button type="primary" disabled={!dirty} loading={working}
                 onClick={() => { void saveProduct(); }}>Zapisz w SQL</Button>
             </Space>
           </div>
           <div className="catalogue-product-fields">
+            <label>Symbol leku (identyfikator w katalogu SQL)
+              <Input value={editing.symbol} disabled={!!original}
+                maxLength={128} placeholder="Symbol produktu"
+                onChange={event=>changeField("symbol",event.target.value.trim())}/>
+            </label>
             <label>Nazwa leku
               <Input value={editing.name}
                 onChange={event => changeField("name", event.target.value)} />
