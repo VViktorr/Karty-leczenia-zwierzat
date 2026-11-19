@@ -119,6 +119,63 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         return new(symbol.Trim(), name, rpl, description, revision, variants);
     }
 
+    /// <summary>
+    /// Batch-load just the catalogue variants needed by one Subiekt document.
+    /// Never queries by fuzzy product name, and does not change clinical data.
+    /// Parameterized batches avoid opening one SQL connection per row.
+    /// </summary>
+    internal Dictionary<string, List<CatalogueVariantModel>> VariantsForSymbols(
+        IEnumerable<string> symbols)
+    {
+        string[] unique = symbols.Select(x => x.Trim())
+            .Where(x => x.Length is > 0 and <= 128)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(300).ToArray();
+        var result = new Dictionary<string, List<CatalogueVariantModel>>(
+            StringComparer.OrdinalIgnoreCase);
+        if (unique.Length == 0) return result;
+
+        using var db = Open();
+        CheckImported(db);
+        foreach (var batch in unique.Chunk(90))
+        {
+            var args = batch.Select((_, i) => "@symbol" + i).ToArray();
+            string query = """
+                SELECT p.symbol,v.id,v.species,v.indication,v.route,v.dose,
+                       v.edible_tissues,v.milk,v.restrictions,v.source,
+                       v.withdrawal_short,COALESCE(w.compact_text,N''),v.pdf_path
+                FROM dbo.catalog_products p
+                INNER JOIN dbo.catalog_variants v ON v.symbol=p.symbol
+                LEFT JOIN dbo.catalog_price_withdrawal w ON w.id=v.id
+                WHERE COALESCE(p.decision,N'')<>N'NOT_MEDICINE'
+                  AND UPPER(p.symbol) IN (
+                """ + string.Join(",", args) + """
+                )
+                ORDER BY p.symbol,v.id;
+                """;
+            using var cmd = Command(db, query);
+            for (int i = 0; i < batch.Length; i++)
+                cmd.Parameters.Add(args[i], SqlDbType.NVarChar, 128)
+                    .Value = batch[i].ToUpperInvariant();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                string Value(int index) => reader.IsDBNull(index)
+                    ? "" : reader.GetString(index);
+                string symbol = reader.GetString(0);
+                if (!result.TryGetValue(symbol, out var variants))
+                {
+                    variants = [];
+                    result.Add(symbol, variants);
+                }
+                variants.Add(new(reader.GetInt32(1),Value(2),Value(3),
+                    Value(4),Value(5),Value(6),Value(7),Value(8),
+                    Value(9),Value(10),Value(11),Value(12)));
+            }
+        }
+        return result;
+    }
+
     internal void Save(CatalogueProductModel product, IReadOnlyDictionary<string, byte[]> uploads)
     {
         if (product.Symbol.Length is < 1 or > 128 || product.Name.Length is < 1 or > 1000 ||
