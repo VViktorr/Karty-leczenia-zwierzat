@@ -696,7 +696,7 @@ function Expiry() {
   const [receivedTo,setReceivedTo]=useState("");
   // Local filters and sorting never cause an additional SQL query.
   const today=localDateTime().slice(0,10);
-  const dayNumber=(text:string)=>Math.floor(new Date(text+"T00:00:00").getTime()/86400000);
+  const dayNumber=(text:string)=>Math.floor(Date.parse(text+"T00:00:00Z")/86400000);
   const days=(row:MedicineExpiry)=>row.expires
     ? dayNumber(row.expires.slice(0,10))-dayNumber(today) : null;
   const normalized=query.trim().toLocaleLowerCase("pl");
