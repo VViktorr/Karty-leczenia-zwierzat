@@ -2553,13 +2553,31 @@ internal sealed class MainForm : Form
             if (sharedArchive is { } archive) await RefreshClinic(archive);
         };
         form = Section("Kopia zapasowa SQL");
-        Message(form, "Archiwizacja i odtwarzanie używają aktualnego połączenia SQL KartyLeczenia. " +
-            "Do wykonania kopii wystarcza uprawnienie BACKUP DATABASE. " +
-            "Odtworzenie wymaga uprawnień sysadmin dla aktualnego konta SQL. " +
-            "Plik .bak musi być dostępny dla usługi SQL Server.", multiline: true);
+        Message(form, "Archiwizuj: wybierz plik .bak w oknie „Zapisz jako” (dysk, pulpit lub pendrive). " +
+            "Program zna aktualny serwer i bazę KartyLeczenia. " +
+            "Kopia powstaje najpierw na serwerze SQL i jest przenoszona do wskazanego pliku. " +
+            "Odtwarzanie wymaga uprawnień administratora SQL.", multiline: true);
         // Credentials are taken exclusively from the current SQL archive connection.
-        var backupFolder = Field("Folder kopii na serwerze", "", "Puste pole = domyślny folder SQL Servera");
         var restoreFile = Field("Plik kopii na serwerze", "", @"np. D:\Kopie\KartyLeczenia.bak");
+
+        // SaveFileDialog works with the workstation's real drives, including
+        // removable USB media. The SQL backup is staged on its own server
+        // and copied to the selected destination only after completion.
+        string? ChooseBackupDestination()
+        {
+            using var dialog = new SaveFileDialog
+            {
+                Title = "Zapisz archiwum SQL KartyLeczenia",
+                Filter = "Archiwum SQL Server (*.bak)|*.bak",
+                DefaultExt = "bak",
+                AddExtension = true,
+                OverwritePrompt = true,
+                CheckPathExists = true,
+                FileName = "KartyLeczenia-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm") + ".bak",
+                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+            };
+            return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
+        }
         var maintenanceStatus = Message(form, "", multiline: true);
         bool maintainingArchive = false;
         FormClosing += (_, e) =>
@@ -2574,15 +2592,21 @@ internal sealed class MainForm : Form
             if (maintainingArchive) return;
             var archive = Archive();
 
-            using var archiveDialog = new ArchiveBackupDialog(restoring,
-                (restoring ? restoreFile : backupFolder).Text.Trim(), archive.Server);
-            if (DialogPlacement.Show(archiveDialog, this,
-                    restoring ? "database-restore-options" : "database-backup-options") != DialogResult.OK)
-                return;
-            string path = archiveDialog.SelectedPath;
-            bool compressBackup = archiveDialog.Compressed;
-            if (restoring) restoreFile.Text = path;
-            else backupFolder.Text = path;
+            string path;
+            if (restoring)
+            {
+                using var archiveDialog = new ArchiveBackupDialog(true, restoreFile.Text.Trim(), archive.Server);
+                if (DialogPlacement.Show(archiveDialog, this, "database-restore-options") != DialogResult.OK)
+                    return;
+                path = archiveDialog.SelectedPath;
+                restoreFile.Text = path;
+            }
+            else
+            {
+                string? selected = ChooseBackupDestination();
+                if (selected is null) return;
+                path = selected;
+            }
             if (restoring && !path.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Podaj pełną ścieżkę do pliku .bak dostępnego z serwera SQL.");
             if (path.Length > 0 && !Path.IsPathFullyQualified(path) && !path.StartsWith('/'))
@@ -2615,7 +2639,7 @@ internal sealed class MainForm : Form
                 if (restoring)
                     restoredFrom = await Task.Run(() => archive.RestoreDatabase(path));
                 else
-                    backupResult = await Task.Run(() => archive.BackupDatabase(path, compressBackup));
+                    backupResult = await Task.Run(() => archive.BackupToLocalFile(path));
                 if (restoring && ReferenceEquals(archive, sharedArchive))
                 {
                     sharedClinic = null;
@@ -2694,8 +2718,10 @@ internal sealed class MainForm : Form
             status.Text = "Archiwizacja bazy SQL przed zamknięciem…";
             try
             {
+                string? destination = ChooseBackupDestination();
+                if (destination is null) return;
                 DatabaseBackupResult result = await Task.Run(
-                    () => archive.BackupDatabase(backupFolder.Text.Trim()));
+                    () => archive.BackupToLocalFile(destination));
                 if (IsDisposed) return;
                 status.Text = result.Verified
                     ? $"Kopia wykonana i zweryfikowana: {result.Path}"
