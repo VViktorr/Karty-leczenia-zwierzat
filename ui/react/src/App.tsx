@@ -1444,10 +1444,35 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       content:row.number || row.document,okText:trash?"Przywróć":"Przenieś",cancelText:"Anuluj",
       onOk:async()=>{await invoke("trashCard",{id:row.id,trash});remote.reload();}});
   };
+
+  const savedColumns:ColumnsType<SavedCard>=[
+
+          {title:"Numer karty",dataIndex:"number",width:150},
+          {title:"Data",dataIndex:"date",render:date,width:145},
+          {title:"Kontrahent",dataIndex:"client",ellipsis:true},
+          {title:"Dokument",dataIndex:"document",width:175},
+          {key:"actions",title:"Czynności",width:650,render:(_,row)=><Space wrap>
+            <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
+            <Button size="small" onClick={()=>{void printSaved(row);}}>Drukuj</Button>
+            <Button size="small" loading={pdfBusy===row.id}
+              onClick={()=>{void cardPdf(row,false);}}>Zapisz PDF</Button>
+            <Button size="small" loading={pdfBusy===row.id}
+              onClick={()=>{void cardPdf(row,true);}}>Wyślij mailem</Button>
+            <Button size="small" loading={exportingId===row.id}
+              onClick={()=>{void exportJson(row);}}>Eksport JSON</Button>
+            <Button size="small" danger={!trash} onClick={()=>changeTrash(row)}>{trash?"Przywróć":"Kosz"}</Button>
+            {trash&&<Button size="small" danger onClick={()=>{setPurgeTarget(row);setPurgeConfirmation("");setPurgeError("");setNotice("");}}>
+              Usuń trwale
+            </Button>}
+          </Space>}
+
+  ];
+  const savedLayout=useListColumnLayout("saved-cards",savedColumns);
   return <>
     <div className="page-heading"><Typography.Title level={3}>Zapisane karty leczenia</Typography.Title>
       <Space><Segmented value={trash?"trash":"active"} onChange={v=>setTrash(v==="trash")}
         options={[{label:"Archiwum",value:"active"},{label:"Kosz",value:"trash"}]}/>
+      <Button onClick={savedLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={remote.reload}>Odśwież</Button></Space></div>
     <Card>
       <Space wrap style={{marginBottom:12}}>
@@ -1463,27 +1488,9 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       <Table rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
         scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={{pageSize:35}}
         onRow={row=>({onDoubleClick:()=>{void open(row);}})}
-        columns={[
-          {title:"Numer karty",dataIndex:"number",width:150},
-          {title:"Data",dataIndex:"date",render:date,width:145},
-          {title:"Kontrahent",dataIndex:"client",ellipsis:true},
-          {title:"Dokument",dataIndex:"document",width:175},
-          {title:"Czynności",width:650,render:(_,row)=><Space wrap>
-            <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
-            <Button size="small" onClick={()=>{void printSaved(row);}}>Drukuj</Button>
-            <Button size="small" loading={pdfBusy===row.id}
-              onClick={()=>{void cardPdf(row,false);}}>Zapisz PDF</Button>
-            <Button size="small" loading={pdfBusy===row.id}
-              onClick={()=>{void cardPdf(row,true);}}>Wyślij mailem</Button>
-            <Button size="small" loading={exportingId===row.id}
-              onClick={()=>{void exportJson(row);}}>Eksport JSON</Button>
-            <Button size="small" danger={!trash} onClick={()=>changeTrash(row)}>{trash?"Przywróć":"Kosz"}</Button>
-            {trash&&<Button size="small" danger onClick={()=>{setPurgeTarget(row);setPurgeConfirmation("");setPurgeError("");setNotice("");}}>
-              Usuń trwale
-            </Button>}
-          </Space>}
-        ]}/>
+        columns={savedLayout.columns}/>
     </Card>
+    {savedLayout.dialog}
     <Modal className="kl-dialog-permanent-delete" open={purgeTarget!==null} title="Trwale usunąć kartę leczenia?"
       onCancel={()=>{if(!purgeBusy){setPurgeTarget(null);setPurgeConfirmation("");}}}
       closable={!purgeBusy} maskClosable={!purgeBusy} keyboard={!purgeBusy}
