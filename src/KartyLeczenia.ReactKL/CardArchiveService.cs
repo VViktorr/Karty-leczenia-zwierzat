@@ -23,7 +23,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
 
     internal sealed record SaveResult(bool Duplicate, string? DuplicateId, string? Number, string? Id);
 
-    internal SaveResult Save(DocumentData source, DateTime reported, DateTime performed,
+    internal SaveResult Save(DocumentData source, DateTime? reported, DateTime performed,
         string findings, bool confirmDuplicate)
     {
         if (source.Rows.All(x => !x.Printed))
@@ -50,7 +50,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Lecznica i adres"] = clinicInfo,
             ["Lekarz i nr prawa wykonywania zawodu"] = doctor,
             ["Właściciel i adres"] = source.Payer,
-            ["Zgłoszenie — data i godzina"] = reported.ToString("dd.MM.yyyy HH:mm"),
+            ["Zgłoszenie — data i godzina"] = reported?.ToString("dd.MM.yyyy HH:mm") ?? "",
             ["Wykonanie — data i godzina"] = performed.ToString("dd.MM.yyyy HH:mm"),
             ["Wyniki badań"] = findings,
             ["Dokument źródłowy"] = source.Number
@@ -90,7 +90,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
                 return new(true, other.ToString("N"), null, null);
             }
         }
-        int year = reported.Year;
+        int year = performed.Year;
         long sequence;
         using (var next = Cmd(db, tx, """
             SELECT COALESCE(MAX(card_sequence), CONVERT(bigint,0)) + 1
@@ -117,7 +117,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             save.Parameters.Add("@payer", SqlDbType.Int).Value = (object?)source.PayerId ?? DBNull.Value;
             save.Parameters.Add("@client", SqlDbType.NVarChar,-1).Value = client;
             save.Parameters.Add("@document", SqlDbType.NVarChar,-1).Value = source.Number;
-            save.Parameters.Add("@date", SqlDbType.Date).Value = reported.Date;
+            save.Parameters.Add("@date", SqlDbType.Date).Value = performed.Date;
             save.Parameters.Add("@search", SqlDbType.NVarChar,-1).Value = (client+" "+source.Number).ToUpperInvariant();
             save.Parameters.Add("@card", SqlDbType.NVarChar,-1).Value = json;
             save.Parameters.Add("@print", SqlDbType.NVarChar,-1).Value = json;
@@ -145,7 +145,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         return CardHtmlRenderer.Render(card);
     }
 
-    internal string RenderDraft(DocumentData source, DateTime reported, DateTime performed, string findings)
+    internal string RenderDraft(DocumentData source, DateTime? reported, DateTime performed, string findings)
     {
         var clinic = ClinicSettingsStore.Load();
         var fields = new Dictionary<string, string>
@@ -154,7 +154,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Lecznica i adres"] = clinic.CardText,
             ["Lekarz i nr prawa wykonywania zawodu"] = clinic.Doctor,
             ["Właściciel i adres"] = source.Payer,
-            ["Zgłoszenie — data i godzina"] = reported.ToString("dd.MM.yyyy HH:mm"),
+            ["Zgłoszenie — data i godzina"] = reported?.ToString("dd.MM.yyyy HH:mm") ?? "",
             ["Wykonanie — data i godzina"] = performed.ToString("dd.MM.yyyy HH:mm"),
             ["Wyniki badań"] = findings,
             ["Dokument źródłowy"] = source.Number
