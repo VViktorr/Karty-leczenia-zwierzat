@@ -220,8 +220,72 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     return()=>{cancelled=true;};
   },[draft,suggestTick]);
   useEffect(()=>()=>{if(variantPdfUrl)URL.revokeObjectURL(variantPdfUrl);},[variantPdfUrl]);
+  // Do not silently print an incomplete treatment card. The warning review
+  // covers both SQL save and draft preview, without changing clinician entries.
+  async function reviewBefore(action:"save"|"preview"):Promise<boolean> {
+    const selected=rows.filter(row=>row.selected);
+    if(!selected.length) {
+      setError("Zaznacz przynajmniej jeden lek do zapisania lub wydruku.");
+      return false;
+    }
+    const warnings=selected.map(row=>{
+      const issues:string[]=[];
+      const blocking:string[]=[];
+      if(!row.product.trim()) blocking.push("Brak nazwy produktu");
+      if(!row.species.trim()) blocking.push("Brak gatunku");
+      if(!row.route.trim()) blocking.push("Brak drogi podania");
+      if(!row.dosing.trim()) blocking.push("Brak dawkowania");
+      if(!row.diagnosis.trim()) blocking.push("Brak rozpoznania");
+      if(!row.batch.trim()) issues.push("Nie wpisano serii");
+      if(!row.animals.trim()) issues.push("Nie wpisano liczby zwierząt");
+      if(!row.withdrawal.trim()) issues.push("Brak karencji — sprawdź, czy dotyczy tego gatunku");
+      const candidate=suggestions.find(item=>item.index===row.index);
+      if(candidate && ["review","ambiguous","notFound","noMatch","missingSymbol"].includes(candidate.status))
+        issues.push("Wariant ChPL wymaga ręcznego sprawdzenia");
+      return {row,issues,blocking};
+    }).filter(item=>item.issues.length||item.blocking.length);
+    if(!warnings.length)return true;
+    const blocked=warnings.some(item=>item.blocking.length>0);
+    return new Promise<boolean>(resolve=>{
+      let resolved=false;
+      const done=(accepted:boolean)=>{if(!resolved){resolved=true;resolve(accepted);}};
+      let dialog:ReturnType<typeof Modal.confirm>|null=null;
+      dialog=Modal.confirm({
+        title:blocked?"Uzupełnij wymagane dane karty":"Sprawdź ostrzeżenia przed "+
+          (action==="save"?"zapisem":"podglądem wydruku"),
+        width:700,
+        content:<div>
+          <Alert className="notice" type={blocked?"error":"warning"} showIcon
+            message={blocked
+              ?"Brak wymaganych pól — zapis i wydruk są zablokowane do czasu poprawy."
+              :"Sprawdź wymienione pozycje. Możesz świadomie kontynuować, gdy dane są prawidłowe."}/>
+          <div style={{maxHeight:350,overflowY:"auto",marginTop:12}}>
+            {warnings.map(item=><div key={item.row.index} style={{padding:"9px 0",borderBottom:"1px solid var(--ant-color-border-secondary, #ddd)"}}>
+              <Typography.Text strong>{item.row.index+1}. {item.row.product||"Bez nazwy produktu"}</Typography.Text>
+              <ul style={{margin:"5px 0",paddingLeft:20}}>
+                {item.blocking.map((message,i)=><li key={"required-"+i}><Typography.Text type="danger">{message}</Typography.Text></li>)}
+                {item.issues.map((message,i)=><li key={"warning-"+i}>{message}</li>)}
+              </ul>
+              <Button type="link" size="small" onClick={()=>{
+                dialog?.destroy();done(false);
+                window.setTimeout(()=>{
+                  document.querySelector('[data-row-key="'+item.row.index+'"]')
+                    ?.scrollIntoView({behavior:"smooth",block:"center"});
+                },80);
+              }}>Przejdź do pozycji</Button>
+            </div>)}
+          </div>
+        </div>,
+        okText:"Potwierdzam — "+(action==="save"?"zapisz kartę":"otwórz podgląd"),
+        okButtonProps:{disabled:blocked},
+        cancelText:"Anuluj",
+        onOk:()=>done(true),onCancel:()=>done(false)
+      });
+    });
+  }
   async function saveCard(confirmDuplicate = false) {
     if (!draft || busy || applyBusy) return;
+    if (!await reviewBefore("save")) return;
     setBusy(true); setError("");
     try {
       const result = await invoke<SaveResult>("saveDraft", {
@@ -253,6 +317,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   }
   async function printPreview() {
     if (!draft || busy || applyBusy) return;
+    if (!await reviewBefore("preview")) return;
     setBusy(true);
     try {
       const data = await invoke<{html:string}>("previewDraft", {
