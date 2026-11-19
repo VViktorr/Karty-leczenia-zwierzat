@@ -40,3 +40,20 @@
 .layout-fluent .topbar{background:var(--shell-bg)}
 @media(max-width:1200px){.document-filters{grid-template-columns:1fr 1fr}.document-filters .ant-segmented{grid-column:1/-1}}
 @media(max-width:900px){.sidebar{width:182px;flex-basis:182px}.sidebar-brand strong{font-size:13px}.topbar{padding:0 14px}.main-content{padding:18px 14px}.document-filters{grid-template-columns:1fr}.document-filters .ant-segmented{grid-column:auto}.appearance-controls .ant-select:first-child{width:175px}}
+
+/* ReactKL catalogue: master/detail layout. The editing grid scrolls independently
+   so 11 ChPL fields remain usable at standard Windows DPI and zoom settings. */
+.catalogue-layout{display:grid;grid-template-columns:minmax(260px,300px) minmax(0,1fr);gap:16px;align-items:start}
+.catalogue-layout .ant-card{min-width:0}
+.catalogue-list .ant-input-search{margin-bottom:12px}
+.catalogue-list .ant-table-row{cursor:pointer}
+.catalogue-list .catalogue-selected td{background:var(--shell-bg)!important;font-weight:600}
+.catalogue-editor-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.catalogue-product-fields{display:grid;grid-template-columns:minmax(190px,1.2fr) minmax(130px,.5fr);gap:10px 15px;margin-bottom:16px}
+.catalogue-product-fields label{display:flex;flex-direction:column;gap:6px;color:var(--text);font-size:13px;font-weight:500}
+.catalogue-product-fields label:last-child{grid-column:1/-1}
+.catalogue-variant-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:13px}
+.catalogue-variants .ant-input-textarea textarea{font-size:12px;line-height:1.4;resize:vertical}
+.catalogue-variants .ant-table-thead>tr>th{white-space:nowrap}
+.catalogue-variants .ant-table-cell{vertical-align:top}
+@media(max-width:1120px){.catalogue-layout{grid-template-columns:1fr}.catalogue-list .ant-table-body{max-height:170px!important}}
