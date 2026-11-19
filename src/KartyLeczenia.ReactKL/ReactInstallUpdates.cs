@@ -12,11 +12,13 @@ internal static class ReactInstallUpdates
 {
     private static string InstallFile => Path.Combine(AppContext.BaseDirectory, "archive-installation.ini");
 
-    internal static string? Read(string key)
+    internal static string? Read(string key) => ReadValue(InstallFile, key);
+
+    internal static string? ReadValue(string path, string key)
     {
-        if (!File.Exists(InstallFile)) return null;
+        if (!File.Exists(path)) return null;
         bool inArchive = false;
-        foreach (string line in File.ReadLines(InstallFile))
+        foreach (string line in File.ReadLines(path))
         {
             string part = line.Trim();
             if (part.StartsWith("[") && part.EndsWith("]"))
