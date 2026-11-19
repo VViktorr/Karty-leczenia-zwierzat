@@ -7,8 +7,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
-import {groupExpiryLots} from "./expiryGrouping";
-import type {ExpiryLot,ExpiryViewRow} from "./expiryGrouping";
+import {useExpiryTableLayout} from "./ExpiryTableLayout";
 import DialogPlacement from "./DialogPlacement";
 import { defaultPricePrint, normalizePriceSettings, withdrawalText,
   PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
@@ -64,7 +63,10 @@ interface PriceLevel { number: number; name: string; }
 interface MedicinePrice {
   symbol: string; name: string; gross: number | null; withdrawal: string; latestBatch: string;
 }
-type MedicineExpiry=ExpiryLot;
+interface MedicineExpiry {
+  name: string; batch: string; expires: string | null; received: string | null; remaining: number;
+  warehouseName: string; deliveriesConfirmed: boolean; productId: number; movementId: number;
+}
 interface SavedCard { id: string; date: string; client: string; document: string; number: string; }
 interface SaveResult {duplicate: boolean; duplicateId: string | null; number: string | null; id: string | null;}
 interface StoredCard {
@@ -1166,14 +1168,6 @@ function Expiry() {
   const [query,setQuery]=useState("");
   const [receivedFrom,setReceivedFrom]=useState("");
   const [receivedTo,setReceivedTo]=useState("");
-  const [combineDeliveries,setCombineDeliveries]=useState(()=>{
-    try{return localStorage.getItem("kl.expiryGroupDeliveries")!=="false";}
-    catch{return true;}
-  });
-  useEffect(()=>{
-    try{localStorage.setItem("kl.expiryGroupDeliveries",String(combineDeliveries));}
-    catch{/* Local preference is optional. */}
-  },[combineDeliveries]);
   // Local filters and sorting never cause an additional SQL query.
   const today=localDateTime().slice(0,10);
   const dayNumber=(text:string)=>Math.floor(Date.parse(text+"T00:00:00Z")/86400000);
@@ -1194,12 +1188,27 @@ function Expiry() {
     if(!b.expires)return -1;
     return a.expires.localeCompare(b.expires)||a.name.localeCompare(b.name,"pl");
   });
-  const displayRows=groupExpiryLots(rows,combineDeliveries);
+  const expiryColumns:ColumnsType<MedicineExpiry> = [
+          {title:"Lek",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
+          {title:"Seria",dataIndex:"batch",width:150},
+          {title:"Data przyjęcia",dataIndex:"received",width:160,render:date,
+            sorter:(a,b)=>(a.received??"").localeCompare(b.received??"")},
+          {title:"Data ważności",dataIndex:"expires",width:160,render:date,
+            defaultSortOrder:"ascend",
+            sorter:(a,b)=>(a.expires??"9999").localeCompare(b.expires??"9999")},
+          {title:"Pozostało",dataIndex:"remaining",align:"right",width:125},
+          {title:"Magazyn",dataIndex:"warehouseName",width:160},
+          {title:"Status",width:145,render:(_,row)=>days(row)===null ?
+            <Tag>Brak daty</Tag> : days(row)!<0 ? <Tag color="red">Przeterminowane</Tag> :
+              days(row)!<=30 ? <Tag color="orange">Do 30 dni</Tag> : <Tag color="green">Aktualne</Tag>}
+  ];
+  const expiryLayout=useExpiryTableLayout(expiryColumns);
   return <>
     <div className="page-heading"><div>
       <Typography.Title level={3}>Terminy ważności leków</Typography.Title>
       <Typography.Text type="secondary">Filtry działają lokalnie, bez obciążania serwera SQL.</Typography.Text>
-    </div><Button onClick={remote.reload} loading={remote.busy}>Odśwież z SQL</Button></div>
+    </div><Space><Button onClick={expiryLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
+      <Button onClick={remote.reload} loading={remote.busy}>Odśwież z SQL</Button></Space></div>
     <Card>
       <Space wrap style={{marginBottom:12}}>
         <Segmented className="expiry-filters" value={range} onChange={setRange} options={[
@@ -1207,11 +1216,6 @@ function Expiry() {
           {label:"Do 30 dni",value:"30"}, {label:"Do 60 dni",value:"60"}]}/>
         <Input.Search allowClear placeholder="Lek lub seria" value={query}
           onChange={e=>setQuery(e.target.value)} style={{width:240}}/>
-        <Space size={6}>
-          <Switch checked={combineDeliveries} onChange={setCombineDeliveries}
-            aria-label="Scalaj identyczne potwierdzone partie"/>
-          <Typography.Text>Scalaj partie</Typography.Text>
-        </Space>
         <label>Przyjęto od <Input type="date" value={receivedFrom} onChange={e=>setReceivedFrom(e.target.value)}/></label>
         <label>do <Input type="date" value={receivedTo} onChange={e=>setReceivedTo(e.target.value)}/></label>
         <Button onClick={()=>{setQuery("");setReceivedFrom("");setReceivedTo("");setRange("all");}}>
@@ -1219,40 +1223,15 @@ function Expiry() {
         </Button>
       </Space>
       <ErrorNotice error={remote.error}/>
-      <Table<ExpiryViewRow> rowKey="key"
-        loading={remote.busy} dataSource={displayRows}
-        expandable={{rowExpandable:row=>!!row.children?.length}}
-        pagination={{pageSize:40,showSizeChanger:true}} scroll={{x:1150,y:"calc(100vh - 400px)"}}
-        columns={[
-          {title:"Lek",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
-          {title:"Seria",dataIndex:"batch",width:150},
-          {title:"Data przyjęcia",dataIndex:"received",width:160,
-            render:(value:string|null,row:ExpiryViewRow)=>row.multipleReceivedDates
-              ? <Typography.Text type="secondary">Różne daty</Typography.Text>
-              : date(value),
-            sorter:(a,b)=>(a.received??"").localeCompare(b.received??"")},
-          {title:"Data ważności",dataIndex:"expires",width:160,render:date,
-            defaultSortOrder:"ascend",
-            sorter:(a,b)=>(a.expires??"9999").localeCompare(b.expires??"9999")},
-          {title:"Pozostało",dataIndex:"remaining",align:"right",width:125},
-          {title:"Dostawy",dataIndex:"deliveryCount",width:105,
-            render:(count:number|undefined)=>count && count>1
-              ? <Tag>{count} dostawy</Tag> : "—"},
-          {title:"Magazyn",dataIndex:"warehouseName",width:160},
-          {title:"Status",width:145,render:(_,row)=>!row.deliveriesConfirmed
-            ? <Tag color="orange">Stan bez partii</Tag>
-            : days(row)===null ? <Tag>Brak daty</Tag>
-            : days(row)!<0 ? <Tag color="red">Przeterminowane</Tag> :
-              days(row)!<=30 ? <Tag color="orange">Do 30 dni</Tag> : <Tag color="green">Aktualne</Tag>}
-        ]}/>
+      <Table rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
+        loading={remote.busy} dataSource={rows}
+        pagination={{pageSize:40,showSizeChanger:true}} scroll={{x:1040,y:"calc(100vh - 400px)"}}
+        columns={expiryLayout.columns}/>
       <Typography.Text type="secondary">
-        {rows.length} dostaw/pozycji, {displayRows.length} wierszy głównych.
-        Scalane są wyłącznie potwierdzone dostawy tego samego leku, magazynu, serii i terminu ważności.
-        Rozwiń wiersz, aby zobaczyć poszczególne dostawy.
-        Przy aktywnych filtrach sumy dotyczą tylko widocznych dostaw.
-        Dane magazynowe są buforowane maksymalnie 30 sekund. „Odśwież z SQL” pomija bufor.
+        Wyświetlono {rows.length} pozycji. Dane magazynowe są buforowane maksymalnie 30 sekund. „Odśwież z SQL” pomija bufor.
       </Typography.Text>
     </Card>
+    {expiryLayout.dialog}
   </>;
 }
 
