@@ -531,6 +531,7 @@ internal sealed class ReactWindow : Form
                     dosing = r.Get("Dawkowanie i okres stosowania"), withdrawal = r.Get("Karencja"),
                     description = r.Get("Opis zwierząt / numer siedziby stada"),
                     animals = r.Get("Liczba zwierząt"), diagnosis = r.Get("Rozpoznanie"),
+                    section = r.Get("Sekcja (II lub III)"),
                     selected = r.Printed }).ToArray() };
         }
         if (action == "updateDraft")
@@ -542,7 +543,7 @@ internal sealed class ReactWindow : Form
                 throw new InvalidOperationException("Ponownie otwórz dokument.");
             string[] allowed = ["Gatunek", "Droga podania", "Dawkowanie i okres stosowania",
                 "Karencja", "Opis zwierząt / numer siedziby stada", "Liczba zwierząt",
-                "Rozpoznanie", "Seria", "Drukuj"];
+                "Rozpoznanie", "Seria", "Sekcja (II lub III)", "Drukuj"];
             if (!allowed.Contains(field, StringComparer.Ordinal)) throw new ArgumentException("Pole nie jest edytowalne.");
             string value = field == "Drukuj" ? Flag(root, "checked").ToString() : Text(root, "value", 3000);
             draft.Rows[index].Set(field, value);
@@ -590,7 +591,8 @@ internal sealed class ReactWindow : Form
                         ("route", "Droga podania"), ("dosing", "Dawkowanie i okres stosowania"),
                         ("withdrawal", "Karencja"),
                         ("description", "Opis zwierząt / numer siedziby stada"),
-                        ("animals", "Liczba zwierząt"), ("diagnosis", "Rozpoznanie")
+                        ("animals", "Liczba zwierząt"), ("diagnosis", "Rozpoznanie"),
+                        ("section", "Sekcja (II lub III)")
                     })
                         treatment.Set(field, Text(item, key, 3000));
                 }
