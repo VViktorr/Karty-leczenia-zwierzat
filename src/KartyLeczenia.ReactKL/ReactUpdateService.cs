@@ -70,7 +70,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
         Version current=Version.TryParse(CurrentVersion,out var local)?local:new Version(0,0);
         if (!Version.TryParse(release.Version,out var advertised)||Normalize(advertised)<=Normalize(current))
             throw new InvalidOperationException("Brak nowszej wersji ReactKL do zainstalowania.");
-        if(release.Sha256.Length!=64 || !Convert.TryFromHexString(release.Sha256,new byte[32],out int parsed) || parsed!=32)
+        if(release.Sha256.Length!=64 || !release.Sha256.All(Uri.IsHexDigit))
             throw new InvalidDataException("Nieprawidłowy skrót SHA-256 publikacji.");
         string folder=Path.Combine(Path.GetTempPath(),"KartyLeczenia-Update",
             Guid.NewGuid().ToString("N"));
