@@ -47,7 +47,9 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
                 now() - hit.LoadedAt < Lifetime)
                 return hit with { Cached = true };
 
-            if (!pending.TryGetValue(key, out task!))
+            if (pending.TryGetValue(key, out var existing))
+                task = existing;
+            else
             {
                 task = new Lazy<Task<Result>>(() => LoadAsync(key, fetch));
                 pending[key] = task;
