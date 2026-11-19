@@ -12,18 +12,18 @@ internal sealed class ArchiveBackupDialog : Form
     internal string SelectedPath => location.Text.Trim();
     internal bool Compressed => compressed.Checked;
 
-    internal ArchiveBackupDialog(bool restoring, string initialLocation)
+    internal ArchiveBackupDialog(bool restoring, string initialLocation, string server)
     {
-        Text = restoring ? "Odtwarzanie bazy z archiwum" : "Archiwizacja bazy SQL";
+        Text = restoring ? "Odtwarzanie SQL KartyLeczenia" : "Archiwizacja SQL KartyLeczenia";
         StartPosition = FormStartPosition.CenterParent;
         AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.Sizable;
-        MinimumSize = new Size(480, 270);
-        ClientSize = new Size(750, 290);
+        MinimumSize = new Size(650, 300);
+        ClientSize = new Size(800, 310);
         MaximizeBox = true;
         MinimizeBox = false;
 
-        var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(14), ColumnCount = 2, RowCount = 5 };
+        var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 2, RowCount = 6 };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -31,18 +31,26 @@ internal sealed class ArchiveBackupDialog : Form
         grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         var title = new Label
         {
-            Text = restoring ? "Wskaż kopię zapasową .bak do odtworzenia:" :
-                "Wybierz folder zapisu kopii zapasowej SQL:",
-            AutoSize = true, Margin = new Padding(3, 3, 3, 10)
+            Text = restoring ? "Odtworzenie bazy SQL KartyLeczenia" : "Utworzenie kopii zapasowej SQL KartyLeczenia",
+            AutoSize = true, Margin = new Padding(3, 3, 3, 10),
+            Font = new Font(Font, FontStyle.Bold)
         };
         grid.Controls.Add(title, 0, 0);
         grid.SetColumnSpan(title, 2);
+        var subtitle = new Label
+        {
+            Text = $"Serwer: {server}   ·   Baza: KartyLeczenia",
+            AutoSize = true, Margin = new Padding(3, 0, 3, 10)
+        };
+        grid.Controls.Add(subtitle, 0, 1);
+        grid.SetColumnSpan(subtitle, 2);
         location.Text = initialLocation;
         location.PlaceholderText = restoring ? @"np. D:\Kopie\KartyLeczenia.bak" : "Puste pole = domyślny folder kopii SQL Server";
-        grid.Controls.Add(location, 0, 1);
+        grid.Controls.Add(location, 0, 2);
         var browse = new Button { Text = "Przeglądaj…", AutoSize = true, Anchor = AnchorStyles.Left };
         browse.Click += (_, _) =>
         {
@@ -63,11 +71,11 @@ internal sealed class ArchiveBackupDialog : Form
                 if (dialog.ShowDialog(this) == DialogResult.OK) location.Text = dialog.SelectedPath;
             }
         };
-        grid.Controls.Add(browse, 1, 1);
+        grid.Controls.Add(browse, 1, 2);
 
         if (!restoring)
         {
-            grid.Controls.Add(compressed, 0, 2);
+            grid.Controls.Add(compressed, 0, 3);
             grid.SetColumnSpan(compressed, 2);
         }
         else
@@ -76,29 +84,29 @@ internal sealed class ArchiveBackupDialog : Form
             {
                 Text = "Kompresja jest wykrywana automatycznie przez SQL Server przy odtwarzaniu.",
                 AutoSize = true
-            }, 0, 2);
+            }, 0, 3);
         }
 
         var note = new Label
         {
             Dock = DockStyle.Fill,
             AutoSize = false,
-            Text = "Ważne: folder lub plik musi być dostępny dla usługi SQL Server na wskazanym serwerze. " +
-                "Przeglądaj pokazuje pliki tego komputera; wybrana ścieżka lokalna może być niedostępna " +
-                "dla zdalnego serwera SQL. W takim przypadku wpisz ścieżkę serwera lub UNC."
+            Text = "Plik .bak jest zapisywany i odczytywany przez usługę SQL Server, a nie przez aplikację na stanowisku. " +
+                "Wskaż folder dostępny na serwerze lub ścieżkę UNC z odpowiednimi uprawnieniami. " +
+                "Przycisk „Przeglądaj” pokazuje pliki bieżącego komputera."
         };
-        grid.Controls.Add(note, 0, 3);
+        grid.Controls.Add(note, 0, 4);
         grid.SetColumnSpan(note, 2);
 
         var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft };
-        var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+        var cancel = new Button { Text = "Anuluj", AutoSize = false, Size = new Size(120, 38), DialogResult = DialogResult.Cancel };
         var apply = new Button
         {
             Text = restoring ? "Przywróć bazę" : "Utwórz archiwum",
-            AutoSize = true, DialogResult = DialogResult.OK
+            AutoSize = false, Size = new Size(175, 38), DialogResult = DialogResult.OK
         };
         actions.Controls.AddRange([cancel, apply]);
-        grid.Controls.Add(actions, 0, 4);
+        grid.Controls.Add(actions, 0, 5);
         grid.SetColumnSpan(actions, 2);
         Controls.Add(grid);
         AcceptButton = apply;
