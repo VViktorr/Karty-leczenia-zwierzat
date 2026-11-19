@@ -97,7 +97,7 @@ public static class MedicineStockService
         return result.ToArray();
     }
 
-    public static async Task<List<MedicinePrice>> Prices(ConnectionOptions options, int level, CancellationToken token, int withdrawalSource = 0, bool net = false)
+    public static async Task<List<MedicinePrice>> Prices(ConnectionOptions options, int level, CancellationToken token, int withdrawalSource = 0, bool net = false, IReadOnlyList<MedicineExpiry>? knownExpiries = null)
     {
         if (level is < 1 or > 10) throw new ArgumentOutOfRangeException(nameof(level));
         if (withdrawalSource is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(withdrawalSource));
@@ -143,7 +143,9 @@ public static class MedicineStockService
         }
         if (prices.Count == 0) return [];
 
-        var deliveries = await Expiries(options, token);
+        // Reuse a recent stock snapshot when supplied by the React desktop host.
+        // Other callers retain the original fresh-query behavior.
+        var deliveries = knownExpiries ?? await Expiries(options, token);
         var latestBatches = deliveries.Where(row => row.DeliveriesConfirmed)
             .GroupBy(row => row.ProductId)
             .Where(group => group.Count() == 1 || group.All(row => row.Received.HasValue))
