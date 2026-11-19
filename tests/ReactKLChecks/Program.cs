@@ -251,6 +251,64 @@ static class Program
             Check(!freshStock.Cached,
                 "cancelled SQL query must never be reused by the next viewer");
 
+            var cataloguePrices = PriceCatalogueSnapshot.FromRows(
+            [
+                ("LEK-A", new PriceVariant("Bydło","domięśniowo","Wskazanie",
+                    "1 ml","7 dni","60 godzin","T: 7 dni, M: 60 h")),
+                ("LEK-A", new PriceVariant("Świnie","doustnie","Wskazanie",
+                    "2 ml","3 dni","","T: 3 dni")),
+                ("LEK-B", new PriceVariant("Koty","doustnie","Wskazanie",
+                    "1 ml","","",""))
+            ]);
+            var formatted = cataloguePrices.Format(
+                new KartyLeczenia.MedicinePrice("Próba", 12.5m)
+                { Symbol = "LEK-A" });
+            Check(formatted.FullCodes.Contains("Bydło IM") &&
+                  formatted.FullCodes.Contains("Tkanki: 7 dni") &&
+                  formatted.FullCodes.Contains("Mleko: 60 godzin"),
+                "full price withdrawal should include both tissues and milk by species");
+            Check(formatted.FullNames.Contains("domięśniowo") &&
+                  !formatted.FullNames.Contains("Bydło IM"),
+                "price route presentation must offer both Polish names and codes");
+            Check(formatted.VariantsCodes.Contains("Bydło IM: T: 7 dni, M: 60 h") &&
+                  formatted.VariantsCodes.Contains("Świnie PO: T: 3 dni"),
+                "variant compact format should come from catalog_price_withdrawal");
+            Check(formatted.SpeciesCodes.Contains("Bydło — IM:") &&
+                  formatted.SpeciesNames.Contains("Świnie — doustnie:"),
+                "species compact grouping should retain route and species");
+            Check(!formatted.NeedsCompletion,
+                "complete official catalogue variants should not be flagged missing");
+            var unknownPrice = cataloguePrices.Format(
+                new KartyLeczenia.MedicinePrice("Brak w katalogu", null)
+                { Symbol = "BRAK" });
+            Check(unknownPrice.NeedsCompletion && unknownPrice.FullCodes == "" &&
+                  unknownPrice.VariantsCodes == "",
+                "missing catalogue medicine must not invent withdrawal data");
+            Check(cataloguePrices.Format(
+                new KartyLeczenia.MedicinePrice("Wariant bez karencji", null)
+                { Symbol = "LEK-B" }).NeedsCompletion,
+                "incomplete catalogue withdrawal must require completion");
+            var printDefault = new PricePrintOptions();
+            Check(printDefault.Landscape && printDefault.Legend == "start" &&
+                  printDefault.WithdrawalFormat == 1 && printDefault.RouteCodes,
+                "price print defaults must match the final WinForms layout");
+            var migratedPrice = PricePrintOptionsStore.FromLegacyJson(
+                """
+                {"Landscape":false,"Margin":9,"WithdrawalFormat":2,
+                 "RouteCodes":false,"Legend":true,"LegendEveryPage":true,
+                 "Font":"Segoe UI","FontSizes":[10,10,10,10,12,10],
+                 "Widths":[5,40,15,14,35]}
+                """);
+            Check(!migratedPrice.Landscape && migratedPrice.Margin == 9 &&
+                  migratedPrice.Legend == "every" &&
+                  migratedPrice.WithdrawalFormat == 2 && !migratedPrice.RouteCodes &&
+                  migratedPrice.Widths[1] == 40 && migratedPrice.ColumnSizes[4] == 12,
+                "React price editor must preserve legacy WinForms print settings");
+            bool invalidPrintRejected = false;
+            try { _ = (printDefault with { Widths = [0, 10, 10, 10, 10] }).Validate(); }
+            catch (ArgumentException) { invalidPrintRejected = true; }
+            Check(invalidPrintRejected, "invalid print widths must not be saved");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
