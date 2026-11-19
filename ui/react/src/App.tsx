@@ -44,7 +44,7 @@ interface MedicinePrice {
   symbol: string; name: string; gross: number | null; withdrawal: string; latestBatch: string;
 }
 interface MedicineExpiry {
-  name: string; batch: string; expires: string | null; remaining: number;
+  name: string; batch: string; expires: string | null; received: string | null; remaining: number;
   warehouseName: string; deliveriesConfirmed: boolean; productId: number; movementId: number;
 }
 interface SavedCard { id: string; date: string; client: string; document: string; number: string; }
@@ -691,33 +691,68 @@ function Prices() {
 function Expiry() {
   const remote=useRemote<MedicineExpiry[]>("expiries",{},[]);
   const [range,setRange]=useState("all");
-  const now=Date.now();
-  const days=(row:MedicineExpiry)=>row.expires ? Math.ceil((new Date(row.expires).getTime()-now)/86400000) : null;
-  const rows=(remote.data ?? []).filter(row => range==="all" ||
-    (range==="expired" ? days(row)!==null && days(row)!<0 :
-      days(row)!==null && days(row)!>=0 && days(row)!<=Number(range)));
+  const [query,setQuery]=useState("");
+  const [receivedFrom,setReceivedFrom]=useState("");
+  const [receivedTo,setReceivedTo]=useState("");
+  // Local filters and sorting never cause an additional SQL query.
+  const today=localDateTime().slice(0,10);
+  const dayNumber=(text:string)=>Math.floor(new Date(text+"T00:00:00").getTime()/86400000);
+  const days=(row:MedicineExpiry)=>row.expires
+    ? dayNumber(row.expires.slice(0,10))-dayNumber(today) : null;
+  const normalized=query.trim().toLocaleLowerCase("pl");
+  const rows=(remote.data??[]).filter(row=>{
+    if(normalized && ![row.name,row.batch,row.warehouseName].some(value=>
+      value.toLocaleLowerCase("pl").includes(normalized)))return false;
+    if(receivedFrom && (!row.received || row.received.slice(0,10)<receivedFrom))return false;
+    if(receivedTo && (!row.received || row.received.slice(0,10)>receivedTo))return false;
+    const delta=days(row);
+    return range==="all" || (range==="expired" ? delta!==null && delta<0 :
+      delta!==null && delta>=0 && delta<=Number(range));
+  }).sort((a,b)=>{
+    if(!a.expires && !b.expires)return a.name.localeCompare(b.name,"pl");
+    if(!a.expires)return 1;
+    if(!b.expires)return -1;
+    return a.expires.localeCompare(b.expires)||a.name.localeCompare(b.name,"pl");
+  });
   return <>
-    <div className="page-heading"><Typography.Title level={3}>Terminy ważności leków</Typography.Title>
-      <Button onClick={remote.reload} loading={remote.busy}>Odśwież</Button></div>
+    <div className="page-heading"><div>
+      <Typography.Title level={3}>Terminy ważności leków</Typography.Title>
+      <Typography.Text type="secondary">Filtry działają lokalnie, bez obciążania serwera SQL.</Typography.Text>
+    </div><Button onClick={remote.reload} loading={remote.busy}>Odśwież z SQL</Button></div>
     <Card>
-      <Segmented className="expiry-filters" value={range} onChange={setRange} options={[
-        {label:"Wszystkie",value:"all"}, {label:"Przeterminowane",value:"expired"},
-        {label:"Do 30 dni",value:"30"}, {label:"Do 60 dni",value:"60"}]}/>
+      <Space wrap style={{marginBottom:12}}>
+        <Segmented className="expiry-filters" value={range} onChange={setRange} options={[
+          {label:"Wszystkie",value:"all"}, {label:"Przeterminowane",value:"expired"},
+          {label:"Do 30 dni",value:"30"}, {label:"Do 60 dni",value:"60"}]}/>
+        <Input.Search allowClear placeholder="Lek lub seria" value={query}
+          onChange={e=>setQuery(e.target.value)} style={{width:240}}/>
+        <label>Przyjęto od <Input type="date" value={receivedFrom} onChange={e=>setReceivedFrom(e.target.value)}/></label>
+        <label>do <Input type="date" value={receivedTo} onChange={e=>setReceivedTo(e.target.value)}/></label>
+        <Button onClick={()=>{setQuery("");setReceivedFrom("");setReceivedTo("");setRange("all");}}>
+          Wyczyść filtry
+        </Button>
+      </Space>
       <ErrorNotice error={remote.error}/>
       <Table rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
         loading={remote.busy} dataSource={rows}
-        pagination={{pageSize:40,showSizeChanger:true}} scroll={{x:900,y:"calc(100vh - 400px)"}}
+        pagination={{pageSize:40,showSizeChanger:true}} scroll={{x:1040,y:"calc(100vh - 400px)"}}
         columns={[
-          {title:"Lek",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name)},
-          {title:"Seria",dataIndex:"batch",width:180},
+          {title:"Lek",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
+          {title:"Seria",dataIndex:"batch",width:150},
+          {title:"Data przyjęcia",dataIndex:"received",width:160,render:date,
+            sorter:(a,b)=>(a.received??"").localeCompare(b.received??"")},
           {title:"Data ważności",dataIndex:"expires",width:160,render:date,
-            sorter:(a,b)=>(a.expires ?? "").localeCompare(b.expires ?? "")},
-          {title:"Pozostało",dataIndex:"remaining",align:"right",width:140},
-          {title:"Magazyn",dataIndex:"warehouseName",width:175},
+            defaultSortOrder:"ascend",
+            sorter:(a,b)=>(a.expires??"9999").localeCompare(b.expires??"9999")},
+          {title:"Pozostało",dataIndex:"remaining",align:"right",width:125},
+          {title:"Magazyn",dataIndex:"warehouseName",width:160},
           {title:"Status",width:145,render:(_,row)=>days(row)===null ?
             <Tag>Brak daty</Tag> : days(row)!<0 ? <Tag color="red">Przeterminowane</Tag> :
               days(row)!<=30 ? <Tag color="orange">Do 30 dni</Tag> : <Tag color="green">Aktualne</Tag>}
         ]}/>
+      <Typography.Text type="secondary">
+        Wyświetlono {rows.length} pozycji. Dane magazynowe są odświeżane ręcznie lub po wygaśnięciu krótkiego bufora.
+      </Typography.Text>
     </Card>
   </>;
 }
