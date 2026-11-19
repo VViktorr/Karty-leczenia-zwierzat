@@ -30,6 +30,7 @@ internal sealed class ReactWindow : Form
         new(TimeSpan.FromMinutes(1));
     private readonly PriceCatalogueService priceCatalogueService;
     private readonly CardArchiveService cards;
+    private readonly SavedCardRevisionService savedCardEditor;
     private readonly SharedClinicService clinicService;
     private readonly TreatmentChoiceService treatmentChoices;
     private readonly AnimalDescriptionService animalDescriptions;
@@ -52,6 +53,7 @@ internal sealed class ReactWindow : Form
     internal ReactWindow()
     {
         cards = new CardArchiveService(archive);
+        savedCardEditor = new SavedCardRevisionService(archive);
         clinicService = new SharedClinicService(archive);
         treatmentChoices = new TreatmentChoiceService(archive);
         animalDescriptions = new AnimalDescriptionService(archive);
@@ -574,6 +576,27 @@ internal sealed class ReactWindow : Form
             return await ReadSavedCards(token, Flag(root, "trash"), Text(root, "query", 120));
         if (action == "savedCard")
             return await ReadSavedCard(token, Text(root, "id", 40), Flag(root, "trash"));
+        if (action == "updateSavedCard")
+        {
+            string id = Text(root, "id", 40);
+            string revision = Text(root, "revision", 64);
+            if (!root.TryGetProperty("fields", out var editFields) ||
+                editFields.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("rows", out var editRows) ||
+                editRows.ValueKind != JsonValueKind.Array ||
+                editRows.GetArrayLength() > 500)
+                throw new ArgumentException("Wymagana pełna zawartość edytowanej karty.");
+            var fields = JsonSerializer.Deserialize<Dictionary<string,string>>(
+                editFields.GetRawText()) ??
+                throw new ArgumentException("Nieprawidłowe dane nagłówka karty.");
+            var rows = JsonSerializer.Deserialize<List<Dictionary<string,string>>>(
+                editRows.GetRawText()) ??
+                throw new ArgumentException("Nieprawidłowe pozycje karty.");
+            // Archive access stays available if the separate Subiekt SQL source
+            // is temporarily unavailable. Run the small guarded write off UI.
+            return await Task.Run(() =>
+                savedCardEditor.Update(id, revision, fields, rows), token);
+        }
         if (action == "trashCard")
             return await TrashCard(token, Text(root, "id", 40), Flag(root, "trash"));
         if (action == "purgeTrashedCard")
@@ -1001,8 +1024,10 @@ internal sealed class ReactWindow : Form
         cmd.Parameters.AddWithValue("@trash", trash);
         string? json = (string?)await cmd.ExecuteScalarAsync(token);
         if (json is null) throw new InvalidOperationException("Nie znaleziono zapisanej karty.");
-        return JsonSerializer.Deserialize<Card>(json) ??
+        var card = JsonSerializer.Deserialize<Card>(json) ??
             throw new InvalidDataException("Zapisana karta ma nieprawidłową zawartość.");
+        return new { card.Fields, card.Rows,
+            revision = SavedCardRevisionService.Revision(json) };
     }
 
     private async Task<object> TrashCard(CancellationToken token, string id, bool trash)
