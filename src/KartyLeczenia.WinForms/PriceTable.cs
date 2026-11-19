@@ -60,6 +60,9 @@ internal sealed class PriceTable : AntdUI.Table
         Invalidate();
     }
 
+    internal void ShowColumnsMenu(Control anchor) =>
+        AntdTableColumnMenu.Show(anchor, this, priceColumns);
+
     void RestoreLayout()
     {
         try
