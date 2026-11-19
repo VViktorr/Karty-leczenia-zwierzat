@@ -20,6 +20,11 @@ internal sealed class ReactWindow : Form
         "KartyLeczenia", "archive-connection.json"));
     private readonly DocumentService documents = new();
     private readonly DocumentListCache documentLists = new();
+    // Short snapshots avoid the expensive delivery/stock query being repeated
+    // when switching between price levels, netto/brutto, and expiry screens.
+    private readonly TimedSqlCache<List<MedicineExpiry>> expiryLists = new(TimeSpan.FromSeconds(30));
+    private readonly TimedSqlCache<List<MedicinePrice>> priceLists = new(TimeSpan.FromSeconds(30));
+    private readonly TimedSqlCache<MedicinePriceLevel[]> priceLevelLists = new(TimeSpan.FromMinutes(10));
     private readonly CardArchiveService cards;
     private readonly SharedClinicService clinicService;
     private byte[]? stagedClinicStamp;
@@ -522,6 +527,9 @@ internal sealed class ReactWindow : Form
             await new SubiektConnectionService().TestAsync(config, token);
             subiekt.Save(config, Flag(root, "rememberPassword"));
             documentLists.Clear();
+            expiryLists.Clear();
+            priceLists.Clear();
+            priceLevelLists.Clear();
             return new { saved = true };
         }
         // Archive browsing and trash management use the program database only.
@@ -757,15 +765,40 @@ internal sealed class ReactWindow : Form
             draft.Rows[index].Set(field, value);
             return new { updated = true };
         }
-        if (action == "priceLevels")
-            return await MedicineStockService.PriceLevels(options, token);
-        if (action == "prices")
+        if (action is "priceLevels" or "prices" or "expiries")
         {
-            int level = Int(root, "level") ?? 1;
-            return await MedicineStockService.Prices(options, level, token, net: Flag(root, "net"));
+            string stockKey = DocumentListCache.Key(options, DocumentSearchKinds.None,
+                "stock-expiry", null, null);
+            bool refresh = Flag(root, "refresh");
+            if (action == "priceLevels")
+            {
+                string levelsKey = DocumentListCache.Key(options, DocumentSearchKinds.None,
+                    "price-levels", null, null);
+                var levels = await priceLevelLists.ReadAsync(levelsKey, refresh,
+                    ct => MedicineStockService.PriceLevels(options, ct), token);
+                return levels.Value;
+            }
+            if (action == "expiries")
+            {
+                var expiries = await expiryLists.ReadAsync(stockKey, refresh,
+                    ct => MedicineStockService.Expiries(options, ct), token);
+                return expiries.Value;
+            }
+            int level = Int(root, "level") ?? throw new ArgumentException("Wybierz poziom cen.");
+            bool net = Flag(root, "net");
+            string priceKey = DocumentListCache.Key(options, DocumentSearchKinds.None,
+                $"prices-{level}-{net}", null, null);
+            var priced = await priceLists.ReadAsync(priceKey, refresh, async ct =>
+            {
+                // Prices would otherwise re-run the heavy Expiries SQL query
+                // each time the user changes between levels or net/gross.
+                var stock = await expiryLists.ReadAsync(stockKey, refresh,
+                    stockToken => MedicineStockService.Expiries(options, stockToken), ct);
+                return await MedicineStockService.Prices(options, level, ct,
+                    net: net, knownExpiries: stock.Value);
+            }, token);
+            return priced.Value;
         }
-        if (action == "expiries")
-            return await MedicineStockService.Expiries(options, token);
         if (action == "saveDraft" || action == "previewDraft")
         {
             string draftId = Text(root, "draftId", 30);
