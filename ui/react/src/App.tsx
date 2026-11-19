@@ -31,7 +31,7 @@ interface TreatmentVariantList {
 interface TreatmentSuggestion {
   index:number;symbol:string;status:string;message:string;
   variantId:number|null;species:string;route:string;dosing:string;
-  withdrawal:string;source:string;hasPdf:boolean;
+  withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;
 }
 interface TreatmentSuggestionList { items:TreatmentSuggestion[]; }
 interface TreatmentBulkResult {
@@ -276,7 +276,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
         draftId:draft.draftId, rows,
         candidates:readySuggestions.map(s=>({index:s.index,variantId:s.variantId,
           species:s.species,route:s.route,dosing:s.dosing,withdrawal:s.withdrawal,
-          source:s.source,hasPdf:s.hasPdf}))
+          source:s.source,hasPdf:s.hasPdf,pdfPath:s.pdfPath}))
       });
       const applied=new Map(result.applied.map(item=>[item.index,item]));
       setRows(current=>current.map(row=>{
