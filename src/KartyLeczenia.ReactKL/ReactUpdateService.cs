@@ -10,8 +10,8 @@ internal sealed record ReactUpdateInfo(Guid ReleaseId, string Version,
     string CurrentVersion, string Sha256, bool Newer, DateTime PublishedAtUtc);
 
 /// <summary>
-/// Read-only update discovery and integrity-checked installer download.
-/// Publication is deliberately a separate administrator-run SQL script.
+/// Uses the existing dbo.program_update SQL channel and integrity-checked
+/// installer download; installation/publishing follows the previous SQL app.
 /// </summary>
 internal sealed class ReactUpdateService(ConnectionSettingsStore store)
 {
@@ -43,7 +43,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
         await db.OpenAsync(token);
         using var query=new SqlCommand("""
             SELECT release_id,version,sha256,published_at_utc
-            FROM dbo.react_program_update WHERE id=1;
+            FROM dbo.program_update WHERE id=1;
             """,db){CommandTimeout=30};
         try
         {
@@ -61,7 +61,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
         catch(SqlException ex) when(ex.Number==208)
         {
             throw new InvalidOperationException(
-                "W SQL nie ma jeszcze kanału ReactKL. Administrator powinien uruchomić scripts/Setup-ReactKLUpdates.sql.",ex);
+                "Brakuje tabeli aktualizacji SQL. Na serwerze uruchom scripts/Setup-SharedArchive.sql.",ex);
         }
     }
 
@@ -72,17 +72,17 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
             throw new InvalidOperationException("Brak nowszej wersji ReactKL do zainstalowania.");
         if(release.Sha256.Length!=64 || !Convert.TryFromHexString(release.Sha256,new byte[32],out int parsed) || parsed!=32)
             throw new InvalidDataException("Nieprawidłowy skrót SHA-256 publikacji.");
-        string folder=Path.Combine(Path.GetTempPath(),"KartyLeczenia.ReactKL-Updates",
+        string folder=Path.Combine(Path.GetTempPath(),"KartyLeczenia-Update",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
-        string installer=Path.Combine(folder,"ReactKL-Setup-win-x64-v"+advertised+".exe");
+        string installer=Path.Combine(folder,"KartyLeczenia-Setup-win-x64-v"+advertised+".exe");
         bool valid=false;
         try
         {
             using var db=Connection();
             await db.OpenAsync(token);
             using var query=new SqlCommand("""
-                SELECT installer FROM dbo.react_program_update
+                SELECT installer FROM dbo.program_update
                 WHERE id=1 AND release_id=@release AND version=@version AND sha256=@hash;
                 """,db){CommandTimeout=300};
             query.Parameters.Add("@release",SqlDbType.UniqueIdentifier).Value=release.ReleaseId;
@@ -130,6 +130,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
         using var process=Process.Start(new ProcessStartInfo(file)
         {
             UseShellExecute=true,
+            Verb="runas",
             WorkingDirectory=Path.GetDirectoryName(file)!
         }) ?? throw new InvalidOperationException("Windows nie uruchomił instalatora aktualizacji.");
     }
