@@ -117,3 +117,31 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 - Każda pozycja zawiera akcję „Przejdź do pozycji”, kierującą do odpowiedniego wiersza tabeli.
 - Kontrola działa przy zapisie i otwieraniu podglądu. To pierwszy etap parytetu: **wymagany test UI i potwierdzenie scenariuszy klinicznych**; pozostałe walidacje backendu nadal pozostają obowiązujące.
 
+
+### P1/P2: szybki odczyt Subiekta i niskie obciążenie SQL — implementacja 19.11.2026
+
+**Przeniesiono mechanizmy ostatniego WinForms do ReactKL (do testów na Windows/SQL):**
+
+- Lista dokumentów: cache po stronie hosta C# **5 minut / maksymalnie 32 kombinacje**. Klucz uwzględnia serwer, bazę, sposób logowania (również hasło bez przechowywania go w kluczu), magazyn, grupę, kategorię, filtr i zakres dat; wynik z serwera SQL jest pobierany tylko po wygaśnięciu cache albo wymuszonym F5.
+- Wróciło **500 pozycji** + wykrywanie uciętej listy na podstawie 501. rekordu, 10 zakresów dat: brak okresu, dzisiaj, bieżący tydzień/miesiąc/kwartał/rok, ostatnie 7/30 dni, wybrany miesiąc i własny okres. Bieżący tydzień zaczyna się w poniedziałek.
+- Przywrócono **Alt+1/2/4, Enter na wierszu, dwuklik, F5, czyszczenie pola oraz debounce 300 ms**. Widoczna jest godzina ostatniego odczytu i informacja „z pamięci”.
+- Dwa jednoczesne odczyty tej samej listy współdzielą jedno zapytanie; najwyżej **dwa aktywne odczyty list** na okno ReactKL. Wyszukiwania porzucone przez UI są anulowane przez WebView2 → C# → token SQL; brakujące odpowiedzi nie zastępują nowszych.
+- **Otwieranie pojedynczego dokumentu i pozycji karty nigdy nie korzysta z cache listy** — zachowuje aktualność serii, ilości i danych klinicznych.
+- Cennik i terminy: niezależny, **30-sekundowy cache danych magazynowych** (maksymalnie 16 zestawów) z jednym współdzielonym odczytem `Expiries` przy przełączaniu poziomów cen i netto/brutto. Poziomy cen cache 10 minut. Wymuszone „Odśwież” omija cache.
+- Cennik wybiera **cenę detaliczną brutto** przed pierwszym zapytaniem o ceny, unikając wcześniejszego niepotrzebnego pobrania poziomu 1.
+- Terminy ważności: lokalne filtry nazwy/serii/magazynu, daty przyjęcia i 0/30/60 dni oraz sortowanie od najbliższych dat; używanie filtrów nie generuje nowych zapytań SQL.
+- Po zmianie ustawień połączenia wszystkie zapisane zestawy danych są unieważniane. Hasła i dane osobowe nie trafiają do logów cache.
+- Testy bez SQL w `tests/ReactKLChecks/Program.cs`: hit/TTL/F5, różne magazyny i typy, limit cache, deduplikacja równoczesnych zapytań, anulowanie, brak cache błędów, 30-sekundowa ważność magazynu.
+
+**Ważne:** nie deklarować osiągnięcia czasu ładowania poniżej 1 s przed pomiarem na rzeczywistym serwerze. CI i testy z autentycznym Subiektem wymagane osobno. Dla dokumentów aktualność do 5 minut jest widoczna w UI i może być pominięta ręcznym F5; dla magazynu domyślnie maksymalnie 30 sekund. Celowo nie preloadujemy wszystkich kategorii w tle, aby nie obciążać serwera odczytami, których użytkownik nie potrzebuje.
+
+#### Test wydajności na rzeczywistych stanowiskach
+
+1. Otworzyć Dokumenty przy pierwszym uruchomieniu, zmierzyć czas i liczbę zapytań w SQL.
+2. Przełączać FS/PA/WZ i wrócić do FS: **drugi dostęp w ciągu 5 minut bez ponownego SELECT**.
+3. F5 w FS: **dokładnie jeden nowy odczyt listy**; wyświetlić nową godzinę.
+4. Szybko zmieniać wyszukiwane frazy: stare zapytania anulowane, najnowsza lista prawidłowa.
+5. Zmienić magazyn/połączenie: nie wolno pokazać starych wpisów z poprzedniego magazynu.
+6. W cenniku przełączać netto/brutto i poziomy, następnie otworzyć Terminy; w ciągu 30 s **bez powtarzania kosztownego SELECT dostaw**.
+7. Sprawdzić świeżość serii, cen i stanów przy ręcznym odświeżeniu; brak jakiegokolwiek wpływu cache na zapis kart, katalog ChPL i aktualizacje.
+
