@@ -234,3 +234,12 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 - `929defc`: wykrycie duplikatu dokumentu ma teraz 3 jawne wybory: **Otwórz / zaktualizuj istniejącą**, **Zapisz kolejną kartę**, **Anuluj**. Otwieranie istniejącej karty nie wymaga ponownego odczytu dokumentów Subiekta i nie zmienia numeracji.
 - `9057652`, `3fc8e47`, `2f80992`: read-only eksport pełnego JSON zapisanej karty przez systemowy `SaveFileDialog` Windows, z bezpieczną nazwą pliku (np. `K_14_2026.json`). Nie zapisuje żadnych zmian w bazie SQL.
 - **Pozostaje do potwierdzenia:** aktualne CI dla duplikatów/JSON, test rzeczywistego SQL i konfliktu między dwoma stanowiskami, zgodność historycznych kart o nietypowych polach, obsługa Windows przy zapisie pliku i podglądzie po aktualizacji. Nie uznawać samego sukcesu kompilacji za test integracyjny.
+
+### Zasada zakresu prac — tylko funkcje z WinForms (19.11.2026)
+
+**Wymóg użytkownika:** przenosić do ReactKL wyłącznie funkcje rzeczywiście istniejące w gałęzi `winforms-backup-2026-11-19`. Każdą nową funkcję (bez odpowiednika w tym WinForms) najpierw uzgodnić z użytkownikiem; bez zgody nie wdrażać. Weryfikować zachowanie na podstawie kodu WinForms, nie wyłącznie wcześniejszych luźnych sugestii lub punktów z audytu.
+
+- `e5f17b1`: wycofano nowe scalanie różnych dostaw w rozwijane grupy w terminach ważności (`expiryGrouping.ts`, jego test i workflow), ponieważ `MainForm.ConfigureExpiry` i `ExpiryTable` nie implementują tej funkcji.
+- Przywrócono widok terminów ważności z bieżącej aplikacji i podłączono `Ctrl+Shift+L` oraz lokalne ustawienia widoczności, kolejności i szerokości kolumn. Takie ustawienia potwierdza `ExpiryTable.cs` w końcowym WinForms. W przeciwieństwie do próbnej nowej implementacji dopuszczono ukrycie dowolnej kolumny pod warunkiem pozostawienia jednej widocznej.
+- Parametry lokalne pozostają odrębne na poszczególnych stanowiskach; żaden z tych elementów nie zmienia SQL ani instalatora.
+- Test działania panelu i zmian kolejności w Windows/WebView2 pozostaje otwarty; kompilację sprawdza kolejny GitHub Actions.
