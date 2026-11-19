@@ -639,7 +639,13 @@ internal sealed class MainForm : Form
                 var rows = await MedicineStockService.Prices(options, level.Number, work.Token, net: netPrice);
                 var catalogue = await RunArchive(archive.ReadCatalogue);
                 if (connection != options || sharedArchive != archive) return;
-                priceRows = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol) }).ToList();
+                // The on-screen price list uses the same route and withdrawal
+                // formatting preferences as the print preview.
+                priceRows = rows.Select(row => row with
+                {
+                    Withdrawal = catalogue.PriceWithdrawal(row.Symbol,
+                        pricePrintSettings.WithdrawalFormat, pricePrintSettings.RouteCodes)
+                }).ToList();
                 prices.SetPriceHeading(netPrice);
                 prices.DataSource = priceRows;
                 status.Text = $"Pozycje cennika: {rows.Count}";
@@ -708,6 +714,15 @@ internal sealed class MainForm : Form
             DialogPlacement.Show(preview, this, "price-print-direct");
         }
         else DialogPlacement.Show(editor, this, "price-print-settings");
+
+        // Refresh the table formatting after printing settings have changed,
+        // without re-querying Subiekt or changing medicine data in SQL.
+        priceRows = priceRows.Select(row => row with
+        {
+            Withdrawal = catalogue.PriceWithdrawal(row.Symbol,
+                pricePrintSettings.WithdrawalFormat, pricePrintSettings.RouteCodes)
+        }).ToList();
+        prices.DataSource = priceRows;
     }
 
     async Task OpenCataloguePdf(string path)
