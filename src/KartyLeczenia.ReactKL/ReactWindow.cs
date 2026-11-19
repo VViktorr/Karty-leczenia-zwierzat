@@ -587,6 +587,18 @@ internal sealed class ReactWindow : Form
             return await ReadSavedCard(token, Text(root, "id", 40), Flag(root, "trash"));
         if (action == "trashCard")
             return await TrashCard(token, Text(root, "id", 40), Flag(root, "trash"));
+        if (action == "purgeTrashedCard")
+        {
+            string id = Text(root, "id", 40);
+            string confirmation = Text(root, "confirmation", 160);
+            if (!Guid.TryParseExact(id, "N", out var cardId) ||
+                string.IsNullOrWhiteSpace(confirmation))
+                throw new ArgumentException("Wybierz kartę z kosza i potwierdź jej numer.");
+            if (!await WindowsHelloConsent.VerifyAsync(this,
+                    "trwałe usunięcie jednej karty leczenia z kosza"))
+                return new { deleted = false, cancelled = true };
+            return await PurgeTrashedCard(token, cardId, confirmation);
+        }
         throw new InvalidOperationException("Nieznana operacja interfejsu: " + action);
     }
 
@@ -641,6 +653,51 @@ internal sealed class ReactWindow : Form
             : "UPDATE dbo.treatment_cards SET deleted_at_utc=SYSUTCDATETIME() WHERE id=@id AND deleted_at_utc IS NULL", db);
         cmd.Parameters.AddWithValue("@id", Guid.ParseExact(id, "N"));
         return new { updated = await cmd.ExecuteNonQueryAsync(token) > 0 };
+    }
+
+    private async Task<object> PurgeTrashedCard(
+        CancellationToken token, Guid cardId, string confirmation)
+    {
+        await using var db = ArchiveDb();
+        await db.OpenAsync(token);
+        await using var tx = (SqlTransaction)await db.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, token);
+        using (var access = new SqlCommand("""
+            IF ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1
+                THROW 50041, N'Trwałe usunięcie wymaga uprawnienia sysadmin SQL Server.', 1;
+            """, db, tx))
+            await access.ExecuteNonQueryAsync(token);
+        using (var check = new SqlCommand("""
+            SELECT card_year,card_sequence,document
+            FROM dbo.treatment_cards WITH (UPDLOCK,HOLDLOCK)
+            WHERE id=@id AND deleted_at_utc IS NOT NULL;
+            """, db, tx))
+        {
+            check.Parameters.Add("@id", System.Data.SqlDbType.UniqueIdentifier).Value = cardId;
+            await using var reader = await check.ExecuteReaderAsync(token);
+            if (!await reader.ReadAsync(token))
+                throw new InvalidOperationException(
+                    "Karta nie znajduje się już w koszu. Odśwież listę.");
+            string number = reader.IsDBNull(0) || reader.IsDBNull(1) ? "" :
+                $"K/{reader.GetInt64(1)}/{reader.GetInt32(0):D4}";
+            string document = reader.GetString(2);
+            if (!string.Equals(confirmation, number.Length > 0 ? number : document,
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Potwierdzony numer karty nie jest zgodny z danymi SQL. Nic nie usunięto.");
+        }
+        using (var remove = new SqlCommand("""
+            DELETE FROM dbo.treatment_cards
+            WHERE id=@id AND deleted_at_utc IS NOT NULL;
+            """, db, tx))
+        {
+            remove.Parameters.Add("@id", System.Data.SqlDbType.UniqueIdentifier).Value = cardId;
+            if (await remove.ExecuteNonQueryAsync(token) != 1)
+                throw new InvalidOperationException(
+                    "Karta zmieniła stan w trakcie operacji. Nie została usunięta.");
+        }
+        await tx.CommitAsync(token);
+        return new { deleted = true, cancelled = false };
     }
 
     private SqlConnection ArchiveDb()
