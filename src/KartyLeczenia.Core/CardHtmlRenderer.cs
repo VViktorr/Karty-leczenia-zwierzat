@@ -96,7 +96,9 @@ public static class CardHtmlRenderer
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
                     .Replace("Sprawdź / uzupełnij serię i ważność.", "", StringComparison.OrdinalIgnoreCase).Trim();
                 string route = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Droga podania")) ? "" : "<br>" + V("Droga podania");
-                html.Append($"<tr><td class='lp'>{++index}</td>{description}{count}<td>{V("Rozpoznanie")}</td><td>{V("Produkt")}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
+                string replacement = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Zamiennik produktu"))
+                    ? "" : "<br><small>Zamiennik produktu: " + V("Zamiennik produktu") + "</small>";
+                html.Append($"<tr><td class='lp'>{++index}</td>{description}{count}<td>{V("Rozpoznanie")}</td><td>{V("Produkt")}{replacement}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
             }
             for (; index < minimum; index++) html.Append("<tr class='empty'>" + string.Concat(Enumerable.Repeat("<td>&nbsp;</td>", 9)) + "</tr>");
         }

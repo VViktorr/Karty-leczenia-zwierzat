@@ -17,7 +17,7 @@ type LayoutName = "classic" | "modern" | "fluent";
 type PaletteName = "light" | "dark" | "sea";
 type Section = "documents" | "prices" | "catalogue" | "treatment" | "saved" | "expiry" | "settings";
 interface DraftRow {
-  index: number; product: string; symbol: string; indication: string; quantity: string; batch: string;
+  index: number; product: string; replacement: string; symbol: string; indication: string; quantity: string; batch: string;
   species: string; route: string; dosing: string; withdrawal: string;
   description: string; animals: string; diagnosis: string; section: string; selected: boolean;
 }
@@ -247,6 +247,7 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
 
 const editable: Array<{key: keyof DraftRow; field: string; title: string}> = [
   {key:"batch",field:"Seria",title:"Seria"},
+  {key:"replacement",field:"Zamiennik produktu",title:"Zamiennik produktu"},
   {key:"species",field:"Gatunek",title:"Gatunek"},
   {key:"route",field:"Droga podania",title:"Droga podania"},
   {key:"dosing",field:"Dawkowanie i okres stosowania",title:"Dawkowanie"},
@@ -590,7 +591,11 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
         disabled={applyBusy||selectionBusy||!isCompatible(row)}
         title={!isCompatible(row)?"Brak wariantu ChPL dla wybranego gatunku":undefined}
         onChange={e => {void update(row.index,"selected",e.target.checked);}}/>},
-    {title:"Produkt",dataIndex:"product",width:240,ellipsis:true,fixed:"left"},
+    {title:"Produkt",dataIndex:"product",width:240,ellipsis:true,fixed:"left",
+      render:(value:string,row:DraftRow)=><span title={value}>
+        {value}{row.replacement?.trim()&&<><br/><Typography.Text type="secondary">
+          Zamiennik: {row.replacement}</Typography.Text></>}
+      </span>},
     {title:"Dopasowanie z SQL",key:"suggestion",width:185,
       render:(_value:unknown,row:DraftRow)=>{
         const item=suggestions.find(x=>x.index===row.index);

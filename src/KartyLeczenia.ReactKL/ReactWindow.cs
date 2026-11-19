@@ -663,6 +663,7 @@ internal sealed class ReactWindow : Form
             drafts[key] = document;
             return new { draftId = key, document.Number, document.Payer, document.Recipient,
                 rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),
+                    replacement = r.Get("Zamiennik produktu"),
                     symbol = r.Get("Symbol Subiekta"), indication = r.Get("Wskazanie ChPL"),
                     quantity = r.Get("Ilość wydana"), batch = r.Get("Seria"),
                     species = r.Get("Gatunek"), route = r.Get("Droga podania"),
@@ -843,7 +844,7 @@ internal sealed class ReactWindow : Form
                 throw new InvalidOperationException("Ponownie otwórz dokument.");
             string[] allowed = ["Gatunek", "Droga podania", "Dawkowanie i okres stosowania",
                 "Karencja", "Opis zwierząt / numer siedziby stada", "Liczba zwierząt",
-                "Rozpoznanie", "Seria", "Sekcja (II lub III)", "Drukuj"];
+                "Rozpoznanie", "Seria", "Zamiennik produktu", "Sekcja (II lub III)", "Drukuj"];
             if (!allowed.Contains(field, StringComparer.Ordinal)) throw new ArgumentException("Pole nie jest edytowalne.");
             string value = field == "Drukuj" ? Flag(root, "checked").ToString() : Text(root, "value", 3000);
             draft.Rows[index].Set(field, value);
@@ -914,7 +915,8 @@ internal sealed class ReactWindow : Form
                     var treatment = draft.Rows[index];
                     treatment.Printed = Flag(item, "selected");
                     foreach (var (key, field) in new[] {
-                        ("batch", "Seria"), ("species", "Gatunek"),
+                        ("batch", "Seria"), ("replacement", "Zamiennik produktu"),
+                        ("species", "Gatunek"),
                         ("route", "Droga podania"), ("dosing", "Dawkowanie i okres stosowania"),
                         ("withdrawal", "Karencja"),
                         ("description", "Opis zwierząt / numer siedziby stada"),
