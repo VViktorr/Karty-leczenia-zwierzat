@@ -66,6 +66,22 @@ razem z wariantami, karencjami do cennika i powiązanymi PDF-ami w jednej
 transakcji. Istniejące symbole i ich ręczne poprawki są zachowywane.
 Jeśli istniejący PDF ma tę samą ścieżkę i inną treść, import zgłosi konflikt.
 
+## Aktualizacje programu z SQL
+
+Zainstaluj pierwszą wersję obsługującą aktualizacje SQL ręcznie na serwerze
+i na stanowiskach. W trybie **Serwer** instalator przygotowuje tabelę w
+bazie `KartyLeczenia` i zachowuje kopię uruchomionego pliku EXE. Przy
+pierwszym uruchomieniu programu potwierdź podniesienie uprawnień na koncie
+Windows, które może publikować w tej bazie. Po udanej publikacji program
+usuwa kopię roboczą. Przy błędzie można ponowić publikację w
+**Ustawienia → Aktualizacje**. Szczegóły zapisują się w
+`C:\ProgramData\KartyLeczenia\update-publish.log`.
+
+Stanowiska z zapisanym połączeniem z archiwum sprawdzają aktualizację przy
+starcie lub po kliknięciu **Sprawdź aktualizację w SQL**. Operator ma prawo
+odczytu instalatora. Program pobiera go lokalnie, weryfikuje SHA-256 i prosi
+o zatwierdzenie uruchomienia instalatora przez Windows.
+
 ## Odtworzenie archiwum na innym serwerze
 
 Skopiuj plik `.bak` do miejsca dostępnego dla usługi docelowego SQL Servera.

@@ -97,7 +97,7 @@ internal sealed class MainForm : Form
         ConfigureExpiry();
         ConfigureCard();
         var savedCardsGrid = ConfigureSavedCards();
-        ConfigureConnection();
+        ConfigureConnection(openSettings);
         var tables = new Dictionary<string, DataGridView>
         {
             ["documents"] = documents, ["prices"] = prices,
@@ -1998,7 +1998,7 @@ internal sealed class MainForm : Form
         DialogPlacement.Show(preview, this, "treatment-print-preview");
     }
 
-    void ConfigureConnection()
+    void ConfigureConnection(bool settingsOnlyForUpdates)
     {
         var subiektConfiguration = settings.Load();
         var saved = subiektConfiguration.Options;
@@ -2690,97 +2690,71 @@ internal sealed class MainForm : Form
         Add("", Action("Odtwórz bazę z kopii…", () => MaintainArchive(restoring: true)));
 
         form = Section("Aktualizacje");
-        string? updateShare = ServerUpdateGate.UpdateShare;
-        Message(form, "Poświadczenia dostępu do instalatorów na serwerze. Hasło jest zapisywane wyłącznie w Menedżerze poświadczeń Windows bieżącego użytkownika, nie w ustawieniach KartyLeczenia.", multiline: true);
-        Message(form, string.IsNullOrWhiteSpace(updateShare)
-            ? "Nie skonfigurowano udziału aktualizacji w instalatorze. Zainstaluj program w trybie stanowiska zdalnego."
-            : "Udział aktualizacji: " + updateShare, multiline: true);
-        string? updateHost = null;
-        if (!string.IsNullOrWhiteSpace(updateShare))
+        Add("Zainstalowana wersja", new Label { Text = ServerUpdateGate.InstalledVersion, AutoSize = true });
+        var updateState = Message(form, "Źródło aktualizacji: baza archiwum SQL KartyLeczenia.", multiline: true);
+        bool updateBusy = false;
+
+        async Task CheckUpdates(bool interactive)
         {
-            try { updateHost = UpdateCredentials.ServerFromShare(updateShare); }
-            catch (ArgumentException ex) { CrashLog.Write("UpdateCredentials.Share", ex); }
-        }
-        var credentialsUser = Field("Konto Windows na serwerze", "", @"np. LEWY\KartyAktualizacje");
-        var credentialsPassword = Field("Hasło konta aktualizacji", "", password: true);
-        var credentialsState = Message(form, "", multiline: true);
-        if (updateHost is not null)
-        {
+            if (updateBusy) return;
+            if (sharedArchive is not { } archive)
+            {
+                if (interactive) updateState.Text = "Ustaw połączenie z archiwum SQL, aby sprawdzić aktualizacje.";
+                return;
+            }
+            updateBusy = true;
             try
             {
-                credentialsUser.Text = UpdateCredentials.SavedUser(updateHost) ?? "";
-                credentialsState.Text = credentialsUser.TextLength > 0
-                    ? "Zapisano poświadczenia dla serwera " + updateHost + ". Hasło nie jest wyświetlane."
-                    : "Poświadczenia nie są jeszcze zapisane dla tego konta Windows.";
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                var release = await archive.ReadUpdate(timeout.Token);
+                if (IsDisposed || sharedArchive != archive) return;
+                updateState.Text = release is null ? "W SQL nie opublikowano jeszcze instalatora."
+                    : $"Wersja dostępna w SQL: {release.Version}.";
+                if (release is not null && Version.TryParse(ServerUpdateGate.InstalledVersion, out var current) &&
+                    release.Version > current && await ServerUpdateGate.OfferUpdate(this, archive, release))
+                    Close();
             }
             catch (Exception ex)
             {
-                CrashLog.Write("UpdateCredentials.Read", ex);
-                credentialsState.Text = ex.Message;
+                CrashLog.Write("SqlUpdate.Check", ex);
+                if (!IsDisposed) updateState.Text = "Nie udało się sprawdzić lub pobrać aktualizacji. " + ex.Message;
             }
+            finally { updateBusy = false; }
         }
-        var updateCredentialsHost = updateHost;
-        var saveCredentials = Action("Zapisz poświadczenia", () =>
+
+        async Task PublishUpdate()
         {
-            if (updateCredentialsHost is null)
-                throw new InvalidOperationException("Brak skonfigurowanego adresu serwera aktualizacji.");
-            Require(credentialsUser, "Podaj konto Windows na serwerze aktualizacji.");
-            Require(credentialsPassword, "Podaj hasło konta aktualizacji.");
+            if (updateBusy) return;
+            updateBusy = true;
+            updateState.Text = "Publikowanie instalatora w SQL…";
             try
             {
-                UpdateCredentials.Save(updateCredentialsHost, credentialsUser.Text, credentialsPassword.Text);
-                credentialsState.Text = status.Text = "Zapisano poświadczenia w Menedżerze poświadczeń Windows.";
-            }
-            finally { credentialsPassword.Clear(); }
-            return Task.CompletedTask;
-        });
-        saveCredentials.Enabled = updateHost is not null;
-        Add("", saveCredentials);
-        var testCredentials = Action("Sprawdź dostęp do aktualizacji", async () =>
-        {
-            if (string.IsNullOrWhiteSpace(updateShare))
-                throw new InvalidOperationException("Brak skonfigurowanego udziału aktualizacji.");
-            try
-            {
-                string json = await Task.Run(() => UpdateCredentials.Test(updateShare));
-                using var data = JsonDocument.Parse(json);
-                string? version = data.RootElement.TryGetProperty("version", out var versionValue)
-                    ? versionValue.GetString() : null;
-                credentialsState.Text = status.Text = "Dostęp do aktualizacji działa. Wersja na serwerze: " +
-                    (version ?? "nieznana") + ".";
+                await ServerUpdateGate.PublishPending();
+                if (!IsDisposed) updateState.Text = $"Opublikowano wersję {ServerUpdateGate.InstalledVersion} w SQL.";
             }
             catch (Exception ex)
             {
-                credentialsState.Text = "Nie udało się odczytać aktualizacji: " + ex.Message +
-                    " Jeśli dostęp SMB korzysta ze starej sesji, wyloguj się z Windows i zaloguj ponownie.";
-                throw;
+                CrashLog.Write("SqlUpdate.Publish", ex);
+                if (!IsDisposed)
+                {
+                    updateState.Text = "Nie udało się opublikować instalatora. " + ex.Message;
+                    MessageBox.Show(this, updateState.Text, "Aktualizacja KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
-        });
-        testCredentials.Enabled = updateHost is not null;
-        Add("", testCredentials);
-        var deleteCredentials = Action("Usuń zapisane poświadczenia", () =>
+            finally { updateBusy = false; }
+        }
+
+        Add("", Action("Sprawdź aktualizację w SQL", () => CheckUpdates(interactive: true)));
+        if (ServerUpdateGate.HasPendingPublication)
+            Add("", Action("Opublikuj oczekujący instalator", PublishUpdate));
+        Shown += async (_, _) =>
         {
-            if (updateCredentialsHost is null)
-                throw new InvalidOperationException("Brak skonfigurowanego adresu serwera aktualizacji.");
-            if (MessageBox.Show(this, "Usunąć zapisane poświadczenia aktualizacji z Windows?",
-                "KartyLeczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-                return Task.CompletedTask;
-            UpdateCredentials.Delete(updateCredentialsHost);
-            credentialsUser.Clear();
-            credentialsPassword.Clear();
-            credentialsState.Text = status.Text = "Usunięto poświadczenia aktualizacji.";
-            return Task.CompletedTask;
-        });
-        deleteCredentials.Enabled = updateHost is not null;
-        Add("", deleteCredentials);
+            if (settingsOnlyForUpdates) return;
+            if (ServerUpdateGate.HasPendingPublication) await PublishUpdate();
+            else if (!ServerUpdateGate.IsServer) await CheckUpdates(interactive: false);
+        };
 
         form = Section("Wygląd");
-        Add("Wersja programu", new Label
-        {
-            Text = ServerUpdateGate.InstalledVersion,
-            AutoSize = true,
-            Anchor = AnchorStyles.Left
-        });
         Add("", AppearanceEditor.Create(this, options => applyAppearance?.Invoke(options)));
         var scaleSelector = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, AccessibleName = "Skala interfejsu" };
         scaleSelector.Items.AddRange(InterfaceScale.Percentages.Select(value => $"{value}%").ToArray());

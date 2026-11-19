@@ -22,7 +22,6 @@ internal static class Program
                 defaultFont.SizeInPoints * scale / 100f, defaultFont.Style, GraphicsUnit.Point);
             if (scaledFont is not null) Application.SetDefaultFont(scaledFont);
             bool settingsOnly = args.Contains("--settings", StringComparer.OrdinalIgnoreCase);
-            if (!ServerUpdateGate.Check(settingsOnly)) return;
             Application.Run(new MainForm(settingsOnly, scale));
             CrashLog.Write("WinForms.Application.Exit");
         }

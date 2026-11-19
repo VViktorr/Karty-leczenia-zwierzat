@@ -1,13 +1,10 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace KartyLeczenia.Windows;
 
-/// <summary>Offers an administrator-published update without preventing normal work.</summary>
 internal static class ServerUpdateGate
 {
-    sealed record Release(string Version, string Installer, string Sha256);
     static string? Setting(string key)
     {
         string file = Path.Combine(AppContext.BaseDirectory, "archive-installation.ini");
@@ -16,7 +13,9 @@ internal static class ServerUpdateGate
             .FirstOrDefault(s => s.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase))?[(key.Length + 1)..].Trim();
     }
 
-    internal static string? UpdateShare => Setting("UpdateShare");
+    internal static bool IsServer => string.Equals(Setting("Role"), "server", StringComparison.OrdinalIgnoreCase);
+    static string PendingInstaller => Path.Combine(AppContext.BaseDirectory, $"KartyLeczenia-Update-Pending-v{InstalledVersion}.exe");
+    internal static bool HasPendingPublication => IsServer && File.Exists(PendingInstaller);
 
     internal static string InstalledVersion
     {
@@ -33,88 +32,68 @@ internal static class ServerUpdateGate
         }
     }
 
-    internal static bool Check(bool settingsOnly)
+    internal static async Task<bool> OfferUpdate(Form owner, SharedArchive archive, PublishedUpdate release)
     {
-        // Server controls publication. Settings can still be opened to repair a broken connection.
-        if (settingsOnly || string.Equals(Setting("Role"), "server", StringComparison.OrdinalIgnoreCase))
-            return true;
+        if (MessageBox.Show(owner,
+            $"Dostępna wersja: {release.Version}. Obecna wersja: {InstalledVersion}.\n\nPobrać aktualizację i uruchomić instalator?",
+            "Aktualizacja KartyLeczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Information,
+            MessageBoxDefaultButton.Button2) != DialogResult.Yes) return false;
+
+        string folder = Path.Combine(Path.GetTempPath(), "KartyLeczenia-Update", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string installer = Path.Combine(folder, "KartyLeczenia-Setup-win-x64.exe");
+        bool started = false;
         try
         {
-            string? share = Setting("UpdateShare");
-            if (string.IsNullOrWhiteSpace(share)) return true;
-            if (!share.StartsWith(@"\\", StringComparison.Ordinal) || share.Contains("..", StringComparison.Ordinal))
-                throw new InvalidDataException("Nieprawidłowy folder aktualizacji.");
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            await archive.DownloadUpdate(release, installer, timeout.Token);
+            byte[] hash;
+            await using (var stream = File.OpenRead(installer))
+                hash = await SHA256.HashDataAsync(stream, timeout.Token);
+            if (!CryptographicOperations.FixedTimeEquals(hash, release.Sha256))
+                throw new InvalidDataException("Suma SHA-256 pobranego instalatora jest niezgodna.");
+            if (owner.IsDisposed || owner.Disposing) return false;
 
-            string manifest = Path.Combine(share, "release.json");
-            string manifestContent;
-            try
-            {
-                // File.Exists also returns false on access errors. Reading the
-                // manifest directly preserves useful authentication diagnostics.
-                manifestContent = File.ReadAllText(manifest);
-            }
-            catch (FileNotFoundException)
-            {
-                CrashLog.Write("ServerUpdateGate.NoManifest",
-                    new FileNotFoundException("Nie opublikowano jeszcze instalatora na serwerze.", manifest));
-                return true;
-            }
-            var release = JsonSerializer.Deserialize<Release>(manifestContent,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-                ?? throw new InvalidDataException("Pusty manifest aktualizacji.");
-            if (!Version.TryParse(release.Version, out var required) || required is null)
-                throw new InvalidDataException("Błędny numer wersji aktualizacji.");
-            // The installer records the installed release version. Fall back to the
-            // executable metadata for portable builds without installer settings.
-            string installedVersion = InstalledVersion;
-            if (!Version.TryParse(installedVersion, out var current) || current is null)
-            {
-                CrashLog.Write("ServerUpdateGate.UnknownVersion",
-                    new InvalidDataException("Nie można ustalić wersji zainstalowanego programu."));
-                return true;
-            }
-            if (current >= required) return true;
-            if (string.IsNullOrWhiteSpace(release.Installer)
-                || release.Installer != Path.GetFileName(release.Installer)
-                || !release.Installer.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-                || release.Sha256 is null || release.Sha256.Length != 64
-                || !release.Sha256.All(Uri.IsHexDigit))
-                throw new InvalidDataException("Manifest zawiera nieprawidłowe informacje o instalatorze.");
-
-            string installer = Path.Combine(share, release.Installer);
-            var choice = MessageBox.Show(
-                $"Znaleziono nowszą wersję programu KartyLeczenia ({required}).\n" +
-                $"Obecna wersja: {current}.\n\n" +
-                "Aktualizować teraz?\n\n" +
-                "Tak — pobierz aktualizację i uruchom instalator.\n" +
-                "Nie — uruchom program bez aktualizacji.",
-                "Dostępna aktualizacja KartyLeczenia",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Information, MessageBoxDefaultButton.Button2);
-            if (choice != DialogResult.Yes) return true;
-
-            // Copy to local temp: the installer can restart even when the SMB share disconnects.
-            string tempDir = Path.Combine(Path.GetTempPath(), "KartyLeczenia-Update", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDir);
-            string local = Path.Combine(tempDir, release.Installer);
-            using (var source = File.OpenRead(installer))
-            using (var target = File.Create(local))
-                source.CopyTo(target);
-            using var stream = File.OpenRead(local);
-            string actualHash = Convert.ToHexString(SHA256.HashData(stream));
-            if (!actualHash.Equals(release.Sha256, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Suma SHA-256 instalatora nie zgadza się z wersją opublikowaną na serwerze.");
-            Process.Start(new ProcessStartInfo(local) { UseShellExecute = true, Verb = "runas" });
-            return false; // The new installer replaces this application after it exits.
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
-            or InvalidDataException or System.ComponentModel.Win32Exception or ArgumentException)
-        {
-            CrashLog.Write("ServerUpdateGate.Check", ex);
-            MessageBox.Show(
-                "Nie udało się sprawdzić lub uruchomić aktualizacji.\n\n" +
-                ex.Message + "\n\nProgram zostanie uruchomiony bez aktualizacji.",
-                "Aktualizacja KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            using var process = Process.Start(new ProcessStartInfo(installer) { UseShellExecute = true, Verb = "runas" })
+                ?? throw new InvalidOperationException("Nie udało się uruchomić instalatora.");
+            started = true;
             return true;
         }
+        finally
+        {
+            if (!started)
+            {
+                try { Directory.Delete(folder, recursive: true); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                { CrashLog.Write("SqlUpdate.Cleanup", ex); }
+            }
+        }
+    }
+
+    internal static async Task PublishPending()
+    {
+        if (!HasPendingPublication)
+            throw new InvalidOperationException("Brak instalatora oczekującego na publikację.");
+        string server = SharedArchive.ReadInstalledServer();
+        if (string.IsNullOrWhiteSpace(server) || !Version.TryParse(InstalledVersion, out _))
+            throw new InvalidOperationException("Brak adresu archiwum lub poprawnego numeru zainstalowanej wersji.");
+
+        string powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+        var start = new ProcessStartInfo(powershell)
+        {
+            UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden
+        };
+        foreach (string argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+            Path.Combine(AppContext.BaseDirectory, "Publish-KartyLeczeniaUpdate.ps1"),
+            "-Server", server, "-Installer", PendingInstaller, "-Version", InstalledVersion, "-Pending" })
+            start.ArgumentList.Add(argument);
+
+        using var process = Process.Start(start)
+            ?? throw new InvalidOperationException("Nie udało się uruchomić publikacji.");
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException("Publikacja w SQL nie powiodła się. Szczegóły: " +
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "KartyLeczenia", "update-publish.log"));
     }
 }

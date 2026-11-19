@@ -30,7 +30,8 @@ Name: "desktopicon"; Description: "Utwórz skrót na pulpicie"; Flags: unchecked
 
 [Files]
 Source: "Configure-SharedArchive.ps1"; Flags: dontcopy
-Source: "..\scripts\Publish-KartyLeczeniaUpdate.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\scripts\Publish-KartyLeczeniaUpdate.ps1"; DestDir: "{app}"; Flags: ignoreversion; Check: IsServerInstall
+Source: "{srcexe}"; DestDir: "{app}"; DestName: "KartyLeczenia-Update-Pending-v{#ReleaseVersion}.exe"; Flags: external ignoreversion; Check: IsServerInstall
 Source: "..\scripts\Setup-SharedArchive.sql"; Flags: dontcopy
 Source: "..\catalog-seed-win-x64.zip"; Flags: dontcopy
 Source: "..\publish-winforms\*"; DestDir: "{app}"; Excludes: "medicine-catalog.sqlite,ChPL\*,Microsoft.Data.Sqlite.dll,SQLitePCLRaw.*,e_sqlite3.dll"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -39,12 +40,12 @@ Source: "..\publish-winforms\*"; DestDir: "{app}"; Excludes: "medicine-catalog.s
 Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Server"; String: "{code:ArchiveServer}"
 Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Role"; String: "{code:ArchiveRole}"
 Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "AppVersion"; String: "{#ReleaseVersion}"
-Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "UpdateShare"; String: "{code:UpdateShare}"
 
 [UninstallDelete]
 Type: files; Name: "{app}\archive-installation.ini"
 
 [InstallDelete]
+Type: files; Name: "{app}\KartyLeczenia-Update-Pending-v*.exe"
 Type: files; Name: "{commonprograms}\Karty leczenia zwierząt (SQL).lnk"
 Type: files; Name: "{commondesktop}\Karty leczenia zwierząt (SQL).lnk"
 
@@ -79,8 +80,6 @@ var
   ExistingServerAddress: String;
   DownloadPage: TDownloadWizardPage;
   ComponentProgress: TOutputMarqueeProgressWizardPage;
-  UpdatePublished: Boolean;
-  UpdatePublishError: String;
 
 function IsServerInstall: Boolean;
 begin
@@ -115,19 +114,6 @@ end;
 function ArchiveRole(Param: String): String;
 begin
   if RolePage.SelectedValueIndex = 0 then Result := 'server' else Result := 'client';
-end;
-
-function UpdateShare(Param: String): String;
-var
-  Host: String;
-  Cut: Integer;
-begin
-  Host := ArchiveServer('');
-  Cut := Pos(',', Host);
-  if Cut > 0 then Host := Copy(Host, 1, Cut - 1);
-  Cut := Pos('\', Host);
-  if Cut > 0 then Host := Copy(Host, 1, Cut - 1);
-  Result := '\\' + Host + '\KartyLeczenia-Updates';
 end;
 
 function HasRunningSqlInstance: Boolean;
@@ -411,66 +397,15 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ExitCode: Integer;
-  Parameters: String;
-  SourceInstaller: String;
-  LogContents: AnsiString;
-  LogFilePath: String;
-  LastErrorDetails: String;
 begin
-  if (CurStep <> ssPostInstall) or not IsServerInstall then Exit;
-
-  // Publish from the installer being run (not from the installed application
-  // directory), so the shared EXE is identical to the server's installation.
-  SourceInstaller := ExpandConstant('{srcexe}');
-  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
-    ExpandConstant('{app}\Publish-KartyLeczeniaUpdate.ps1') +
-    '" -Installer "' + SourceInstaller +
-    '" -Version "{#ReleaseVersion}"';
-
-  UpdatePublished := False;
-  UpdatePublishError := '';
-  Log('Publishing KartyLeczenia server installer: ' + SourceInstaller);
-  if not Exec(PowerShellPath, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
-    UpdatePublishError := 'Nie mozna uruchomic skryptu publikacji: ' + SysErrorMessage(ExitCode)
-  else if ExitCode <> 0 then
-    UpdatePublishError := 'Skrypt publikacji zakonczyl sie bledem (kod ' + IntToStr(ExitCode) + ').'
-  else
-    UpdatePublished := True;
-
-  if not UpdatePublished then
-  begin
-    Log('Update publication FAILED: ' + UpdatePublishError);
-    LogFilePath := ExpandConstant('{commonappdata}\KartyLeczenia\update-publish.log');
-    LastErrorDetails := 'Log nie zostal utworzony: ' + LogFilePath;
-    if LoadStringFromFile(LogFilePath, LogContents) then
-    begin
-      LastErrorDetails := Trim(String(LogContents));
-      if Length(LastErrorDetails) > 1400 then
-        LastErrorDetails := Copy(LastErrorDetails, Length(LastErrorDetails) - 1399, 1400);
-    end;
-    MsgBox('Program zostal zainstalowany na serwerze, ale nie udalo sie udostepnic nowej wersji dla stanowisk.' +
-      Chr(13) + Chr(10) + UpdatePublishError + Chr(13) + Chr(10) +
-      LastErrorDetails + Chr(13) + Chr(10) +
-      'Poprzedni instalator na udziale pozostaje dostepny.',
-      mbError, MB_OK);
-  end
-  else
-    Log('Update publication completed for version {#ReleaseVersion}.');
+  if CurStep = ssPostInstall then
+    DeleteIniEntry('Archive', 'UpdateShare', ExpandConstant('{app}\archive-installation.ini'));
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
 begin
-  if (CurPageID = wpFinished) and (RolePage.SelectedValueIndex = 0) then
-  begin
+  if (CurPageID = wpFinished) and IsServerInstall then
     WizardForm.FinishedLabel.Caption := 'Serwer archiwum jest gotowy. Adres dla stanowisk: ' +
-      ArchiveServer('') + #13#10;
-    if UpdatePublished then
-      WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption +
-        'Aktualizacje: opublikowano wersje {#ReleaseVersion}.'
-    else
-      WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption +
-        'UWAGA: nie udalo sie opublikowac instalatora aktualizacji.';
-  end;
+      ArchiveServer('') + #13#10 +
+      'Przy pierwszym uruchomieniu program opublikuje instalator w bazie SQL.';
 end;

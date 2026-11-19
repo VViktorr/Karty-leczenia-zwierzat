@@ -133,8 +133,22 @@ BEGIN
     );
 END;
 
+IF OBJECT_ID(N'dbo.program_update', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.program_update (
+        id tinyint NOT NULL PRIMARY KEY CHECK (id = 1),
+        release_id uniqueidentifier NOT NULL,
+        version nvarchar(32) NOT NULL,
+        sha256 binary(32) NOT NULL,
+        installer varbinary(max) NOT NULL CHECK (DATALENGTH(installer) > 0),
+        published_at_utc datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+END;
+
 IF DATABASE_PRINCIPAL_ID(N'KartyLeczeniaOperator') IS NULL
     CREATE ROLE KartyLeczeniaOperator AUTHORIZATION dbo;
+
+GRANT SELECT ON dbo.program_update TO KartyLeczeniaOperator;
 
 GRANT SELECT, INSERT, UPDATE ON dbo.treatment_cards TO KartyLeczeniaOperator;
 REVOKE DELETE ON dbo.treatment_cards FROM KartyLeczeniaOperator;
