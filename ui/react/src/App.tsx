@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Empty,
   Form, Input, InputNumber, Modal, Segmented, Select, Space, Spin, Switch, Table,
@@ -28,6 +28,7 @@ interface MedicineExpiry {
   warehouseName: string; deliveriesConfirmed: boolean; productId: number; movementId: number;
 }
 interface SavedCard { id: string; date: string; client: string; document: string; number: string; }
+interface SaveResult {duplicate: boolean; duplicateId: string | null; number: string | null; id: string | null;}
 interface StoredCard { fields: Record<string, string>; rows: Array<Record<string, string>>; }
 interface SqlSettings {
   configured: boolean; warning?: string; server: string; database: string;
@@ -49,6 +50,11 @@ const palettes = ["light", "dark", "sea"] as const;
 const currency = (n: number | null, unit = "zł") =>
   n === null ? "—" : new Intl.NumberFormat("pl-PL", {minimumFractionDigits: 2, maximumFractionDigits: 2})
     .format(n) + " " + unit;
+function localDateTime() {
+  const d = new Date();
+  const local = new Date(d.getTime() - d.getTimezoneOffset()*60000);
+  return local.toISOString().slice(0,16);
+}
 const date = (value: string | null) => value
   ? new Intl.DateTimeFormat("pl-PL").format(new Date(value)) : "—";
 function ErrorNotice({error}: {error: string}) {
@@ -156,7 +162,43 @@ const editable: Array<{key: keyof DraftRow; field: string; title: string}> = [
 function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () => void}) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
   const [error, setError] = useState("");
-  useEffect(() => { setRows(draft?.rows ?? []); }, [draft]);
+  const [busy, setBusy] = useState(false);
+  const [savedNumber, setSavedNumber] = useState("");
+  const [reported, setReported] = useState(() => localDateTime());
+  const [performed, setPerformed] = useState(() => localDateTime());
+  const [findings, setFindings] = useState("");
+  const [preview, setPreview] = useState<string | null>(null);
+  const previewFrame = useRef<HTMLIFrameElement>(null);
+  useEffect(() => { setRows(draft?.rows ?? []); setSavedNumber(""); }, [draft]);
+  async function saveCard(confirmDuplicate = false) {
+    if (!draft || busy) return;
+    setBusy(true); setError("");
+    try {
+      const result = await invoke<SaveResult>("saveDraft", {
+        draftId:draft.draftId, reported, performed, findings, confirmDuplicate
+      });
+      if (result.duplicate) {
+        Modal.confirm({
+          title:"Karta z tego dokumentu już istnieje",
+          content:"Czy na pewno utworzyć kolejną kartę leczenia z tego samego dokumentu?",
+          okText:"Zapisz kolejną", cancelText:"Anuluj",
+          onOk:() => {void saveCard(true);}
+        });
+      } else setSavedNumber(result.number ?? "");
+    } catch (e) {setError(e instanceof Error ? e.message : String(e));}
+    finally {setBusy(false);}
+  }
+  async function printPreview() {
+    if (!draft || busy) return;
+    setBusy(true);
+    try {
+      const data = await invoke<{html:string}>("previewDraft", {
+        draftId:draft.draftId, reported, performed, findings
+      });
+      setPreview(data.html); setError("");
+    } catch(e) {setError(e instanceof Error ? e.message : String(e));}
+    finally {setBusy(false);}
+  }
   if (!draft) return <Card>
     <Empty description="Wybierz dokument w zakładce Dokumenty">
       <Button type="primary" onClick={onDocuments}>Przejdź do dokumentów</Button>
@@ -190,14 +232,30 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     <div className="page-heading"><div>
       <Typography.Title level={3}>Karta leczenia — {draft.number}</Typography.Title>
       <Typography.Text type="secondary">{draft.payer.split("\n")[0]}</Typography.Text>
-    </div><Button onClick={onDocuments}>Wróć do dokumentów</Button></div>
-    <Alert className="notice" type="warning" showIcon message="Edycja robocza — zapis i wydruk karty nie są jeszcze włączone w ReactKL."
-      description="Zmiany w tabeli dotyczą bieżącej sesji. Funkcji zapisu do SQL nie udostępniamy bez przeniesienia kompletnej walidacji klinicznej i numeracji."/>
+    </div><Space>
+      <Button onClick={onDocuments}>Dokumenty</Button>
+      <Button onClick={()=>{void printPreview();}} loading={busy}>Podgląd wydruku</Button>
+      <Button type="primary" onClick={()=>{void saveCard();}} loading={busy}>Zapisz kartę do SQL</Button>
+    </Space></div>
+    <Card className="treatment-meta">
+      <Space wrap>
+        <label>Data zgłoszenia <Input type="datetime-local" value={reported} onChange={e=>setReported(e.target.value)}/></label>
+        <label>Data wykonania <Input type="datetime-local" value={performed} onChange={e=>setPerformed(e.target.value)}/></label>
+        <label>Wyniki badań <Input value={findings} onChange={e=>setFindings(e.target.value)} style={{width:340}}/></label>
+      </Space>
+    </Card>
+    {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
     <Card><Table<DraftRow> rowKey="index" dataSource={rows} columns={columns} size="small"
       scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}</Typography.Text>
     </Card>
+    <Modal width="92vw" open={preview!==null} title="Podgląd karty leczenia" onCancel={()=>setPreview(null)}
+      footer={<Space><Button onClick={()=>setPreview(null)}>Zamknij</Button>
+        <Button type="primary" onClick={()=>previewFrame.current?.contentWindow?.print()}>Drukuj</Button></Space>}>
+      {preview && <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
+        style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
+    </Modal>
   </>;
 }
 
