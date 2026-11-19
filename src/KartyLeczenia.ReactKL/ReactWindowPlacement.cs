@@ -59,7 +59,7 @@ internal static class ReactWindowPlacement
                 saved.Width, saved.Height), workAreas, fallback, window.MinimumSize);
             window.StartPosition = FormStartPosition.Manual;
             window.Bounds = actual;
-            if (saved.Maximized && actual != fallback)
+            if (saved.Maximized)
                 window.WindowState = FormWindowState.Maximized;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
