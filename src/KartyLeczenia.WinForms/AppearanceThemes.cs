@@ -258,53 +258,104 @@ internal static class AppearanceThemes
     internal static void ApplyButton(Button button, AppearanceOptions options)
     {
         bool selector = button is ThemeSelector;
-        bool selected = selector && button.Toggle;
-        bool classic = IsClassic(options);
         bool dark = IsDark(options);
+        bool classic = IsClassic(options);
         int style = classic ? 0 : options.SwitchStyle;
         Color surface = Canvas(options);
-        Color ink = Ink(options);
         Color accent = Accent(options);
+        Color ink = Ink(options);
 
-        // One visual surface per button: AntdUI must not paint its primary
-        // background over a second manually assigned ToggleBack/BackColor.
-        // ToggleType follows Type, preventing a switch to a second renderer
-        // when the selected state changes.
-        bool filled = selected && style == 1;
-        bool tonal = selected && (style is 3 or 4);
-        bool primaryAction = !selector && options.ColorButtons && !classic && style == 1;
-        bool bright = filled || primaryAction;
-        bool outlined = selector && selected && style == 2;
-        Color foreground = bright ? ContrastingText(accent) : selected ? accent : ink;
-        Color background = bright ? accent : tonal
-            ? Blend(surface, accent, dark ? .27f : .13f)
-            : surface;
+        // AntdUI has independent normal and Toggle surfaces. Previously both
+        // were written with the *current* Toggle colour and Type/DefaultBack
+        // were additionally mixed in, causing uneven patches on redraw.
+        // Set stable colours for both states instead; changing Toggle only
+        // switches the state and never requires reconstructing the palette.
+        Color normal = surface;
+        Color active = style switch
+        {
+            1 => accent,
+            2 => surface,
+            3 or 4 => Blend(surface, accent, dark ? .30f : .14f),
+            _ => Blend(surface, accent, dark ? .18f : .08f)
+        };
+        Color selectedFore = style == 1 ? ContrastingText(accent) : accent;
+        bool hasBorder = style == 2;
+        int radius = style == 4 ? 20 : Math.Clamp(options.CornerRadius, 4, 20);
 
         button.ColorScheme = dark ? AntdUI.TAMode.Dark : AntdUI.TAMode.Light;
-        button.Radius = style == 4 ? 20 : Math.Clamp(options.CornerRadius, 4, 20);
         button.Type = AntdUI.TTypeMini.Default;
         button.ToggleType = AntdUI.TTypeMini.Default;
-        button.BorderWidth = outlined ? 2f : style == 2 ? 1f : 0f;
-        button.DefaultBorderColor = outlined ? accent : Blend(surface, ink, dark ? .28f : .19f);
+        button.Radius = radius;
+        button.BorderWidth = hasBorder ? 1.25f : 0f;
+        button.DefaultBorderColor = hasBorder
+            ? Blend(surface, ink, dark ? .52f : .32f)
+            : Color.Transparent;
         button.Ghost = false;
-        button.BackExtend = button.ToggleBackExtend = null;
-        button.DefaultBack = background;
-        button.BackColor = background;
-        button.ToggleBack = background;
-        button.ForeColor = button.ToggleFore = foreground;
-        button.BackHover = button.ToggleBackHover = Blend(background, bright ? Color.White : accent, .10f);
-        button.BackActive = button.ToggleBackActive = Blend(background, bright ? Color.Black : accent, .16f);
-        button.ForeHover = button.ToggleForeHover = foreground;
-        button.ForeActive = button.ToggleForeActive = foreground;
+        button.BackExtend = null;
+        button.ToggleBackExtend = null;
+
+        // Do not set Control.BackColor and DefaultBack independently. The
+        // AntdUI renderer owns its background, avoiding a second WinForms fill.
+        button.BackColor = normal;
+        button.DefaultBack = normal;
+        button.ForeColor = ink;
+        button.ForeHover = ink;
+        button.ForeActive = ink;
+        button.BackHover = Blend(normal, accent, dark ? .18f : .09f);
+        button.BackActive = Blend(normal, accent, dark ? .25f : .15f);
+
         if (selector)
         {
+            button.ToggleBack = active;
+            button.ToggleFore = selectedFore;
+            button.ToggleForeHover = selectedFore;
+            button.ToggleForeActive = selectedFore;
+            button.ToggleBackHover = Blend(active, style == 1 ? Color.White : accent, .12f);
+            button.ToggleBackActive = Blend(active, style == 1 ? Color.Black : accent, .15f);
+            button.AutoToggle = false;
             button.WaveSize = 0;
-            button.Margin = new Padding(3, 3, 3, 3);
-            button.MinimumSize = new Size(0, 32);
+            button.Margin = new Padding(3);
+            button.MinimumSize = new Size(0, 34);
+            button.AccessibleRole = AccessibleRole.RadioButton;
+        }
+        else
+        {
+            // Normal action buttons stay neutral; the "Color buttons" setting
+            // controls only their hover treatment, not a blanket primary fill.
+            button.ToggleBack = null;
+            button.ToggleFore = null;
+            button.ToggleForeHover = null;
+            button.ToggleForeActive = null;
+            button.ToggleBackHover = null;
+            button.ToggleBackActive = null;
+            if (!options.ColorButtons)
+            {
+                button.BackHover = Blend(normal, ink, dark ? .12f : .06f);
+                button.BackActive = Blend(normal, ink, dark ? .20f : .10f);
+            }
         }
         if (button.Tag is string shortcut)
-            button.AccessibleDescription = selected ? shortcut + " · wybrano" : shortcut;
+            button.AccessibleDescription = button.Toggle ? shortcut + " · wybrano" : shortcut;
         button.Invalidate();
+    }
+
+    /// <summary>
+    /// Make related AntdUI selectors the same height/width. The widest caption
+    /// sets the minimum; no one tab gets a different fill because AutoSize grew.
+    /// </summary>
+    internal static void EqualizeSelectors(IEnumerable<ThemeSelector> selectors)
+    {
+        var group = selectors.ToArray();
+        if (group.Length == 0) return;
+        int width = Math.Max(92, group.Max(x =>
+            TextRenderer.MeasureText(x.Text, x.Font).Width + 28));
+        int height = Math.Max(34, group.Max(x => x.PreferredSize.Height));
+        foreach (var selector in group)
+        {
+            selector.AutoSize = false;
+            selector.Size = new Size(width, height);
+            selector.MinimumSize = new Size(width, height);
+        }
     }
 
     sealed class AntdTableFontState(AntdUI.Table table)
