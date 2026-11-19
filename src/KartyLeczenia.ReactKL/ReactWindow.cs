@@ -22,6 +22,8 @@ internal sealed class ReactWindow : Form
     private readonly CardArchiveService cards;
     private readonly SqlBackupService backups;
     private readonly SqlRestoreService restores;
+    private readonly ReactUpdateService updates;
+    private ReactUpdateInfo? checkedUpdate;
     private string? selectedRestoreFile;
     private bool restoreRunning;
     private readonly CatalogueService catalogue;
@@ -36,6 +38,7 @@ internal sealed class ReactWindow : Form
         cards = new CardArchiveService(archive);
         backups = new SqlBackupService(archive);
         restores = new SqlRestoreService(archive);
+        updates = new ReactUpdateService(archive);
         catalogue = new CatalogueService(archive);
         base.Text = "KartyLeczenia — ReactKL";
         MinimumSize = new Size(900, 600);
@@ -108,7 +111,8 @@ internal sealed class ReactWindow : Form
             string action = Text(root, "action", 40);
             if (string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(action)) return;
             cancel = new CancellationTokenSource(action is "backupDatabase" or "restoreDatabase"
-                ? TimeSpan.FromMinutes(45) : TimeSpan.FromSeconds(45));
+                ? TimeSpan.FromMinutes(45) : action == "installUpdate"
+                    ? TimeSpan.FromMinutes(15) : TimeSpan.FromSeconds(45));
             active[requestId] = cancel;
             object result = await Handle(action, root, cancel.Token);
             if (!cancel.IsCancellationRequested) Send(requestId, result);
@@ -215,6 +219,36 @@ internal sealed class ReactWindow : Form
             byte[] data = pendingCataloguePdfs.TryGetValue(path, out var pending)
                 ? pending : await Task.Run(() => catalogue.ReadPdf(path), token);
             return new { base64 = Convert.ToBase64String(data), name = Path.GetFileName(path) };
+        }
+        if (action == "checkUpdate")
+        {
+            checkedUpdate = await updates.Check(token);
+            return new { release = checkedUpdate,
+                currentVersion = ReactUpdateService.CurrentVersion };
+        }
+        if (action == "installUpdate")
+        {
+            if (backupRunning || restoreRunning)
+                throw new InvalidOperationException(
+                    "Aktualizacja może rozpocząć się dopiero po zakończeniu archiwizacji lub odtwarzania.");
+            var release = checkedUpdate;
+            if (release is null || !release.Newer)
+                throw new InvalidOperationException(
+                    "Najpierw sprawdź dostępność nowszej wersji ReactKL w SQL.");
+            // Re-read SQL after the user's confirmation: a newer release may
+            // have replaced the one they saw in the meantime.
+            var current = await updates.Check(token);
+            if (current is null || current.ReleaseId != release.ReleaseId ||
+                !current.Newer || !string.Equals(current.Sha256,release.Sha256,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    "Opublikowana aktualizacja zmieniła się. Sprawdź wersję ponownie.");
+            string file = await updates.Download(current,token);
+            ReactUpdateService.Start(file);
+            // The installer is already running. Exit the old app so Inno can
+            // replace its files without launching the old user interface.
+            BeginInvoke(new Action(Close));
+            return new { started = true, version = current.Version };
         }
         if (action == "chooseRestoreFile")
         {
