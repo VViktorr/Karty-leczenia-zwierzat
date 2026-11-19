@@ -79,6 +79,7 @@ Filename: "{app}\KartyLeczenia.ReactKL.exe"; Description: "Uruchom SQL KartyLecz
 var
   RolePage: TInputOptionWizardPage;
   ServerPage: TInputQueryWizardPage;
+  ExistingInstallAtStart: Boolean;
 
 function ExistingArchiveConfiguration: Boolean;
 begin
@@ -87,7 +88,7 @@ end;
 
 function IsNewInstallation: Boolean;
 begin
-  Result := not ExistingArchiveConfiguration;
+  Result := not ExistingInstallAtStart;
 end;
 
 function InstallerRole(Param: String): String;
@@ -143,4 +144,10 @@ begin
     MsgBox('Wpisz adres serwera bazy KartyLeczenia.', mbError, MB_OK);
     Result := False;
   end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+    ExistingInstallAtStart := ExistingArchiveConfiguration;
 end;
