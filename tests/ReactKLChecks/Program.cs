@@ -191,6 +191,25 @@ static class Program
             }
             Check(errors==2, "SQL errors must not be cached as successful lists");
 
+            var cancelledSearch = new CancellationTokenSource();
+            async Task<IReadOnlyList<KartyLeczenia.DocumentSuggestion>> SlowDocuments(
+                CancellationToken ct)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                return Array.Empty<KartyLeczenia.DocumentSuggestion>();
+            }
+            var superseded = fastLists.GetAsync("superseded-search", false,
+                SlowDocuments, cancelledSearch.Token);
+            cancelledSearch.Cancel();
+            bool cancelled = false;
+            try { _ = superseded.GetAwaiter().GetResult(); }
+            catch (OperationCanceledException) { cancelled = true; }
+            Check(cancelled, "superseded document filters must cancel obsolete work");
+            var retried = fastLists.GetAsync("superseded-search", false,
+                FetchList, CancellationToken.None).GetAwaiter().GetResult();
+            Check(!retried.Cached,
+                "a cancelled document query must not poison future search results");
+
             var priceClock = new DateTimeOffset(2026, 11, 19, 18, 0, 0, TimeSpan.Zero);
             var stockCache = new TimedSqlCache<int>(TimeSpan.FromSeconds(30),
                 clock: () => priceClock);
