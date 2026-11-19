@@ -304,6 +304,17 @@ static class Program
                   migratedPrice.WithdrawalFormat == 2 && !migratedPrice.RouteCodes &&
                   migratedPrice.Widths[1] == 40 && migratedPrice.ColumnSizes[4] == 12,
                 "React price editor must preserve legacy WinForms print settings");
+            var olderPrint = PricePrintOptionsStore.FromLegacyJson(
+                """
+                {"FontWeight":0,"Fonts":[0,4,0,0,0,0],
+                 "Sizes":[0,2,0,0,0,0],
+                 "FontNames":["","","","","",""],
+                 "FontSizes":[0,0,0,0,0,0]}
+                """);
+            Check(olderPrint.FontWeight == 400 &&
+                  olderPrint.ColumnFonts[1] == "Segoe UI" &&
+                  olderPrint.ColumnSizes[1] == 9,
+                "older WinForms indexed fonts and sizes should migrate without data loss");
             bool invalidPrintRejected = false;
             try { _ = (printDefault with { Widths = [0, 10, 10, 10, 10] }).Validate(); }
             catch (ArgumentException) { invalidPrintRejected = true; }
