@@ -1,4 +1,6 @@
 using System.Data;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia.Windows;
@@ -18,61 +20,126 @@ internal sealed partial class SharedArchive
         return CreateBackup(db, folder, "kopia", compress);
     }
 
-    // SQL Server writes the native .bak in its own default backup directory.
-    // The Windows workstation then copies it to the user-selected file.
-    // This is deliberately not BACKUP TO DISK = E:\\...: a workstation's
-    // drive letter is not the same drive on a remote SQL Server.
-    internal DatabaseBackupResult BackupToLocalFile(string destination)
+    // A full base backup plus differential backups form a recoverable set.
+    // Keep the full .bak and all later .bak files on the selected destination.
+    private sealed record BackupChain(string BaseFile, string BaseLsn);
+    private static readonly JsonSerializerOptions BackupJson = new() { WriteIndented = true };
+
+    private static string? DifferentialBaseLsn(SqlConnection db)
     {
-        if (!Path.IsPathFullyQualified(destination) ||
-            !destination.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Wybierz pełną ścieżkę pliku .bak na swoim komputerze.", nameof(destination));
-
-        string folder = Path.GetDirectoryName(destination)
-            ?? throw new InvalidOperationException("Nieprawidłowa lokalizacja kopii.");
-        if (!Directory.Exists(folder))
-            throw new DirectoryNotFoundException("Wybrany folder lub pendrive nie jest dostępny: " + folder);
-
-        // Verify destination write access before starting a potentially long backup.
-        string probe = Path.Combine(folder, ".kartyleczenia-" + Guid.NewGuid().ToString("N") + ".tmp");
-        try
+        using var command = MaintenanceCommand(db, """
+            SELECT CONVERT(nvarchar(100), differential_base_lsn)
+            FROM sys.database_files WHERE type = 0;
+            """);
+        using var reader = command.ExecuteReader();
+        string? lsn = null;
+        while (reader.Read())
         {
-            using (File.Create(probe)) { }
+            if (reader.IsDBNull(0)) return null;
+            string current = reader.GetString(0);
+            if (lsn is not null && lsn != current) return null;
+            lsn = current;
         }
+        return lsn;
+    }
+
+    internal DatabaseBackupResult BackupToLocalFile(string destinationFolder)
+    {
+        if (!Path.IsPathFullyQualified(destinationFolder) || !Directory.Exists(destinationFolder))
+            throw new DirectoryNotFoundException("Folder archiwizacji lub pendrive jest niedostępny: " + destinationFolder);
+
+        // Never overwrite an earlier complete or differential archive.
+        string folder = Path.Combine(destinationFolder, "KartyLeczenia-SQL");
+        Directory.CreateDirectory(folder);
+        string probe = Path.Combine(folder, ".kartyleczenia-" + Guid.NewGuid().ToString("N") + ".tmp");
+        try { using (File.Create(probe)) { } }
         finally { if (File.Exists(probe)) File.Delete(probe); }
 
-        DatabaseBackupResult serverBackup = BackupDatabase("", compress: false);
+        string stateFile = Path.Combine(folder, "backup-chain.json");
+        BackupChain? state = null;
+        try
+        {
+            if (File.Exists(stateFile))
+                state = JsonSerializer.Deserialize<BackupChain>(File.ReadAllText(stateFile));
+        }
+        catch (JsonException) { /* Damaged metadata: start a new full backup. */ }
+
+        using var db = OpenMaintenance(options, restoring: false);
+        string? currentBase = DifferentialBaseLsn(db);
+        bool differential = state is { } chain &&
+            !string.IsNullOrEmpty(currentBase) &&
+            currentBase == chain.BaseLsn &&
+            Path.GetFileName(chain.BaseFile) == chain.BaseFile &&
+            File.Exists(Path.Combine(folder, chain.BaseFile));
+
+        // A differential backup is only valid if the server still uses the
+        // exact same differential base as the locally preserved full backup.
+        DatabaseBackupResult serverBackup = CreateBackup(
+            db, "", differential ? "roznicowa" : "pelna",
+            compress: false, differential: differential, copyOnly: false);
         string serverPath = serverBackup.Path;
         string? accessible = ResolveBackupSource(serverPath);
         if (accessible is null)
             throw new InvalidOperationException(
-                "SQL wykonał kopię na serwerze: " + serverPath + ". " +
-                "Nie udało się odczytać jej z tego stanowiska. " +
-                "Aby zapisywać kopie na pendrivie podłączonym do innego komputera, " +
-                "folder kopii serwera SQL musi być udostępniony w sieci z prawem odczytu. " +
-                "Kopia na serwerze nie została usunięta.");
+                "SQL wykonał kopię na serwerze: " + serverPath +
+                ". Nie udało się odczytać pliku na tym komputerze. Kopia pozostała na serwerze.");
 
-        // Write to a staging file on the destination volume first. The user
-        // never sees a truncated .bak when copying across the network fails.
+        string destination = Path.Combine(folder, Path.GetFileName(serverPath));
         string staging = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
+            byte[] sourceHash;
             using (var input = File.OpenRead(accessible))
             using (var output = new FileStream(staging, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                input.CopyTo(output, 1024 * 1024);
+            using (var sha = SHA256.Create())
+            {
+                byte[] buffer = new byte[1024 * 1024];
+                int read;
+                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    sha.TransformBlock(buffer, 0, read, null, 0);
+                    output.Write(buffer, 0, read);
+                }
+                sha.TransformFinalBlock([], 0, 0);
+                sourceHash = sha.Hash!;
+                output.Flush(true);
+            }
+            byte[] copiedHash;
+            using (var stream = File.OpenRead(staging))
+                copiedHash = SHA256.HashData(stream);
+            if (!CryptographicOperations.FixedTimeEquals(sourceHash, copiedHash))
+                throw new IOException("SHA-256 skopiowanego archiwum jest niezgodne z oryginałem.");
+            File.Move(staging, destination); // No overwrite of existing archives.
 
-            var sourceInfo = new FileInfo(accessible);
-            var targetInfo = new FileInfo(staging);
-            if (targetInfo.Length == 0 || targetInfo.Length != sourceInfo.Length)
-                throw new IOException("Rozmiar skopiowanego archiwum jest niezgodny z kopią SQL.");
-            File.Move(staging, destination, overwrite: true);
-            return serverBackup with { Path = destination };
+            if (!differential)
+            {
+                // Re-read after the full backup; other SQL maintenance may have
+                // changed the differential base while the copy was running.
+                string? newBase = DifferentialBaseLsn(db);
+                if (!string.IsNullOrWhiteSpace(newBase))
+                {
+                    string newState = stateFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                    try
+                    {
+                        File.WriteAllText(newState, JsonSerializer.Serialize(
+                            new BackupChain(Path.GetFileName(destination), newBase), BackupJson));
+                        File.Move(newState, stateFile, overwrite: true);
+                    }
+                    finally { if (File.Exists(newState)) File.Delete(newState); }
+                }
+                else if (File.Exists(stateFile)) File.Delete(stateFile);
+            }
+            return serverBackup with
+            {
+                Path = destination,
+                VerificationNote = (differential ? "Kopia różnicowa. " : "Nowa kopia pełna. ") +
+                    "Zgodność SHA-256 potwierdzona. " + serverBackup.VerificationNote
+            };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new IOException(
-                "Nie udało się zapisać kopii na wybranym nośniku. " +
-                "Oryginalna kopia pozostała na serwerze: " + serverPath + ". " + ex.Message, ex);
+            throw new IOException("Nie udało się zapisać archiwum na pendrivie. " +
+                "Kopia na serwerze: " + serverPath + ". " + ex.Message, ex);
         }
         finally
         {
@@ -254,7 +321,7 @@ internal sealed partial class SharedArchive
         }
     }
 
-    static DatabaseBackupResult CreateBackup(SqlConnection db, string folder, string label, bool compress = false)
+    static DatabaseBackupResult CreateBackup(SqlConnection db, string folder, string label, bool compress = false, bool differential = false, bool copyOnly = true)
     {
         if (folder.Length == 0)
         {
@@ -265,9 +332,9 @@ internal sealed partial class SharedArchive
             throw new InvalidOperationException("Serwer SQL nie zwrócił domyślnego folderu kopii zapasowych. Wskaż folder dostępny dla SQL Servera.");
 
         string path = ServerPath(folder, $"KartyLeczenia-{label}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak");
-        string backupSql = compress
-            ? "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM, COMPRESSION;"
-            : "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM, NO_COMPRESSION;";
+        string backupSql = "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH " +
+            (differential ? "DIFFERENTIAL, " : copyOnly ? "COPY_ONLY, " : "") +
+            "CHECKSUM, " + (compress ? "COMPRESSION" : "NO_COMPRESSION") + ";";
         try
         {
             using var backup = MaintenanceCommand(db, backupSql, path);
