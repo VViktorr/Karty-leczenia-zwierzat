@@ -338,6 +338,8 @@ internal static class AppearanceThemes
                 button.BackActive = Blend(normal, ink, dark ? .20f : .10f);
             }
         }
+        if (button is ThemeSelector themeSelector)
+            themeSelector.SetAppearance(options);
         if (button.Tag is string shortcut)
             button.AccessibleDescription = button.Toggle ? shortcut + " · wybrano" : shortcut;
         button.Invalidate();
