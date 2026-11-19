@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../KartyLeczenia.Core/KartyLeczenia.Core.csproj" />
+    <PackageReference Include="AntdUI" Version="2.4.19" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
   </ItemGroup>
 </Project>

@@ -14,7 +14,7 @@ internal sealed class MainForm : Form
     readonly DataGridView prices = NewGrid(), expiry = NewGrid(), treatment = NewGrid();
     readonly TextBox search = new();
     Font? boldDocumentKindFont;
-    readonly Dictionary<DocumentSearchKinds, Button> documentKinds = new();
+    readonly Dictionary<DocumentSearchKinds, AntdUI.Button> documentKinds = new();
     readonly StatusStrip statusBar = new();
     readonly ToolStripStatusLabel status = new();
     readonly ToolStripStatusLabel refreshDocuments = new() { IsLink = true, Visible = false };
@@ -103,12 +103,13 @@ internal sealed class MainForm : Form
             ["documents"] = documents, ["prices"] = prices,
             ["expiry"] = expiry, ["treatment"] = treatment
         };
-        if (interfaceScale > 100) EnlargeInterface(tables.Values.Append(savedCardsGrid));
+        if (interfaceScale != 100) ScaleInterface(tables.Values.Append(savedCardsGrid));
         var layout = new WindowLayout(this, rememberTreatment, tables, interfaceScale);
         void ApplyAppearance(AppearanceOptions options)
         {
             appearance = AppearanceThemes.Normalize(options);
             AppearanceThemes.ApplySurface(this, appearance);
+            UpdateDocumentKindButtons();
             AppearanceThemes.ApplyTabs(tabs, appearance);
             foreach (var grid in tables.Values.Append(savedCardsGrid))
                 AppearanceThemes.ApplyGrid(grid, appearance);
@@ -144,7 +145,7 @@ internal sealed class MainForm : Form
         };
     }
 
-    void EnlargeInterface(IEnumerable<DataGridView> grids)
+    void ScaleInterface(IEnumerable<DataGridView> grids)
     {
         float factor = interfaceScale / 100f;
         int Pixels(int value) => (int)Math.Round(value * factor);
@@ -156,6 +157,13 @@ internal sealed class MainForm : Form
         var tabPadding = tabs.Padding;
         Scale(new SizeF(factor, factor));
         tabs.Padding = new Point(Pixels(tabPadding.X), Pixels(tabPadding.Y));
+        var scaledFont = new Font(Font.FontFamily, Font.SizeInPoints * factor, Font.Style, GraphicsUnit.Point);
+        Font = scaledFont;
+        Disposed += (_, _) => scaledFont.Dispose();
+        var previousBold = boldDocumentKindFont;
+        boldDocumentKindFont = new Font(Font, Font.Style | FontStyle.Bold);
+        UpdateDocumentKindButtons();
+        previousBold?.Dispose();
         MinimumSize = new Size(Math.Min(MinimumSize.Width, workingArea.Width), Math.Min(MinimumSize.Height, workingArea.Height));
         Size = new Size(Math.Min(Width, workingArea.Width), Math.Min(Height, workingArea.Height));
 
@@ -422,18 +430,19 @@ internal sealed class MainForm : Form
         UpdateDocumentKindButtons();
     }
 
-    Button DocumentKindButton(DocumentSearchKinds value, string label, string shortcut)
+    AntdUI.Button DocumentKindButton(DocumentSearchKinds value, string label, string shortcut)
     {
-        var button = Action(label, () => SelectKind(value));
+        var button = new AntdUI.Button
+        {
+            Text = label, AutoSize = true, WaveSize = 0, TabStop = true, Tag = shortcut
+        };
+        button.Click += async (_, _) => await Run(() => SelectKind(value), label);
         if (boldDocumentKindFont is null)
         {
             boldDocumentKindFont = new Font(Font, Font.Style | FontStyle.Bold);
             Disposed += (_, _) => boldDocumentKindFont.Dispose();
         }
-        AppearanceThemes.RegisterSelector(button, () => kind == value);
         button.Font = boldDocumentKindFont;
-        button.MinimumSize = button.GetPreferredSize(Size.Empty);
-        button.AccessibleDescription = shortcut;
         documentKinds.Add(value, button);
         return button;
     }
@@ -444,7 +453,7 @@ internal sealed class MainForm : Form
         {
             bool selected = value == kind;
             button.Font = selected ? boldDocumentKindFont : Font;
-            button.Invalidate();
+            AppearanceThemes.ApplyDocumentSelector(button, appearance, selected);
         }
     }
 

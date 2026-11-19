@@ -217,7 +217,6 @@ internal static class AppearanceThemes
     sealed class ButtonTheme(ButtonBase button)
     {
         internal AppearanceOptions? Options;
-        internal Func<bool>? IsSelected;
         bool hovered;
         bool pressed;
 
@@ -237,22 +236,20 @@ internal static class AppearanceThemes
         }
 
         internal bool UsesTheme => Options is { SwitchStyle: > 0 } options && !IsClassic(options) &&
-            (IsSelected is not null || (button is Button && options.ColorButtons) ||
+            ((button is Button && options.ColorButtons) ||
                 button is CheckBox { Appearance: Appearance.Button } ||
                 button is RadioButton { Appearance: Appearance.Button });
 
         void Draw(Graphics graphics)
         {
-            bool selected = IsSelected?.Invoke() ?? (button is CheckBox { Checked: true } ||
-                button is RadioButton { Checked: true });
-            bool themed = UsesTheme;
-            if (!themed && (IsSelected is null || !selected)) return;
+            if (!UsesTheme) return;
+            bool selected = button is CheckBox { Checked: true } || button is RadioButton { Checked: true };
 
             var options = Options;
             Color surface = button.Parent?.BackColor ?? SystemColors.Control;
-            Color accent = themed ? Accent(options!) : SystemColors.Highlight;
-            bool dark = themed && IsDark(options!);
-            bool outline = themed && options!.SwitchStyle == 2;
+            Color accent = Accent(options!);
+            bool dark = IsDark(options!);
+            bool outline = options!.SwitchStyle == 2;
             Color ink = dark ? Color.WhiteSmoke : Color.FromArgb(30, 37, 49);
             Color edge = dark ? Blend(accent, Color.White, .45f) : Blend(accent, Color.Black, .25f);
             Color fill = selected && !outline ? Blend(accent, Color.Black, .32f)
@@ -260,7 +257,6 @@ internal static class AppearanceThemes
             if (button.Enabled && (hovered || pressed))
                 fill = Blend(fill, selected && !outline ? Color.Black : accent, pressed ? .25f : .13f);
             Color text = selected && !outline ? ContrastingText(fill) : ink;
-            if (!themed) { fill = SystemColors.Highlight; text = SystemColors.HighlightText; }
             if (!button.Enabled)
             {
                 fill = Blend(fill, surface, .7f);
@@ -273,7 +269,7 @@ internal static class AppearanceThemes
             var bounds = new RectangleF(stroke / 2, stroke / 2,
                 button.ClientSize.Width - stroke - 1, button.ClientSize.Height - stroke - 1);
             if (bounds.Width <= 0 || bounds.Height <= 0) return;
-            float diameter = Math.Min((themed ? options!.CornerRadius : 4) * 2 * scale,
+            float diameter = Math.Min(options!.CornerRadius * 2 * scale,
                 Math.Min(bounds.Width, bounds.Height));
 
             using var path = new System.Drawing.Drawing2D.GraphicsPath();
@@ -309,8 +305,30 @@ internal static class AppearanceThemes
         }
     }
 
-    internal static void RegisterSelector(Button button, Func<bool> isSelected) =>
-        GetButtonTheme(button).IsSelected = isSelected;
+    internal static void ApplyDocumentSelector(AntdUI.Button button, AppearanceOptions options, bool selected)
+    {
+        bool classic = IsClassic(options) || options.SwitchStyle == 0;
+        bool dark = IsDark(options);
+        bool outlined = !classic && options.SwitchStyle == 2;
+        Color accent = classic ? SystemColors.Highlight : Accent(options);
+        Color surface = button.Parent?.BackColor ?? SystemColors.Control;
+        Color text = dark ? Color.WhiteSmoke : SystemColors.ControlText;
+        Color selectedFill = classic ? accent : Blend(accent, Color.Black, .22f);
+        Color edge = dark ? Blend(accent, Color.White, .45f) : Blend(accent, Color.Black, .25f);
+
+        button.Radius = classic ? 4 : options.CornerRadius;
+        button.BorderWidth = selected && outlined ? 2 : 1;
+        button.DefaultBorderColor = selected ? edge : Blend(surface, edge, .42f);
+        button.DefaultBack = selected && !outlined ? selectedFill
+            : Blend(surface, accent, selected ? .15f : .03f);
+        button.ForeColor = selected && !outlined ? ContrastingText(selectedFill) : text;
+        button.ForeHover = button.ForeColor;
+        button.ForeActive = button.ForeColor;
+        button.BackHover = selected && !outlined ? selectedFill : edge;
+        button.BackActive = button.BackHover;
+        button.AccessibleDescription = (button.Tag as string) + (selected ? " · wybrano" : "");
+        button.Invalidate();
+    }
 
     static ButtonTheme GetButtonTheme(ButtonBase button) => ButtonThemes.GetValue(button, item =>
     {
