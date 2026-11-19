@@ -265,7 +265,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     if(!draft || !variantModal || variantBusy)return;
     setVariantBusy(true);setVariantError("");
     try{
-      const result=await invoke<Pick<DraftRow,"species"|"route"|"dosing"|"withdrawal"|"indication">>(
+      const result=await invoke<Pick<DraftRow,"species"|"route"|"dosing"|"withdrawal"|"indication"|"description">>(
         "applyTreatmentVariant",{draftId:draft.draftId,
           index:variantModal.index,variantId:id});
       setRows(current=>current.map(row=>row.index===variantModal.index
