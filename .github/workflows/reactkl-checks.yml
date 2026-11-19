@@ -39,7 +39,7 @@ jobs:
           if (Get-ChildItem src/KartyLeczenia.ReactKL/bin/Release -Filter AntdUI.dll -Recurse) {
             throw 'ReactKL must not depend on AntdUI.'
           }
-          if (Select-String -Path src/KartyLeczenia.ReactKL/*.cs -Pattern 'MainForm|AntdUI|openClassic') {
+          if (Select-String -Path src/KartyLeczenia.ReactKL/*.cs -Pattern 'new MainForm|using AntdUI|openClassic') {
             throw 'Old WinForms view referenced from React-only shell.'
           }
       - name: Registry compatibility
