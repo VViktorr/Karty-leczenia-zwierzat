@@ -291,6 +291,8 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   const [savedChoices,setSavedChoices]=useState<Record<string,SavedChoice>>({});
   const [choiceError,setChoiceError]=useState("");
   const [selectionBusy,setSelectionBusy]=useState(false);
+  const selectionQueue=useRef<Promise<void>>(Promise.resolve());
+  const selectionVersion=useRef(0);
   useEffect(() => {
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
     desiredChecks.current=new Map((draft?.rows??[]).map(row=>[row.index,row.selected]));
@@ -336,10 +338,23 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     const planned=rows.map(row=>({...row,selected:belongs(row.index)&&
       (desiredChecks.current.get(row.index)??row.selected)}));
     setRows(planned);setSavedNumber("");setSelectionBusy(true);
-    void invoke("setDraftSelections",{draftId:draft.draftId,
-      selections:planned.map(row=>({index:row.index,symbol:row.symbol,selected:row.selected}))})
-      .catch(error=>setError(error instanceof Error?error.message:String(error)))
-      .finally(()=>setSelectionBusy(false));
+    // Serialize snapshots: a slower SQL/host response must not overwrite a
+    // newer species filter selection when the user switches groups quickly.
+    const version=++selectionVersion.current;
+    const payload={draftId:draft.draftId,
+      selections:planned.map(row=>({index:row.index,symbol:row.symbol,selected:row.selected}))};
+    selectionQueue.current=selectionQueue.current
+      .catch(()=>{/* An earlier failed snapshot must not block the next one. */})
+      .then(async()=>{
+        await invoke("setDraftSelections",payload);
+      })
+      .catch(error=>{
+        if(version===selectionVersion.current)
+          setError(error instanceof Error?error.message:String(error));
+      })
+      .finally(()=>{
+        if(version===selectionVersion.current)setSelectionBusy(false);
+      });
     // Changing the filter uses catalogue compatibility already loaded once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[speciesGroup,compatibility,compatibilityDraftId,draft]);
@@ -414,7 +429,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     });
   }
   async function saveCard(confirmDuplicate = false) {
-    if (!draft || busy || applyBusy) return;
+    if (!draft || busy || applyBusy || selectionBusy) return;
     if (!await reviewBefore("save")) return;
     setBusy(true); setError("");
     try {
@@ -446,7 +461,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     finally {setBusy(false);}
   }
   async function printPreview() {
-    if (!draft || busy || applyBusy) return;
+    if (!draft || busy || applyBusy || selectionBusy) return;
     if (!await reviewBefore("preview")) return;
     setBusy(true);
     try {
@@ -620,8 +635,8 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       <Typography.Text type="secondary">{draft.payer.split("\n")[0]}</Typography.Text>
     </div><Space>
       <Button onClick={onDocuments}>Dokumenty</Button>
-      <Button onClick={()=>{void printPreview();}} loading={busy} disabled={applyBusy}>Podgląd wydruku</Button>
-      <Button type="primary" onClick={()=>{void saveCard();}} loading={busy} disabled={applyBusy}>Zapisz kartę do SQL</Button>
+      <Button onClick={()=>{void printPreview();}} loading={busy} disabled={applyBusy||selectionBusy}>Podgląd wydruku</Button>
+      <Button type="primary" onClick={()=>{void saveCard();}} loading={busy} disabled={applyBusy||selectionBusy}>Zapisz kartę do SQL</Button>
     </Space></div>
     <Card className="treatment-autofill">
       <Space wrap>
