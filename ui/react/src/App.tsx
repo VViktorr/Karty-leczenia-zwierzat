@@ -274,7 +274,9 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     try{
       const result=await invoke<TreatmentBulkResult>("applyTreatmentSuggestions",{
         draftId:draft.draftId, rows,
-        candidates:readySuggestions.map(s=>({index:s.index,variantId:s.variantId}))
+        candidates:readySuggestions.map(s=>({index:s.index,variantId:s.variantId,
+          species:s.species,route:s.route,dosing:s.dosing,withdrawal:s.withdrawal,
+          source:s.source,hasPdf:s.hasPdf}))
       });
       const applied=new Map(result.applied.map(item=>[item.index,item]));
       setRows(current=>current.map(row=>{
