@@ -231,7 +231,10 @@ COMMIT;
 }
 
 function Initialize-Catalogue {
-    if ((Invoke-LocalSql 'KartyLeczenia' 'SELECT COUNT(*) FROM dbo.catalog_import WHERE id = 1;') -eq 1) { return }
+    # Re-run the importer on every server installation. In update mode it
+    # inserts only missing medicines and variant keys and leaves existing
+    # operator changes untouched. Clients never run this server-side import.
+    $initialized = (Invoke-LocalSql 'KartyLeczenia' 'SELECT COUNT(*) FROM dbo.catalog_import WHERE id = 1;') -eq 1
 
     $package = Join-Path $PSScriptRoot 'catalog-seed-win-x64.zip'
     $directory = Join-Path $PSScriptRoot ("catalog-seed-" + [Guid]::NewGuid().ToString('N'))
@@ -240,7 +243,9 @@ function Initialize-Catalogue {
         $installer = Join-Path $directory 'KartyLeczenia.CatalogImport.exe'
         $server = if ($instance -eq 'MSSQLSERVER') { 'lpc:localhost' } else { "lpc:localhost\$instance" }
         $log = Join-Path $directory 'import-error.txt'
-        $result = Start-Process -FilePath $installer -ArgumentList ('"{0}" "{1}"' -f $server, $directory) `
+        $importArgs = ('"{0}" "{1}"' -f $server, $directory)
+        if ($initialized) { $importArgs += ' --apply-update' }
+        $result = Start-Process -FilePath $installer -ArgumentList $importArgs `
             -Wait -PassThru -NoNewWindow -RedirectStandardError $log
         if ($result.ExitCode -ne 0) {
             $detail = Get-Content -LiteralPath $log -Raw
