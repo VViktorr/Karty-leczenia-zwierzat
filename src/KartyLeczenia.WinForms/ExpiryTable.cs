@@ -14,7 +14,8 @@ internal sealed class ExpiryTable : Table
     string? sortKey;
     SortMode sortMode;
 
-    sealed record Layout(bool ShowAntd, int[] Order, int[] Widths);
+    // ShowAntd remains only for backward compatibility with earlier saved layouts.
+    sealed record Layout(bool ShowAntd, int[] Order, int[] Widths, bool[]? Visible = null);
 
     internal ExpiryTable(int interfaceScale)
     {
@@ -48,8 +49,6 @@ internal sealed class ExpiryTable : Table
             return true;
         };
     }
-
-    internal bool ShowAntd { get; private set; } = true;
 
     Column CreateColumn(string key, string title, int width, string? format = null) =>
         new(key, title) { Width = Scale(width).ToString(CultureInfo.InvariantCulture), DisplayFormat = format,
@@ -127,10 +126,16 @@ internal sealed class ExpiryTable : Table
         try
         {
             if (!File.Exists(LayoutPath) || JsonSerializer.Deserialize<Layout>(File.ReadAllText(LayoutPath)) is not { } layout) return;
-            ShowAntd = layout.ShowAntd;
             if (layout.Widths?.Length == expiryColumns.Length)
                 for (int i = 0; i < expiryColumns.Length; i++)
                     expiryColumns[i].Width = Scale(Math.Clamp(layout.Widths[i], 40, 2000)).ToString(CultureInfo.InvariantCulture);
+            if (layout.Visible?.Length == expiryColumns.Length)
+            {
+                // At least one column must remain visible.
+                if (layout.Visible.Any(visible => visible))
+                    for (int i = 0; i < expiryColumns.Length; i++)
+                        expiryColumns[i].Visible = layout.Visible[i];
+            }
             if (layout.Order?.Length == expiryColumns.Length &&
                 layout.Order.Order().SequenceEqual(Enumerable.Range(0, expiryColumns.Length)))
                 SetSortColumnsIndex(layout.Order);
@@ -141,7 +146,38 @@ internal sealed class ExpiryTable : Table
         }
     }
 
-    internal void SaveLayout(bool showAntd)
+    internal void ShowColumnsMenu(Control anchor)
+    {
+        var menu = new ContextMenuStrip();
+        int visibleColumns = expiryColumns.Count(column => column.Visible);
+        foreach (var column in expiryColumns)
+        {
+            var item = new ToolStripMenuItem(column.Title)
+            {
+                Checked = column.Visible,
+                CheckOnClick = false,
+                Enabled = !column.Visible || visibleColumns > 1
+            };
+            item.Click += (_, _) =>
+            {
+                column.Visible = !column.Visible;
+                Invalidate();
+            };
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Przywróć wszystkie kolumny", null, (_, _) =>
+        {
+            foreach (var column in expiryColumns) column.Visible = true;
+            Invalidate();
+        });
+        // Keep the popup alive until it closes.
+        menu.Show(anchor, new Point(0, anchor.Height));
+        // Don't dispose the popup before WinForms has finished showing it.
+        menu.Closed += (_, _) => menu.Dispose();
+    }
+
+    internal void SaveLayout()
     {
         try
         {
@@ -152,7 +188,7 @@ internal sealed class ExpiryTable : Table
             string temp = LayoutPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                File.WriteAllText(temp, JsonSerializer.Serialize(new Layout(showAntd, SortColumnsIndex(), widths)));
+                File.WriteAllText(temp, JsonSerializer.Serialize(new Layout(true, SortColumnsIndex(), widths, expiryColumns.Select(column => column.Visible).ToArray())));
                 File.Move(temp, LayoutPath, overwrite: true);
             }
             finally { File.Delete(temp); }
