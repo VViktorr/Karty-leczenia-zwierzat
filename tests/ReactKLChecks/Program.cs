@@ -672,6 +672,16 @@ static class Program
                   CardPdfService.AttachmentName("") == "karta-leczenia.pdf" &&
                   CardPdfService.AttachmentName("   ") == "karta-leczenia.pdf",
                 "PDF attachments must use the source document number and Windows-safe characters");
+            var completeness = PriceCatalogueSnapshot.FromRows([
+                ("OK",new PriceVariant("Bydło","domięśniowo","zakażenia",
+                    "1 ml","10 dni","","Tkanki: 10 dni")),
+                ("MISSING",new PriceVariant("Świnie","doustnie","",
+                    "5 ml","","",""))
+            ]);
+            Check(!completeness.NeedsCompletion("ok") &&
+                  completeness.NeedsCompletion("MISSING") &&
+                  completeness.NeedsCompletion("UNKNOWN"),
+                "missing catalogue products must be identified from SQL variant snapshot");
             Console.WriteLine($"ReactKL regression checks passed: {checks}");
         }
         finally
