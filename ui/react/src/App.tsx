@@ -1189,16 +1189,16 @@ function Expiry() {
     return a.expires.localeCompare(b.expires)||a.name.localeCompare(b.name,"pl");
   });
   const expiryColumns:ColumnsType<MedicineExpiry> = [
-          {title:"Lek",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
-          {title:"Seria",dataIndex:"batch",width:150},
-          {title:"Data przyjęcia",dataIndex:"received",width:160,render:date,
+          {key:"name",title:"Lek",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
+          {key:"batch",title:"Seria",dataIndex:"batch",width:150},
+          {key:"received",title:"Data przyjęcia",dataIndex:"received",width:160,render:date,
             sorter:(a,b)=>(a.received??"").localeCompare(b.received??"")},
-          {title:"Data ważności",dataIndex:"expires",width:160,render:date,
+          {key:"expires",title:"Data ważności",dataIndex:"expires",width:160,render:date,
             defaultSortOrder:"ascend",
             sorter:(a,b)=>(a.expires??"9999").localeCompare(b.expires??"9999")},
-          {title:"Pozostało",dataIndex:"remaining",align:"right",width:125},
-          {title:"Magazyn",dataIndex:"warehouseName",width:160},
-          {title:"Status",width:145,render:(_,row)=>days(row)===null ?
+          {key:"remaining",title:"Pozostało",dataIndex:"remaining",align:"right",width:125},
+          {key:"warehouseName",title:"Magazyn",dataIndex:"warehouseName",width:160},
+          {key:"status",title:"Status",width:145,render:(_,row)=>days(row)===null ?
             <Tag>Brak daty</Tag> : days(row)!<0 ? <Tag color="red">Przeterminowane</Tag> :
               days(row)!<=30 ? <Tag color="orange">Do 30 dni</Tag> : <Tag color="green">Aktualne</Tag>}
   ];
