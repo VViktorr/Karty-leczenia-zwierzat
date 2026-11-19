@@ -40,7 +40,7 @@ internal sealed record PricePrintOptions
             WithdrawalFormat is < 0 or > 2 ||
             Legend is not ("hidden" or "start" or "every") ||
             string.IsNullOrWhiteSpace(Font) || Font.Length > 100 ||
-            Font.ContainsAny([';', '{', '}', '\n', '\r']))
+            Font.IndexOfAny([';', '{', '}', '\n', '\r']) >= 0)
             throw new ArgumentException("Nieprawidłowe parametry wydruku cennika.");
         if (Widths is null || Widths.Length != 5 || Widths.Any(x => x is < 1 or > 100) ||
             ColumnFonts is null || ColumnFonts.Length != 6 ||
@@ -53,8 +53,8 @@ internal sealed record PricePrintOptions
             PageFontSizes.Any(x => x is < 6 or > 48) ||
             ColumnWeights.Any(x => x is < 400 or > 900) ||
             ColumnAlignments.Any(x => x is not ("left" or "center" or "right")) ||
-            ColumnFonts.Concat(PageFontNames).Any(x => x.Length > 100 ||
-                x.ContainsAny([';', '{', '}', '\n', '\r'])))
+            ColumnFonts.Concat(PageFontNames).Any(x => x is null || x.Length > 100 ||
+                x.IndexOfAny([';', '{', '}', '\n', '\r']) >= 0))
             throw new ArgumentException("Nieprawidłowe formatowanie kolumn cennika.");
         return this;
     }
