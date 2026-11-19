@@ -162,6 +162,13 @@ internal sealed class ReactWindow : Form
             requestId = Text(root, "id", 80);
             string action = Text(root, "action", 40);
             if (string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(action)) return;
+            if (action == "cancelRequest")
+            {
+                string cancelledId = Text(root, "requestId", 80);
+                if (active.TryGetValue(cancelledId, out var runningRequest))
+                    runningRequest.Cancel();
+                return;
+            }
             cancel = new CancellationTokenSource(action is "backupDatabase" or "restoreDatabase"
                 ? TimeSpan.FromMinutes(45) : action == "installUpdate"
                     ? TimeSpan.FromMinutes(15) : action == "purgeTrashedCard"
