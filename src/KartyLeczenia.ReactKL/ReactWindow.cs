@@ -154,7 +154,8 @@ internal sealed class ReactWindow : Form
             if (string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(action)) return;
             cancel = new CancellationTokenSource(action is "backupDatabase" or "restoreDatabase"
                 ? TimeSpan.FromMinutes(45) : action == "installUpdate"
-                    ? TimeSpan.FromMinutes(15) : TimeSpan.FromSeconds(45));
+                    ? TimeSpan.FromMinutes(15) : action == "purgeTrashedCard"
+                        ? TimeSpan.FromMinutes(3) : TimeSpan.FromSeconds(45));
             active[requestId] = cancel;
             object result = await Handle(action, root, cancel.Token);
             if (!cancel.IsCancellationRequested) Send(requestId, result);
