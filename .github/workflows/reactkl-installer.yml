@@ -1,0 +1,59 @@
+name: ReactKL installer (manual version)
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Wpisz recznie wersje instalatora, np. 2.2.5'
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Ensure Inno Setup is installed
+        shell: pwsh
+        run: |
+          $iscc = @(
+            'C:\Program Files\Inno Setup 7\ISCC.exe',
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe'
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (!$iscc) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Nie udalo sie zainstalowac Inno Setup.' }
+          }
+      - name: Build manual-version in-place SQL KartyLeczenia setup
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+            throw 'Wersja musi miec format X.Y.Z lub X.Y.Z.W.'
+          }
+          ./installer/Build-ReactKL.ps1 -Version $env:RELEASE_VERSION
+      - name: Verify installer
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $path = "Instalatory/KartyLeczenia-Setup-win-x64-v$env:RELEASE_VERSION.exe"
+          if (!(Test-Path -LiteralPath $path)) { throw "Nie znaleziono $path" }
+          Get-FileHash -Path $path -Algorithm SHA256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KartyLeczenia-Setup-win-x64
+          path: Instalatory/KartyLeczenia-Setup-win-x64-v*.exe
+          if-no-files-found: error
+          retention-days: 14
