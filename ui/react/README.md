@@ -36,9 +36,11 @@ na pendrive z Windows Hello i kontrolą SHA-256.
 - Bezpośrednie zapytania SQL wykonuje tylko C#, nie JavaScript.
 - Hasła SQL są zabezpieczane przez Windows DPAPI w istniejących ustawieniach.
 - Wydruk korzysta z `CardHtmlRenderer` z `KartyLeczenia.Core`.
-- Katalog React pozwala edytować/dodawać warianty i przypisywać PDF, ale **nie**
-  ma jeszcze automatycznej ekstrakcji propozycji z ChPL, kasowania istniejących
-  wariantów ani pełnej kontroli zgodności danych klinicznych.
+- Katalog React pozwala edytować/dodawać warianty i przypisywać PDF, a tekstowe
+  ChPL analizuje offline jako **propozycje** z ostrzeżeniami i fragmentami źródłowymi.
+  Dopiero po zatwierdzeniu przenosi proponowane dane do edytora, bez automatycznego
+  zapisu w SQL. Nadal nie ma OCR dla skanów, usuwania istniejących wariantów ani
+  pełnej kontroli zgodności danych klinicznych.
 - Nadal brakuje wszystkich parametrów wydruków, odtwarzania kopii SQL i mechanizmu
   publikacji aktualizacji. Tych funkcji nie wolno uważać za gotowe.
 - Wymagane testy na Windows z rzeczywistym SQL, Subiektem i drukarką.

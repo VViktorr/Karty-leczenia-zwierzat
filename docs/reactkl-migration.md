@@ -17,7 +17,10 @@ Data: 19 listopada 2026.
 - Cennik i terminy ważności przez `MedicineStockService`.
 - Katalog SQL: wyszukiwanie produktów, edycja wariantów i karencji, podgląd PDF ChPL,
   dołączanie PDF do wielu wariantów i zapis z ochroną przed nadpisaniem zmian z innego stanowiska.
-  Zachowano istniejące schematy SQL; nie dodawano automatycznego uzupełniania danych klinicznych.
+  Dodatkowo offline ekstrakcja ostrożnych propozycji z tekstowych ChPL (PdfPig):
+  użytkownik widzi ostrzeżenia i fragmenty źródłowe i osobno akceptuje uzupełnienie
+  wyłącznie pustych pól. **Propozycja nie jest zapisywana bezpośrednio do SQL**.
+  Zachowano istniejące schematy SQL.
 - Ustawienia połączenia Subiekt/SQL i dane lekarza.
 - Archiwizacja: pojedynczy .bak w lokalizacji docelowej, tymczasowy plik SQL,
   weryfikacja SHA-256, postęp kopiowania, Windows Hello.
@@ -26,9 +29,10 @@ Data: 19 listopada 2026.
 - Testy GUI na Windows 11 (wygląd przy DPI 80–200%, ergonomia, klawiatura, wyświetlanie dużych dokumentów).
 - Weryfikacja kliniczna automatycznego doboru gatunku, wskazania, dawkowania,
   karencji, źródeł ChPL i zapamiętywania wariantów.
-- Automatyczny odczyt propozycji z ChPL, walidacja wskazań oraz kompleksowy edytor źródeł
-  i wszystkich operacji na kartotekach (np. usuwanie wariantów) — obecny edytor React
-  obejmuje wyszukiwanie, edycję, dodawanie wariantów i powiązania istniejących PDF.
+- Weryfikacja poprawności propozycji ChPL z dokumentami urzędowymi,
+  obsługa skanów bez warstwy tekstowej (obecnie wyraźny błąd, brak OCR), zaawansowana
+  edycja źródeł i wszystkie operacje na kartotekach (np. usuwanie istniejących wariantów).
+  Obecny edytor pozwala edytować, dodawać, dołączać PDF i ręcznie przyjmować propozycje.
 - Odtwarzanie bazy z pendrive i publikacja/aktualizacja instalatora z SQL.
 - Zaawansowane ustawienia wydruków i czyszczenie kosza po dodatkowej autoryzacji.
 - Potwierdzenie zgodności druków z dotychczasowym programem.
