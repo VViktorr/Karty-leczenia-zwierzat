@@ -67,3 +67,31 @@ jobs:
           path: ReactKL-preview/
           if-no-files-found: error
           retention-days: 14
+      - name: Install Inno Setup for compiler smoke test
+        shell: pwsh
+        run: |
+          $known = @(
+            'C:\Program Files\Inno Setup 7\ISCC.exe',
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe'
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (!$known) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup install failed.' }
+          }
+      - name: Compile in-place Inno Setup script (smoke only; no release/version)
+        shell: pwsh
+        run: |
+          $iscc = @(
+            'C:\Program Files\Inno Setup 7\ISCC.exe',
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe'
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (!$iscc) { throw 'ISCC.exe not found.' }
+          $payload = (Resolve-Path ReactKL-preview).Path
+          $output = Join-Path (Get-Location) 'ReactKL-InnoSmoke'
+          & $iscc '/DReleaseVersion=0.0.0' '/DReleaseFileVersion=0.0.0.0' "/DPayloadDir=$payload" "/O$output" 'installer/KartyLeczenia.ReactKL.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'In-place installer script compilation failed.' }
+          if (!(Test-Path (Join-Path $output 'KartyLeczenia-Setup-win-x64-v0.0.0.exe'))) {
+            throw 'Inno Setup did not produce the expected smoke-test file.'
+          }
