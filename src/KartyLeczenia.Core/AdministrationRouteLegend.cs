@@ -35,6 +35,14 @@ public static class AdministrationRouteLegend
         if (lower.Contains("pour-on") || lower.Contains("polewan")) return "POUR-ON";
         if (lower.Contains("spot-on") || lower.Contains("nakrapian")) return "SPOT-ON";
 
+        // A combined instruction must retain every supported route rather
+        // than being silently shortened to just the first match.
+        var injectionRoutes = new List<string>();
+        if (lower.Contains("dożyln") || lower.Contains("dozyln")) injectionRoutes.Add("IV");
+        if (lower.Contains("domięśniow") || lower.Contains("domiesniow")) injectionRoutes.Add("IM");
+        if (lower.Contains("podskórn") || lower.Contains("podskorn")) injectionRoutes.Add("SC");
+        if (injectionRoutes.Count > 1) return string.Join(" / ", injectionRoutes);
+
         // These forms occur in Polish ChPL and in auto-imported variants:
         // e.g. "dożylna (i.v.)", "domięśniowa (i.m.)", "podskórna (s.c.)".
         if (lower.Contains("domięśniow") || lower.Contains("domiesniow")) return "IM";
