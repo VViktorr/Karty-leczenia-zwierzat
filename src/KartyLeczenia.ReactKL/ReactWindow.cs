@@ -572,6 +572,83 @@ internal sealed class ReactWindow : Form
         // They must remain available when Subiekt GT is temporarily offline.
         if (action == "renderSavedCard")
             return new { html = cards.RenderSaved(Text(root, "id", 40), Flag(root, "trash")) };
+        if (action is "saveCardPdf" or "emailCardPdf")
+        {
+            // The archived SQL card is the single authoritative source. An
+            // old preview must not produce a stale PDF after another station
+            // changed the clinical data.
+            string id = Text(root, "id", 40);
+            bool trash = Flag(root, "trash");
+            if (!Guid.TryParseExact(id, "N", out var cardId))
+                throw new ArgumentException("Nieprawidłowy identyfikator karty.");
+            var stored = JsonSerializer.Deserialize<Card>(cards.ReadSavedJson(id, trash))
+                ?? throw new InvalidDataException("Zapisana karta nie zawiera poprawnych danych.");
+            string fileName = CardPdfService.AttachmentName(
+                stored.Fields.GetValueOrDefault("Dokument źródłowy"));
+            string? destination = null;
+            if (action == "saveCardPdf")
+            {
+                using var save = new SaveFileDialog
+                {
+                    Title = "Zapisz kartę leczenia jako PDF",
+                    Filter = "Dokument PDF (*.pdf)|*.pdf",
+                    AddExtension = true, DefaultExt = "pdf",
+                    FileName = fileName, OverwritePrompt = true
+                };
+                if (save.ShowDialog(this) != DialogResult.OK)
+                    return new { cancelled = true, fileName = "", recipient = "" };
+                destination = save.FileName;
+            }
+            // Render a separate WebView2 page on this UI/STA thread; never
+            // navigate the main React editor away from the current screen.
+            string temporary = await CardPdfService.RenderAsync(
+                this, CardHtmlRenderer.Render(stored), token);
+            try
+            {
+                if (destination is not null)
+                {
+                    CardPdfService.MoveToDestination(temporary, destination);
+                    return new { cancelled = false,
+                        fileName = Path.GetFileName(destination), recipient = "" };
+                }
+                var (payerId, scope) = await ReadSavedCardPayer(cardId, trash, token);
+                string? recipient = null;
+                var source = subiekt.Load().Options;
+                if (payerId is > 0 && source is not null &&
+                    string.Equals(scope,
+                        source.Server.ToUpperInvariant() + "|" +
+                        source.Database.ToUpperInvariant(), StringComparison.Ordinal))
+                {
+                    using var mailTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    mailTimeout.CancelAfter(TimeSpan.FromSeconds(5));
+                    try
+                    {
+                        recipient = await documents.ReadPayerEmailAsync(
+                            source, payerId.Value, mailTimeout.Token);
+                    }
+                    catch (Exception ex) when (ex is SqlException or
+                        OperationCanceledException or InvalidOperationException)
+                    {
+                        // No recipient is preferable to using the card's
+                        // recipient rather than its actual Subiekt payer.
+                        CrashLog.Write("ReactKL.Card.PayerEmail", ex);
+                    }
+                }
+                var mail = PdfMail.ComposeInBackground(temporary, fileName, recipient);
+                _ = mail.ContinueWith(task =>
+                {
+                    if (task.Exception is { } failure)
+                        CrashLog.Write("ReactKL.Card.Mail", failure);
+                }, TaskContinuationOptions.OnlyOnFaulted);
+                return new { cancelled = false, fileName, recipient = recipient ?? "" };
+            }
+            finally
+            {
+                try { File.Delete(temporary); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
         if (action == "exportSavedCardJson")
         {
             // A read-only operation; the Windows user chooses the destination
@@ -1011,6 +1088,25 @@ internal sealed class ReactWindow : Form
             return cards.Save(draft, reported, performed, findings, Flag(root, "confirmDuplicate"));
         }
         throw new InvalidOperationException("Nieznana operacja interfejsu: " + action);
+    }
+
+    private async Task<(int? PayerId, string Scope)> ReadSavedCardPayer(
+        Guid id, bool trash, CancellationToken token)
+    {
+        await using var db = ArchiveDb();
+        await db.OpenAsync(token);
+        using var query = new SqlCommand("""
+            SELECT payer_id,source_scope FROM dbo.treatment_cards
+            WHERE id=@id AND ((@trash=0 AND deleted_at_utc IS NULL)
+                OR (@trash=1 AND deleted_at_utc IS NOT NULL));
+            """, db) { CommandTimeout = 10 };
+        query.Parameters.Add("@id", System.Data.SqlDbType.UniqueIdentifier).Value = id;
+        query.Parameters.Add("@trash", System.Data.SqlDbType.Bit).Value = trash;
+        await using var reader = await query.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token))
+            throw new InvalidOperationException("Karta została usunięta lub przeniesiona.");
+        return (reader.IsDBNull(0) ? null : reader.GetInt32(0),
+            reader.GetString(1));
     }
 
     private async Task<object> ReadSavedCards(CancellationToken token,
