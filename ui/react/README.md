@@ -1,31 +1,44 @@
-# ReactKL — uruchamialny interfejs testowy
+# ReactKL — nowy interfejs bez AntdUI
 
-React + TypeScript + Ant Design wewnątrz Windows WebView2. Dane SQL są obsługiwane przez istniejący kod C#.
+**Jedynym interfejsem użytkownika na tej gałęzi jest React + TypeScript + WebView2.**
+WinForms służy wyłącznie jako natywne okno hostujące WebView2, bez dawnych formularzy.
+C#/.NET oraz SQL Server odpowiadają za dane, logikę leczenia, zapis i wydruki.
 
-## Jak zbudować
+## Budowanie lokalne (Windows 11)
 
-1. W katalogu `ui/react`: wykonaj `npm install`, następnie `npm run build`.
-2. W katalogu głównym wykonaj `dotnet build src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release`.
-3. Uruchom program z parametrem `--react` (np. `KartyLeczenia.WinForms.exe --react`).
-4. Jeśli ustawienia połączenia Subiekta nie są zapisane, uruchom zwykły WinForms i skonfiguruj je najpierw tam.
+```powershell
+cd ui/react
+npm install
+npm run build
+cd ../..
+dotnet publish src/KartyLeczenia.ReactKL/KartyLeczenia.ReactKL.csproj -c Release -r win-x64 --self-contained true -o ReactKL-preview
+.\ReactKL-preview\KartyLeczenia.ReactKL.exe
+```
 
-Build .NET kopiuje wcześniej zbudowany frontend do katalogu `react-ui` obok programu.
+Workflow [ReactKL frontend and Windows desktop checks](../../.github/workflows/reactkl-checks.yml) kompiluje frontend,
+aplikację C#, testy regresji i tworzy artefakt `ReactKL-win-x64-preview`.
+Wymagany Microsoft Edge WebView2 Runtime.
 
-## Wybór skórki
+## Widoki
 
-Układy: Modern (menu boczne), Classic (zakładki u góry), Fluent (Windows 11).
-Motywy barwne: jasny, ciemny, morski. Układ i kolor zapamiętywane są w profilu WebView2 na stanowisku.
+React ma trzy wymienne układy: Modern (menu boczne), Classic (zakładki) i Fluent
+(Windows 11). Niezależnie można wybrać motyw jasny, ciemny lub morski.
 
-## Etap pierwszy
+Interfejs obejmuje: dokumenty FS/PA/WZ, podgląd i edycję karty leczenia, podgląd
+wydruku, zapis karty do SQL, listę zapisanych kart i kosz, cennik, terminy
+ważności, dane lecznicy, konfigurację Subiekta i archiwum oraz pełną kopię SQL
+na pendrive z Windows Hello i kontrolą SHA-256.
 
-- Lista FS / PA / WZ z rzeczywistymi danymi Subiekta i sortowaniem.
-- Wyszukiwanie, filtry rodzaju, okresu i podgląd pozycji dokumentu.
-- Przycisk umożliwiający uruchomienie pełnej funkcjonalności w niezmienionym WinForms.
+## Bezpieczeństwo i ograniczenia
 
-**Nieukończone:** edytor i wydruk karty leczenia, cennik, zapisane karty, terminy ważności, archiwizacja i aktualizacje pozostają w WinForms. Nie wyłączamy ich przed migracją.
+- Brak AntdUI w nowym projekcie i brak przełączania na stare okna.
+- Bezpośrednie zapytania SQL wykonuje tylko C#, nie JavaScript.
+- Hasła SQL są zabezpieczane przez Windows DPAPI w istniejących ustawieniach.
+- Wydruk korzysta z `CardHtmlRenderer` z `KartyLeczenia.Core`.
+- Nie migrowano jeszcze całego zaawansowanego edytora katalogu ChPL/PDF,
+  wszystkich parametrów wydruków, odtwarzania kopii SQL i mechanizmu
+  publikacji aktualizacji — tych funkcji nie wolno uważać za gotowe.
+- Wymagane testy na Windows z rzeczywistym SQL, Subiektem i drukarką.
 
-## Bezpieczeństwo
-
-React nie przechowuje haseł SQL. WebView2 dopuszcza tylko lokalny wirtualny host, a most C# akceptuje tylko jawne polecenia searchDocuments, readDocument, openClassic. Frontend nie korzysta z CDN ani z zewnętrznego serwera WWW.
-
-Do pełnego wdrożenia potrzebne są testy z prawdziwym SQL Serverem i aktualizacja workflow produkcyjnego instalatora. Numer aplikacji pozostaje pod ręczną kontrolą.
+Historyczna aplikacja WinForms jest zabezpieczona na gałęzi
+`winforms-backup-2026-11-19` i nie stanowi części pakietu ReactKL.
