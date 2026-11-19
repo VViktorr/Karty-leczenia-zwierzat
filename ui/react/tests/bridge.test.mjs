@@ -14,7 +14,7 @@ test("record IDs cannot overwrite the RPC correlation ID",async()=>{
   const pending=invoke("savedCard",{id:savedId,trash:false});
   const sent=posted.at(-1);
   assert.equal(sent.id,savedId);
-  assert.ok(/^\\d+$/.test(sent._bridgeRequestId));
+  assert.ok(/^[0-9]+$/.test(sent._bridgeRequestId));
   assert.notEqual(sent._bridgeRequestId,savedId);
   deliver({data:{id:sent._bridgeRequestId,ok:true,data:{savedId}}});
   assert.deepEqual(await pending,{savedId});
