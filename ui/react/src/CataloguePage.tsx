@@ -44,7 +44,7 @@ function emptyVariant(): UiVariant {
   };
 }
 
-export default function CataloguePage() {
+export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: boolean) => void}) {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [list, setList] = useState<CatalogueListing[]>([]);
@@ -57,6 +57,7 @@ export default function CataloguePage() {
   const [editing, setEditing] = useState<CatalogueProduct | null>(null);
   const [variants, setVariants] = useState<UiVariant[]>([]);
   const [dirty, setDirty] = useState(false);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfName, setPdfName] = useState("");
   const [version, setVersion] = useState(0);
@@ -152,9 +153,7 @@ export default function CataloguePage() {
     } finally { setWorking(false); }
   }
 
-  const closePdf = useCallback(() => {
-    setPdfUrl(previous => { if (previous) URL.revokeObjectURL(previous); return null; });
-  }, []);
+  const closePdf = useCallback(() => { setPdfUrl(null); }, []);
 
   useEffect(() => () => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
@@ -263,8 +262,7 @@ export default function CataloguePage() {
           pagination={{ pageSize: 20, showSizeChanger: false }}
           scroll={{ y: "calc(100vh - 370px)" }}
           onRow={row => ({
-            onClick: () => { void openProduct(row); },
-            onDoubleClick: () => { void openProduct(row); }
+            onClick: () => { void openProduct(row); }
           })}
           rowClassName={row =>
             editing?.symbol === row.symbol ? "catalogue-selected" : ""}
