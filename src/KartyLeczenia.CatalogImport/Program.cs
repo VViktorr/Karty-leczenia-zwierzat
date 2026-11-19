@@ -28,6 +28,9 @@ try
     bool initialized = marker.ExecuteScalar() is not null;
     if (initialized && !updating)
     {
+        // Older installers used the basic import command even after SQL was
+        // initialized. The additive manifest is always safe to reapply.
+        CatalogueAdditions.Apply(sql, transaction, root);
         transaction.Commit();
         return 0;
     }
@@ -98,6 +101,7 @@ try
         }
         if (preview)
         {
+            CatalogueAdditions.Apply(sql, transaction, root);
             transaction.Rollback();
             return 0;
         }
@@ -123,6 +127,7 @@ try
             INSERT dbo.catalog_price_withdrawal(id,compact_text)
             SELECT ids.new_id,w.compact_text FROM #withdrawals w JOIN #variantIds ids ON ids.old_id = w.id;
             """);
+        CatalogueAdditions.Apply(sql, transaction, root);
         transaction.Commit();
         Console.WriteLine("Aktualizacja katalogu zapisana.");
         return 0;
@@ -171,6 +176,7 @@ try
     Copy("upd_search", "id,name", "dbo.catalog_upd_search");
     marker.CommandText = "INSERT dbo.catalog_import(id) VALUES (1);";
     marker.ExecuteNonQuery();
+    CatalogueAdditions.Apply(sql, transaction, root);
     transaction.Commit();
     return 0;
 }
