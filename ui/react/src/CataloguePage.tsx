@@ -17,6 +17,15 @@ interface CatalogueProduct {
   symbol: string; name: string; rplId: string; description: string;
   revision: string; variants: CatalogueVariant[];
 }
+interface ChplProposal {
+  variants: CatalogueVariant[];
+  evidence: string;
+  warnings: string[];
+}
+interface PendingChplProposal extends ChplProposal {
+  path: string;
+  filename: string;
+}
 interface UiVariant extends CatalogueVariant { key: string; }
 
 const textFields = [
@@ -60,6 +69,7 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfName, setPdfName] = useState("");
+  const [proposal, setProposal] = useState<PendingChplProposal | null>(null);
   const [version, setVersion] = useState(0);
   const [msgApi, contextHolder] = message.useMessage();
 
@@ -151,6 +161,56 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setWorking(false); }
+  }
+
+  async function suggestFromPdf() {
+    if (!editing || working) return;
+    setWorking(true);
+    setError("");
+    try {
+      const picked = await invoke<{cancelled:boolean;path?:string;name?:string}>(
+        "chooseCataloguePdf");
+      if (picked.cancelled || !picked.path) return;
+      const result = await invoke<ChplProposal>("analyseCataloguePdf", {path:picked.path});
+      setProposal({...result,path:picked.path,filename:picked.name ?? "ChPL.pdf"});
+    } catch(e) {
+      setError(e instanceof Error?e.message:String(e));
+    } finally {setWorking(false);}
+  }
+
+  function acceptProposal() {
+    if (!proposal) return;
+    let added=0, filled=0, skipped=0;
+    const next = [...variants];
+    for (const suggestion of proposal.variants) {
+      const species = suggestion.species.trim();
+      const route = suggestion.route.trim();
+      const match = next.find(row =>
+        row.species.trim().toLocaleLowerCase("pl")===species.toLocaleLowerCase("pl") &&
+        row.route.trim().toLocaleLowerCase("pl")===route.toLocaleLowerCase("pl"));
+      if (match) {
+        const update = {...match};
+        for (const field of ["indication","dose","tissues","milk","source"] as const) {
+          if (!update[field].trim() && suggestion[field]?.trim()) {
+            update[field] = suggestion[field];filled++;
+          }
+        }
+        if (!update.pdf && proposal.path) {update.pdf=proposal.path;filled++;}
+        next[next.indexOf(match)] = update;
+      } else if (species && route && suggestion.dose.trim()) {
+        next.push({...emptyVariant(),...suggestion,id:null,key:"new-"+crypto.randomUUID(),
+          pdf:proposal.path});
+        added++;
+      } else skipped++;
+    }
+    setVariants(next);
+    if (added || filled) setDirty(true);
+    void msgApi.info(
+      "Propozycje w edytorze: dodano "+added+
+      " wariantów, uzupełniono "+filled+" pustych pól, pominięto "+skipped+
+      ". Sprawdź każdą pozycję przed zapisem SQL."
+    );
+    setProposal(null);
   }
 
   const closePdf = useCallback(() => { setPdfUrl(null); }, []);
@@ -319,6 +379,9 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
                 onClick={() => { void choosePdf(); }}>
                 Dołącz PDF do zaznaczonych ({selected.length})
               </Button>
+              <Button disabled={working} onClick={() => { void suggestFromPdf(); }}>
+                Wczytaj propozycje z ChPL
+              </Button>
             </Space>
             <Typography.Text type="secondary">
               Istniejące warianty nie są kasowane przez pominięcie w edytorze.
@@ -337,6 +400,40 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
         </>}
       </Card>
     </div>
+    <Modal open={proposal !== null}
+      title={"Sprawdź odczyt ChPL — " + (proposal?.filename ?? "")}
+      width="90vw"
+      onCancel={() => setProposal(null)}
+      footer={<Space>
+        <Button onClick={() => setProposal(null)}>Anuluj</Button>
+        <Button type="primary" disabled={!proposal?.variants.length}
+          onClick={acceptProposal}>
+          Przenieś propozycje do edytora (bez zapisu SQL)
+        </Button>
+      </Space>}>
+      {proposal && <>
+        <Alert className="notice" type="warning" showIcon
+          message="To tylko automatyczna propozycja. Sprawdź zgodność każdej wartości z aktualną urzędową polską ChPL."
+          description="Dane z dokumentów wielogatunkowych lub niejednoznacznych mogą pozostać puste."/>
+        {proposal.warnings.map((warning,index) =>
+          <Alert key={index} type="info" className="notice" showIcon message={warning}/>)}
+        <Table<CatalogueVariant> rowKey={(_,index)=>String(index)}
+          dataSource={proposal.variants} pagination={false} size="small"
+          scroll={{x:1100,y:230}}
+          columns={[
+            {title:"Gatunek",dataIndex:"species",width:120},
+            {title:"Droga podania",dataIndex:"route",width:135},
+            {title:"Wskazanie",dataIndex:"indication",width:245,ellipsis:true},
+            {title:"Dawkowanie",dataIndex:"dose",width:255,ellipsis:true},
+            {title:"Tkanki",dataIndex:"tissues",width:180,ellipsis:true},
+            {title:"Mleko",dataIndex:"milk",width:160,ellipsis:true}
+          ]}/>
+        <Typography.Title level={5} style={{marginTop:18}}>
+          Rozpoznane fragmenty źródłowe (do weryfikacji)
+        </Typography.Title>
+        <pre className="chpl-evidence">{proposal.evidence}</pre>
+      </>}
+    </Modal>
     <Modal open={pdfUrl !== null} title={"ChPL — " + pdfName}
       width="94vw" destroyOnClose
       onCancel={closePdf}
