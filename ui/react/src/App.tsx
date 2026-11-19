@@ -457,6 +457,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
           Zastosuj do edytora ({readySuggestions.length})
         </Button>
       </Space>}>
+      <ErrorNotice error={variantError}/>
       <Alert type="warning" className="notice" showIcon
         message="Sprawdź każdą dawkę i karencję przed zatwierdzeniem"
         description="Dopasowanie następuje wyłącznie po symbolu Subiekta. Wpisy ręczne nie będą nadpisywane, a zapis karty w SQL pozostaje oddzielną czynnością."/>
@@ -471,8 +472,11 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
           {title:"Dawkowanie",dataIndex:"dosing",width:260},
           {title:"Karencja",dataIndex:"withdrawal",width:270},
           {title:"Źródło",dataIndex:"source",width:155},
-          {title:"PDF ChPL",dataIndex:"hasPdf",width:110,
-            render:(value:boolean)=>value?"Przypisany":"Brak"}
+          {title:"PDF ChPL",dataIndex:"pdfPath",width:155,
+            render:(path:string)=>path
+              ? <Button size="small" disabled={variantBusy}
+                  onClick={()=>{void viewVariantPdf(path);}}>Otwórz ChPL</Button>
+              : "Brak"}
         ]}/>
     </Modal>
     <Modal width="90vw" open={variantModal!==null}
