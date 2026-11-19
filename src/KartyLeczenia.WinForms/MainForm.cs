@@ -202,27 +202,6 @@ internal sealed class MainForm : Form
         }
     }
 
-    sealed class DocumentGrid : DataGridView
-    {
-        public DocumentGrid() { }
-
-        internal event EventHandler? OpenRequested;
-
-        protected override bool ProcessDialogKey(Keys keyData)
-            => TryOpen(keyData) || base.ProcessDialogKey(keyData);
-
-        protected override bool ProcessDataGridViewKey(KeyEventArgs e)
-            => TryOpen(e.KeyData) || base.ProcessDataGridViewKey(e);
-
-        bool TryOpen(Keys keyData)
-        {
-            if (keyData != Keys.Enter) return false;
-            if (CurrentRow?.DataBoundItem is DocumentSuggestion)
-                OpenRequested?.Invoke(this, EventArgs.Empty);
-            return true;
-        }
-    }
-
     static DataGridView NewGrid() => NewGrid<DataGridView>();
 
     static T NewGrid<T>() where T : DataGridView, new() => new T()
