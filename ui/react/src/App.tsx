@@ -28,6 +28,17 @@ interface TreatmentVariantChoice {
 interface TreatmentVariantList {
   product:string;symbol:string;variants:TreatmentVariantChoice[];
 }
+interface TreatmentSuggestion {
+  index:number;symbol:string;status:string;message:string;
+  variantId:number|null;species:string;route:string;dosing:string;
+  withdrawal:string;source:string;hasPdf:boolean;
+}
+interface TreatmentSuggestionList { items:TreatmentSuggestion[]; }
+interface TreatmentBulkResult {
+  applied:Array<{index:number;species:string;route:string;dosing:string;
+    withdrawal:string;indication:string;description:string}>;
+  skipped:string[];
+}
 interface PriceLevel { number: number; name: string; }
 interface MedicinePrice {
   symbol: string; name: string; gross: number | null; withdrawal: string; latestBatch: string;
@@ -187,9 +198,27 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   const [variantError,setVariantError]=useState("");
   const [variantPdfUrl,setVariantPdfUrl]=useState<string|null>(null);
   const [variantPdfName,setVariantPdfName]=useState("");
+  const [suggestions,setSuggestions]=useState<TreatmentSuggestion[]>([]);
+  const [suggestBusy,setSuggestBusy]=useState(false);
+  const [suggestError,setSuggestError]=useState("");
+  const [suggestReviewOpen,setSuggestReviewOpen]=useState(false);
+  const [applyBusy,setApplyBusy]=useState(false);
+  const [autofillMessage,setAutofillMessage]=useState("");
+  const [suggestTick,setSuggestTick]=useState(0);
   useEffect(() => {
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
   }, [draft]);
+  useEffect(()=>{
+    if(!draft){setSuggestions([]);return;}
+    let cancelled=false;
+    setSuggestBusy(true);setSuggestError("");
+    invoke<TreatmentSuggestionList>("treatmentSuggestions",{draftId:draft.draftId})
+      .then(result=>{if(!cancelled)setSuggestions(result.items);})
+      .catch(e=>{if(!cancelled){setSuggestions([]);setSuggestError(
+        e instanceof Error?e.message:String(e));}})
+      .finally(()=>{if(!cancelled)setSuggestBusy(false);});
+    return()=>{cancelled=true;};
+  },[draft,suggestTick]);
   useEffect(()=>()=>{if(variantPdfUrl)URL.revokeObjectURL(variantPdfUrl);},[variantPdfUrl]);
   async function saveCard(confirmDuplicate = false) {
     if (!draft || busy) return;
@@ -233,6 +262,36 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     } catch(e) {setError(e instanceof Error ? e.message : String(e));}
     finally {setBusy(false);}
   }
+  const readySuggestions=suggestions.filter(s=>{
+    if(s.status!=="ready" || s.variantId==null)return false;
+    const row=rows.find(x=>x.index===s.index);
+    return !!row && row.selected && row.symbol===s.symbol &&
+      !row.dosing?.trim() && !row.withdrawal?.trim();
+  });
+  async function applySuggestions(){
+    if(!draft || !readySuggestions.length || applyBusy)return;
+    setApplyBusy(true);setAutofillMessage("");setError("");
+    try{
+      const result=await invoke<TreatmentBulkResult>("applyTreatmentSuggestions",{
+        draftId:draft.draftId, rows,
+        candidates:readySuggestions.map(s=>({index:s.index,variantId:s.variantId}))
+      });
+      const applied=new Map(result.applied.map(item=>[item.index,item]));
+      setRows(current=>current.map(row=>{
+        const item=applied.get(row.index);
+        return item ? {...row,...item} : row;
+      }));
+      setSuggestReviewOpen(false);
+      setAutofillMessage(result.applied.length+
+        " jednoznacznych wariantów wstawiono do edytora. "+
+        "Sprawdź dawkowanie i karencję przed zapisem karty."+
+        (result.skipped.length?" Pominięto: "+result.skipped.join(" "):""));
+      setSuggestTick(value=>value+1);
+      setSavedNumber("");
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setApplyBusy(false);}
+  }
+
   async function openVariants(row:DraftRow){
     if(!draft || variantBusy)return;
     setVariantBusy(true);setVariantError("");setError("");
@@ -271,6 +330,9 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       setRows(current=>current.map(row=>row.index===variantModal.index
         ? {...row,...result} : row));
       setVariantModal(null);
+      setSuggestions(current=>current.map(s=>s.index===variantModal.index
+        ? {...s,status:"existingData",message:"Wariant wybrany ręcznie."} : s));
+      setSavedNumber("");
       setError(!result.withdrawal?.trim()
         ? "Wybrany wariant nie zawiera pełnej karencji w katalogu SQL. Zweryfikuj ChPL i uzupełnij karencję ręcznie przed zapisem karty, jeżeli jest wymagana."
         : "");
@@ -286,6 +348,11 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     if (!field) return;
     const previous = rows;
     setRows(current => current.map(row => row.index === index ? {...row,[key]:value} : row));
+    if(["species","route","dosing","withdrawal"].includes(String(key))){
+      setSuggestions(current=>current.map(s=>s.index===index
+        ? {...s,status:"existingData",message:"Zmieniono dane w edytorze — sprawdź wariant ręcznie."} : s));
+    }
+    setSavedNumber("");
     try { await invoke("updateDraft", {draftId:draft.draftId,index,field,
       ...(key === "selected" ? {checked:value} : {value})}); setError(""); }
     catch (e) { setRows(previous); setError(e instanceof Error ? e.message : String(e)); }
@@ -294,6 +361,19 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     {title:"Druk",dataIndex:"selected",width:63,render:(value:boolean,row) =>
       <Checkbox checked={value} onChange={e => {void update(row.index,"selected",e.target.checked);}}/>},
     {title:"Produkt",dataIndex:"product",width:240,ellipsis:true,fixed:"left"},
+    {title:"Dopasowanie z SQL",key:"suggestion",width:185,
+      render:(_value:unknown,row:DraftRow)=>{
+        const item=suggestions.find(x=>x.index===row.index);
+        if(!item)return "—";
+        const color=item.status==="ready"?"green":
+          item.status==="review"||item.status==="ambiguous"?"orange":"default";
+        const label=item.status==="ready"?"Jednoznaczny":
+          item.status==="review"?"Sprawdź ChPL":
+          item.status==="ambiguous"?"Kilka wariantów":
+          item.status==="existingData"?"Dane istnieją":
+          item.status==="unselected"?"Odznaczony":"Wybór ręczny";
+        return <Tag color={color} title={item.message}>{label}</Tag>;
+      }},
     {title:"Wariant ChPL",key:"variant",width:150,
       render:(_value:unknown,row:DraftRow)=><Button size="small"
         disabled={!row.symbol || variantBusy}
@@ -328,6 +408,29 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       <Button onClick={()=>{void printPreview();}} loading={busy}>Podgląd wydruku</Button>
       <Button type="primary" onClick={()=>{void saveCard();}} loading={busy}>Zapisz kartę do SQL</Button>
     </Space></div>
+    <Card className="treatment-autofill">
+      <Space wrap>
+        <Typography.Text strong>Podpowiedzi z katalogu SQL</Typography.Text>
+        <Typography.Text type="secondary">
+          {suggestBusy?"Sprawdzam symbole produktów...":
+            readySuggestions.length+" jednoznacznych wariantów do uzupełnienia"}
+        </Typography.Text>
+        <Button loading={suggestBusy} disabled={applyBusy}
+          onClick={()=>setSuggestTick(v=>v+1)}>Odśwież propozycje</Button>
+        <Button type="primary" disabled={!readySuggestions.length||suggestBusy||applyBusy}
+          onClick={()=>setSuggestReviewOpen(true)}>
+          Przejrzyj i uzupełnij ({readySuggestions.length})
+        </Button>
+      </Space>
+      <Typography.Text type="secondary">
+        Warianty niejednoznaczne, bez potwierdzonej ChPL albo z już wpisanymi danymi
+        wymagają ręcznego wyboru. Nic nie jest automatycznie zapisywane do SQL.
+      </Typography.Text>
+      {suggestError&&<Alert type="warning" showIcon className="notice"
+        message={"Nie udało się pobrać propozycji: "+suggestError}/>}
+      {autofillMessage&&<Alert type="info" showIcon className="notice"
+        message={autofillMessage}/>}
+    </Card>
     <Card className="treatment-meta">
       <Space wrap>
         <label>Data zgłoszenia <Input type="datetime-local" value={reported} onChange={e=>setReported(e.target.value)}/></label>
@@ -341,6 +444,35 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}</Typography.Text>
     </Card>
+    <Modal width="90vw" open={suggestReviewOpen}
+      title="Potwierdź uzupełnienie jednoznacznych wariantów ChPL"
+      onCancel={()=>{if(!applyBusy)setSuggestReviewOpen(false);}}
+      footer={<Space>
+        <Button disabled={applyBusy} onClick={()=>setSuggestReviewOpen(false)}>Anuluj</Button>
+        <Button type="primary" loading={applyBusy}
+          disabled={!readySuggestions.length}
+          onClick={()=>{void applySuggestions();}}>
+          Zastosuj do edytora ({readySuggestions.length})
+        </Button>
+      </Space>}>
+      <Alert type="warning" className="notice" showIcon
+        message="Sprawdź każdą dawkę i karencję przed zatwierdzeniem"
+        description="Dopasowanie następuje wyłącznie po symbolu Subiekta. Wpisy ręczne nie będą nadpisywane, a zapis karty w SQL pozostaje oddzielną czynnością."/>
+      <Table<TreatmentSuggestion> rowKey="index" size="small"
+        dataSource={readySuggestions} pagination={false}
+        scroll={{x:1160,y:350}}
+        columns={[
+          {title:"Produkt",width:240,render:(_v,item)=>
+            rows.find(x=>x.index===item.index)?.product||item.symbol},
+          {title:"Gatunek",dataIndex:"species",width:120},
+          {title:"Droga",dataIndex:"route",width:100},
+          {title:"Dawkowanie",dataIndex:"dosing",width:260},
+          {title:"Karencja",dataIndex:"withdrawal",width:270},
+          {title:"Źródło",dataIndex:"source",width:155},
+          {title:"PDF ChPL",dataIndex:"hasPdf",width:110,
+            render:(value:boolean)=>value?"Przypisany":"Brak"}
+        ]}/>
+    </Modal>
     <Modal width="90vw" open={variantModal!==null}
       title={"Dobór wariantu leku — "+(variantModal?.product||"")}
       onCancel={()=>{if(!variantBusy)setVariantModal(null);}}
