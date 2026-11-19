@@ -217,6 +217,9 @@ internal sealed class TreatmentTable : AntdUI.Table
         {
             displayed.RaiseListChangedEvents = true;
             displayed.ResetBindings();
+            // Force an AntdUI refresh even when a particular package version
+            // does not subscribe to BindingList.ListChanged through DataSource.
+            DataSource = displayed.ToArray();
         }
         if (selectedBeforeRefresh is not null &&
             displayed.FirstOrDefault(row => ReferenceEquals(row.Source, selectedBeforeRefresh)) is { } updated)
