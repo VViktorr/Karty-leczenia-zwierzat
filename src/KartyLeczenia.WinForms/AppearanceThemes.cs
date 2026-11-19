@@ -397,9 +397,15 @@ internal static class AppearanceThemes
             };
             return next;
         });
-        var font = new Font(state.OriginalFont.FontFamily, appearance.TableFontSize,
-            state.OriginalFont.Style, GraphicsUnit.Point);
-        state.ThemeFonts.Add(font);
+        var font = state.ThemeFonts.FirstOrDefault(existing =>
+            Math.Abs(existing.SizeInPoints - appearance.TableFontSize) < .01f &&
+            existing.Style == state.OriginalFont.Style);
+        if (font is null)
+        {
+            font = new Font(state.OriginalFont.FontFamily, appearance.TableFontSize,
+                state.OriginalFont.Style, GraphicsUnit.Point);
+            state.ThemeFonts.Add(font);
+        }
         state.ThemeFont = font;
         // Set the new font before triggering AntdUI's synchronous row re-layout.
         table.Font = font;
