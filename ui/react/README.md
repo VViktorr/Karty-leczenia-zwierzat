@@ -47,3 +47,38 @@ na pendrive z Windows Hello i kontrolą SHA-256.
 
 Historyczna aplikacja WinForms jest zabezpieczona na gałęzi
 `winforms-backup-2026-11-19` i nie stanowi części pakietu ReactKL.
+
+
+## Aktualizacje i instalacja w miejsce poprzedniej wersji
+
+**ReactKL zastępuje dotychczasową instalację** — ten sam Inno Setup AppId
+`pl.kartyleczenia.winforms.sql`, katalog `C:\Program Files\KartyLeczenia`,
+skróty i rola serwer/stanowisko w `archive-installation.ini`. Istniejący plik
+konfiguracji archiwum jest zachowywany. Stare EXE i AntdUI.dll są usuwane
+przy instalacji, ale pliki użytkownika, bazy SQLite, PDF i .bak nie są czyszczone.
+
+Numer wersji jest zawsze podawany ręcznie:
+
+```powershell
+.\installer\Build-ReactKL.ps1 -Version 2.2.5
+```
+
+(Powyższe `2.2.5` to przykład — faktyczny numer wybiera operator.)
+Wynik: `Instalatory\KartyLeczenia-Setup-win-x64-v<wersja>.exe`.
+Dostępny również workflow `.github/workflows/reactkl-installer.yml` z
+ręcznym polem wersji.
+
+W trybie serwera instalator po zainstalowaniu kopiuje się tymczasowo do
+`{app}\KartyLeczenia-Update-Pending-v<wersja>.exe`. Przy pierwszym uruchomieniu
+ReactKL publikuje ten plik do **istniejącej** tabeli
+`KartyLeczenia.dbo.program_update`, sprawdza wersję i sumę SHA-256, a po
+sukcesie usuwa kopię oczekującą. Publikacja wymaga UAC oraz uprawnień SQL.
+Jeżeli się nie uda, w Ustawieniach można użyć "Opublikuj instalator".
+
+Stanowisko zdalne po uruchomieniu sprawdza tę samą tabelę i proponuje nowszą
+wersję. Pobieranie/uruchomienie wymaga zgody użytkownika; sprawdzane są
+SHA-256 i metadane pliku. Przy aktualizacji instalator nadpisuje poprzednią
+instalację. **Nie publikujemy już do osobnej tabeli react_program_update.**
+
+Nie zamieniaj instalatora produkcyjnego bez wcześniejszego sprawdzenia
+z prawdziwym serwerem SQL i stacjami Windows.
