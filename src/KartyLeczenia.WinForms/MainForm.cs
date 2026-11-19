@@ -343,6 +343,7 @@ internal sealed class MainForm : Form
             control.Anchor = AnchorStyles.None;
             control.Margin = new Padding(3);
         }
+        AppearanceThemes.EqualizeSelectors(documentKinds.Values);
         UpdateDocumentKindButtons();
     }
 
@@ -791,6 +792,7 @@ internal sealed class MainForm : Form
             };
         }
 
+        AppearanceThemes.EqualizeSelectors(filters.Select(x => x.Button));
         var columnsButton = new Button { Text = "Kolumny", AutoSize = true };
         columnsButton.Click += (_, _) => expiryTable.ShowColumnsMenu(columnsButton);
         page = Page("Terminy ważności", expiryTable, Action("Odśwież", LoadExpiries),
