@@ -44,6 +44,11 @@ IF OBJECT_ID(N'dbo.catalog_products', N'U') IS NULL OR
    OBJECT_ID(N'dbo.catalog_price_withdrawal', N'U') IS NULL
     THROW 51001, N'Brak tabel katalogu leków. Najpierw przygotuj archiwum SQL.', 1;
 
+IF OBJECT_ID(N'dbo.catalog_import', N'U') IS NULL
+    THROW 51003, N'Nie zaimportowano jeszcze katalogu SQL.', 1;
+IF NOT EXISTS (SELECT 1 FROM dbo.catalog_import WHERE id = 1)
+    THROW 51003, N'Najpierw zaimportuj katalog instalatorem serwera.', 1;
+
 DECLARE @symbol nvarchar(128) = @symbolParameter;
 DECLARE @path nvarchar(450) = @pathParameter;
 
