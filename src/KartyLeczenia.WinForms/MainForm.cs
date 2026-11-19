@@ -13,6 +13,7 @@ internal sealed class MainForm : Form
     TabControl? settingsTabs;
     readonly DocumentsTable documents;
     readonly DataGridView treatment = NewGrid();
+    TreatmentTable? treatmentView;
     readonly PriceTable prices;
     List<MedicinePrice> priceRows = [];
     readonly ExpiryTable expiryTable;
@@ -865,6 +866,7 @@ internal sealed class MainForm : Form
         }
         if (rows.Length > 1)
             treatment.Sort(new TreatmentGroupOrder(rows, excludedTreatmentRows));
+        treatmentView?.RefreshFromSource();
     }
 
     sealed class TreatmentGroupOrder(DataGridViewRow[] rows, Dictionary<DataGridViewRow, bool> excluded)
@@ -1354,6 +1356,7 @@ internal sealed class MainForm : Form
         {
             treatment.EndEdit();
             treatment.InvalidateColumn(treatment.Columns["Karencja"]!.Index);
+            treatmentView?.RefreshFromSource();
         };
         treatment.CellFormatting += (_, e) =>
         {
@@ -1422,11 +1425,128 @@ internal sealed class MainForm : Form
             if (!full)
                 foreach (DataGridViewRow row in treatment.Rows) row.Height = treatment.RowTemplate.Height;
             treatment.InvalidateColumn(column.Index);
+            treatmentView?.RefreshFromSource();
         };
         cardSpeciesGroup.Items.AddRange(["Wszystkie gatunki", "Bydło", "Świnie", "Drób", "Pies", "Kot"]);
         cardSpeciesGroup.SelectedIndex = 0;
         cardSpeciesGroup.SelectedIndexChanged += (_, _) => ApplyCardSpeciesGroup();
-        var page = Page("Karta leczenia", treatment,
+        // AntdUI is the visible card table. The original grid is retained as
+        // an off-screen state/editor model so treatment-choice and PDF logic is
+        // not duplicated or discarded during migration.
+        var treatmentHost = new Panel { Dock = DockStyle.Fill };
+        treatment.Visible = false;
+        treatmentHost.Controls.Add(treatment);
+        treatmentView = new TreatmentTable(treatment, interfaceScale);
+        treatmentHost.Controls.Add(treatmentView);
+        treatmentView.BringToFront();
+
+        treatmentView.EditRequested = async (row, key) =>
+        {
+            if (row.DataGridView != treatment || row.IsNewRow) return;
+            try
+            {
+                if (key == TreatmentChoices.Route)
+                {
+                    await PickTreatmentRoute(row);
+                    return;
+                }
+                if (key == ReferenceColumn)
+                {
+                    PickTreatmentReference(row);
+                    return;
+                }
+                if (key == IndicationColumn)
+                {
+                    ShowTreatmentIndication(row);
+                    return;
+                }
+                if (key == AnimalDescriptionColumn)
+                {
+                    await EditSharedAnimals(row);
+                    return;
+                }
+                if (!treatment.Columns.Contains(key)) return;
+
+                var cell = row.Cells[key];
+                using var editor = new Form
+                {
+                    Text = "Karta leczenia — " + treatment.Columns[key]!.HeaderText,
+                    StartPosition = FormStartPosition.CenterParent,
+                    AutoScaleMode = AutoScaleMode.Dpi,
+                    FormBorderStyle = FormBorderStyle.Sizable,
+                    MinimumSize = new Size(480, 225),
+                    ClientSize = new Size(680, 255)
+                };
+                var layout = new TableLayoutPanel
+                {
+                    Dock = DockStyle.Fill, Padding = new Padding(16),
+                    ColumnCount = 1, RowCount = 3
+                };
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.Controls.Add(new Label
+                {
+                    Text = treatment.Columns[key]!.HeaderText,
+                    AutoSize = true
+                }, 0, 0);
+                Control input;
+                ComboBox? variants = null;
+                TextBox? textInput = null;
+                if (cell is DataGridViewComboBoxCell combo)
+                {
+                    variants = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
+                    foreach (object item in combo.Items) variants.Items.Add(item);
+                    variants.SelectedItem = cell.Value;
+                    input = variants;
+                }
+                else
+                {
+                    textInput = new TextBox
+                    {
+                        Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical,
+                        Text = cell.Value?.ToString() ?? ""
+                    };
+                    input = textInput;
+                }
+                layout.Controls.Add(input, 0, 1);
+                var actions = new FlowLayoutPanel
+                {
+                    Dock = DockStyle.Fill, AutoSize = true,
+                    FlowDirection = FlowDirection.RightToLeft
+                };
+                var apply = new Button { Text = "Zastosuj", AutoSize = true, DialogResult = DialogResult.OK };
+                var cancel = new Button { Text = "Anuluj", AutoSize = true, DialogResult = DialogResult.Cancel };
+                actions.Controls.AddRange([apply, cancel]);
+                layout.Controls.Add(actions, 0, 2);
+                editor.Controls.Add(layout);
+                editor.AcceptButton = apply;
+                editor.CancelButton = cancel;
+                AppearanceThemes.ApplySurface(editor, appearance);
+                if (DialogPlacement.Show(editor, this, "treatment-antdui-cell-editor") != DialogResult.OK)
+                    return;
+                string newText = variants?.SelectedItem?.ToString() ?? textInput?.Text ?? "";
+                if (key == TreatmentChoices.Species && variants?.SelectedItem is null) return;
+                cell.Value = newText;
+                if (key == AnimalDescriptionColumn && newText.Trim().Length > 0 &&
+                    currentCard is { PayerId: > 0 } card)
+                {
+                    var archive = Archive();
+                    await RunArchive(() => { archive.SaveDescription(card, newText.Trim()); return true; });
+                }
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write("Treatment.AntdUI.Edit", ex);
+                status.Text = ex.Message;
+                MessageBox.Show(this, ex.Message, "Edycja karty leczenia",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally { treatmentView?.RefreshFromSource(); }
+        };
+        tabs.SelectedIndexChanged += (_, _) => treatmentView?.RefreshFromSource();
+        Shown += (_, _) => treatmentView?.RefreshFromSource();
+        var page = Page("Karta leczenia", treatmentHost,
             new Label { Text = "Gatunek", AutoSize = true, Anchor = AnchorStyles.Left }, cardSpeciesGroup, withdrawalMode, routeMode,
             new Label { Text = "Data leczenia", AutoSize = true, Anchor = AnchorStyles.Left }, treatmentDate,
             Action("Otwórz ChPL", async () =>
