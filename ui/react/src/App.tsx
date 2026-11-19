@@ -1252,6 +1252,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
   const [editing,setEditing]=useState(false);
   const [editBusy,setEditBusy]=useState(false);
   const [printHtml,setPrintHtml]=useState<string|null>(null);
+  const [printTarget,setPrintTarget]=useState<SavedCard|null>(null);
+  const [pdfBusy,setPdfBusy]=useState<string|null>(null);
   const printFrame=useRef<HTMLIFrameElement>(null);
   const [error,setError]=useState("");
   const [purgeTarget,setPurgeTarget]=useState<SavedCard|null>(null);
@@ -1330,6 +1332,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       remote.reload();
       try{
         const result=await invoke<{html:string}>("renderSavedCard",{id:selected.id,trash:false});
+        setPrintTarget(selected);
         setPrintHtml(result.html);
       }catch(previewError){
         setError("Karta została zaktualizowana, ale podgląd nie jest dostępny: "+
@@ -1351,8 +1354,22 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
   async function printSaved(row: SavedCard) {
     try {
       const result=await invoke<{html:string}>("renderSavedCard",{id:row.id,trash});
-      setPrintHtml(result.html);setError("");
+      setPrintTarget(row);setPrintHtml(result.html);setError("");
     } catch(e) {setError(e instanceof Error?e.message:String(e));}
+  }
+  async function cardPdf(row:SavedCard,mail:boolean){
+    if(pdfBusy)return;
+    setPdfBusy(row.id);setError("");setNotice("");
+    try{
+      const result=await invoke<{cancelled:boolean;fileName:string;recipient:string}>(
+        mail?"emailCardPdf":"saveCardPdf",{id:row.id,trash});
+      if(!result.cancelled)setNotice(mail
+        ? "Przygotowano wiadomość z załącznikiem „"+result.fileName+
+          "”. Adres płatnika: "+(result.recipient||"brak w Subiekcie — wpisz ręcznie")+
+          ". Sprawdź wiadomość w programie pocztowym przed wysłaniem."
+        : "Zapisano kartę jako PDF: "+result.fileName);
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setPdfBusy(null);}
   }
   async function exportJson(row:SavedCard){
     if(exportingId)return;
@@ -1412,9 +1429,13 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           {title:"Data",dataIndex:"date",render:date,width:145},
           {title:"Kontrahent",dataIndex:"client",ellipsis:true},
           {title:"Dokument",dataIndex:"document",width:175},
-          {title:"Czynności",width:430,render:(_,row)=><Space>
+          {title:"Czynności",width:650,render:(_,row)=><Space wrap>
             <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
             <Button size="small" onClick={()=>{void printSaved(row);}}>Drukuj</Button>
+            <Button size="small" loading={pdfBusy===row.id}
+              onClick={()=>{void cardPdf(row,false);}}>Zapisz PDF</Button>
+            <Button size="small" loading={pdfBusy===row.id}
+              onClick={()=>{void cardPdf(row,true);}}>Wyślij mailem</Button>
             <Button size="small" loading={exportingId===row.id}
               onClick={()=>{void exportJson(row);}}>Eksport JSON</Button>
             <Button size="small" danger={!trash} onClick={()=>changeTrash(row)}>{trash?"Przywróć":"Kosz"}</Button>
@@ -1458,6 +1479,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           </Button>
         </> : <>
           {!trash&&<Button onClick={beginEdit} disabled={!card}>Edytuj zapisaną kartę</Button>}
+          {selected&&<Button disabled={!!pdfBusy} onClick={()=>{void cardPdf(selected,false);}}>Zapisz PDF</Button>}
+          {selected&&<Button disabled={!!pdfBusy} onClick={()=>{void cardPdf(selected,true);}}>Wyślij mailem</Button>}
           <Button onClick={discardSaved}>Zamknij</Button>
         </>}
       </Space>}
@@ -1503,8 +1526,12 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       </>}
     </Modal>
     <Modal className="kl-dialog-saved-preview" width="92vw" open={printHtml!==null} title="Podgląd zapisanej karty leczenia"
-      onCancel={()=>setPrintHtml(null)} footer={<Space>
+      onCancel={()=>setPrintHtml(null)} footer={<Space wrap>
         <Button onClick={()=>setPrintHtml(null)}>Zamknij</Button>
+        {printTarget&&<Button loading={pdfBusy===printTarget.id}
+          onClick={()=>{void cardPdf(printTarget,false);}}>Zapisz PDF</Button>}
+        {printTarget&&<Button loading={pdfBusy===printTarget.id}
+          onClick={()=>{void cardPdf(printTarget,true);}}>Wyślij mailem</Button>}
         <Button type="primary" onClick={()=>printFrame.current?.contentWindow?.print()}>Drukuj</Button>
       </Space>}>
       {printHtml&&<iframe ref={printFrame} title="Wydruk zapisanej karty" srcDoc={printHtml}
