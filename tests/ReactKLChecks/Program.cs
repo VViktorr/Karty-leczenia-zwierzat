@@ -399,6 +399,30 @@ static class Program
             Check(invalidDescriptionRejected,
                 "animal description memory must require a scoped identity");
 
+            // Window placement is local to each workstation. Off-screen
+            // monitor geometry must not trap the application window.
+            var workArea = new System.Drawing.Rectangle(0, 0, 1920, 1040);
+            var fallback = new System.Drawing.Rectangle(150, 100, 1400, 850);
+            var minSize = new System.Drawing.Size(900, 600);
+            Check(ReactWindowPlacement.VisibleBounds(
+                new System.Drawing.Rectangle(200, 150, 1100, 700),
+                [workArea], fallback, minSize) ==
+                new System.Drawing.Rectangle(200, 150, 1100, 700),
+                "window geometry must retain size and position");
+            Check(ReactWindowPlacement.VisibleBounds(
+                new System.Drawing.Rectangle(-3200, 100, 1100, 700),
+                [workArea], fallback, minSize) == fallback,
+                "disconnected monitor must return the window on-screen");
+            Check(ReactWindowPlacement.VisibleBounds(
+                new System.Drawing.Rectangle(1200, 750, 1100, 700),
+                [workArea], fallback, minSize) ==
+                new System.Drawing.Rectangle(820, 340, 1100, 700),
+                "partly visible windows should be clamped into working area");
+            Check(ReactWindowPlacement.VisibleBounds(
+                new System.Drawing.Rectangle(100, 100, 200, 200),
+                [workArea], fallback, minSize) == fallback,
+                "invalid saved window dimensions must be ignored");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
