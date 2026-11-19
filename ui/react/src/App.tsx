@@ -258,8 +258,38 @@ const editable: Array<{key: keyof DraftRow; field: string; title: string}> = [
   {key:"diagnosis",field:"Rozpoznanie",title:"Rozpoznanie"},
   {key:"section",field:"Sekcja (II lub III)",title:"Sekcja"}
 ];
+const treatmentColumns=[{value:"selected",label:"Druk"},{value:"product",label:"Produkt"},
+  {value:"suggestion",label:"Dopasowanie z SQL"},{value:"variant",label:"Wariant ChPL"},
+  {value:"quantity",label:"Ilość"},{value:"indication",label:"Wskazanie z ChPL"},
+  ...editable.map(({key,title})=>({value:key,label:title}))];
+const treatmentColumnKeys=treatmentColumns.map(column=>column.value);
 function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () => void}) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
+  const [showColumns,setShowColumns]=useState(false);
+  const [visibleColumns,setVisibleColumns]=useState<string[]>(()=>{
+    try{
+      const stored=JSON.parse(localStorage.getItem("kl.treatmentColumns")??"null");
+      if(Array.isArray(stored)){
+        const valid=stored.filter((value:unknown)=>typeof value==="string"&&
+          treatmentColumnKeys.includes(value));
+        return Array.from(new Set([...valid,"selected","product"]));
+      }
+    }catch{/* Use original columns if settings are unavailable. */}
+    return treatmentColumnKeys;
+  });
+  useEffect(()=>{
+    try{localStorage.setItem("kl.treatmentColumns",JSON.stringify(visibleColumns));}
+    catch{/* Current choice remains active for this session. */}
+  },[visibleColumns]);
+  useEffect(()=>{
+    const key=(event:KeyboardEvent)=>{
+      if(event.ctrlKey&&event.shiftKey&&event.code==="KeyL"){
+        event.preventDefault();setShowColumns(current=>!current);
+      }
+    };
+    window.addEventListener("keydown",key);
+    return()=>window.removeEventListener("keydown",key);
+  },[]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedNumber, setSavedNumber] = useState("");
@@ -682,6 +712,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
       <Typography.Text type="secondary">{draft.payer.split("\n")[0]}</Typography.Text>
     </div><Space>
       <Button onClick={onDocuments}>Dokumenty</Button>
+      <Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={()=>{void printPreview();}} loading={busy} disabled={applyBusy||selectionBusy}>Podgląd wydruku</Button>
       <Button type="primary" onClick={()=>{void saveCard();}} loading={busy} disabled={applyBusy||selectionBusy}>Zapisz kartę do SQL</Button>
     </Space></div>
@@ -763,12 +794,30 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     </Card>
     {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
-    <Card><Table<DraftRow> rowKey="index" dataSource={sortedRows} columns={columns} size="small"
+    <Card><Table<DraftRow> rowKey="index" dataSource={sortedRows}
+      columns={columns.filter(column=>visibleColumns.includes(String(column.key??column.dataIndex)))} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
       scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>
+    <Modal open={showColumns} title="Parametry listy — karta leczenia"
+      onCancel={()=>setShowColumns(false)} onOk={()=>setShowColumns(false)}
+      okText="Gotowe" cancelButtonProps={{style:{display:"none"}}}>
+      <Typography.Paragraph type="secondary">
+        Wybierz widoczne kolumny. Produkt i zaznaczenie do wydruku pozostają zawsze dostępne.
+        Ustawienie jest zapamiętywane na tym stanowisku.
+      </Typography.Paragraph>
+      <Checkbox.Group style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}
+        value={visibleColumns} options={treatmentColumns.map(option=>({
+          ...option,disabled:option.value==="selected"||option.value==="product"
+        }))}
+        onChange={values=>setVisibleColumns(Array.from(new Set([
+          ...values.map(String),"selected","product"
+        ])))}/>
+      <Button size="small" style={{marginTop:16}}
+        onClick={()=>setVisibleColumns(treatmentColumnKeys)}>Przywróć wszystkie kolumny</Button>
+    </Modal>
     <Modal width="90vw" open={suggestReviewOpen}
       title="Potwierdź uzupełnienie jednoznacznych wariantów ChPL"
       onCancel={()=>{if(!applyBusy)setSuggestReviewOpen(false);}}
