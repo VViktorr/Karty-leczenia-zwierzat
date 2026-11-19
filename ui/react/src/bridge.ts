@@ -62,7 +62,8 @@ export function invoke<T>(action: string, fields: Record<string, unknown> = {},
       action === "installUpdate" ? 900000 :
       action === "purgeTrashedCard" ? 180000 :
       action === "analyseCataloguePdf" ? 120000 :
-      action === "saveCardPdf" || action === "emailCardPdf" ? 180000 : 40000);
+      action === "saveCardPdf" || action === "emailCardPdf" ? 180000 :
+      action === "missingCatalogueProducts" ? 90000 : 40000);
     pending.set(id, {
       resolve: value => {clean();resolve(value as T);},
       reject: error => {clean();reject(error);},

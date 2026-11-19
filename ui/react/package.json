@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:bridge": "node --experimental-strip-types --test tests/bridge.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

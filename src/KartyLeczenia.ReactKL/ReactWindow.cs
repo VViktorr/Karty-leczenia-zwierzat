@@ -192,7 +192,8 @@ internal sealed class ReactWindow : Form
             }
             cancel = new CancellationTokenSource(action is "backupDatabase" or "restoreDatabase"
                 ? TimeSpan.FromMinutes(45) : action is "saveCardPdf" or "emailCardPdf"
-                    ? TimeSpan.FromMinutes(3) : action == "installUpdate"
+                    ? TimeSpan.FromMinutes(3) : action == "missingCatalogueProducts"
+                    ? TimeSpan.FromMinutes(2) : action == "installUpdate"
                     ? TimeSpan.FromMinutes(15) : action == "purgeTrashedCard"
                         ? TimeSpan.FromMinutes(3) : TimeSpan.FromSeconds(45));
             active[requestId] = cancel;

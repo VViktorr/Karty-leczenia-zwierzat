@@ -17,6 +17,9 @@ jobs:
       - name: Install React dependencies
         working-directory: ui/react
         run: npm install --no-audit --no-fund
+      - name: Verify React-to-WebView2 RPC correlation
+        working-directory: ui/react
+        run: npm run test:bridge
       - name: Build React frontend
         working-directory: ui/react
         run: npm run build
