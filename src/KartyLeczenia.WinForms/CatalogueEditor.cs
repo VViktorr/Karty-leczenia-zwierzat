@@ -229,6 +229,11 @@ internal sealed class CatalogueEditor : Form
             string Value(int i) => row.Cells[i].Value?.ToString() ?? "";
             var edit = new CatalogueVariantEdit(original.Id, Value(0), Value(1), Value(2), Value(3),
                 Value(4), Value(5), Value(6), Value(7), Value(8), Value(9), Value(10));
+            // For new variants store the canonical upper-case administration
+            // route code (IV, IM, SC, PO...) instead of an arbitrary ChPL spelling.
+            // Existing SQL variants keep their current source unless edited.
+            if (edit.Id is null)
+                edit = edit with { Route = AdministrationRouteLegend.Abbreviate(edit.Route) };
             // A new imported proposal has no SQL id, even when the operator
             // accepts it without editing. Persist it after validation.
             if (edit == original && edit.Id is not null) continue;
