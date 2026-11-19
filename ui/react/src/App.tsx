@@ -641,11 +641,49 @@ interface UpdateRelease {
   newer:boolean;publishedAtUtc:string;
 }
 interface UpdateResult {release:UpdateRelease|null;currentVersion:string;}
+interface InstallUpdateStatus {
+  isServer:boolean; pending:boolean; installedVersion:string;
+  server:string; publicationError:string|null;
+}
+let checkedOnStartup=false;
+function AutomaticUpdateCheck(){
+  useEffect(()=>{
+    if(checkedOnStartup || !isDesktop())return;
+    checkedOnStartup=true;
+    void invoke<InstallUpdateStatus>("getUpdateStatus").then(async status=>{
+      if(status.isServer)return; // The SQL server publishes the pending installer on startup.
+      const result=await invoke<UpdateResult>("checkUpdate");
+      if(!result.release?.newer)return;
+      Modal.confirm({
+        title:"Dostępna aktualizacja KartyLeczenia",
+        content:"Wersja "+result.release.version+
+          " jest dostępna na serwerze SQL. Obecna wersja: "+result.currentVersion+
+          ". Czy pobrać instalator i zaktualizować program?",
+        okText:"Pobierz i zainstaluj",cancelText:"Później",
+        onOk:async()=>{await invoke("installUpdate");}
+      });
+    }).catch(()=>{/* Settings offers an explicit retry if SQL is temporarily unavailable. */});
+  },[]);
+  return null;
+}
 function UpdatePanel(){
   const [data,setData]=useState<UpdateResult|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
+  const [status,setStatus]=useState<InstallUpdateStatus|null>(null);
+  useEffect(()=>{
+    void invoke<InstallUpdateStatus>("getUpdateStatus").then(setStatus).catch(()=>{});
+  },[]);
+  async function publish(){
+    setBusy(true);setError("");setNotice("");
+    try{
+      await invoke("publishPendingUpdate");
+      setStatus(await invoke<InstallUpdateStatus>("getUpdateStatus"));
+      setNotice("Zainstalowany instalator został opublikowany w SQL.");
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy(false);}
+  }
   async function check(){
     setBusy(true);setError("");setNotice("");
     try{
@@ -689,10 +727,12 @@ function UpdatePanel(){
   return <Card className="settings-card">
     <Typography.Title level={4}>Aktualizacje ReactKL z SQL Server</Typography.Title>
     <Typography.Paragraph type="secondary">
-      Osobny kanał ReactKL — nie zmienia instalatorów WinForms ani bazy Subiekta.
-      Publikacja nowego instalatora na serwerze wymaga uprawnień administratora SQL.
+      Ten sam mechanizm co poprzednio: instalator trafia do SQL na komputerze serwera,
+      a stanowiska sprawdzają aktualizacje przy uruchomieniu. Numer wersji jest wpisywany ręcznie.
     </Typography.Paragraph>
     <ErrorNotice error={error}/>
+    {status?.publicationError && <Alert className="notice" type="warning" showIcon
+      message={"Publikacja na serwerze: "+status.publicationError}/>}
     {notice&&<Alert className="notice" showIcon
       type={data?.release?.newer?"info":"success"} message={notice}/>}
     <Space direction="vertical" size={12}>
@@ -705,8 +745,12 @@ function UpdatePanel(){
       </div>}
       <Space wrap>
         <Button loading={busy} onClick={()=>{void check();}}>Sprawdź aktualizację w SQL</Button>
-        <Button type="primary" loading={busy}
-          disabled={!data?.release?.newer} onClick={install}>Pobierz i zainstaluj</Button>
+        {status?.isServer && status.pending &&
+          <Button type="primary" loading={busy} onClick={()=>{void publish();}}>
+            Opublikuj instalator na serwerze SQL
+          </Button>}
+        {!status?.isServer && <Button type="primary" loading={busy}
+          disabled={!data?.release?.newer} onClick={install}>Pobierz i zainstaluj</Button>}
       </Space>
     </Space>
   </Card>;
@@ -810,6 +854,7 @@ export default function App() {
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards/>:<SettingsPage/>;
   return <ConfigProvider theme={appearance}>
+    <AutomaticUpdateCheck/>
     <div className={"app-shell layout-"+layout+" palette-"+palette}>
       {layout!=="classic"&&<aside className="sidebar">
         <div className="sidebar-brand"><div className="brand-mark">KL</div>
