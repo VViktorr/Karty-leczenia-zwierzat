@@ -95,14 +95,15 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   useEffect(() => {
     let expired = false;
     if (!enabled) {setBusy(false);return;}
+    const controller = new AbortController();
     const refresh = forceRefresh.current;
     forceRefresh.current = false;
     setBusy(true); setError("");
-    invoke<T>(action, refresh ? {...payload, refresh:true} : payload)
+    invoke<T>(action, refresh ? {...payload, refresh:true} : payload, undefined, controller.signal)
       .then(result => { if (!expired) setData(result); })
       .catch(reason => { if (!expired) setError(reason instanceof Error ? reason.message : String(reason)); })
       .finally(() => { if (!expired) setBusy(false); });
-    return () => { expired = true; };
+    return () => { expired = true; controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action, key, tick, enabled]);
   return {data, busy, error, reload: () => {
