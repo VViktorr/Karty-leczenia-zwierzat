@@ -100,25 +100,38 @@ internal sealed class ExpiryTable : Table
         ColumnBack = AppearanceThemes.Blend(canvas, ink, .06f);
         BorderColor = AppearanceThemes.Blend(background, ink, dark ? .23f : .13f);
         Bordered = options.GridLines;
-        RowHeight = Scale(options.RowHeight);
+        // Match Documents, Prices, SavedCards and Treatment AntdUI tables.
+        // The shared palette determines row height; avoid separate double-scaling.
+        RowHeight = options.RowHeight;
         RowHoverBg = AppearanceThemes.Blend(background, accent, .12f);
         RowSelectedBg = accent;
         RowSelectedFore = AppearanceThemes.ContrastingText(accent);
         ShowTip = options.ShowToolTips;
         alternatingBackground = options.AlternatingRows ? AppearanceThemes.Blend(background, ink, .045f) : null;
-        var previousFont = themeFont;
-        themeFont = new Font(Font.FontFamily, options.TableFontSize * interfaceScale / 100f, Font.Style, GraphicsUnit.Point);
-        Font = themeFont;
-        previousFont?.Dispose();
+        float pointSize = options.TableFontSize;
+        var existing = themeFonts.FirstOrDefault(font =>
+            Math.Abs(font.SizeInPoints - pointSize) < .01f);
+        if (existing is null)
+        {
+            existing = new Font(originalFont.FontFamily, pointSize,
+                originalFont.Style, GraphicsUnit.Point);
+            themeFonts.Add(existing);
+        }
+        Font = existing;
         Invalidate();
     }
 
-    Font? themeFont;
+    readonly List<Font> themeFonts = [];
+    readonly Font originalFont = SystemFonts.DefaultFont;
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        if (disposing) themeFont?.Dispose();
+        if (disposing)
+        {
+            foreach (var font in themeFonts) font.Dispose();
+            themeFonts.Clear();
+        }
     }
 
     void RestoreLayout()
