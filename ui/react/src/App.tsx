@@ -329,12 +329,20 @@ function SavedCards() {
   const [query,setQuery]=useState("");
   const [selected,setSelected]=useState<SavedCard | null>(null);
   const [card,setCard]=useState<StoredCard|null>(null);
+  const [printHtml,setPrintHtml]=useState<string|null>(null);
+  const printFrame=useRef<HTMLIFrameElement>(null);
   const [error,setError]=useState("");
   const remote=useRemote<SavedCard[]>("savedCards",{trash,query},[trash,query]);
   const open=async (row: SavedCard) => {
     try {setSelected(row);setCard(await invoke<StoredCard>("savedCard",{id:row.id,trash}));setError("");}
     catch(e){setSelected(null);setError(e instanceof Error?e.message:String(e));}
   };
+  async function printSaved(row: SavedCard) {
+    try {
+      const result=await invoke<{html:string}>("renderSavedCard",{id:row.id,trash});
+      setPrintHtml(result.html);setError("");
+    } catch(e) {setError(e instanceof Error?e.message:String(e));}
+  }
   const changeTrash=(row:SavedCard)=>{
     Modal.confirm({title:trash?"Przywrócić kartę?":"Przenieść kartę do kosza?",
       content:row.number || row.document,okText:trash?"Przywróć":"Przenieś",cancelText:"Anuluj",
@@ -357,8 +365,9 @@ function SavedCards() {
           {title:"Data",dataIndex:"date",render:date,width:145},
           {title:"Kontrahent",dataIndex:"client",ellipsis:true},
           {title:"Dokument",dataIndex:"document",width:175},
-          {title:"Czynności",width:155,render:(_,row)=><Space>
+          {title:"Czynności",width:230,render:(_,row)=><Space>
             <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
+            <Button size="small" onClick={()=>{void printSaved(row);}}>Drukuj</Button>
             <Button size="small" danger={!trash} onClick={()=>changeTrash(row)}>{trash?"Przywróć":"Kosz"}</Button>
           </Space>}
         ]}/>
@@ -379,6 +388,14 @@ function SavedCards() {
             {title:"Rozpoznanie",dataIndex:"Rozpoznanie",width:180}
           ]}/>
       </>}
+    </Modal>
+    <Modal width="92vw" open={printHtml!==null} title="Podgląd zapisanej karty leczenia"
+      onCancel={()=>setPrintHtml(null)} footer={<Space>
+        <Button onClick={()=>setPrintHtml(null)}>Zamknij</Button>
+        <Button type="primary" onClick={()=>printFrame.current?.contentWindow?.print()}>Drukuj</Button>
+      </Space>}>
+      {printHtml&&<iframe ref={printFrame} title="Wydruk zapisanej karty" srcDoc={printHtml}
+        style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
     </Modal>
   </>;
 }
