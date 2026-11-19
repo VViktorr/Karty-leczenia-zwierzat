@@ -36,6 +36,45 @@ internal static class ArchiveStorageLocation
         return Directory.Exists(selection.Path) ? selection.Path : null;
     }
 
+    private static string OptionsPath => Path.Combine(SharedArchive.LocalDataFolder, "backup-options.json");
+
+    internal static BackupPreferences LoadPreferences()
+    {
+        try
+        {
+            if (File.Exists(OptionsPath))
+                return JsonSerializer.Deserialize<BackupPreferences>(File.ReadAllText(OptionsPath))
+                    ?? new BackupPreferences();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        { CrashLog.Write("BackupOptions.Read", ex); }
+        return new BackupPreferences { DestinationFolder = Resolve() ?? "" };
+    }
+
+    internal static BackupPreferences? ResolvePreferences()
+    {
+        var options = LoadPreferences();
+        string? destination = Resolve();
+        return destination is null ? null : options with { DestinationFolder = destination };
+    }
+
+    internal static void SavePreferences(BackupPreferences options)
+    {
+        if (string.IsNullOrWhiteSpace(options.DestinationFolder) ||
+            !Directory.Exists(options.DestinationFolder))
+            throw new DirectoryNotFoundException("Nie znaleziono folderu archiwum.");
+        _ = options.FileName(); // Validate the configured filename before persisting.
+        Save(options.DestinationFolder);
+        Directory.CreateDirectory(SharedArchive.LocalDataFolder);
+        string staging = OptionsPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(staging, JsonSerializer.Serialize(options));
+            File.Move(staging, OptionsPath, overwrite: true);
+        }
+        finally { if (File.Exists(staging)) File.Delete(staging); }
+    }
+
     internal static void Save(string folder)
     {
         folder = Path.GetFullPath(folder);
@@ -59,5 +98,34 @@ internal static class ArchiveStorageLocation
             File.Move(staging, SettingsPath, overwrite: true);
         }
         finally { if (File.Exists(staging)) File.Delete(staging); }
+    }
+}
+
+internal sealed record BackupPreferences
+{
+    public string DestinationFolder { get; init; } = "";
+    // Absolute path visible to the SQL Server service (not a client-only path).
+    public string WorkingFolder { get; init; } = "";
+    public string Naming { get; init; } = "Dzienna";
+    public string CustomName { get; init; } = "KartyLeczenia";
+    public bool Overwrite { get; init; } = true;
+    public bool Compress { get; init; }
+    public string FileName()
+    {
+        string stem = Naming switch
+        {
+            "Stała nazwa" => "KartyLeczenia",
+            "Miesięczna" => "KartyLeczenia_" + DateTime.Now.ToString("yyyy-MM"),
+            "Tygodniowa" => "KartyLeczenia_" +
+                System.Globalization.ISOWeek.GetYear(DateTime.Now).ToString() + "-T" +
+                System.Globalization.ISOWeek.GetWeekOfYear(DateTime.Now).ToString("00"),
+            "Własna" => CustomName,
+            _ => "KartyLeczenia_" + DateTime.Now.ToString("yyyy-MM-dd")
+        };
+        stem = Path.GetFileNameWithoutExtension(stem.Trim());
+        if (string.IsNullOrWhiteSpace(stem) || stem.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            stem is "." or "..")
+            throw new InvalidOperationException("Podaj prawidłową nazwę archiwum.");
+        return stem + ".bak";
     }
 }
