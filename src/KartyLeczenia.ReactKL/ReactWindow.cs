@@ -265,6 +265,30 @@ internal sealed class ReactWindow : Form
                     throw new ArgumentException("Podaj datę i godzinę: " + name);
                 return date;
             }
+            // The complete edited snapshot travels with save/preview to avoid a
+            // WebView2 blur-vs-click race leaving the last cell unsaved.
+            if (root.TryGetProperty("rows", out var submitted) &&
+                submitted.ValueKind == JsonValueKind.Array)
+            {
+                if (submitted.GetArrayLength() != draft.Rows.Count || draft.Rows.Count > 500)
+                    throw new InvalidOperationException("Liczba pozycji zmieniła się. Ponownie otwórz dokument.");
+                foreach (var item in submitted.EnumerateArray())
+                {
+                    int index = Int(item, "index") ?? -1;
+                    if (index < 0 || index >= draft.Rows.Count)
+                        throw new InvalidOperationException("Niewłaściwy indeks pozycji.");
+                    var treatment = draft.Rows[index];
+                    treatment.Printed = Flag(item, "selected");
+                    foreach (var (key, field) in new[] {
+                        ("batch", "Seria"), ("species", "Gatunek"),
+                        ("route", "Droga podania"), ("dosing", "Dawkowanie i okres stosowania"),
+                        ("withdrawal", "Karencja"),
+                        ("description", "Opis zwierząt / numer siedziby stada"),
+                        ("animals", "Liczba zwierząt"), ("diagnosis", "Rozpoznanie")
+                    })
+                        treatment.Set(field, Text(item, key, 3000));
+                }
+            }
             var reported = RequiredDate(root, "reported");
             var performed = RequiredDate(root, "performed");
             string findings = Text(root, "findings", 2000);
