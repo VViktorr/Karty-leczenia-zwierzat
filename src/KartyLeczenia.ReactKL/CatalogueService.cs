@@ -131,7 +131,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         string[] unique = symbols.Select(x => x.Trim())
             .Where(x => x.Length is > 0 and <= 128)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(300).ToArray();
+            .Take(500).ToArray();
         var result = new Dictionary<string, List<CatalogueVariantModel>>(
             StringComparer.OrdinalIgnoreCase);
         if (unique.Length == 0) return result;
