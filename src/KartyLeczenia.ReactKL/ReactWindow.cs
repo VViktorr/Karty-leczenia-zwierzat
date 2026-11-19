@@ -565,6 +565,17 @@ internal sealed class ReactWindow : Form
                 string.IsNullOrWhiteSpace(choice.Tissues) ? "" : "Tkanki jadalne: " + choice.Tissues.Trim(),
                 string.IsNullOrWhiteSpace(choice.Milk) ? "" : "Mleko: " + choice.Milk.Trim()
             }.Where(x=>x.Length>0));
+            // This explicit SQL-catalogue selection supersedes any registry
+            // context previously cached for another product/variant.
+            // Otherwise TreatmentRow.Set(species/route) could silently
+            // recalculate dosing/withdrawal from the obsolete registry PDF.
+            row.Set("Dokument kontekstu JSON","",false);
+            row.Set("Produkt kontekstu","",false);
+            row.Set("Automatyczna karencja","",false);
+            row.Set("Automatyczne dawkowanie","",false);
+            row.Set("Pełna sekcja karencji źródła","",false);
+            row.Set("Pełna sekcja dawkowania źródła","",false);
+            row.Set("SHA256 źródła","",false);
             row.Set("Gatunek",choice.Species);
             row.Set("Droga podania",choice.Route);
             row.Set("Dawkowanie i okres stosowania",choice.Dose);
