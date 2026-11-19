@@ -2568,11 +2568,11 @@ internal sealed class MainForm : Form
         var maintenancePassword = Field("Hasło administratora SQL (do odtwarzania)", "", password: true);
         void UpdateMaintenanceCredentials()
         {
-            maintenanceAuth.Enabled = !backupWithArchiveLogin.Checked;
+            // Administrative credentials remain editable for the separate
+            // Restore action even when backups use the stored SQL login.
             maintenanceUser.Enabled = maintenancePassword.Enabled =
-                !backupWithArchiveLogin.Checked && maintenanceAuth.SelectedIndex == 0;
+                maintenanceAuth.SelectedIndex == 0;
         }
-        backupWithArchiveLogin.CheckedChanged += (_, _) => UpdateMaintenanceCredentials();
         maintenanceAuth.SelectedIndexChanged += (_, _) => UpdateMaintenanceCredentials();
         UpdateMaintenanceCredentials();
         Add("", backupWithArchiveLogin);
