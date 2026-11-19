@@ -10,7 +10,7 @@ internal sealed class MainForm : Form
         DrawMode = TabDrawMode.OwnerDrawFixed,
         Padding = new Point(30, 9)
     };
-    readonly DocumentGrid documents = NewGrid<DocumentGrid>();
+    readonly DocumentsTable documents;
     readonly DataGridView treatment = NewGrid();
     readonly PriceTable prices;
     List<MedicinePrice> priceRows = [];
@@ -59,6 +59,7 @@ internal sealed class MainForm : Form
         this.interfaceScale = interfaceScale;
         expiryTable = new ExpiryTable(interfaceScale);
         prices = new PriceTable(interfaceScale);
+        documents = new DocumentsTable(interfaceScale);
         Text = $"KartyLeczenia — wersja {ServerUpdateGate.InstalledVersion}";
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(850, 550);
@@ -105,7 +106,7 @@ internal sealed class MainForm : Form
         ConfigureConnection(openSettings);
         var tables = new Dictionary<string, DataGridView>
         {
-            ["documents"] = documents, ["treatment"] = treatment
+            ["treatment"] = treatment
         };
         if (interfaceScale != 100) ScaleInterface(tables.Values);
         var layout = new WindowLayout(this, rememberTreatment, tables, interfaceScale);
@@ -128,7 +129,7 @@ internal sealed class MainForm : Form
             ApplyAppearance(appearance);
             if (appearance.StartMaximized) WindowState = FormWindowState.Maximized;
             treatment.Columns["Drukuj"]!.DisplayIndex = 0;
-            documents.Columns["DocumentType"]!.Visible = true;
+            documents.SetKind(kind);
         };
         FormClosed += (_, _) => layout.Save();
         int startupTab = 0;
@@ -316,55 +317,13 @@ internal sealed class MainForm : Form
 
     void ConfigureDocuments()
     {
-        bool applyingRowHeight = false;
-        documents.RowHeightChanged += (_, e) =>
+        FormClosed += (_, _) => documents.SaveLayout();
+        documents.KeyDown += async (_, e) =>
         {
-            if (applyingRowHeight || e.Row.Index < 0) return;
-            applyingRowHeight = true;
-            try
-            {
-                int height = e.Row.Height;
-                documents.RowTemplate.Height = height;
-                foreach (DataGridViewRow row in documents.Rows)
-                    if (row.Height != height) row.Height = height;
-            }
-            finally { applyingRowHeight = false; }
+            if (e.KeyCode != Keys.Enter) return;
+            e.SuppressKeyPress = true;
+            await Run(OpenDocument);
         };
-        var stack = new Bitmap(14, 14);
-        using (var graphics = Graphics.FromImage(stack))
-        {
-            for (int offset = 4; offset >= 0; offset -= 2)
-            {
-                graphics.FillRectangle(SystemBrushes.Window, 1 + offset, 5 - offset, 7, 8);
-                graphics.DrawRectangle(SystemPens.ControlDarkDark, 1 + offset, 5 - offset, 7, 8);
-            }
-        }
-        Disposed += (_, _) => stack.Dispose();
-        var documentType = new DataGridViewImageColumn
-        {
-            Name = "DocumentType",
-            HeaderText = "R",
-            ToolTipText = "Rodzaj dokumentu – stos kartek oznacza fakturę zbiorczą",
-            Width = 30,
-            DefaultCellStyle = new DataGridViewCellStyle { NullValue = null }
-        };
-        documents.Columns.Add(documentType);
-        documents.CellFormatting += (_, e) =>
-        {
-            if (e.RowIndex < 0 || e.ColumnIndex != documentType.Index) return;
-            e.Value = kind == DocumentSearchKinds.Invoices
-                && documents.Rows[e.RowIndex].DataBoundItem is DocumentSuggestion row
-                && row.Related.Count(link => link.Number.StartsWith("WZ ", StringComparison.OrdinalIgnoreCase)) > 1
-                ? stack : null;
-            e.FormattingApplied = true;
-        };
-        Column(documents, "Data", "Date", 100, "dd.MM.yyyy");
-        Column(documents, "Numer", "Number", 180);
-        Column(documents, "Kontrahent", "Payer", 290);
-        documents.Columns["Payer"]!.DataPropertyName = nameof(DocumentSuggestion.ShortPayer);
-        Column(documents, "Wartość brutto", "Gross", 145, "N2");
-        Column(documents, "Powiązane dokumenty", "RelatedText", 300);
-        documents.OpenRequested += async (_, _) => await Run(OpenDocument);
         documents.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0) await Run(OpenDocument); };
         documentSearchTimer.Tick += async (_, _) =>
         {
@@ -487,7 +446,7 @@ internal sealed class MainForm : Form
     {
         tabs.SelectedIndex = 0;
         kind = selected;
-        documents.Columns["DocumentType"]!.Visible = kind == DocumentSearchKinds.Invoices;
+        documents.SetKind(kind);
         UpdateDocumentKindButtons();
         return Search(false);
     }
@@ -1555,7 +1514,7 @@ internal sealed class MainForm : Form
 
     async Task OpenDocument()
     {
-        if (documents.CurrentRow?.DataBoundItem is not DocumentSuggestion row) return;
+        if (documents.SelectedDocument() is not DocumentSuggestion row) return;
         var options = Connection();
         using var work = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var card = await service.ReadAsync(options, row.Number, 0, work.Token, row.Id);
@@ -2799,7 +2758,7 @@ internal sealed class MainForm : Form
             }
         };
 
-        foreach (var grid in new[] { documents, treatment })
+        foreach (var grid in new[] { treatment })
         {
             var menu = new ContextMenuStrip();
             menu.Items.Add("Parametry listy…", null, (_, _) => ListParameters.Show(this, grid));
