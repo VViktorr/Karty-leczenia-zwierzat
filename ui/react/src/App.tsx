@@ -16,7 +16,7 @@ type Section = "documents" | "prices" | "catalogue" | "treatment" | "saved" | "e
 interface DraftRow {
   index: number; product: string; quantity: string; batch: string;
   species: string; route: string; dosing: string; withdrawal: string;
-  description: string; animals: string; diagnosis: string; selected: boolean;
+  description: string; animals: string; diagnosis: string; section: string; selected: boolean;
 }
 interface Draft {
   draftId: string; number: string; payer: string; recipient: string; rows: DraftRow[];
@@ -160,7 +160,8 @@ const editable: Array<{key: keyof DraftRow; field: string; title: string}> = [
   {key:"withdrawal",field:"Karencja",title:"Karencja"},
   {key:"animals",field:"Liczba zwierząt",title:"Liczba zwierząt"},
   {key:"description",field:"Opis zwierząt / numer siedziby stada",title:"Opis zwierząt"},
-  {key:"diagnosis",field:"Rozpoznanie",title:"Rozpoznanie"}
+  {key:"diagnosis",field:"Rozpoznanie",title:"Rozpoznanie"},
+  {key:"section",field:"Sekcja (II lub III)",title:"Sekcja"}
 ];
 function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () => void}) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
@@ -221,8 +222,13 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     {title:"Produkt",dataIndex:"product",width:240,ellipsis:true,fixed:"left"},
     {title:"Ilość",dataIndex:"quantity",width:100},
     ...editable.map(({key,title}) => ({
-      title, dataIndex:key, width:key==="dosing" || key==="withdrawal" ? 245 : 170,
-      render:(value:string,row:DraftRow) => <Input.TextArea autoSize={{minRows:1,maxRows:3}}
+      title, dataIndex:key, width:key==="section" ? 125 : key==="dosing" || key==="withdrawal" ? 245 : 170,
+      render:(value:string,row:DraftRow) => key==="section"
+        ? <Select aria-label={"Sekcja karty leczenia — "+row.product}
+            value={value==="III"?"III":"II"} style={{width:"100%"}}
+            options={[{label:"II",value:"II"},{label:"III",value:"III"}]}
+            onChange={next=>{void update(row.index,"section",next);}}/>
+        : <Input.TextArea autoSize={{minRows:1,maxRows:3}}
         aria-label={title} value={value}
         onChange={e => {
           const next=e.target.value;
