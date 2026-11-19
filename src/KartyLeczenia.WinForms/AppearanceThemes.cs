@@ -19,7 +19,7 @@ internal sealed record AppearanceOptions
     public bool UseCustomAccent { get; set; }
     public int AccentArgb { get; set; } = Color.FromArgb(0, 100, 190).ToArgb();
     public int PrintPreviewZoom { get; set; } = 100;
-    public int SwitchStyle { get; set; } = 1; // 0 neutral, 1 filled, 2 outline
+    public int SwitchStyle { get; set; } = 3; // 0 subtle, 1 filled, 2 outline, 3 tonal, 4 pill
     public int CornerRadius { get; set; } = 8;
     public bool ColorButtons { get; set; } = true;
 
@@ -62,7 +62,7 @@ internal static class AppearanceThemes
         value.TableFontSize = Math.Clamp(value.TableFontSize, 8, 18);
         value.RowHeight = Math.Clamp(value.RowHeight, 20, 60);
         value.PrintPreviewZoom = Math.Clamp(value.PrintPreviewZoom, 50, 200);
-        value.SwitchStyle = Math.Clamp(value.SwitchStyle, 0, 2);
+        value.SwitchStyle = Math.Clamp(value.SwitchStyle, 0, 4);
         value.CornerRadius = Math.Clamp(value.CornerRadius, 0, 20);
         // Migrate earlier settings without losing the operator's fonts,
         // layout preferences, print zoom or a manually chosen accent.
@@ -245,33 +245,50 @@ internal static class AppearanceThemes
 
     internal static void ApplyButton(Button button, AppearanceOptions options)
     {
+        // Use one design system for every supported AntdUI button. Avoid
+        // mixing the old native outline with a forced bright-filled surface.
         bool selector = button is ThemeSelector;
         bool selected = selector && button.Toggle;
         bool classic = IsClassic(options);
-        bool neutral = options.SwitchStyle == 0 || (!selector && !options.ColorButtons);
-        bool outlined = options.SwitchStyle == 2;
         bool dark = IsDark(options);
-        Color surface = button.Parent?.BackColor ?? (classic ? SystemColors.Control : Canvas(options));
+        int style = classic ? 0 : options.SwitchStyle;
+        Color canvas = Canvas(options);
+        Color surface = button.Parent?.BackColor ?? canvas;
         Color ink = Ink(options);
-        Color accent = neutral ? (dark ? Color.LightGray : SystemColors.Highlight) : Accent(options);
-        Color edge = dark ? Blend(accent, Color.White, .40f) : Blend(accent, Color.Black, .26f);
-        bool filled = selected && !outlined;
-        Color fill = filled ? (dark ? accent : Blend(accent, Color.Black, .12f))
-            : Blend(surface, accent, selected ? .18f : neutral || outlined ? 0f : .05f);
-        Color hover = Blend(fill, filled ? ink : accent, dark ? .17f : .11f);
-        Color pressed = Blend(fill, filled ? ink : accent, dark ? .24f : .18f);
+        Color accent = Accent(options);
+        Color toned = Blend(surface, accent, dark ? .26f : .12f);
 
+        bool filled = selected && style == 1;
+        bool tonal = selected && (style == 3 || style == 4);
+        bool outlined = selected && style == 2;
+        bool pill = style == 4;
+        bool isAction = !selector;
+        Color fill = filled ? accent : tonal ? toned : surface;
+        Color foreground = filled ? ContrastingText(accent) : selected ? accent : ink;
+
+        // For ordinary actions use AntdUI's own surface and hover engine,
+        // reserving the primary fill for the active selector and emphasized
+        // actions. This keeps dialogs and toolbars consistent.
+        bool primaryAction = isAction && options.ColorButtons && !classic && style == 1;
+        if (primaryAction)
+        {
+            fill = accent;
+            foreground = ContrastingText(accent);
+        }
+
+        Color hover = Blend(fill, primaryAction || filled ? foreground : accent, .11f);
+        Color active = Blend(fill, primaryAction || filled ? foreground : accent, .20f);
         button.ColorScheme = dark ? AntdUI.TAMode.Dark : AntdUI.TAMode.Light;
-        button.Radius = neutral ? 4 : options.CornerRadius;
-        button.Type = filled ? AntdUI.TTypeMini.Primary : AntdUI.TTypeMini.Default;
-        button.BorderWidth = filled ? 0 : selected && outlined ? 2 : 1;
-        button.DefaultBorderColor = selected ? edge : Blend(surface, neutral ? ink : edge, .30f);
+        button.Radius = pill ? 20 : style == 0 ? 6 : Math.Clamp(options.CornerRadius, 4, 20);
+        button.Type = filled || primaryAction ? AntdUI.TTypeMini.Primary : AntdUI.TTypeMini.Default;
+        button.BorderWidth = outlined ? 2 : style == 2 && !selected ? 1 : 0;
+        button.DefaultBorderColor = outlined ? accent : Blend(surface, ink, .22f);
         button.DefaultBack = button.BackColor = button.ToggleBack = fill;
-        button.ForeColor = button.ToggleFore = filled ? ContrastingText(fill) : ink;
-        button.ForeHover = button.ToggleForeHover = filled ? ContrastingText(hover) : ink;
-        button.ForeActive = button.ToggleForeActive = filled ? ContrastingText(pressed) : ink;
-        button.BackHover = button.ToggleBackHover = filled ? hover : edge;
-        button.BackActive = button.ToggleBackActive = filled ? pressed : edge;
+        button.ForeColor = button.ToggleFore = foreground;
+        button.ForeHover = button.ToggleForeHover = filled || primaryAction ? foreground : accent;
+        button.ForeActive = button.ToggleForeActive = filled || primaryAction ? foreground : accent;
+        button.BackHover = button.ToggleBackHover = hover;
+        button.BackActive = button.ToggleBackActive = active;
         if (button.Tag is string shortcut)
             button.AccessibleDescription = selected ? shortcut + " · wybrano" : shortcut;
         button.Invalidate();
@@ -408,7 +425,7 @@ internal static class AppearanceEditor
         var wide = new CheckBox { Text = "Powiększone zakładki", AutoSize = true };
         var customAccent = new CheckBox { Text = "Własny kolor zaznaczenia i przełączników", AutoSize = true };
         var switchStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
-        switchStyle.Items.AddRange(["Neutralne", "Wypełnione", "Z obramowaniem"]);
+        switchStyle.Items.AddRange(["Subtelne", "Pełne wypełnienie", "Kontur", "Tonalne (Material 3)", "Pastylki"]);
         var cornerRadius = new NumericUpDown { Minimum = 0, Maximum = 20, Width = 80 };
         var colorButtons = new CheckBox { Text = "Koloruj także zwykłe przyciski", AutoSize = true };
         var accent = new Button { Text = "Wybierz kolor…", AutoSize = true };
@@ -575,7 +592,7 @@ internal static class AppearanceEditor
         var actions = new FlowLayoutPanel { AutoSize = true, Width = vertical ? 390 : 640, WrapContents = true };
         var applyButton = new Button { Text = "Zastosuj tymczasowo", AutoSize = true };
         var save = new Button { Text = "Zapisz i zastosuj", AutoSize = true };
-        var reset = new Button { Text = "Przywróć Klasyczny", AutoSize = true };
+        var reset = new Button { Text = "Przywróć ustawienia motywu", AutoSize = true };
         actions.Controls.AddRange([applyButton, save, reset]);
         panel.Controls.Add(actions);
         applyButton.Click += (_, _) =>
@@ -595,8 +612,8 @@ internal static class AppearanceEditor
         };
         reset.Click += (_, _) =>
         {
-            current = AppearanceOptions.ForPreset("Klasyczny");
-            preset.SelectedItem = "Klasyczny";
+            current = AppearanceOptions.ForPreset(current.Preset);
+            preset.SelectedItem = current.Preset;
             LoadControls();
         };
         LoadControls();
