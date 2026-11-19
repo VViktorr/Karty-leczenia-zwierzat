@@ -2575,7 +2575,7 @@ internal sealed class MainForm : Form
             var archive = Archive();
 
             using var archiveDialog = new ArchiveBackupDialog(restoring,
-                (restoring ? restoreFile : backupFolder).Text.Trim());
+                (restoring ? restoreFile : backupFolder).Text.Trim(), archive.Server);
             if (DialogPlacement.Show(archiveDialog, this,
                     restoring ? "database-restore-options" : "database-backup-options") != DialogResult.OK)
                 return;
