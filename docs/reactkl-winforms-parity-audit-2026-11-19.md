@@ -209,3 +209,11 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 - „Druk” i „Produkt” są przypięte na początku dla zachowania bezpieczeństwa wyboru pozycji. Nie modyfikuje to danych karty, SQL ani wydruku.
 - **Ograniczenie:** na razie zmiana kolejności odbywa się przyciskami panelu, nie przeciąganiem nagłówka w tabeli. Ciągłe przeciąganie i dodatkowe ustawienia typografii pozostają do wykonania.
 - **CI:** po poprawkach wymagane sprawdzenie przebiegów #196 i #197 przed oznaczeniem jako ukończone.
+
+### P1/P2: układ każdego okna na stanowisku (19.11.2026)
+
+- `9d4f8dc`, `354ae9a`: natywne główne okno ReactKL (host WebView2) zapisuje pozycję, rozmiar i maksymalizację do `%LOCALAPPDATA%\\KartyLeczenia\\reactkl-window.json`. Wyświetlenie na odłączonym monitorze jest korygowane; zapis lokalny i atomowy, bez SQL.
+- `727b8ab`: regresja geometrii (położenie, usunięty monitor, ograniczenie do obszaru roboczego i błędne dane).
+- `277eaee`: wspólny mechanizm `DialogPlacement.tsx` dla okien Ant Design `Modal` i `Modal.confirm` we wszystkich ekranach React: przeciąganie nagłówka, zmiana wielkości narożnikiem i trwałość ustawień per typ dialogu w lokalnym `localStorage`. Zmiana jest wspólna dla podglądów karty/ChPL, wyboru wariantu, ustawień oraz potwierdzeń. Brak zapytań SQL.
+- Każde stanowisko ma własne ustawienia; klient A nie zmienia pozycji okien klienta B. Ustawienia dotyczą okien aplikacji React; natywne okna systemowe wyboru pliku lub drukowania podlegają zachowaniu systemu Windows.
+- **Do testu na Windows:** przeciąganie i resize wszystkich dialogów po zmianie DPI/skalowania, podgląd PDF przy małym rozmiarze, modalne potwierdzenia, nawigacja klawiaturą oraz monitor odłączony podczas pracy. Nie oznaczać tych testów jako ukończonych wyłącznie na podstawie CI.
