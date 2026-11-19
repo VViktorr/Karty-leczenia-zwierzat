@@ -1,11 +1,12 @@
 export type DocumentKind = "invoices" | "receipts" | "warehouse" | "all";
-export type DatePeriod = "all" | "today" | "week" | "month";
+export type DatePeriod = "all" | "today" | "currentWeek" | "currentMonth" |
+  "currentQuarter" | "currentYear" | "week" | "month" | "customMonth" | "custom";
 export interface DocumentRow {
   id: number; number: string; date: string | null;
   shortPayer: string; payer: string; gross: number | null;
   net: number | null; currency: string; relatedText: string;
 }
-export interface DocumentsResult { items: DocumentRow[]; truncated: boolean; }
+export interface DocumentsResult { items: DocumentRow[]; truncated: boolean; cached: boolean; loadedAt: string; }
 export interface DocumentDetail {
   number: string; payer: string; recipient: string;
   rows: Array<{product: string; quantity: string; batch: string; species: string; route: string;}>;
