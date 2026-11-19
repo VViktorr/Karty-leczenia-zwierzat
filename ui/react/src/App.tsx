@@ -175,7 +175,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     setBusy(true); setError("");
     try {
       const result = await invoke<SaveResult>("saveDraft", {
-        draftId:draft.draftId, reported, performed, findings, confirmDuplicate
+        draftId:draft.draftId, reported, performed, findings, confirmDuplicate, rows
       });
       if (result.duplicate) {
         Modal.confirm({
@@ -193,7 +193,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     setBusy(true);
     try {
       const data = await invoke<{html:string}>("previewDraft", {
-        draftId:draft.draftId, reported, performed, findings
+        draftId:draft.draftId, reported, performed, findings, rows
       });
       setPreview(data.html); setError("");
     } catch(e) {setError(e instanceof Error ? e.message : String(e));}
