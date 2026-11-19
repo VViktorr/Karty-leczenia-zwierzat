@@ -610,7 +610,9 @@ internal sealed class ReactWindow : Form
                 return date;
             }
             string period = Text(root, "period", 20);
-            (DateTime? from, DateTime? to) = period switch
+            // Explicit target type makes nullable dates a valid tuple switch result.
+            // A deconstruction target alone does not provide a switch-expression type.
+            (DateTime? From, DateTime? To) periodBounds = period switch
             {
                 "all" => (null, null),
                 "today" => (today, today.AddDays(1)),
@@ -625,6 +627,8 @@ internal sealed class ReactWindow : Form
                 "custom" => (ParseDate(root, "startDate"), ParseDate(root, "endDate").AddDays(1)),
                 _ => throw new ArgumentException("Nieznany okres dokumentów.")
             };
+            DateTime? from = periodBounds.From;
+            DateTime? to = periodBounds.To;
             if (period == "customMonth" && from is DateTime customStart)
                 to = customStart.AddMonths(1);
             if (from >= to)
