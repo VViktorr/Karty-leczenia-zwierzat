@@ -102,13 +102,13 @@ internal sealed class ExpiryTable : Table
         Bordered = options.GridLines;
         // Match Documents, Prices, SavedCards and Treatment AntdUI tables.
         // The shared palette determines row height; avoid separate double-scaling.
-        RowHeight = options.RowHeight;
+        RowHeight = Scale(options.RowHeight);
         RowHoverBg = AppearanceThemes.Blend(background, accent, .12f);
         RowSelectedBg = accent;
         RowSelectedFore = AppearanceThemes.ContrastingText(accent);
         ShowTip = options.ShowToolTips;
         alternatingBackground = options.AlternatingRows ? AppearanceThemes.Blend(background, ink, .045f) : null;
-        float pointSize = options.TableFontSize;
+        float pointSize = options.TableFontSize * interfaceScale / 100f;
         var existing = themeFonts.FirstOrDefault(font =>
             Math.Abs(font.SizeInPoints - pointSize) < .01f);
         if (existing is null)
