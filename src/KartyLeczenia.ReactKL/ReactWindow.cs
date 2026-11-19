@@ -173,6 +173,37 @@ internal sealed class ReactWindow : Form
             pendingCataloguePdfs[path] = bytes;
             return new { cancelled = false, path, name = info.Name, size = info.Length };
         }
+        if (action == "analyseCataloguePdf")
+        {
+            string pdfPath = Text(root, "path", 450);
+            byte[] bytes = pendingCataloguePdfs.TryGetValue(pdfPath, out var staged)
+                ? staged : await Task.Run(() => catalogue.ReadPdf(pdfPath), token);
+            return await Task.Run(() =>
+            {
+                string temp = Path.Combine(Path.GetTempPath(),
+                    "ReactKL-ChPL-" + Guid.NewGuid().ToString("N") + ".pdf");
+                try
+                {
+                    File.WriteAllBytes(temp, bytes);
+                    var proposal = ChplPdfAssistant.Read(temp);
+                    return new
+                    {
+                        variants = proposal.Variants.Select(v => v with
+                        {
+                            Route = AdministrationRouteLegend.Abbreviate(v.Route)
+                        }).ToArray(),
+                        evidence = proposal.Evidence,
+                        warnings = proposal.Warnings
+                    };
+                }
+                finally
+                {
+                    try { if (File.Exists(temp)) File.Delete(temp); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    { CrashLog.Write("ChPL.TempCleanup", ex); }
+                }
+            }, token);
+        }
         if (action == "readCataloguePdf")
         {
             string path = Text(root, "path", 450);
