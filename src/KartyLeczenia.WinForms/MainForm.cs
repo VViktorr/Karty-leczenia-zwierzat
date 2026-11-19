@@ -112,6 +112,9 @@ internal sealed class MainForm : Form
             appearance = AppearanceThemes.Normalize(options);
             AppearanceThemes.Current = appearance;
             AntdUI.Config.Mode = AppearanceThemes.IsDark(appearance) ? AntdUI.TMode.Dark : AntdUI.TMode.Light;
+            // Apply the AntdUI palette globally, including hover/pressed states
+            // of controls which are not manually styled by the application.
+            AntdUI.Style.SetPrimary(AppearanceThemes.Accent(appearance));
             AppearanceThemes.ApplySurface(this, appearance);
             AppearanceThemes.ApplyTabs(tabs, appearance, interfaceScale);
             tabs.Invalidate();
