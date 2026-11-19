@@ -15,7 +15,7 @@ internal sealed class ExpiryTable : Table
     SortMode sortMode;
 
     // ShowAntd remains only for backward compatibility with earlier saved layouts.
-    sealed record Layout(bool ShowAntd, int[] Order, int[] Widths, bool[]? Visible = null);
+    sealed record ExpiryLayout(bool ShowAntd, int[] Order, int[] Widths, bool[]? Visible = null);
 
     internal ExpiryTable(int interfaceScale)
     {
@@ -125,7 +125,7 @@ internal sealed class ExpiryTable : Table
     {
         try
         {
-            if (!File.Exists(LayoutPath) || JsonSerializer.Deserialize<Layout>(File.ReadAllText(LayoutPath)) is not { } layout) return;
+            if (!File.Exists(LayoutPath) || JsonSerializer.Deserialize<ExpiryLayout>(File.ReadAllText(LayoutPath)) is not { } layout) return;
             if (layout.Widths?.Length == expiryColumns.Length)
                 for (int i = 0; i < expiryColumns.Length; i++)
                     expiryColumns[i].Width = Scale(Math.Clamp(layout.Widths[i], 40, 2000)).ToString(CultureInfo.InvariantCulture);
@@ -188,7 +188,7 @@ internal sealed class ExpiryTable : Table
             string temp = LayoutPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                File.WriteAllText(temp, JsonSerializer.Serialize(new Layout(true, SortColumnsIndex(), widths, expiryColumns.Select(column => column.Visible).ToArray())));
+                File.WriteAllText(temp, JsonSerializer.Serialize(new ExpiryLayout(true, SortColumnsIndex(), widths, expiryColumns.Select(column => column.Visible).ToArray())));
                 File.Move(temp, LayoutPath, overwrite: true);
             }
             finally { File.Delete(temp); }
