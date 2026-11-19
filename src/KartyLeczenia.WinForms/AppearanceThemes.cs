@@ -369,6 +369,7 @@ internal static class AppearanceThemes
         // Keep previously assigned fonts alive until the table is disposed.
         internal readonly List<Font> ThemeFonts = [];
         internal Font? ThemeFont;
+        internal AppearanceOptions Options = AppearanceOptions.ForPreset("Antd Jasny");
     }
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<AntdUI.Table, AntdTableFontState>
         AntdTableFonts = new();
@@ -394,6 +395,16 @@ internal static class AppearanceThemes
         var state = AntdTableFonts.GetValue(table, t =>
         {
             var next = new AntdTableFontState(t);
+            // Apply alternating row styles consistently in all general AntdUI
+            // lists, including card, documents, prices and saved cards.
+            t.SetRowStyle += (_, e) =>
+            {
+                if (!next.Options.AlternatingRows || e.Index % 2 == 0) return null;
+                var baseColor = IsDark(next.Options)
+                    ? Blend(Canvas(next.Options), Color.White, .03f) : Color.White;
+                return new AntdUI.Table.CellStyleInfo().SetBackColor(
+                    Blend(baseColor, Ink(next.Options), IsDark(next.Options) ? .055f : .035f));
+            };
             t.Disposed += (_, _) =>
             {
                 foreach (var font in next.ThemeFonts) font.Dispose();
@@ -401,6 +412,7 @@ internal static class AppearanceThemes
             };
             return next;
         });
+        state.Options = appearance;
         var font = state.ThemeFonts.FirstOrDefault(existing =>
             Math.Abs(existing.SizeInPoints - appearance.TableFontSize) < .01f &&
             existing.Style == state.OriginalFont.Style);
