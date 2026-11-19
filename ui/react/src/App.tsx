@@ -642,7 +642,7 @@ interface UpdateRelease {
 }
 interface UpdateResult {release:UpdateRelease|null;currentVersion:string;}
 interface InstallUpdateStatus {
-  isServer:boolean; pending:boolean; installedVersion:string;
+  installed:boolean; isServer:boolean; pending:boolean; installedVersion:string;
   server:string; publicationError:string|null;
 }
 let checkedOnStartup=false;
@@ -651,7 +651,7 @@ function AutomaticUpdateCheck(){
     if(checkedOnStartup || !isDesktop())return;
     checkedOnStartup=true;
     void invoke<InstallUpdateStatus>("getUpdateStatus").then(async status=>{
-      if(status.isServer)return; // The SQL server publishes the pending installer on startup.
+      if(status.isServer || !status.installed)return; // Portable previews never launch old SQL installers.
       const result=await invoke<UpdateResult>("checkUpdate");
       if(!result.release?.newer)return;
       Modal.confirm({
@@ -731,6 +731,8 @@ function UpdatePanel(){
       a stanowiska sprawdzają aktualizacje przy uruchomieniu. Numer wersji jest wpisywany ręcznie.
     </Typography.Paragraph>
     <ErrorNotice error={error}/>
+    {status && !status.installed && <Alert className="notice" type="info" showIcon
+      message="Tryb testowy — aktualizacje SQL są dostępne po zainstalowaniu ReactKL."/>}
     {status?.publicationError && <Alert className="notice" type="warning" showIcon
       message={"Publikacja na serwerze: "+status.publicationError}/>}
     {notice&&<Alert className="notice" showIcon
@@ -744,7 +746,8 @@ function UpdatePanel(){
         </Typography.Text></div>
       </div>}
       <Space wrap>
-        <Button loading={busy} onClick={()=>{void check();}}>Sprawdź aktualizację w SQL</Button>
+        <Button loading={busy} disabled={status?.installed===false}
+          onClick={()=>{void check();}}>Sprawdź aktualizację w SQL</Button>
         {status?.isServer && status.pending &&
           <Button type="primary" loading={busy} onClick={()=>{void publish();}}>
             Opublikuj instalator na serwerze SQL
