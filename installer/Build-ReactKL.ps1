@@ -50,8 +50,8 @@ try {
     New-Item -ItemType Directory -Path $output -Force | Out-Null
     & $Iscc "/DReleaseVersion=$Version" "/DReleaseFileVersion=$fileVersion" "/DPayloadDir=$stage" "/O$output" $installerScript
     if ($LASTEXITCODE -ne 0) { throw 'Budowanie instalatora Inno Setup nie powiodlo sie.' }
-    Write-Host "Gotowy instalator: $output\ReactKL-Setup-win-x64-v$Version.exe"
-    Write-Host 'Instalator pozostaje lokalny. Publikacja aktualizacji do SQL jest osobna i wymaga zatwierdzenia.'
+    Write-Host "Gotowy instalator: $output\KartyLeczenia-Setup-win-x64-v$Version.exe"
+    Write-Host 'Na serwerze instalator zostanie automatycznie opublikowany w SQL po pierwszym uruchomieniu ReactKL.'
 }
 finally {
     Pop-Location
