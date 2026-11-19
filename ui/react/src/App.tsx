@@ -6,12 +6,13 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
+import CataloguePage from "./CataloguePage";
 import type { BackupProgress } from "./bridge";
 import type { DocumentKind, DocumentRow, DocumentsResult, DatePeriod } from "./bridge";
 
 type LayoutName = "classic" | "modern" | "fluent";
 type PaletteName = "light" | "dark" | "sea";
-type Section = "documents" | "prices" | "treatment" | "saved" | "expiry" | "settings";
+type Section = "documents" | "prices" | "catalogue" | "treatment" | "saved" | "expiry" | "settings";
 interface DraftRow {
   index: number; product: string; quantity: string; batch: string;
   species: string; route: string; dosing: string; withdrawal: string;
@@ -39,6 +40,7 @@ interface SqlSettings {
 
 const sections: Array<{id: Section; name: string}> = [
   {id: "documents", name: "Dokumenty"}, {id: "prices", name: "Cennik leków"},
+  {id: "catalogue", name: "Katalog leków / ChPL"},
   {id: "treatment", name: "Karta leczenia"}, {id: "saved", name: "Zapisane karty"},
   {id: "expiry", name: "Terminy ważności"}, {id: "settings", name: "Ustawienia"}
 ];
@@ -621,7 +623,8 @@ export default function App() {
   </div>;
   const content=section==="documents"?<Documents onOpen={next=>{setDraft(next);setSection("treatment");}}/>:
     section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}/>:
-    section==="prices"?<Prices/>:section==="expiry"?<Expiry/>:
+    section==="prices"?<Prices/>:section==="catalogue"?<CataloguePage/>:
+    section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards/>:<SettingsPage/>;
   return <ConfigProvider theme={appearance}>
     <div className={"app-shell layout-"+layout+" palette-"+palette}>
