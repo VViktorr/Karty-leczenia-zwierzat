@@ -15,7 +15,7 @@ internal sealed class TreatmentTable : AntdUI.Table
     {
         internal DataGridViewRow Source { get; }
         internal DisplayRow(DataGridViewRow row) => Source = row;
-        public string Print { get; set; } = "";
+        public bool Print { get; set; }
         public string Product { get; set; } = "";
         public string Quantity { get; set; } = "";
         public string Batch { get; set; } = "";
@@ -80,7 +80,21 @@ internal sealed class TreatmentTable : AntdUI.Table
             .ToString(CultureInfo.InvariantCulture);
         void Add(string key, string header, int width)
             => Columns.Add(new AntdUI.Column(key, header) { Width = Scale(width), Ellipsis = true });
-        Add(nameof(DisplayRow.Print), "Druk", 65);
+        Columns.Add(new AntdUI.ColumnCheck(nameof(DisplayRow.Print))
+        {
+            Title = "Druk", Width = Scale(65),
+            AutoCheck = true,
+            Call = (value, record, _, _) =>
+            {
+                if (record is DisplayRow row && row.Source.DataGridView == source)
+                {
+                    selectedSource = row.Source;
+                    row.Source.Cells["Drukuj"].Value = value;
+                    ScheduleRefresh();
+                }
+                return value;
+            }
+        });
         Add(nameof(DisplayRow.Product), "Produkt", 260);
         Add(nameof(DisplayRow.Quantity), "Ilość wydana", 110);
         Add(nameof(DisplayRow.Batch), "Seria", 125);
@@ -107,12 +121,6 @@ internal sealed class TreatmentTable : AntdUI.Table
             if (e.Record is not DisplayRow row) return;
             int modelIndex = ModelIndex(e.ColumnIndex);
             SelectSource(row.Source, modelIndex);
-            if (modelIndex == 0)
-            {
-                row.Source.Cells["Drukuj"].Value =
-                    row.Source.Cells["Drukuj"].Value is not true;
-                ScheduleRefresh();
-            }
         };
         CellDoubleClick += async (_, e) =>
         {
@@ -189,7 +197,7 @@ internal sealed class TreatmentTable : AntdUI.Table
                 }
                 displayed.Add(new DisplayRow(row)
                 {
-                    Print = row.Cells["Drukuj"].Value is true ? "☑" : "☐",
+                    Print = row.Cells["Drukuj"].Value is true,
                     Product = Value("Produkt"),
                     Quantity = Value("Ilość wydana"),
                     Batch = Value("Seria"),
