@@ -96,7 +96,7 @@ internal static class AppearanceThemes
 
     internal static bool IsDark(AppearanceOptions options) => options.Preset is "Antd Ciemny" or "Antd Śliwkowy" or "Antd Grafitowy";
     internal static bool IsClassic(AppearanceOptions options) =>
-        options == AppearanceOptions.ForPreset("Klasyczny");
+        options.Preset == "Klasyczny";
     internal static Color Accent(AppearanceOptions options) =>
         Color.FromArgb(options.UseCustomAccent ? options.AccentArgb : AppearanceOptions.ForPreset(options.Preset).AccentArgb);
 
@@ -160,7 +160,7 @@ internal static class AppearanceThemes
         state.BoldFont?.Dispose();
         state.BoldFont = new Font(state.Font.FontFamily, appearance.TableFontSize,
             FontStyle.Bold, GraphicsUnit.Point);
-        if (appearance == AppearanceOptions.ForPreset("Klasyczny"))
+        if (IsClassic(appearance))
         {
             // Restore the exact styles captured before the first theme change.
             grid.BackgroundColor = state.Background;
