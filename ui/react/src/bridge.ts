@@ -54,7 +54,7 @@ export function invoke<T>(action: string, fields: Record<string, unknown> = {},
     const timeout = setTimeout(() => {
       pending.delete(id);
       reject(new Error("Serwer nie odpowiedział w wyznaczonym czasie."));
-    }, action === "backupDatabase" ? 1800000 : 40000);
+    }, action === "backupDatabase" ? 1800000 : action === "analyseCataloguePdf" ? 120000 : 40000);
     pending.set(id, {resolve: value => resolve(value as T), reject, timeout, onProgress});
     bridge.postMessage({id, action, ...fields});
   });
