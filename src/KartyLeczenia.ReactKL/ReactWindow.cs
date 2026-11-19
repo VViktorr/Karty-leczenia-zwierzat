@@ -241,7 +241,7 @@ internal sealed class ReactWindow : Form
                 "price-catalogue",refresh,
                 ct => priceCatalogueService.ReadAsync(ct),token);
             var missing = products.Value
-                .Where(item => snapshot.Value.Format(item).NeedsCompletion)
+                .Where(item => snapshot.Value.NeedsCompletion(item.Symbol))
                 .Select(item => new {symbol=item.Symbol,name=item.Name}).ToArray();
             return new {items=missing,count=missing.Length,total=products.Value.Length};
         }
