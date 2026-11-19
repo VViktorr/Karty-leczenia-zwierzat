@@ -719,22 +719,82 @@ function SavedCards() {
   </>;
 }
 
+interface ClinicData {
+  name:string;address:string;doctor:string;phone:string;revision:string;
+  useClinicStamp:boolean;useDoctorStamp:boolean;
+  hasClinicStamp:boolean;hasDoctorStamp:boolean;
+}
 function ClinicSettingsPanel() {
   const [form]=Form.useForm();
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
-  useEffect(()=>{
-    invoke("getClinic").then(data=>form.setFieldsValue(data)).catch(e=>setError(String(e)));
-  },[form]);
-  const save=async(values:Record<string,unknown>)=>{
+  const [revision,setRevision]=useState<string|null>(null);
+  const [clinicStamp,setClinicStamp]=useState(false);
+  const [doctorStamp,setDoctorStamp]=useState(false);
+  const [selectedClinic,setSelectedClinic]=useState("");
+  const [selectedDoctor,setSelectedDoctor]=useState("");
+  const [removeClinic,setRemoveClinic]=useState(false);
+  const [removeDoctor,setRemoveDoctor]=useState(false);
+  async function refresh(){
+    setBusy(true);setError("");setNotice("");setRevision(null);
+    try {
+      const current=await invoke<ClinicData>("getClinic");
+      form.setFieldsValue(current);
+      setRevision(current.revision);
+      setClinicStamp(current.hasClinicStamp);
+      setDoctorStamp(current.hasDoctorStamp);
+      setSelectedClinic("");setSelectedDoctor("");
+      setRemoveClinic(false);setRemoveDoctor(false);
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy(false);}
+  }
+  useEffect(()=>{void refresh();},[form]);
+  async function chooseStamp(kind:"clinic"|"doctor"){
     setBusy(true);setError("");setNotice("");
-    try{await invoke("saveClinic",values);setNotice("Dane lecznicy i lekarza zapisane.");}
-    catch(e){setError(e instanceof Error?e.message:String(e));}
+    try{
+      const result=await invoke<{cancelled:boolean;name?:string}>("chooseClinicStamp",{kind});
+      if(!result.cancelled){
+        if(kind==="clinic"){
+          setSelectedClinic(result.name??"Wybrano plik PNG");
+          setRemoveClinic(false);form.setFieldValue("useClinicStamp",true);
+        }else{
+          setSelectedDoctor(result.name??"Wybrano plik PNG");
+          setRemoveDoctor(false);form.setFieldValue("useDoctorStamp",true);
+        }
+      }
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy(false);}
+  }
+  function removeStamp(kind:"clinic"|"doctor"){
+    if(kind==="clinic"){
+      setRemoveClinic(true);setSelectedClinic("");form.setFieldValue("useClinicStamp",false);
+    }else{
+      setRemoveDoctor(true);setSelectedDoctor("");form.setFieldValue("useDoctorStamp",false);
+    }
+  }
+  const save=async(values:Record<string,unknown>)=>{
+    if(!revision)return;
+    setBusy(true);setError("");setNotice("");
+    try{
+      const result=await invoke<{saved:boolean;revision:string;
+        hasClinicStamp:boolean;hasDoctorStamp:boolean}>("saveClinic",{
+          ...values,revision,removeClinicStamp:removeClinic,removeDoctorStamp:removeDoctor
+        });
+      setRevision(result.revision);
+      setClinicStamp(result.hasClinicStamp);setDoctorStamp(result.hasDoctorStamp);
+      setSelectedClinic("");setSelectedDoctor("");setRemoveClinic(false);setRemoveDoctor(false);
+      setNotice("Wspólne dane lecznicy i lekarza zapisane w SQL Server.");
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
   };
   return <Card className="settings-card">
-    <Typography.Title level={4}>Lecznica i lekarz</Typography.Title>
+    <Typography.Title level={4}>Lecznica i lekarz — wspólne dane SQL</Typography.Title>
+    <Typography.Paragraph type="secondary">
+      Dane są przechowywane w bazie KartyLeczenia i wykorzystywane przy wydruku
+      na każdym stanowisku. Przy pierwszym połączeniu pustą kartotekę SQL można
+      uzupełnić z wcześniejszych ustawień komputera.
+    </Typography.Paragraph>
     <ErrorNotice error={error}/>
     {notice&&<Alert type="success" showIcon className="notice" message={notice}/>}
     <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
@@ -748,7 +808,34 @@ function ClinicSettingsPanel() {
         <Input/>
       </Form.Item>
       <Form.Item label="Telefon" name="phone"><Input/></Form.Item>
-      <Button type="primary" htmlType="submit" loading={busy}>Zapisz dane lecznicy</Button>
+      <Form.Item name="useClinicStamp" label="Pieczątka lecznicy na karcie" valuePropName="checked">
+        <Switch checkedChildren="PNG" unCheckedChildren="Tekst"/>
+      </Form.Item>
+      <Space wrap style={{marginBottom:16}}>
+        <Button disabled={busy||!revision} onClick={()=>{void chooseStamp("clinic");}}>
+          Wybierz PNG lecznicy
+        </Button>
+        <Typography.Text type="secondary">{selectedClinic||(!removeClinic&&clinicStamp?"Zapisana pieczątka SQL":"Brak pliku")}</Typography.Text>
+        <Button danger disabled={busy||(!clinicStamp&&!selectedClinic)||removeClinic}
+          onClick={()=>removeStamp("clinic")}>Usuń pieczątkę</Button>
+      </Space>
+      <Form.Item name="useDoctorStamp" label="Pieczątka lekarza na karcie" valuePropName="checked">
+        <Switch checkedChildren="PNG" unCheckedChildren="Tekst"/>
+      </Form.Item>
+      <Space wrap style={{marginBottom:16}}>
+        <Button disabled={busy||!revision} onClick={()=>{void chooseStamp("doctor");}}>
+          Wybierz PNG lekarza
+        </Button>
+        <Typography.Text type="secondary">{selectedDoctor||(!removeDoctor&&doctorStamp?"Zapisana pieczątka SQL":"Brak pliku")}</Typography.Text>
+        <Button danger disabled={busy||(!doctorStamp&&!selectedDoctor)||removeDoctor}
+          onClick={()=>removeStamp("doctor")}>Usuń pieczątkę</Button>
+      </Space>
+      <Space wrap>
+        <Button onClick={()=>{void refresh();}} disabled={busy}>Odśwież z SQL</Button>
+        <Button type="primary" htmlType="submit" loading={busy} disabled={!revision}>
+          Zapisz wspólne dane lecznicy
+        </Button>
+      </Space>
     </Form>
   </Card>;
 }
