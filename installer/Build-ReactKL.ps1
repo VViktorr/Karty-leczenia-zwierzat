@@ -46,14 +46,50 @@ try {
     if (Test-Path -LiteralPath (Join-Path $stage 'AntdUI.dll')) {
         throw 'Instalator ReactKL nie moze zawierac AntdUI.dll.'
     }
+
+    # The manual-version installer needs a REAL bootstrap package for a new SQL server.
+    # Catalogue SQLite and official ChPL PDFs are only source material for the
+    # initial SQL import; the ReactKL application does not use SQLite as storage.
+    $seedStage = Join-Path ([IO.Path]::GetTempPath()) ("ReactKL-seed-" + [Guid]::NewGuid().ToString('N'))
+    $seedOutput = Join-Path ([IO.Path]::GetTempPath()) ("ReactKL-seedzip-" + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $seedStage, $seedOutput -Force | Out-Null
+    $seedZip = Join-Path $seedOutput 'catalog-seed-win-x64.zip'
+    dotnet publish src/KartyLeczenia.CatalogImport/KartyLeczenia.CatalogImport.csproj -c Release -r win-x64 --self-contained true -o $seedStage
+    if ($LASTEXITCODE -ne 0) { throw 'Budowa pierwszego importera katalogu nie powiodla sie.' }
+    foreach ($required in @(
+        'src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite',
+        'data/ChPL',
+        'scripts/catalogue-additions'
+    )) {
+        if (!(Test-Path -LiteralPath $required)) { throw "Brakuje pliku paczki SQL: $required" }
+    }
+    $sqlite = Get-Item -LiteralPath 'src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite'
+    if ($sqlite.Length -lt 4096) {
+        throw 'Plik SQLite jest pusty lub jest wskaznikiem Git LFS; nie mozna budowac instalatora.'
+    }
+    Copy-Item -LiteralPath $sqlite.FullName -Destination $seedStage
+    Copy-Item -LiteralPath 'data/ChPL' -Destination $seedStage -Recurse
+    Copy-Item -LiteralPath 'scripts/catalogue-additions' -Destination $seedStage -Recurse
+    if (!(Test-Path -LiteralPath (Join-Path $seedStage 'KartyLeczenia.CatalogImport.exe'))) {
+        throw 'Brak programu KartyLeczenia.CatalogImport.exe w paczce startowej.'
+    }
+    if (!(Get-ChildItem -LiteralPath (Join-Path $seedStage 'ChPL') -Filter '*.pdf' -Recurse -File |
+          Select-Object -First 1)) {
+        throw 'Paczka SQL nie zawiera urzedowych ChPL PDF.'
+    }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::CreateFromDirectory($seedStage, $seedZip)
+    Write-Host "Przygotowano paczke SQL i ChPL: $seedZip"
     $output = Join-Path $root 'Instalatory'
     New-Item -ItemType Directory -Path $output -Force | Out-Null
-    & $Iscc "/DReleaseVersion=$Version" "/DReleaseFileVersion=$fileVersion" "/DPayloadDir=$stage" "/O$output" $installerScript
+    & $Iscc "/DReleaseVersion=$Version" "/DReleaseFileVersion=$fileVersion" "/DPayloadDir=$stage" "/DCatalogSeedFile=$seedZip" "/O$output" $installerScript
     if ($LASTEXITCODE -ne 0) { throw 'Budowanie instalatora Inno Setup nie powiodlo sie.' }
     Write-Host "Gotowy instalator: $output\KartyLeczenia-Setup-win-x64-v$Version.exe"
     Write-Host 'Na serwerze instalator zostanie automatycznie opublikowany w SQL po pierwszym uruchomieniu ReactKL.'
 }
 finally {
     Pop-Location
+    if ($seedStage -and (Test-Path -LiteralPath $seedStage)) { Remove-Item -LiteralPath $seedStage -Recurse -Force }
+    if ($seedOutput -and (Test-Path -LiteralPath $seedOutput)) { Remove-Item -LiteralPath $seedOutput -Recurse -Force }
     if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
 }

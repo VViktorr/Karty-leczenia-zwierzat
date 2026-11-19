@@ -84,7 +84,7 @@ jobs:
       - name: Validate SQL publication scripts in Windows PowerShell 5.1
         shell: powershell
         run: |
-          foreach ($path in @('scripts/Publish-ReactKLUpdate.ps1','installer/Build-ReactKL.ps1')) {
+          foreach ($path in @('scripts/Publish-ReactKLUpdate.ps1','installer/Build-ReactKL.ps1','installer/Configure-SharedArchive.ps1')) {
             $tokens = $null
             $errors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile(
@@ -92,6 +92,19 @@ jobs:
             if ($errors.Count -gt 0) {
               throw "PowerShell parse error in $path : $($errors | Out-String)"
             }
+          }
+      - name: Check new-server-only SQL installer bootstrap contract
+        shell: pwsh
+        run: |
+          $iss = Get-Content -LiteralPath 'installer/KartyLeczenia.ReactKL.iss' -Raw
+          $build = Get-Content -LiteralPath 'installer/Build-ReactKL.ps1' -Raw
+          if ($iss -notmatch 'not ExistingArchiveConfiguration' -or
+              $iss -notmatch "ExtractTemporaryFile\('Setup-SharedArchive\.sql'\)" -or
+              $iss -notmatch "ExtractTemporaryFile\('catalog-seed-win-x64\.zip'\)" -or
+              $iss -notmatch 'ServerModePage.SelectedValueIndex' -or
+              $build -notmatch 'KartyLeczenia.CatalogImport.csproj' -or
+              $build -notmatch 'CatalogSeedFile') {
+            throw 'ReactKL server installer is missing first-install SQL bootstrap or catalogue seed.'
           }
       - name: Compile in-place Inno Setup script (smoke only; no release/version)
         shell: pwsh
@@ -104,7 +117,13 @@ jobs:
           if (!$iscc) { throw 'ISCC.exe not found.' }
           $payload = (Resolve-Path ReactKL-preview).Path
           $output = Join-Path (Get-Location) 'ReactKL-InnoSmoke'
-          & $iscc '/DReleaseVersion=0.0.0' '/DReleaseFileVersion=0.0.0.0' "/DPayloadDir=$payload" "/O$output" 'installer/KartyLeczenia.ReactKL.iss'
+          # This synthetic ZIP is used ONLY for compilation. Production uses
+          # the importer + official ChPL ZIP created by Build-ReactKL.ps1.
+          $placeholder = Join-Path $env:RUNNER_TEMP 'catalogue-smoke.txt'
+          $seed = Join-Path $env:RUNNER_TEMP 'catalog-seed-win-x64.zip'
+          Set-Content -LiteralPath $placeholder -Value 'Compiler smoke only; NOT a server installation package.'
+          Compress-Archive -LiteralPath $placeholder -DestinationPath $seed -Force
+          & $iscc '/DReleaseVersion=0.0.0' '/DReleaseFileVersion=0.0.0.0' "/DPayloadDir=$payload" "/DCatalogSeedFile=$seed" "/O$output" 'installer/KartyLeczenia.ReactKL.iss'
           if ($LASTEXITCODE -ne 0) { throw 'In-place installer script compilation failed.' }
           if (!(Test-Path (Join-Path $output 'KartyLeczenia-Setup-win-x64-v0.0.0.exe'))) {
             throw 'Inno Setup did not produce the expected smoke-test file.'

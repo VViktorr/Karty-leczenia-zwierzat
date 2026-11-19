@@ -159,3 +159,13 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 - Testy regresyjne w `tests/ReactKLChecks/Program.cs` obejmują formaty karencji, brak katalogu, niepełny wariant, migrację orientacji, szerokości, legendy i formatów oraz odrzucenie złych parametrów.
 - **Nadal wymagane:** uruchomienie workflow Windows (.NET + frontend), prawdziwy wydruk na kilku stronach A4 w WebView2, drukarka i „Microsoft Print to PDF”, bardzo długie wiersze, powtarzanie legendy i fonty Windows. Nie oznaczać wersji za w pełni zweryfikowaną produkcyjnie. Nie dotykano instalatora, autoaktualizacji, danych Subiekta ani klinicznych wartości SQLite.
 
+
+### P0: pierwsza instalacja serwera SQL — provisioning przeniesiony do ReactKL
+
+- **Tylko świeża instalacja serwerowa** wywołuje istniejący, sprawdzony w WinForms `installer/Configure-SharedArchive.ps1`: wybór istniejącej lokalnej instancji lub instalacja/użycie `KLARCHIVE`, tworzenie schematu `KartyLeczenia`, bezpieczny import katalogu i urzędowych ChPL.
+- Aktualizacja obecnej instalacji z `archive-installation.ini` omija SQL provisioning/import, zachowuje jej rolę, serwer i wszystkie dane. Nowa stacja kliencka nie uruchamia poleceń konfiguracji SQL ani importu, nawet jeśli na dysku jest plik SQLite.
+- Ręczny skrypt `installer/Build-ReactKL.ps1 -Version X.Y.Z` tworzy osobną paczkę ZIP: opublikowany importer `KartyLeczenia.CatalogImport.exe`, źródłowa `medicine-catalog.sqlite`, katalog polskich ChPL i manifesty `scripts/catalogue-additions`. Nie tworzy drugiej aktywnej bazy SQLite. Nie zmienia mechanizmu `dbo.program_update` ani ręcznej numeracji wersji.
+- Skrypt konfiguracji SQL sprawdza istniejący schemat i wykonuje import przyrostowy wyłącznie w wybranym trybie instalacji serwera, nie nadpisując świadomie zmienionych kartotek SQL; dedykowany SQL Server 2025 Express jest instalowany tylko po zgodzie użytkownika.
+- CI sprawdza składnię `Configure-SharedArchive.ps1` dla Windows PowerShell 5.1, obecność ścieżki provisioningowej i kompiluje Inno Setup z **testową, nieprodukcyjną** paczką ZIP. Żaden test CI nie uruchamia inicjalizacji prawdziwej bazy.
+- **Do sprawdzenia na Windows 11 i rzeczywistym SQL:** nowy serwer z pustą bazą, istniejąca instancja z poprawnym katalogiem, aktualizacja już działającego serwera bez importu, nowa instalacja klienta, kreator uprawnień, obecność PDF i publikacja instalatora do `dbo.program_update`. CI może potwierdzić budowę, ale nie tę integrację.
+
