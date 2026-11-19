@@ -16,10 +16,14 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
 
     internal sealed record Result(
         IReadOnlyList<DocumentSuggestion> Items, bool Truncated,
-        DateTimeOffset LoadedAt, bool Cached);
+        DateTimeOffset LoadedAt, bool Cached)
+    {
+        internal long InsertionOrder { get; init; }
+    }
 
     private readonly Func<DateTimeOffset> now = clock ?? (() => DateTimeOffset.UtcNow);
     private readonly object gate = new();
+    private long nextInsertionOrder;
     private readonly Dictionary<string, Result> stored = new(StringComparer.Ordinal);
     private sealed class Flight
     {
@@ -105,10 +109,14 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
                     now(), Cached: false);
                 lock (gate)
                 {
+                    // Timestamps can coincide under bursty requests. A strict
+                    // monotonic order prevents dictionary slot reuse from
+                    // retaining old entries while evicting newer ones.
+                    snapshot = snapshot with { InsertionOrder = ++nextInsertionOrder };
                     stored[key] = snapshot;
                     if (stored.Count > MaxEntries)
                     {
-                        var oldest = stored.MinBy(entry => entry.Value.LoadedAt);
+                        var oldest = stored.MinBy(entry => entry.Value.InsertionOrder);
                         stored.Remove(oldest.Key);
                     }
                 }
