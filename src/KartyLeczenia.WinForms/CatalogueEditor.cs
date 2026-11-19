@@ -69,6 +69,7 @@ internal sealed class CatalogueEditor : Form
         Controls.Add(variants);
         Controls.Add(header);
         Controls.Add(buttons);
+        AppearanceThemes.ApplySurface(this, AppearanceThemes.Current);
     }
 
     void AddVariant(CatalogueVariantEdit variant)
