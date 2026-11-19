@@ -19,6 +19,7 @@ internal sealed class ReactWindow : Form
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "KartyLeczenia", "archive-connection.json"));
     private readonly DocumentService documents = new();
+    private readonly DocumentListCache documentLists = new();
     private readonly CardArchiveService cards;
     private readonly SharedClinicService clinicService;
     private byte[]? stagedClinicStamp;
@@ -520,6 +521,7 @@ internal sealed class ReactWindow : Form
                 trust, Text(root, "drugGroup", 80), warehouse);
             await new SubiektConnectionService().TestAsync(config, token);
             subiekt.Save(config, Flag(root, "rememberPassword"));
+            documentLists.Clear();
             return new { saved = true };
         }
         // Archive browsing and trash management use the program database only.
@@ -557,19 +559,58 @@ internal sealed class ReactWindow : Form
                 "all" => DocumentSearchKinds.All,
                 _ => throw new ArgumentException("Nieznany rodzaj dokumentu.")
             };
-            var today = DateTime.Today;
-            (DateTime? from, DateTime? to) = Text(root, "period", 20) switch
+            DateTime today = DateTime.Today;
+            DateTime monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+            DateTime month = new(today.Year, today.Month, 1);
+            DateTime quarter = new(today.Year, 1 + 3 * ((today.Month - 1) / 3), 1);
+            DateTime year = new(today.Year, 1, 1);
+            static DateTime ParseDate(JsonElement element, string name)
             {
+                string value = Text(element, name, 12);
+                if (!DateTime.TryParseExact(value, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var date))
+                    throw new ArgumentException("Wybierz prawidłową datę: " + name);
+                return date;
+            }
+            string period = Text(root, "period", 20);
+            (DateTime? from, DateTime? to) = period switch
+            {
+                "all" => (null, null),
                 "today" => (today, today.AddDays(1)),
+                "currentWeek" => (monday, monday.AddDays(7)),
+                "currentMonth" => (month, month.AddMonths(1)),
+                "currentQuarter" => (quarter, quarter.AddMonths(3)),
+                "currentYear" => (year, year.AddYears(1)),
                 "week" => (today.AddDays(-6), today.AddDays(1)),
                 "month" => (today.AddDays(-29), today.AddDays(1)),
-                _ => ((DateTime?)null, (DateTime?)null)
+                "customMonth" => (new DateTime(ParseDate(root, "startDate").Year,
+                    ParseDate(root, "startDate").Month, 1), null),
+                "custom" => (ParseDate(root, "startDate"), ParseDate(root, "endDate").AddDays(1)),
+                _ => throw new ArgumentException("Nieznany okres dokumentów.")
             };
-            var rows = await documents.SearchAsync(options, Text(root, "query", 120),
-                token, kind, from, to, limit: 201, allowEmpty: true);
-            return new { items = rows.Take(200).Select(x => new
-                {x.Id, x.Number, x.Date, x.ShortPayer, x.Payer, x.Gross, x.Net,
-                 x.Currency, x.RelatedText}).ToArray(), truncated = rows.Count > 200 };
+            if (period == "customMonth" && from is DateTime customStart)
+                to = customStart.AddMonths(1);
+            if (from >= to)
+                throw new ArgumentException("Data końcowa musi przypadać w dniu rozpoczęcia okresu lub później.");
+
+            string query = Text(root, "query", 120);
+            bool refresh = Flag(root, "refresh");
+            string cacheKey = DocumentListCache.Key(options, kind, query, from, to);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var result = await documentLists.GetAsync(cacheKey, refresh,
+                async queryToken => await documents.SearchAsync(options, query, queryToken,
+                    kind, from, to, limit: 501, allowEmpty: true), token);
+            CrashLog.Write($"ReactKL.Documents.List kind={kind} count={result.Items.Count} cached={result.Cached} elapsedMs={watch.ElapsedMilliseconds}");
+            return new
+            {
+                items = result.Items.Select(x => new
+                {
+                    x.Id, x.Number, x.Date, x.ShortPayer, x.Payer, x.Gross,
+                    x.Net, x.Currency, x.RelatedText
+                }).ToArray(),
+                result.Truncated, result.Cached, result.LoadedAt
+            };
         }
         if (action == "readDocument")
         {
