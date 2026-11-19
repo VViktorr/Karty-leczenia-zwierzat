@@ -26,7 +26,7 @@ internal sealed record AppearanceOptions
     // All contemporary presets use AntdUI's built-in color algorithm.
     // Klasyczny is the sole retained legacy/compatibility preset.
     internal static string[] Names { get; } =
-        ["Antd Jasny", "Antd Ciemny", "Antd Morski", "Antd Śliwkowy", "Antd Fioletowy", "Antd Pomarańczowy", "Antd Grafitowy", "Klasyczny"];
+        ["Antd Jasny", "Antd Ciemny", "Antd Morski", "Antd Śliwkowy", "Antd Fioletowy", "Antd Pomarańczowy", "Antd Grafitowy", "Material 3 Jasny", "Material 3 Ciemny", "Klasyczny"];
     internal static AppearanceOptions ForPreset(string name) => name switch
     {
         "Antd Jasny" => new() { Preset = name, RowHeight = 28, AccentArgb = Color.FromArgb(22, 119, 255).ToArgb() },
@@ -36,6 +36,9 @@ internal sealed record AppearanceOptions
         "Antd Fioletowy" => new() { Preset = name, RowHeight = 30, WideTabs = true, AccentArgb = Color.FromArgb(114, 46, 209).ToArgb() },
         "Antd Pomarańczowy" => new() { Preset = name, RowHeight = 30, AccentArgb = Color.FromArgb(250, 140, 22).ToArgb() },
         "Antd Grafitowy" => new() { Preset = name, RowHeight = 28, AccentArgb = Color.FromArgb(93, 122, 150).ToArgb() },
+        // Material-inspired palette on AntdUI controls, not a second UI toolkit.
+        "Material 3 Jasny" => new() { Preset = name, SwitchStyle = 3, RowHeight = 32, CornerRadius = 16, AccentArgb = Color.FromArgb(103, 80, 164).ToArgb() },
+        "Material 3 Ciemny" => new() { Preset = name, SwitchStyle = 3, RowHeight = 32, CornerRadius = 16, AccentArgb = Color.FromArgb(208, 188, 255).ToArgb() },
         "Klasyczny" => new() { Preset = name },
         _ => ForPreset("Antd Jasny")
     };
@@ -94,7 +97,7 @@ internal static class AppearanceThemes
         finally { File.Delete(temp); }
     }
 
-    internal static bool IsDark(AppearanceOptions options) => options.Preset is "Antd Ciemny" or "Antd Śliwkowy" or "Antd Grafitowy";
+    internal static bool IsDark(AppearanceOptions options) => options.Preset is "Antd Ciemny" or "Antd Śliwkowy" or "Antd Grafitowy" or "Material 3 Ciemny";
     internal static bool IsClassic(AppearanceOptions options) =>
         options.Preset == "Klasyczny";
     internal static Color Accent(AppearanceOptions options) =>
@@ -108,6 +111,8 @@ internal static class AppearanceThemes
         "Antd Śliwkowy" => Color.FromArgb(35, 28, 47),
         "Antd Morski" => Color.FromArgb(236, 247, 246),
         "Antd Grafitowy" => Color.FromArgb(29, 35, 44),
+        "Material 3 Jasny" => Color.FromArgb(255, 251, 254),
+        "Material 3 Ciemny" => Color.FromArgb(28, 27, 31),
         _ => IsDark(options) ? Color.FromArgb(32, 37, 45) : Color.FromArgb(245, 247, 250)
     };
 
