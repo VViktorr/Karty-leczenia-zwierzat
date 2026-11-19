@@ -51,7 +51,7 @@ internal sealed partial class SharedArchive
         try
         {
             progress?.Report(new("Tworzenie pełnej kopii bazy SQL", null, "KartyLeczenia"));
-            using var db = OpenMaintenance(options: this.options, restoring: false);
+            using var db = OpenMaintenance(this.options, restoring: false);
             // WorkingFolder is a folder on the SQL host, visible to its service.
             var created = CreateBackup(db, options.WorkingFolder, "robocza", compress: options.Compress);
             serverPath = created.Path;
@@ -295,7 +295,7 @@ internal sealed partial class SharedArchive
         }
     }
 
-    static DatabaseBackupResult CreateBackup(SqlConnection db, string folder, string label, bool compress = false, bool differential = false, bool copyOnly = true)
+    static DatabaseBackupResult CreateBackup(SqlConnection db, string folder, string label, bool compress = false)
     {
         if (folder.Length == 0)
         {
@@ -307,7 +307,7 @@ internal sealed partial class SharedArchive
 
         string path = ServerPath(folder, $"KartyLeczenia-{label}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak");
         string backupSql = "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH " +
-            (differential ? "DIFFERENTIAL, " : copyOnly ? "COPY_ONLY, " : "") +
+            "COPY_ONLY, " +
             "CHECKSUM, " + (compress ? "COMPRESSION" : "NO_COMPRESSION") + ";";
         try
         {
