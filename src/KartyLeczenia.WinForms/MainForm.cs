@@ -2596,6 +2596,12 @@ internal sealed class MainForm : Form
                     MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
 
+            // No Hello confirmation means no SQL operation is launched.
+            // This never locks the user, Windows session, or application.
+            if (!await WindowsHelloConsent.VerifyAsync(this,
+                    restoring ? "odtwarzanie bazy SQL" : "archiwizację bazy SQL"))
+                return;
+
             maintainingArchive = true;
             tabs.Enabled = false;
             UseWaitCursor = true;
@@ -2677,6 +2683,9 @@ internal sealed class MainForm : Form
             if (answer == DialogResult.No) return;
             e.Cancel = true;
             if (answer != DialogResult.Yes) return;
+
+            if (!await WindowsHelloConsent.VerifyAsync(this, "archiwizację bazy przed zamknięciem"))
+                return;
 
             var archive = sharedArchive;
             exitBackupRunning = true;
