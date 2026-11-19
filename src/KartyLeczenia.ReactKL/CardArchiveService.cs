@@ -139,7 +139,8 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
     {
         // Invalid Windows filename characters include the slashes in K/N/YYYY.
         string safe = string.Concat(cardNumber.Select(c =>
-            char.IsControl(c) || "<>:\\"/\\|?*".Contains(c) ? '_' : c)).Trim(' ', '.', '_');
+            char.IsControl(c) || Path.GetInvalidFileNameChars().Contains(c) ? '_' : c))
+            .Trim(' ', '.', '_');
         return string.IsNullOrWhiteSpace(safe) ? "Karta-leczenia" : safe;
     }
 
