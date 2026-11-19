@@ -277,6 +277,47 @@ internal static class AppearanceThemes
         button.Invalidate();
     }
 
+    sealed class AntdTableFontState(AntdUI.Table table)
+    {
+        internal readonly Font OriginalFont = table.Font;
+        internal Font? ThemeFont;
+    }
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<AntdUI.Table, AntdTableFontState>
+        AntdTableFonts = new();
+
+    static void ApplyAntdTable(AntdUI.Table table, AppearanceOptions appearance)
+    {
+        Color canvas = Canvas(appearance);
+        Color ink = Ink(appearance);
+        Color accent = Accent(appearance);
+        bool dark = IsDark(appearance);
+        var background = dark ? Blend(canvas, Color.White, .03f) : Color.White;
+        table.ColorScheme = dark ? AntdUI.TAMode.Dark : AntdUI.TAMode.Light;
+        table.BackColor = background;
+        table.ForeColor = table.ColumnFore = ink;
+        table.ColumnBack = Blend(canvas, ink, .06f);
+        table.BorderColor = Blend(background, ink, dark ? .23f : .13f);
+        table.Bordered = appearance.GridLines;
+        table.RowHoverBg = Blend(background, accent, .12f);
+        table.RowSelectedBg = accent;
+        table.RowSelectedFore = ContrastingText(accent);
+        table.RowHeight = appearance.RowHeight;
+        table.ShowTip = appearance.ShowToolTips;
+
+        var state = AntdTableFonts.GetValue(table, t =>
+        {
+            var next = new AntdTableFontState(t);
+            t.Disposed += (_, _) => next.ThemeFont?.Dispose();
+            return next;
+        });
+        var previous = state.ThemeFont;
+        state.ThemeFont = new Font(state.OriginalFont.FontFamily, appearance.TableFontSize,
+            state.OriginalFont.Style, GraphicsUnit.Point);
+        table.Font = state.ThemeFont;
+        previous?.Dispose();
+        table.Invalidate();
+    }
+
     internal static void ApplySurface(Control control, AppearanceOptions appearance)
     {
         bool classic = IsClassic(appearance);
@@ -290,6 +331,9 @@ internal static class AppearanceThemes
         {
             case ExpiryTable expiry:
                 expiry.ApplyAppearance(appearance);
+                return;
+            case AntdUI.Table table:
+                ApplyAntdTable(table, appearance);
                 return;
             case Button button:
                 ApplyButton(button, appearance);
