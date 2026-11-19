@@ -68,7 +68,26 @@ interface MedicineExpiry {
 }
 interface SavedCard { id: string; date: string; client: string; document: string; number: string; }
 interface SaveResult {duplicate: boolean; duplicateId: string | null; number: string | null; id: string | null;}
-interface StoredCard { fields: Record<string, string>; rows: Array<Record<string, string>>; }
+interface StoredCard {
+  fields: Record<string, string>;
+  rows: Array<Record<string, string>>;
+  revision: string;
+}
+const archivedEditableColumns=[
+  {key:"Seria",title:"Seria",width:140},
+  {key:"Gatunek",title:"Gatunek",width:145},
+  {key:"Droga podania",title:"Droga podania",width:160},
+  {key:"Dawkowanie i okres stosowania",title:"Dawkowanie",width:250},
+  {key:"Karencja",title:"Karencja",width:250},
+  {key:"Liczba zwierząt",title:"Liczba zwierząt",width:135},
+  {key:"Opis zwierząt / numer siedziby stada",title:"Opis zwierząt",width:230},
+  {key:"Rozpoznanie",title:"Rozpoznanie",width:210},
+  {key:"Zamiennik produktu",title:"Zamiennik",width:180},
+  {key:"Sekcja (II lub III)",title:"Sekcja",width:105},
+  {key:"Zalecenia / uwagi",title:"Uwagi",width:230}
+] as const;
+const archivedEditableFields=new Set(["Wyniki badań",
+  "Zgłoszenie — data i godzina","Wykonanie — data i godzina"]);
 interface SqlSettings {
   configured: boolean; warning?: string; server: string; database: string;
   windowsAuthentication: boolean; userName: string; trustCertificate: boolean;
@@ -1199,6 +1218,9 @@ function SavedCards() {
   const [query,setQuery]=useState("");
   const [selected,setSelected]=useState<SavedCard | null>(null);
   const [card,setCard]=useState<StoredCard|null>(null);
+  const [editDraft,setEditDraft]=useState<StoredCard|null>(null);
+  const [editing,setEditing]=useState(false);
+  const [editBusy,setEditBusy]=useState(false);
   const [printHtml,setPrintHtml]=useState<string|null>(null);
   const printFrame=useRef<HTMLIFrameElement>(null);
   const [error,setError]=useState("");
@@ -1209,9 +1231,69 @@ function SavedCards() {
   const [notice,setNotice]=useState("");
   const remote=useRemote<SavedCard[]>("savedCards",{trash,query},[trash,query]);
   const open=async (row: SavedCard) => {
-    try {setSelected(row);setCard(await invoke<StoredCard>("savedCard",{id:row.id,trash}));setError("");}
-    catch(e){setSelected(null);setError(e instanceof Error?e.message:String(e));}
+    setEditing(false);setEditDraft(null);setCard(null);setSelected(row);
+    try{
+      const loaded=await invoke<StoredCard>("savedCard",{id:row.id,trash});
+      setCard(loaded);setError("");
+    }catch(e){setSelected(null);setError(e instanceof Error?e.message:String(e));}
   };
+  function discardSaved(){
+    const finish=()=>{setSelected(null);setCard(null);setEditDraft(null);setEditing(false);};
+    const changed=editing&&card&&editDraft&&
+      JSON.stringify({fields:card.fields,rows:card.rows})!==
+      JSON.stringify({fields:editDraft.fields,rows:editDraft.rows});
+    if(changed)Modal.confirm({
+      title:"Odrzucić niezapisane zmiany karty?",
+      content:"Zmiany w edytorze zostaną odrzucone. Karta zapisana w SQL pozostanie bez zmian.",
+      okText:"Odrzuć zmiany",cancelText:"Pozostań",onOk:finish
+    });
+    else finish();
+  }
+  function beginEdit(){
+    if(trash||!card)return;
+    setEditDraft({revision:card.revision,fields:{...card.fields},
+      rows:card.rows.map(row=>({...row}))});
+    setEditing(true);setError("");setNotice("");
+  }
+  function editHeader(key:string,value:string){
+    setEditDraft(current=>current?{...current,fields:{...current.fields,[key]:value}}:current);
+  }
+  function editRow(index:number,key:string,value:string){
+    setEditDraft(current=>current?{...current,
+      rows:current.rows.map((row,i)=>i===index?{...row,[key]:value}:row)}:current);
+  }
+  async function updateExisting(){
+    if(!selected||!card||!editDraft||editBusy||trash)return;
+    setEditBusy(true);setError("");setNotice("");
+    try{
+      await invoke("updateSavedCard",{
+        id:selected.id,revision:card.revision,
+        fields:editDraft.fields,rows:editDraft.rows
+      });
+      const refreshed=await invoke<StoredCard>("savedCard",{id:selected.id,trash:false});
+      setCard(refreshed);setEditDraft(null);setEditing(false);
+      setNotice("Zaktualizowano istniejącą kartę w SQL, zachowując jej numer.");
+      remote.reload();
+      try{
+        const result=await invoke<{html:string}>("renderSavedCard",{id:selected.id,trash:false});
+        setPrintHtml(result.html);
+      }catch(previewError){
+        setError("Karta została zaktualizowana, ale podgląd nie jest dostępny: "+
+          (previewError instanceof Error?previewError.message:String(previewError)));
+      }
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setEditBusy(false);}
+  }
+  function confirmUpdate(){
+    if(!selected||!editDraft||editBusy)return;
+    Modal.confirm({
+      title:"Zaktualizować istniejącą kartę?",
+      content:"Numer karty pozostanie bez zmian. Przed zatwierdzeniem sprawdź dawkowanie, "+
+        "karencję, gatunki i daty wykonania. Zmiany mogą być widoczne na innych stanowiskach.",
+      okText:"Zaktualizuj kartę",cancelText:"Wróć do edycji",
+      onOk:async()=>{await updateExisting();}
+    });
+  }
   async function printSaved(row: SavedCard) {
     try {
       const result=await invoke<{html:string}>("renderSavedCard",{id:row.id,trash});
@@ -1293,19 +1375,58 @@ function SavedCards() {
         placeholder={purgeTarget?.number||purgeTarget?.document||""}/>
     </Modal>
     <Modal className="kl-dialog-saved-card" open={!!selected} title={selected?.number||"Karta leczenia"}
-      width={1100} footer={<Button onClick={()=>{setSelected(null);setCard(null);}}>Zamknij</Button>}
-      onCancel={()=>{setSelected(null);setCard(null);}}>
+      width={1100} closable={!editBusy} keyboard={!editBusy} maskClosable={!editBusy}
+      footer={<Space wrap>
+        {editing ? <>
+          <Button disabled={editBusy} onClick={()=>{setEditing(false);setEditDraft(null);setError("");}}>
+            Anuluj edycję
+          </Button>
+          <Button type="primary" loading={editBusy} onClick={confirmUpdate}>
+            Zaktualizuj kartę w SQL
+          </Button>
+        </> : <>
+          {!trash&&<Button onClick={beginEdit} disabled={!card}>Edytuj zapisaną kartę</Button>}
+          <Button onClick={discardSaved}>Zamknij</Button>
+        </>}
+      </Space>}
+      onCancel={()=>{if(!editBusy)discardSaved();}}>
       {!card ? <Spin/> : <>
+        {editing&&<Alert className="notice" type="warning" showIcon
+          message="Edycja istniejącej karty — bez zmiany numeru"
+          description="Zmiany pól klinicznych wymagają ponownej weryfikacji ChPL. Dane źródłowe Subiekta, numer karty i pieczątki pozostają zachowane."/>}
+        <ErrorNotice error={error}/>
         <Descriptions bordered column={2} size="small"
-          items={Object.entries(card.fields).map(([key,value])=>({key,label:key,children:value}))}/>
-        <Table size="small" dataSource={card.rows} pagination={false} scroll={{x:1300}}
+          items={Object.entries(editing&&editDraft?editDraft.fields:card.fields)
+            .map(([key,value])=>({key,label:key,children:
+              editing&&archivedEditableFields.has(key)
+                ? <Input.TextArea aria-label={key} value={value} autoSize={{minRows:1,maxRows:3}}
+                    placeholder={key.includes("data i godzina")?"dd.MM.rrrr gg:mm":undefined}
+                    onChange={event=>editHeader(key,event.target.value)}/>
+                : value
+            }))}/>
+        <Table size="small" dataSource={editing&&editDraft?editDraft.rows:card.rows}
+          pagination={false} scroll={{x:2450,y:"50vh"}}
           rowKey={(_,index)=>String(index)} columns={[
-            {title:"Lek",dataIndex:"Produkt",width:230},
-            {title:"Seria",dataIndex:"Seria",width:140},
-            {title:"Gatunek",dataIndex:"Gatunek",width:130},
-            {title:"Dawkowanie",dataIndex:"Dawkowanie i okres stosowania",width:260},
-            {title:"Karencja",dataIndex:"Karencja",width:260},
-            {title:"Rozpoznanie",dataIndex:"Rozpoznanie",width:180}
+            {title:"Druk",dataIndex:"Drukuj",width:65,
+              render:(value:string,_row:Record<string,string>,index:number)=>
+                editing?<Checkbox checked={value==="True"}
+                  onChange={event=>editRow(index,"Drukuj",String(event.target.checked))}/>
+                  : value==="True"?"Tak":"Nie"},
+            {title:"Lek — Subiekt",dataIndex:"Produkt",width:240,ellipsis:true},
+            ...archivedEditableColumns.map(({key,title,width})=>({
+              title,dataIndex:key,width,
+              render:(value:string,_row:Record<string,string>,index:number)=>
+                editing
+                  ? key==="Sekcja (II lub III)"
+                    ? <Select value={value==="III"?"III":"II"} style={{width:80}}
+                        aria-label={"Sekcja pozycji "+(index+1)}
+                        options={[{value:"II",label:"II"},{value:"III",label:"III"}]}
+                        onChange={next=>editRow(index,key,next)}/>
+                    : <Input.TextArea aria-label={title+" pozycji "+(index+1)}
+                        autoSize={{minRows:1,maxRows:3}} value={value??""}
+                        onChange={event=>editRow(index,key,event.target.value)}/>
+                  : <span>{value||"—"}</span>
+            }))
           ]}/>
       </>}
     </Modal>
