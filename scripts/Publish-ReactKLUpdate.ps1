@@ -114,7 +114,7 @@ IF @@ROWCOUNT=0
     Add-Content -LiteralPath $log -Encoding UTF8 -Value "[$(Get-Date -Format s)] Published ReactKL $Version to dbo.program_update on $Server."
     Write-Host "Opublikowano ReactKL $Version w SQL (SHA-256: $([BitConverter]::ToString($hash).Replace("-", "")))."
 } catch {
-    try { Add-Content -LiteralPath $log -Encoding UTF8 -Value "[$(Get-Date -Format s)] ERROR publishing $Version: $_" } catch {}
+    try { Add-Content -LiteralPath $log -Encoding UTF8 -Value "[$(Get-Date -Format s)] ERROR publishing ${Version}: $_" } catch {}
     Write-Error -ErrorAction Continue $_
     exit 1
 } finally {
