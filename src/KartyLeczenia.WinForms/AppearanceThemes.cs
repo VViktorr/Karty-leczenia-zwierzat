@@ -191,88 +191,133 @@ internal static class AppearanceThemes
     {
         internal readonly Color Background = control.BackColor;
         internal readonly Color Foreground = control.ForeColor;
-        internal readonly FlatStyle? ButtonFlat = control is ButtonBase button ? button.FlatStyle : null;
-        internal readonly bool? VisualStyle = control is ButtonBase styled ? styled.UseVisualStyleBackColor : null;
-        internal readonly int? Border = control is ButtonBase bordered ? bordered.FlatAppearance.BorderSize : null;
-        internal readonly Color? BorderColor = control is ButtonBase colored ? colored.FlatAppearance.BorderColor : null;
-        internal readonly Color? MouseOver = control is ButtonBase hovered ? hovered.FlatAppearance.MouseOverBackColor : null;
-        internal readonly Color? MouseDown = control is ButtonBase pressed ? pressed.FlatAppearance.MouseDownBackColor : null;
+        internal readonly FlatStyle? ButtonFlat = (control as ButtonBase)?.FlatStyle;
+        internal readonly bool? VisualStyle = (control as ButtonBase)?.UseVisualStyleBackColor;
     }
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, SurfaceColors> Surfaces = new();
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ButtonBase, ButtonTheme> ButtonThemes = new();
 
     static Color Blend(Color a, Color b, float ratio) =>
         Color.FromArgb((int)(a.R * (1 - ratio) + b.R * ratio),
             (int)(a.G * (1 - ratio) + b.G * ratio),
             (int)(a.B * (1 - ratio) + b.B * ratio));
 
-    static void UpdateRoundCorners(ButtonBase button, int radius)
+    static Color ContrastingText(Color fill)
     {
-        var oldRegion = button.Region;
-        if (radius == 0 || button.Width < 5 || button.Height < 5)
+        static double Linear(byte channel)
         {
-            button.Region = null;
-            oldRegion?.Dispose();
-            return;
-        }
-        int diameter = Math.Min(radius * 2, Math.Min(button.Width, button.Height));
-        using var path = new System.Drawing.Drawing2D.GraphicsPath();
-        int right = button.Width - diameter - 1, bottom = button.Height - diameter - 1;
-        path.AddArc(0, 0, diameter, diameter, 180, 90);
-        path.AddArc(right, 0, diameter, diameter, 270, 90);
-        path.AddArc(right, bottom, diameter, diameter, 0, 90);
-        path.AddArc(0, bottom, diameter, diameter, 90, 90);
-        path.CloseFigure();
-        button.Region = new Region(path);
-        oldRegion?.Dispose();
-    }
-
-    static void StyleButton(ButtonBase button, AppearanceOptions appearance, SurfaceColors original)
-    {
-        if (IsClassic(appearance) || appearance.SwitchStyle == 0 ||
-            (button is Button && !appearance.ColorButtons))
-        {
-            if (original.ButtonFlat is { } flat) button.FlatStyle = flat;
-            if (original.VisualStyle is { } visual) button.UseVisualStyleBackColor = visual;
-            if (original.Border is { } border) button.FlatAppearance.BorderSize = border;
-            if (original.BorderColor is { } borderColor) button.FlatAppearance.BorderColor = borderColor;
-            if (original.MouseOver is { } hover) button.FlatAppearance.MouseOverBackColor = hover;
-            if (original.MouseDown is { } down) button.FlatAppearance.MouseDownBackColor = down;
-            UpdateRoundCorners(button, 0);
-            return;
+            double value = channel / 255d;
+            return value <= .04045 ? value / 12.92 : Math.Pow((value + .055) / 1.055, 2.4);
         }
 
-        // Do not redraw regular checkboxes/radio circles. Only button-like
-        // selectors (Appearance.Button) get the rounded switch treatment.
-        if (button is CheckBox check && check.Appearance != Appearance.Button) return;
-        if (button is RadioButton radio && radio.Appearance != Appearance.Button) return;
-        Color accent = Accent(appearance);
-        bool selected = button switch
-        {
-            CheckBox cb => cb.Checked,
-            RadioButton rb => rb.Checked,
-            _ => false
-        };
-        bool dark = IsDark(appearance);
-        Color background = dark ? Color.FromArgb(49, 56, 66) : Color.White;
-        button.FlatStyle = FlatStyle.Flat;
-        button.UseVisualStyleBackColor = false;
-        button.FlatAppearance.BorderSize = appearance.SwitchStyle == 2 ? 2 : 1;
-        button.FlatAppearance.BorderColor = selected ? accent : Blend(accent, background, .65f);
-        button.FlatAppearance.MouseOverBackColor = Blend(background, accent, dark ? .35f : .16f);
-        button.FlatAppearance.MouseDownBackColor = Blend(background, accent, .45f);
-        if (selected)
-        {
-            button.BackColor = accent;
-            button.ForeColor = Color.White;
-        }
-        else
-        {
-            button.BackColor = appearance.SwitchStyle == 2
-                ? background : Blend(background, accent, dark ? .17f : .07f);
-            button.ForeColor = dark ? Color.WhiteSmoke : Color.FromArgb(35, 40, 52);
-        }
-        UpdateRoundCorners(button, appearance.CornerRadius);
+        double luminance = .2126 * Linear(fill.R) + .7152 * Linear(fill.G) + .0722 * Linear(fill.B);
+        return luminance > .179 ? Color.Black : Color.White;
     }
+
+    sealed class ButtonTheme(ButtonBase button)
+    {
+        internal AppearanceOptions? Options;
+        internal Func<bool>? IsSelected;
+        bool hovered;
+        bool pressed;
+
+        internal void Attach()
+        {
+            button.Paint += (_, e) => Draw(e.Graphics);
+            button.MouseEnter += (_, _) => { hovered = true; button.Invalidate(); };
+            button.MouseLeave += (_, _) => { hovered = pressed = false; button.Invalidate(); };
+            button.MouseDown += (_, e) => { pressed = e.Button == MouseButtons.Left; button.Invalidate(); };
+            button.MouseUp += (_, _) => { pressed = false; button.Invalidate(); };
+            button.MouseCaptureChanged += (_, _) => { if (!button.Capture) pressed = false; button.Invalidate(); };
+            button.KeyDown += (_, e) => { if (e.KeyCode == Keys.Space) { pressed = true; button.Invalidate(); } };
+            button.KeyUp += (_, e) => { if (e.KeyCode == Keys.Space) { pressed = false; button.Invalidate(); } };
+            button.LostFocus += (_, _) => { pressed = false; button.Invalidate(); };
+            if (button is CheckBox check) check.CheckedChanged += (_, _) => button.Invalidate();
+            if (button is RadioButton radio) radio.CheckedChanged += (_, _) => button.Invalidate();
+        }
+
+        internal bool UsesTheme => Options is { SwitchStyle: > 0 } options && !IsClassic(options) &&
+            (IsSelected is not null || (button is Button && options.ColorButtons) ||
+                button is CheckBox { Appearance: Appearance.Button } ||
+                button is RadioButton { Appearance: Appearance.Button });
+
+        void Draw(Graphics graphics)
+        {
+            bool selected = IsSelected?.Invoke() ?? (button is CheckBox { Checked: true } ||
+                button is RadioButton { Checked: true });
+            bool themed = UsesTheme;
+            if (!themed && (IsSelected is null || !selected)) return;
+
+            var options = Options;
+            Color surface = button.Parent?.BackColor ?? SystemColors.Control;
+            Color accent = themed ? Accent(options!) : SystemColors.Highlight;
+            bool dark = themed && IsDark(options!);
+            bool outline = themed && options!.SwitchStyle == 2;
+            Color ink = dark ? Color.WhiteSmoke : Color.FromArgb(30, 37, 49);
+            Color edge = dark ? Blend(accent, Color.White, .45f) : Blend(accent, Color.Black, .25f);
+            Color fill = selected && !outline ? Blend(accent, Color.Black, .32f)
+                : Blend(surface, accent, selected ? .19f : outline ? 0f : .07f);
+            if (button.Enabled && (hovered || pressed))
+                fill = Blend(fill, selected && !outline ? Color.Black : accent, pressed ? .25f : .13f);
+            Color text = selected && !outline ? ContrastingText(fill) : ink;
+            if (!themed) { fill = SystemColors.Highlight; text = SystemColors.HighlightText; }
+            if (!button.Enabled)
+            {
+                fill = Blend(fill, surface, .7f);
+                edge = Blend(edge, surface, .55f);
+                text = SystemColors.GrayText;
+            }
+
+            float scale = button.DeviceDpi / 96f;
+            float stroke = (selected ? 2f : 1f) * scale;
+            var bounds = new RectangleF(stroke / 2, stroke / 2,
+                button.ClientSize.Width - stroke - 1, button.ClientSize.Height - stroke - 1);
+            if (bounds.Width <= 0 || bounds.Height <= 0) return;
+            float diameter = Math.Min((themed ? options!.CornerRadius : 4) * 2 * scale,
+                Math.Min(bounds.Width, bounds.Height));
+
+            using var path = new System.Drawing.Drawing2D.GraphicsPath();
+            if (diameter < 1) path.AddRectangle(bounds);
+            else
+            {
+                path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+                path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+                path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+                path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+                path.CloseFigure();
+            }
+            using var background = new SolidBrush(surface);
+            using var brush = new SolidBrush(fill);
+            using var pen = new Pen(selected && !outline ? fill : edge, stroke);
+            var state = graphics.Save();
+            graphics.FillRectangle(background, button.ClientRectangle);
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            graphics.FillPath(brush, path);
+            graphics.DrawPath(pen, path);
+            graphics.Restore(state);
+
+            TextRenderer.DrawText(graphics, button.Text, button.Font, button.ClientRectangle, text,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
+                TextFormatFlags.SingleLine | (button.UseMnemonic ? TextFormatFlags.HidePrefix : TextFormatFlags.NoPrefix));
+            if (button.Focused && button.Enabled)
+            {
+                int inset = (int)Math.Ceiling(4 * scale);
+                var focus = Rectangle.Inflate(button.ClientRectangle, -inset, -inset);
+                if (focus.Width > 0 && focus.Height > 0)
+                    ControlPaint.DrawFocusRectangle(graphics, focus, text, fill);
+            }
+        }
+    }
+
+    internal static void RegisterSelector(Button button, Func<bool> isSelected) =>
+        GetButtonTheme(button).IsSelected = isSelected;
+
+    static ButtonTheme GetButtonTheme(ButtonBase button) => ButtonThemes.GetValue(button, item =>
+    {
+        var theme = new ButtonTheme(item);
+        theme.Attach();
+        return theme;
+    });
 
     // Revert each individual control to its captured appearance when returning
     // to Classic; don't force the standard Windows palette over custom controls.
@@ -303,31 +348,25 @@ internal static class AppearanceThemes
                 control.ForeColor = original.Foreground;
             }
         }
-        if (control is ButtonBase button)
+        if (control is ButtonBase button && !button.IsDisposed)
         {
-            if (original.ButtonFlat is not null && !button.IsDisposed)
-                StyleButton(button, appearance, original);
-            if (!classic && appearance.SwitchStyle != 0 && button is CheckBox or RadioButton)
+            var theme = GetButtonTheme(button);
+            theme.Options = appearance;
+            if (theme.UsesTheme)
             {
-                // Keep selector visual state in sync when toggled.
-                if (!ThemeHandlers.TryGetValue(button, out _))
-                {
-                    ThemeHandlers.Add(button, new ButtonThemeMarker());
-                    if (button is CheckBox cb) cb.CheckedChanged += (_, _) => StyleButton(cb, CurrentStyles.GetValue(cb, _ => appearance), original);
-                    if (button is RadioButton rb) rb.CheckedChanged += (_, _) => StyleButton(rb, CurrentStyles.GetValue(rb, _ => appearance), original);
-                    button.SizeChanged += (_, _) => UpdateRoundCorners(button, CurrentStyles.GetValue(button, _ => appearance).CornerRadius);
-                }
+                button.FlatStyle = FlatStyle.Flat;
+                button.UseVisualStyleBackColor = false;
             }
-            CurrentStyles.Remove(button);
-            CurrentStyles.Add(button, appearance);
+            else
+            {
+                if (original.ButtonFlat is { } flat) button.FlatStyle = flat;
+                if (original.VisualStyle is { } visual) button.UseVisualStyleBackColor = visual;
+            }
+            button.Invalidate();
         }
         foreach (Control child in control.Controls)
             ApplySurface(child, appearance);
     }
-
-    sealed class ButtonThemeMarker { }
-    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ButtonBase, ButtonThemeMarker> ThemeHandlers = new();
-    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ButtonBase, AppearanceOptions> CurrentStyles = new();
 
     internal static void ApplyTabs(TabControl tabs, AppearanceOptions appearance)
     {
