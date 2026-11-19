@@ -98,3 +98,26 @@ z prawdziwym serwerem SQL i stacjami Windows.
 **Przed użyciem produkcyjnym:** potwierdzić na testowej bazie SQL uprawnienia
 do kosza, skuteczność pojedynczego usunięcia i pełną ścieżkę aktualizacji
 instalatora. Samo przejście CI nie potwierdza wykonania operacji na żywym SQL.
+
+## Karta leczenia — warianty ChPL w React
+
+- Tabela nowej karty ma wybór sekcji II lub III, zachowywany w podglądzie
+  oraz podczas zapisu do SQL.
+- Przycisk **Wybierz wariant** otwiera dane katalogu SQL po symbolu z Subiekta.
+  Pokazuje gatunek, drogę, dawkowanie, karencję tkanek/mleka, wskazania i
+  powiązany PDF ChPL. PDF można otworzyć bezpośrednio w oknie wyboru.
+- Wybranie wariantu **nie zapisuje automatycznie karty w SQL**. Aktualizuje
+  dopiero jej edytowalne pola, w tym domyślny opis zwierzęcia po zmianie gatunku.
+- Zmieniany wariant czyści poprzedni kontekst dokumentu rejestru, dawkę i
+  automatyczną karencję. Brak karencji nowego wariantu **czyści starą wartość**
+  zamiast pozostawiać nieodpowiednią karencję poprzedniego gatunku; React
+  pokazuje ostrzeżenie o konieczności jej ręcznego zweryfikowania.
+- Po udanym zapisie do bazy otwiera się podgląd zapisanej karty z numerem
+  K/numer/rok; awaria samego podglądu nie jest mylona z awarią zapisu.
+- `TreatmentVariantApplier` ma kontrolę regresyjną w `tests/ReactKLChecks`
+  dotyczącą poprzedniego PDF, opisu zwierzęcia, pustej i złożonej karencji.
+
+**Do sprawdzenia na Windows z SQL:** dopasowanie symboli Subiekta do katalogu,
+czytelność okna wyboru przy wielu wariantach, poprawność każdego wskazania
+i karencji względem oficjalnej ChPL. Testy automatyczne nie dokonują
+weterynaryjnej walidacji dawkowania i nie kontaktują się z produkcyjnym SQL.
