@@ -118,7 +118,7 @@ internal sealed class ReactShellForm : Form
                     "today" => (today, today.AddDays(1)),
                     "week" => (today.AddDays(-6), today.AddDays(1)),
                     "month" => (today.AddDays(-29), today.AddDays(1)),
-                    "all" => (null, null),
+                    "all" => ((DateTime?)null, (DateTime?)null),
                     _ => throw new ArgumentException("Nieznany zakres dat.")
                 };
                 var found = await documents.SearchAsync(options, query, token,
