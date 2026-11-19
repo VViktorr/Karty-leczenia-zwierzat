@@ -180,3 +180,16 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 - Testy bez SQL sprawdzają rozpoznawanie gatunków (w tym cielęta), odrzucanie niezgodnych i niezweryfikowanych wariantów oraz rozdzielenie kluczy preferencji pomiędzy różnymi źródłami.
 - **Do potwierdzenia:** kompilacja nowego commit-u w CI, rzeczywiste odczyty/upserty `treatment_choices`, przełączanie grup po ręcznym zaznaczeniu/odznaczeniu wiersza, praca na wielu stanowiskach oraz zachowanie odznaczeń po zapisie.
 
+
+
+### P1: zamiennik produktu i grupowe opisy zwierząt — ReactKL (19.11.2026)
+
+- `31e09c9`: pole `Zamiennik produktu` jest niezależne od nazwy/symbolu pozycji Subiekta; wartość przechodzi z React przez host do zapisu JSON karty i jest pokazana na podglądzie oraz wydruku obok oryginalnego produktu. Nie zmienia samoczynnie dawki ani karencji.
+- `6126e7b`: uzupełnianie wspólnego opisu i liczby zwierząt dotyczy **zaznaczonych pozycji tego samego gatunku i sekcji II/III**. Przy zapisie/drukowaniu edytor przekazuje pełen stan pozycji; nie dodano aktywnej lokalnej bazy.
+- Historia opisów kontrahenta: odczyt `TOP (100)` z istniejącego `dbo.animal_descriptions` ograniczony do `source_scope` i `payer_id`, kolejność `last_used DESC`; jawny przycisk zapisu. Klucz SHA-256 zgodny z WinForms: `BinaryWriter(scope, payerId, ASCII-NOCASE(description))`. Brak dostępu bez `PayerId`.
+- `a363ae2`: bezbazowe testy regresyjne identyfikatora opisu, separacji źródła i płatnika. Zmiany zachowują dane istniejącej tabeli bez migracji.
+- `989b1d1`: serializacja synchronizacji zaznaczeń gatunków, blokada zapisu i podglądu podczas wysyłania snapshotu do hosta.
+
+**Potwierdzone CI:** przebiegi #187, #188 i #189 zakończyły się sukcesem. Przebiegi #190 i nowsze należy sprawdzić przed oznaczeniem tego etapu jako zweryfikowanego.
+
+**Pozostaje do testów na SQL/Windows:** stare warianty wpisów `treatment_choices` powiązane także z nazwą produktu (odczyt React jest obecnie indeksowany po `choice_key`); współbieżne edycje opisów na dwóch stanowiskach; rzeczywista instalacja/import; sprawdzenie zamiennika na zapisanej karcie i wydruku; kompatybilność widoku grupowego z danymi edytowanymi przed filtrowaniem.
