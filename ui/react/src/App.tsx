@@ -22,7 +22,8 @@ interface DraftRow {
   description: string; animals: string; diagnosis: string; section: string; selected: boolean;
 }
 interface Draft {
-  draftId: string; number: string; payer: string; recipient: string; rows: DraftRow[];
+  draftId: string; number: string; payer: string; recipient: string;
+  hasPayerId: boolean; rows: DraftRow[];
 }
 interface TreatmentVariantChoice {
   id:number;species:string;indication:string;route:string;dose:string;
@@ -292,13 +293,21 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   const [savedChoices,setSavedChoices]=useState<Record<string,SavedChoice>>({});
   const [choiceError,setChoiceError]=useState("");
   const [selectionBusy,setSelectionBusy]=useState(false);
+  const [animalDescriptions,setAnimalDescriptions]=useState<string[]>([]);
+  const [animalError,setAnimalError]=useState("");
+  const [animalBusy,setAnimalBusy]=useState(false);
+  const [groupDescription,setGroupDescription]=useState("");
+  const [groupCount,setGroupCount]=useState("");
+  const [groupSpecies,setGroupSpecies]=useState("");
+  const [groupSection,setGroupSection]=useState("II");
   const selectionQueue=useRef<Promise<void>>(Promise.resolve());
   const selectionVersion=useRef(0);
   useEffect(() => {
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
     desiredChecks.current=new Map((draft?.rows??[]).map(row=>[row.index,row.selected]));
     setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});
-    setSavedChoices({});
+    setSavedChoices({});setAnimalDescriptions([]);setAnimalError("");
+    setGroupDescription("");setGroupCount("");setGroupSpecies("");setGroupSection("II");
   }, [draft]);
   useEffect(()=>{
     if(!draft){setSuggestions([]);return;}
@@ -359,6 +368,39 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     // Changing the filter uses catalogue compatibility already loaded once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[speciesGroup,compatibility,compatibilityDraftId,draft]);
+
+  useEffect(()=>{
+    if(!draft?.hasPayerId){setAnimalDescriptions([]);return;}
+    let active=true;
+    void invoke<{items:string[]}>("readAnimalDescriptions",{draftId:draft.draftId})
+      .then(data=>{if(active){setAnimalDescriptions(data.items);setAnimalError("");}})
+      .catch(error=>{if(active)setAnimalError(error instanceof Error?error.message:String(error));});
+    return()=>{active=false;};
+  },[draft?.draftId,draft?.hasPayerId]);
+
+  const groupSpeciesOptions=Array.from(new Set(rows.map(row=>row.species.trim())
+    .filter(Boolean))).sort((left,right)=>left.localeCompare(right,"pl"));
+  function applyGroupAnimals(){
+    if(!draft||!groupSpecies.trim())return;
+    const target=rows.filter(row=>row.selected&&row.species.trim()===groupSpecies&&
+      (row.section==="III"?"III":"II")===groupSection);
+    if(!target.length){setAnimalError("Nie ma zaznaczonych pozycji tego gatunku i sekcji.");return;}
+    const description=groupDescription.trim(),count=groupCount.trim();
+    if(!description&&!count){setAnimalError("Wprowadź opis zwierząt lub liczbę leczonych.");return;}
+    setRows(current=>current.map(row=>target.some(item=>item.index===row.index)
+      ? {...row,...(description?{description}:{}),...(count?{animals:count}:{})}:row));
+    setSavedNumber("");setAnimalError("");
+  }
+  async function rememberAnimalDescription(){
+    if(!draft?.hasPayerId||!groupDescription.trim()||animalBusy)return;
+    setAnimalBusy(true);setAnimalError("");
+    try{
+      const description=groupDescription.trim();
+      await invoke("saveAnimalDescription",{draftId:draft.draftId,description});
+      setAnimalDescriptions(current=>[description,...current.filter(x=>x!==description)].slice(0,100));
+    }catch(error){setAnimalError(error instanceof Error?error.message:String(error));}
+    finally{setAnimalBusy(false);}
+  }
 
   function changeRemember(next:boolean){
     setRemember(next);
@@ -680,6 +722,37 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
         </Typography.Text>
       </Space>
       {choiceError&&<Alert type="warning" className="notice" showIcon message={choiceError}/>}
+    </Card>
+    <Card className="treatment-animals">
+      <Typography.Text strong>Wspólny opis i liczba zwierząt</Typography.Text>
+      <Typography.Paragraph type="secondary">
+        Uzupełnij zaznaczone pozycje tego samego gatunku i sekcji. Nie zmienia to
+        dawkowania, karencji ani wyboru wariantu ChPL.
+      </Typography.Paragraph>
+      <Space wrap>
+        <Select style={{minWidth:170}} value={groupSpecies||undefined}
+          placeholder="Wybierz gatunek" onChange={setGroupSpecies}
+          options={groupSpeciesOptions.map(value=>({value,label:value}))}/>
+        <Select value={groupSection} onChange={setGroupSection}
+          options={[{value:"II",label:"Sekcja II"},{value:"III",label:"Sekcja III"}]}/>
+        <Select showSearch allowClear style={{minWidth:260}} value={groupDescription||undefined}
+          placeholder="Opis / numery zwierząt" onChange={value=>setGroupDescription(value??"")}
+          options={animalDescriptions.map(value=>({value,label:value}))}
+          notFoundContent="Brak zapamiętanych opisów"/>
+        <Input style={{width:170}} value={groupDescription}
+          placeholder="Nowy opis" onChange={e=>setGroupDescription(e.target.value)}/>
+        <Input style={{width:145}} value={groupCount}
+          placeholder="Liczba zwierząt" onChange={e=>setGroupCount(e.target.value)}/>
+        <Button onClick={applyGroupAnimals} disabled={!groupSpecies||applyBusy||selectionBusy}>
+          Zastosuj do grupy
+        </Button>
+        <Button loading={animalBusy} disabled={!draft.hasPayerId||!groupDescription.trim()}
+          onClick={()=>{void rememberAnimalDescription();}}>Zapamiętaj opis w SQL</Button>
+      </Space>
+      {animalError&&<Alert className="notice" type="warning" showIcon message={animalError}/>}
+      {!draft.hasPayerId&&<Typography.Text type="secondary">
+        Zapamiętywanie wymaga płatnika z identyfikatorem Subiekta.
+      </Typography.Text>}
     </Card>
     <Card className="treatment-meta">
       <Space wrap>

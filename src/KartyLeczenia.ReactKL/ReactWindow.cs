@@ -32,6 +32,7 @@ internal sealed class ReactWindow : Form
     private readonly CardArchiveService cards;
     private readonly SharedClinicService clinicService;
     private readonly TreatmentChoiceService treatmentChoices;
+    private readonly AnimalDescriptionService animalDescriptions;
     private byte[]? stagedClinicStamp;
     private byte[]? stagedDoctorStamp;
     private readonly SqlBackupService backups;
@@ -53,6 +54,7 @@ internal sealed class ReactWindow : Form
         cards = new CardArchiveService(archive);
         clinicService = new SharedClinicService(archive);
         treatmentChoices = new TreatmentChoiceService(archive);
+        animalDescriptions = new AnimalDescriptionService(archive);
         backups = new SqlBackupService(archive);
         restores = new SqlRestoreService(archive);
         updates = new ReactUpdateService(archive);
@@ -662,6 +664,7 @@ internal sealed class ReactWindow : Form
             string key = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
             drafts[key] = document;
             return new { draftId = key, document.Number, document.Payer, document.Recipient,
+                hasPayerId = document.PayerId.HasValue,
                 rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),
                     replacement = r.Get("Zamiennik produktu"),
                     symbol = r.Get("Symbol Subiekta"), indication = r.Get("Wskazanie ChPL"),
@@ -769,6 +772,18 @@ internal sealed class ReactWindow : Form
                 });
             }
             return new { applied, skipped };
+        }
+        if (action == "readAnimalDescriptions" || action == "saveAnimalDescription")
+        {
+            string id = Text(root, "draftId", 30);
+            if (!drafts.TryGetValue(id, out var draft))
+                throw new InvalidOperationException("Ponownie otwórz dokument.");
+            if (action == "readAnimalDescriptions")
+                return new { items = await animalDescriptions.ReadAsync(
+                    draft.Scope, draft.PayerId, token) };
+            await animalDescriptions.SaveAsync(draft.Scope, draft.PayerId,
+                Text(root, "description", 2000), token);
+            return new { saved = true };
         }
         if (action == "readTreatmentChoices")
         {
