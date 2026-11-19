@@ -84,7 +84,7 @@ export function pricePrintHtml(
   const widths=indexes.map(i=>settings.widths[i]??20);
   const sum=widths.reduce((a,b)=>a+b,0)||1;
   const cols=indexes.map((i,j)=>`<col style="width:${100*widths[j]/sum}%">`).join("");
-  const colHeaders=indexes.map(i=>`<th style="${columnCss(settings,i===0?1:0)}">${html(i===3?heading:priceColumns[i])}</th>`).join("");
+  const colHeaders=indexes.map(i=>`<th style="${columnCss(settings,0)}">${html(i===3?heading:priceColumns[i])}</th>`).join("");
   const title=`<h2 class="price-title" style="${headingCss(settings,0)}">Cennik leków</h2>
     <p class="price-date" style="${headingCss(settings,1)}">${html(new Intl.DateTimeFormat("pl-PL").format(new Date()))}</p>`;
   const legend=`<p class="price-legend" style="${headingCss(settings,2)}"><strong>Drogi podania</strong> · ${html(priceRouteLegend)}</p>`;
@@ -161,7 +161,8 @@ export function pricePrintHtml(
       body {margin:0;background:#e7e9ed;font-family:${safeFont(settings.font)};
         font-size:${numeric(settings.size)}pt;font-weight:${numeric(settings.fontWeight)}}
       .sheet {position:relative;width:${width}mm;height:${height}mm;
-        padding:${numeric(settings.margin)}mm;margin:16px auto;background:#fff;
+        padding:${numeric(settings.margin)}mm;padding-bottom:${numeric(settings.margin+7)}mm;
+        margin:16px auto;background:#fff;
         box-shadow:0 3px 18px #aaa;overflow:hidden;break-after:page;page-break-after:always}
       .sheet.oversized {height:auto;min-height:${height}mm;overflow:visible}
       .page-header:empty{display:none}
