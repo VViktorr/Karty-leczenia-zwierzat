@@ -42,10 +42,10 @@ jobs:
       - name: Add React preview launcher
         shell: pwsh
         run: |
-          @'
-          @echo off
-          start "" "%~dp0KartyLeczenia.WinForms.exe" --react
-          '@ | Set-Content -Encoding ascii ReactKL-preview/Uruchom-ReactKL.cmd
+          Set-Content -Path ReactKL-preview/Uruchom-ReactKL.cmd -Encoding ascii -Value @(
+            '@echo off',
+            'start "" "%~dp0KartyLeczenia.WinForms.exe" --react'
+          )
       - name: Check published React frontend
         shell: pwsh
         run: |
