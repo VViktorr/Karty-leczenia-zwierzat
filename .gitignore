@@ -8,3 +8,6 @@ appsettings.local.json
 cards/
 
 /catalog-seed-win-x64.zip
+
+/ui/react/node_modules/
+/ui/react/dist/

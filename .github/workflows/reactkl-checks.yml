@@ -1,0 +1,39 @@
+name: ReactKL frontend and Windows desktop checks
+on:
+  push:
+    branches: [ReactKL]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  react-desktop:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install React dependencies
+        working-directory: ui/react
+        run: npm install --no-audit --no-fund
+      - name: Build React frontend
+        working-directory: ui/react
+        run: npm run build
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Build Windows WebView2 host
+        run: dotnet build src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release
+      - name: Check React assets copied
+        shell: pwsh
+        run: |
+          $asset = Get-ChildItem src/KartyLeczenia.WinForms/bin/Release -Filter index.html -Recurse |
+            Where-Object { $_.FullName -match 'react-ui' } | Select-Object -First 1
+          if (!$asset) { throw 'Missing compiled React assets in desktop output.' }
+      - name: Registry compatibility
+        run: dotnet run --project tests/RegistryChecks -c Release
+      - name: Connection settings
+        run: dotnet run --project tests/ConnectionChecks -c Release
