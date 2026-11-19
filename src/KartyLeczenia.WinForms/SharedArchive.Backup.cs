@@ -5,15 +5,20 @@ namespace KartyLeczenia.Windows;
 
 internal sealed partial class SharedArchive
 {
-    internal string BackupDatabase(ConnectionOptions administrator, string folder, bool compress = false)
+    // An ordinary KartyLeczenia SQL login may create a verified backup
+    // when granted BACKUP DATABASE. No sysadmin server role is required.
+    internal string BackupDatabase(string folder, bool compress = false)
+        => BackupDatabase(options, folder, compress);
+
+    internal string BackupDatabase(ConnectionOptions credentials, string folder, bool compress = false)
     {
-        using var db = OpenMaintenance(administrator);
+        using var db = OpenMaintenance(credentials, restoring: false);
         return CreateBackup(db, folder, "kopia", compress);
     }
 
     internal string? RestoreDatabase(ConnectionOptions administrator, string path)
     {
-        using var db = OpenMaintenance(administrator);
+        using var db = OpenMaintenance(administrator, restoring: true);
         using (var header = MaintenanceCommand(db, "RESTORE HEADERONLY FROM DISK = @path WITH FILE = 1;", path))
         using (var reader = header.ExecuteReader())
         {
@@ -113,13 +118,15 @@ internal sealed partial class SharedArchive
         }));
     }
 
-    SqlConnection OpenMaintenance(ConnectionOptions administrator)
+    SqlConnection OpenMaintenance(ConnectionOptions credentials, bool restoring)
     {
-        var connectionString = new SqlConnectionStringBuilder((administrator with
+        // BACKUP DATABASE permission is checked in the target database, not
+        // master. RESTORE stays restricted to an explicit sysadmin session.
+        var connectionString = new SqlConnectionStringBuilder((credentials with
         {
             Server = Server,
             TrustCertificate = options.TrustCertificate
-        }).BuildConnectionString("master"))
+        }).BuildConnectionString(restoring ? "master" : DatabaseName))
         {
             ApplicationIntent = ApplicationIntent.ReadWrite,
             Pooling = false
@@ -128,9 +135,18 @@ internal sealed partial class SharedArchive
         try
         {
             db.Open();
-            using var access = MaintenanceCommand(db, """
+            using var access = MaintenanceCommand(db, restoring ? """
                 IF ISNULL(IS_SRVROLEMEMBER(N'sysadmin'), 0) <> 1
-                    THROW 50010, N'Zaloguj się kontem administratora SQL Server (sysadmin).', 1;
+                    THROW 50010, N'Odtwarzanie wymaga konta administratora SQL Server (sysadmin).', 1;
+                DECLARE @lockResult int;
+                EXEC @lockResult = sys.sp_getapplock @Resource = N'KartyLeczenia.BackupRestore',
+                    @LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0;
+                IF @lockResult < 0
+                    THROW 50011, N'Kopia zapasowa lub odtwarzanie już trwa na tym serwerze.', 1;
+                """ : """
+                IF ISNULL(IS_SRVROLEMEMBER(N'sysadmin'), 0) <> 1
+                   AND ISNULL(HAS_PERMS_BY_NAME(DB_NAME(), N'DATABASE', N'BACKUP DATABASE'), 0) <> 1
+                    THROW 50017, N'Konto SQL nie ma uprawnienia BACKUP DATABASE. Uruchom instalator w trybie Serwer, aby nadać uprawnienie operatorowi.', 1;
                 DECLARE @lockResult int;
                 EXEC @lockResult = sys.sp_getapplock @Resource = N'KartyLeczenia.BackupRestore',
                     @LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = 0;
