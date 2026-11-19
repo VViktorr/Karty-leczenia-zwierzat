@@ -25,6 +25,10 @@ internal sealed class ReactWindow : Form
     private readonly TimedSqlCache<List<MedicineExpiry>> expiryLists = new(TimeSpan.FromSeconds(30));
     private readonly TimedSqlCache<List<MedicinePrice>> priceLists = new(TimeSpan.FromSeconds(30));
     private readonly TimedSqlCache<MedicinePriceLevel[]> priceLevelLists = new(TimeSpan.FromMinutes(10));
+    // A single catalogue SELECT per minute is shared by all price levels.
+    private readonly TimedSqlCache<PriceCatalogueSnapshot> priceCatalogueLists =
+        new(TimeSpan.FromMinutes(1));
+    private readonly PriceCatalogueService priceCatalogueService;
     private readonly CardArchiveService cards;
     private readonly SharedClinicService clinicService;
     private byte[]? stagedClinicStamp;
@@ -51,6 +55,7 @@ internal sealed class ReactWindow : Form
         restores = new SqlRestoreService(archive);
         updates = new ReactUpdateService(archive);
         catalogue = new CatalogueService(archive);
+        priceCatalogueService = new PriceCatalogueService(archive);
         base.Text = "KartyLeczenia — ReactKL";
         MinimumSize = new Size(900, 600);
         Size = new Size(1400, 850);
@@ -215,6 +220,8 @@ internal sealed class ReactWindow : Form
             var pdfs = selected.Where(pendingCataloguePdfs.ContainsKey)
                 .ToDictionary(x => x, x => pendingCataloguePdfs[x], StringComparer.Ordinal);
             await Task.Run(() => catalogue.Save(product, pdfs), token);
+            priceCatalogueLists.Clear();
+            priceLists.Clear();
             foreach (var key in pdfs.Keys) pendingCataloguePdfs.Remove(key);
             return new { saved = true };
         }
@@ -537,6 +544,7 @@ internal sealed class ReactWindow : Form
             expiryLists.Clear();
             priceLists.Clear();
             priceLevelLists.Clear();
+            priceCatalogueLists.Clear();
             return new { saved = true };
         }
         // Archive browsing and trash management use the program database only.
@@ -804,7 +812,9 @@ internal sealed class ReactWindow : Form
                 return await MedicineStockService.Prices(options, level, ct,
                     net: net, knownExpiries: stock.Value);
             }, token);
-            return priced.Value;
+            var catalogueRows = await priceCatalogueLists.ReadAsync("price-catalogue", refresh,
+                ct => priceCatalogueService.ReadAsync(ct), token);
+            return catalogueRows.Value.FormatPrices(priced.Value);
         }
         if (action == "saveDraft" || action == "previewDraft")
         {
