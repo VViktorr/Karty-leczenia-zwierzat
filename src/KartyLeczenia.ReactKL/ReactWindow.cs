@@ -21,6 +21,8 @@ internal sealed class ReactWindow : Form
     private readonly DocumentService documents = new();
     private readonly CardArchiveService cards;
     private readonly SqlBackupService backups;
+    private readonly CatalogueService catalogue;
+    private readonly Dictionary<string, byte[]> pendingCataloguePdfs = new(StringComparer.Ordinal);
     private bool backupRunning;
 
     private readonly Dictionary<string, CancellationTokenSource> active = [];
@@ -30,6 +32,7 @@ internal sealed class ReactWindow : Form
     {
         cards = new CardArchiveService(archive);
         backups = new SqlBackupService(archive);
+        catalogue = new CatalogueService(archive);
         base.Text = "KartyLeczenia — ReactKL";
         MinimumSize = new Size(900, 600);
         Size = new Size(1400, 850);
@@ -119,6 +122,64 @@ internal sealed class ReactWindow : Form
 
     private async Task<object> Handle(string action, JsonElement root, CancellationToken token)
     {
+        if (action == "searchCatalogue")
+        {
+            string search = Text(root, "query", 120);
+            return await Task.Run(() => catalogue.Search(search), token);
+        }
+        if (action == "readCatalogueProduct")
+        {
+            string symbol = Text(root, "symbol", 128);
+            return await Task.Run(() => catalogue.Read(symbol), token);
+        }
+        if (action == "saveCatalogueProduct")
+        {
+            if (!root.TryGetProperty("product", out var data) ||
+                data.ValueKind != JsonValueKind.Object)
+                throw new ArgumentException("Brak kartoteki do zapisania.");
+            var product = JsonSerializer.Deserialize<CatalogueProductModel>(
+                data.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                ?? throw new ArgumentException("Niepoprawna kartoteka.");
+            // Only staged PDF documents actually referenced in the edited product
+            // may be saved. Other staged documents stay in memory, not in SQL.
+            var selected = product.Variants.Select(x => x.Pdf).Distinct(StringComparer.Ordinal);
+            var pdfs = selected.Where(pendingCataloguePdfs.ContainsKey)
+                .ToDictionary(x => x, x => pendingCataloguePdfs[x], StringComparer.Ordinal);
+            await Task.Run(() => catalogue.Save(product, pdfs), token);
+            foreach (var key in pdfs.Keys) pendingCataloguePdfs.Remove(key);
+            return new { saved = true };
+        }
+        if (action == "chooseCataloguePdf")
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Title = "Wybierz urzędową ChPL (PDF)",
+                Filter = "Dokument PDF (*.pdf)|*.pdf",
+                CheckFileExists = true
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return new { cancelled = true };
+            var info = new FileInfo(dialog.FileName);
+            if (info.Length is < 5 or > 26214400)
+                throw new InvalidOperationException("PDF musi mieć od 5 bajtów do 25 MB.");
+            if (pendingCataloguePdfs.Count >= 10)
+                throw new InvalidOperationException(
+                    "Dołączono zbyt wiele PDF w jednej sesji. Zapisz kartotekę przed kolejnym wyborem.");
+            byte[] bytes = await File.ReadAllBytesAsync(dialog.FileName, token);
+            if (!bytes.AsSpan().StartsWith("%PDF-"u8))
+                throw new InvalidDataException("Wybrany plik nie jest poprawnym PDF.");
+            string path = "ChPL/" + Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(bytes)) + ".pdf";
+            pendingCataloguePdfs[path] = bytes;
+            return new { cancelled = false, path, name = info.Name, size = info.Length };
+        }
+        if (action == "readCataloguePdf")
+        {
+            string path = Text(root, "path", 450);
+            byte[] data = pendingCataloguePdfs.TryGetValue(path, out var pending)
+                ? pending : await Task.Run(() => catalogue.ReadPdf(path), token);
+            return new { base64 = Convert.ToBase64String(data), name = Path.GetFileName(path) };
+        }
         if (action == "getBackupSettings")
             return SqlBackupService.Load();
         if (action == "chooseArchiveFolder")
