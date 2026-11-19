@@ -20,6 +20,8 @@ internal sealed class ReactWindow : Form
         "KartyLeczenia", "archive-connection.json"));
     private readonly DocumentService documents = new();
     private readonly CardArchiveService cards;
+    private readonly SqlBackupService backups;
+    private bool backupRunning;
 
     private readonly Dictionary<string, CancellationTokenSource> active = [];
     private readonly Dictionary<string, DocumentData> drafts = [];
@@ -27,14 +29,22 @@ internal sealed class ReactWindow : Form
     internal ReactWindow()
     {
         cards = new CardArchiveService(archive);
+        backups = new SqlBackupService(archive);
         this.Text = "KartyLeczenia — ReactKL";
         MinimumSize = new Size(900, 600);
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;
         Controls.Add(web);
         Shown += async (_, _) => await StartAsync();
-        FormClosing += (_, _) =>
+        FormClosing += (_, e) =>
         {
+            if (backupRunning)
+            {
+                e.Cancel = true;
+                MessageBox.Show(this, "Archiwizacja SQL trwa. Zamknięcie programu jest chwilowo zablokowane.",
+                    "KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
             foreach (var token in active.Values) token.Cancel();
         };
     }
@@ -109,6 +119,39 @@ internal sealed class ReactWindow : Form
 
     private async Task<object> Handle(string action, JsonElement root, CancellationToken token)
     {
+        if (action == "getBackupSettings")
+            return SqlBackupService.Load();
+        if (action == "chooseArchiveFolder")
+        {
+            using var dialog = new FolderBrowserDialog
+            { Description = "Wybierz folder archiwum SQL na pendrivie" };
+            var existing = SqlBackupService.Load().DestinationFolder;
+            if (Directory.Exists(existing)) dialog.InitialDirectory = existing;
+            return new { folder = dialog.ShowDialog(this) == DialogResult.OK
+                ? dialog.SelectedPath : "" };
+        }
+        if (action == "saveBackupSettings")
+        {
+            var settings = BackupSettings(root);
+            SqlBackupService.Save(settings);
+            return new {saved = true};
+        }
+        if (action == "backupDatabase")
+        {
+            if (backupRunning) throw new InvalidOperationException("Archiwizacja już trwa.");
+            var config = SqlBackupService.Load();
+            if (!await WindowsHelloConsent.VerifyAsync(this,"wykonanie pełnej kopii SQL"))
+                return new {cancelled = true};
+            backupRunning = true;
+            string messageId = Text(root,"id",80);
+            try
+            {
+                var progress = new Progress<SqlBackupProgress>(value => SendProgress(messageId,value));
+                var result = await Task.Run(() => backups.Run(config,progress),token);
+                return new {cancelled = false, result.Path, result.SqlVerified, result.Message};
+            }
+            finally {backupRunning = false;}
+        }
         if (action == "getClinic")
         {
             var clinic = ClinicSettingsStore.Load();
@@ -367,6 +410,23 @@ internal sealed class ReactWindow : Form
         var connectionString = new SqlConnectionStringBuilder(
             saved.BuildConnectionString("KartyLeczenia")) {ApplicationIntent = ApplicationIntent.ReadWrite};
         return new SqlConnection(connectionString.ConnectionString);
+    }
+
+    private static SqlBackupSettings BackupSettings(JsonElement root) => new(
+        DestinationFolder: Text(root,"destinationFolder",1000),
+        WorkingFolder: Text(root,"workingFolder",1000),
+        Naming: Text(root,"naming",20),
+        CustomName: Text(root,"customName",200),
+        Overwrite: Flag(root,"overwrite"),
+        Compress: Flag(root,"compress"));
+    private void SendProgress(string id, SqlBackupProgress state)
+    {
+        if (IsDisposed || web.CoreWebView2 is null) return;
+        web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+        {
+            id, @event="progress", stage=state.Stage, percent=state.Percent,
+            detail=state.Detail
+        },new JsonSerializerOptions(JsonSerializerDefaults.Web)));
     }
 
     private static int? Int(JsonElement root, string name)
