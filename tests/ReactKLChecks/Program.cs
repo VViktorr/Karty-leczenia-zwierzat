@@ -368,6 +368,37 @@ static class Program
             Check(missingChoiceRejected,
                 "preferences with no source scope must never be shared across databases");
 
+            // Description identity is byte-for-byte compatible with the original
+            // WinForms BinaryWriter(scope, payerId, ASCII-NOCASE description).
+            static byte[] OriginalDescriptionKey(string scope, int payer, string description)
+            {
+                using var buffer = new MemoryStream();
+                using (var writer = new BinaryWriter(buffer, System.Text.Encoding.UTF8, leaveOpen:true))
+                {
+                    writer.Write(scope);
+                    writer.Write(payer);
+                    writer.Write(string.Concat(description.Select(c =>
+                        c is >= 'a' and <= 'z' ? char.ToUpperInvariant(c) : c)));
+                }
+                return System.Security.Cryptography.SHA256.HashData(buffer.ToArray());
+            }
+            byte[] animalKey = AnimalDescriptionService.DescriptionKey(
+                "SQLSERVER|Subiekt", 12, "Krowy AB-123");
+            Check(animalKey.SequenceEqual(OriginalDescriptionKey(
+                    "SQLSERVER|Subiekt", 12, "Krowy AB-123")) &&
+                  animalKey.SequenceEqual(AnimalDescriptionService.DescriptionKey(
+                    "SQLSERVER|Subiekt", 12, "Krowy ab-123")) &&
+                  !animalKey.SequenceEqual(AnimalDescriptionService.DescriptionKey(
+                    "SQLSERVER|Subiekt", 13, "Krowy AB-123")) &&
+                  !animalKey.SequenceEqual(AnimalDescriptionService.DescriptionKey(
+                    "INNY|Subiekt", 12, "Krowy AB-123")),
+                "animal description key must match WinForms and remain isolated per payer/source");
+            bool invalidDescriptionRejected = false;
+            try { _ = AnimalDescriptionService.DescriptionKey("", 12, "Krowy"); }
+            catch (ArgumentException) { invalidDescriptionRejected = true; }
+            Check(invalidDescriptionRejected,
+                "animal description memory must require a scoped identity");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
