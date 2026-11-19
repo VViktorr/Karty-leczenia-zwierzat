@@ -81,7 +81,7 @@ try {
                     throw "W SQL jest już nowsza wersja $existingVersion. Numeru instalatora nie zmieniono automatycznie."
                 }
                 if ($old -eq $expected) {
-                    if (-not [Linq.Enumerable]::SequenceEqual([byte[]]$existingHash, [byte[]]$hash)) {
+                    if ([Convert]::ToBase64String($existingHash) -ne [Convert]::ToBase64String($hash)) {
                         throw "W SQL jest już wersja $existingVersion z inną sumą SHA-256. Użyj nowego numeru."
                     }
                     $shouldPublish = $false
@@ -112,7 +112,7 @@ IF @@ROWCOUNT=0
     $stream = $null
     if ($Pending) { Remove-Item -LiteralPath $file.FullName -Force }
     Add-Content -LiteralPath $log -Encoding UTF8 -Value "[$(Get-Date -Format s)] Published ReactKL $Version to dbo.program_update on $Server."
-    Write-Host "Opublikowano ReactKL $Version w SQL (SHA-256: $([Convert]::ToHexString($hash)))."
+    Write-Host "Opublikowano ReactKL $Version w SQL (SHA-256: $([BitConverter]::ToString($hash).Replace("-", "")))."
 } catch {
     try { Add-Content -LiteralPath $log -Encoding UTF8 -Value "[$(Get-Date -Format s)] ERROR publishing $Version: $_" } catch {}
     Write-Error -ErrorAction Continue $_
