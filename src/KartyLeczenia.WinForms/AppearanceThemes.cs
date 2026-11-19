@@ -413,19 +413,21 @@ internal static class AppearanceThemes
             return next;
         });
         state.Options = appearance;
+        float scaledFontSize = appearance.TableFontSize * scale;
         var font = state.ThemeFonts.FirstOrDefault(existing =>
-            Math.Abs(existing.SizeInPoints - appearance.TableFontSize) < .01f &&
+            Math.Abs(existing.SizeInPoints - scaledFontSize) < .01f &&
             existing.Style == state.OriginalFont.Style);
         if (font is null)
         {
-            font = new Font(state.OriginalFont.FontFamily, appearance.TableFontSize,
+            font = new Font(state.OriginalFont.FontFamily, scaledFontSize,
                 state.OriginalFont.Style, GraphicsUnit.Point);
             state.ThemeFonts.Add(font);
         }
         state.ThemeFont = font;
         // Set the new font before triggering AntdUI's synchronous row re-layout.
         table.Font = font;
-        table.RowHeight = appearance.RowHeight;
+        float scale = InterfaceScale.Load() / 100f;
+        table.RowHeight = Math.Max(18, (int)Math.Round(appearance.RowHeight * scale));
         table.Invalidate();
     }
 
