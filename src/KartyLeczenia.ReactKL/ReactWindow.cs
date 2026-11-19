@@ -27,7 +27,7 @@ internal sealed class ReactWindow : Form
     internal ReactWindow()
     {
         cards = new CardArchiveService(archive);
-        Text = "KartyLeczenia — ReactKL";
+        this.Text = "KartyLeczenia — ReactKL";
         MinimumSize = new Size(900, 600);
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;
