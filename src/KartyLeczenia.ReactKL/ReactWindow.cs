@@ -710,7 +710,17 @@ internal sealed class ReactWindow : Form
                         treatment.Set(field, Text(item, key, 3000));
                 }
             }
-            var reported = RequiredDate(root, "reported");
+            static DateTime? OptionalDate(JsonElement element, string name)
+            {
+                string text = Text(element, name, 35);
+                if (string.IsNullOrWhiteSpace(text)) return null;
+                if (!DateTime.TryParseExact(text, "yyyy-MM-ddTHH:mm",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var date))
+                    throw new ArgumentException("Niepoprawna data i godzina: " + name);
+                return date;
+            }
+            var reported = OptionalDate(root, "reported");
             var performed = RequiredDate(root, "performed");
             string findings = Text(root, "findings", 2000);
             if (action == "previewDraft")
