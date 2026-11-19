@@ -430,6 +430,7 @@ internal sealed class PricePrintEditor : Form
         Controls.Add(actions);
         CancelButton = close;
         Shown += (_, _) => UpdateSample();
+        AppearanceThemes.ApplySurface(this, AppearanceThemes.Current);
     }
 
     internal string Render(IEnumerable<MedicinePrice> rows) => render(rows);
