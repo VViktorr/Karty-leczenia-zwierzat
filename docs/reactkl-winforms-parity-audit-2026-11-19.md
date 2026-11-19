@@ -193,3 +193,11 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 **Potwierdzone CI:** przebiegi #187, #188 i #189 zakończyły się sukcesem. Przebiegi #190 i nowsze należy sprawdzić przed oznaczeniem tego etapu jako zweryfikowanego.
 
 **Pozostaje do testów na SQL/Windows:** stare warianty wpisów `treatment_choices` powiązane także z nazwą produktu (odczyt React jest obecnie indeksowany po `choice_key`); współbieżne edycje opisów na dwóch stanowiskach; rzeczywista instalacja/import; sprawdzenie zamiennika na zapisanej karcie i wydruku; kompatybilność widoku grupowego z danymi edytowanymi przed filtrowaniem.
+
+### P1/P2: ergonomia React — skala i kolumny (19.11.2026)
+
+- `8dd29af`: trwałe skalowanie interfejsu w WebView2 przez CSS zoom (80, 90, 100, 110, 125, 150, 175, 200%). Skala zapamiętana lokalnie w `kl.uiScale`, niezależna od DPI Windows i SQL.
+- `9be12e0`: tabela edytora karty — `Ctrl+Shift+L` i przycisk Kolumny, wybór widocznych pól, zapamiętywanie `kl.treatmentColumns`; „Druk” i „Produkt” pozostają widoczne, przywracanie wszystkich kolumn jednym przyciskiem.
+- Przeciąganie kolumn oraz trwałe szerokości pozostają osobnymi zadaniami.
+- Skala i panel kolumn wymagają testu UX na Windows/WebView2, szczególnie przy 175–200%.
+- Legacy `treatment_choices`: aktualny indeksowany odczyt SHA256 pozostaje aktywny; starsze wpisy `product != ''` wymagają wydajnej migracji lub odrębnego odczytu. Nie wykonywano migracji danych ani pełnych skanów SQL.
