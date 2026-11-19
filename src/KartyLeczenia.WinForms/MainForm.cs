@@ -60,7 +60,7 @@ internal sealed class MainForm : Form
         expiryTable = new ExpiryTable(interfaceScale);
         prices = new PriceTable(interfaceScale);
         documents = new DocumentsTable(interfaceScale);
-        Text = $"KartyLeczenia — wersja {ServerUpdateGate.InstalledVersion}";
+        Text = $"SQL KartyLeczenia — wersja {ServerUpdateGate.InstalledVersion}";
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(850, 550);
         Size = new Size(1350, 830);
