@@ -47,7 +47,7 @@ export function invoke<T>(action: string, fields: Record<string, unknown> = {},
   onProgress?: (progress: BackupProgress) => void): Promise<T> {
   const bridge = window.chrome?.webview;
   if (!bridge) return Promise.reject(new Error(
-    "Dane Subiekta są dostępne po uruchomieniu desktopowego WebView2 z parametrem --react."
+    "Dane SQL i Subiekta są dostępne po uruchomieniu aplikacji KartyLeczenia.ReactKL.exe."
   ));
   const id = String(++sequence);
   return new Promise<T>((resolve, reject) => {
@@ -55,6 +55,8 @@ export function invoke<T>(action: string, fields: Record<string, unknown> = {},
       pending.delete(id);
       reject(new Error("Serwer nie odpowiedział w wyznaczonym czasie."));
     }, action === "backupDatabase" || action === "restoreDatabase" ? 2700000 :
+      action === "installUpdate" ? 900000 :
+      action === "purgeTrashedCard" ? 180000 :
       action === "analyseCataloguePdf" ? 120000 : 40000);
     pending.set(id, {resolve: value => resolve(value as T), reject, timeout, onProgress});
     bridge.postMessage({id, action, ...fields});
