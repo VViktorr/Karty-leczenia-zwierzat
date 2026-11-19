@@ -205,7 +205,20 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
           okText:"Zapisz kolejną", cancelText:"Anuluj",
           onOk:() => {void saveCard(true);}
         });
-      } else setSavedNumber(result.number ?? "");
+      } else {
+        setSavedNumber(result.number ?? "");
+        if (result.id) {
+          try {
+            const printable=await invoke<{html:string}>("renderSavedCard",{
+              id:result.id,trash:false
+            });
+            setPreview(printable.html);
+          } catch (previewError) {
+            setError("Karta została zapisana w SQL, ale nie można otworzyć podglądu: "+
+              (previewError instanceof Error ? previewError.message : String(previewError)));
+          }
+        }
+      }
     } catch (e) {setError(e instanceof Error ? e.message : String(e));}
     finally {setBusy(false);}
   }
