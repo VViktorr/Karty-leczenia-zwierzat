@@ -526,6 +526,7 @@ internal sealed class ReactWindow : Form
             drafts[key] = document;
             return new { draftId = key, document.Number, document.Payer, document.Recipient,
                 rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),
+                    symbol = r.Get("Symbol Subiekta"), indication = r.Get("Wskazanie ChPL"),
                     quantity = r.Get("Ilość wydana"), batch = r.Get("Seria"),
                     species = r.Get("Gatunek"), route = r.Get("Droga podania"),
                     dosing = r.Get("Dawkowanie i okres stosowania"), withdrawal = r.Get("Karencja"),
@@ -533,6 +534,50 @@ internal sealed class ReactWindow : Form
                     animals = r.Get("Liczba zwierząt"), diagnosis = r.Get("Rozpoznanie"),
                     section = r.Get("Sekcja (II lub III)"),
                     selected = r.Printed }).ToArray() };
+        }
+        if (action == "treatmentVariants" || action == "applyTreatmentVariant")
+        {
+            string draftId = Text(root,"draftId",30);
+            int index = Int(root,"index") ?? -1;
+            if (!drafts.TryGetValue(draftId,out var draft) ||
+                index<0 || index>=draft.Rows.Count)
+                throw new InvalidOperationException("Ponownie otwórz dokument przed wyborem wariantu ChPL.");
+            var row = draft.Rows[index];
+            string symbol = row.Get("Symbol Subiekta").Trim();
+            if (string.IsNullOrWhiteSpace(symbol))
+                throw new InvalidOperationException(
+                    "Pozycja dokumentu nie zawiera symbolu Subiekta. Wariant wybierz ręcznie w katalogu.");
+            var product = await Task.Run(() => catalogue.Read(symbol),token);
+            if (action == "treatmentVariants")
+                return new {
+                    product = product.Name,symbol = product.Symbol,
+                    variants = product.Variants.Where(v=>v.Id.HasValue)
+                        .Select(v => new {v.Id,v.Species,v.Indication,v.Route,v.Dose,
+                            v.Tissues,v.Milk,v.Remarks,v.Source,v.Pdf}).ToArray()
+                };
+            int variantId = Int(root,"variantId") ?? -1;
+            var choice = product.Variants.SingleOrDefault(v=>v.Id == variantId);
+            if (choice is null || string.IsNullOrWhiteSpace(choice.Species) ||
+                string.IsNullOrWhiteSpace(choice.Route) || string.IsNullOrWhiteSpace(choice.Dose))
+                throw new InvalidOperationException(
+                    "Wybrany wariant jest niekompletny lub nie istnieje. Nie zmieniono karty.");
+            string withdrawal = string.Join(Environment.NewLine,new[] {
+                string.IsNullOrWhiteSpace(choice.Tissues) ? "" : "Tkanki jadalne: " + choice.Tissues.Trim(),
+                string.IsNullOrWhiteSpace(choice.Milk) ? "" : "Mleko: " + choice.Milk.Trim()
+            }.Where(x=>x.Length>0));
+            row.Set("Gatunek",choice.Species);
+            row.Set("Droga podania",choice.Route);
+            row.Set("Dawkowanie i okres stosowania",choice.Dose);
+            if (withdrawal.Length>0) row.Set("Karencja",withdrawal);
+            row.Set("Wskazanie ChPL",choice.Indication);
+            row.Set("Źródło karencji",choice.Source);
+            row.Set("Status karencji","Wariant katalogu SQL — zweryfikuj z aktualną ChPL");
+            row.Set("Domyślny gatunek","False");
+            return new {
+                species=row.Get("Gatunek"),route=row.Get("Droga podania"),
+                dosing=row.Get("Dawkowanie i okres stosowania"),
+                withdrawal=row.Get("Karencja"), indication=row.Get("Wskazanie ChPL")
+            };
         }
         if (action == "updateDraft")
         {
