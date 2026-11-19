@@ -118,8 +118,18 @@ internal static class PricePrintOptionsStore
             var value = Property(obj, name);
             if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != fallback.Length)
                 return fallback;
-            try { return value.EnumerateArray().Select(x => x.GetInt32()).ToArray(); }
-            catch (FormatException) { return fallback; }
+            // Legacy WinForms writes decimal values such as 10.0, not just integers.
+            var items = value.EnumerateArray().ToArray();
+            var parsed = new int[items.Length];
+            for (int i = 0; i < items.Length; i++)
+            {
+                if (items[i].ValueKind != JsonValueKind.Number ||
+                    !items[i].TryGetDecimal(out decimal n) || n != decimal.Truncate(n) ||
+                    n < int.MinValue || n > int.MaxValue)
+                    return fallback;
+                parsed[i] = (int)n;
+            }
+            return parsed;
         }
         static string[] Strings(JsonElement obj, string name, string[] fallback)
         {
