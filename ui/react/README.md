@@ -26,7 +26,8 @@ React ma trzy wymienne układy: Modern (menu boczne), Classic (zakładki) i Flue
 
 Interfejs obejmuje: dokumenty FS/PA/WZ, podgląd i edycję karty leczenia, podgląd
 wydruku, zapis karty do SQL, listę zapisanych kart i kosz, cennik, terminy
-ważności, dane lecznicy, konfigurację Subiekta i archiwum oraz pełną kopię SQL
+ważności, katalog SQL (warianty leków i podgląd/dołączanie PDF ChPL), dane lecznicy,
+konfigurację Subiekta i archiwum oraz pełną kopię SQL
 na pendrive z Windows Hello i kontrolą SHA-256.
 
 ## Bezpieczeństwo i ograniczenia
@@ -35,9 +36,11 @@ na pendrive z Windows Hello i kontrolą SHA-256.
 - Bezpośrednie zapytania SQL wykonuje tylko C#, nie JavaScript.
 - Hasła SQL są zabezpieczane przez Windows DPAPI w istniejących ustawieniach.
 - Wydruk korzysta z `CardHtmlRenderer` z `KartyLeczenia.Core`.
-- Nie migrowano jeszcze całego zaawansowanego edytora katalogu ChPL/PDF,
-  wszystkich parametrów wydruków, odtwarzania kopii SQL i mechanizmu
-  publikacji aktualizacji — tych funkcji nie wolno uważać za gotowe.
+- Katalog React pozwala edytować/dodawać warianty i przypisywać PDF, ale **nie**
+  ma jeszcze automatycznej ekstrakcji propozycji z ChPL, kasowania istniejących
+  wariantów ani pełnej kontroli zgodności danych klinicznych.
+- Nadal brakuje wszystkich parametrów wydruków, odtwarzania kopii SQL i mechanizmu
+  publikacji aktualizacji. Tych funkcji nie wolno uważać za gotowe.
 - Wymagane testy na Windows z rzeczywistym SQL, Subiektem i drukarką.
 
 Historyczna aplikacja WinForms jest zabezpieczona na gałęzi
