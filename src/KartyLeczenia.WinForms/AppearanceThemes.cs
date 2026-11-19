@@ -361,6 +361,9 @@ internal static class AppearanceThemes
     sealed class AntdTableFontState(AntdUI.Table table)
     {
         internal readonly Font OriginalFont = table.Font;
+        // AntdUI may still measure cached rows after a theme update.
+        // Keep previously assigned fonts alive until the table is disposed.
+        internal readonly List<Font> ThemeFonts = [];
         internal Font? ThemeFont;
     }
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<AntdUI.Table, AntdTableFontState>
@@ -382,20 +385,25 @@ internal static class AppearanceThemes
         table.RowHoverBg = Blend(background, accent, .12f);
         table.RowSelectedBg = accent;
         table.RowSelectedFore = ContrastingText(accent);
-        table.RowHeight = appearance.RowHeight;
         table.ShowTip = appearance.ShowToolTips;
 
         var state = AntdTableFonts.GetValue(table, t =>
         {
             var next = new AntdTableFontState(t);
-            t.Disposed += (_, _) => next.ThemeFont?.Dispose();
+            t.Disposed += (_, _) =>
+            {
+                foreach (var font in next.ThemeFonts) font.Dispose();
+                next.ThemeFonts.Clear();
+            };
             return next;
         });
-        var previous = state.ThemeFont;
-        state.ThemeFont = new Font(state.OriginalFont.FontFamily, appearance.TableFontSize,
+        var font = new Font(state.OriginalFont.FontFamily, appearance.TableFontSize,
             state.OriginalFont.Style, GraphicsUnit.Point);
-        table.Font = state.ThemeFont;
-        previous?.Dispose();
+        state.ThemeFonts.Add(font);
+        state.ThemeFont = font;
+        // Set the new font before triggering AntdUI's synchronous row re-layout.
+        table.Font = font;
+        table.RowHeight = appearance.RowHeight;
         table.Invalidate();
     }
 
