@@ -1,0 +1,59 @@
+{
+  "symbol": "000002691",
+  "name": "Vigophos 100 mg/ml + 0,05 mg/ml, roztwór do wstrzykiwań, 100 ml",
+  "rplId": "2800/18",
+  "description": "Butafosfan 100 mg/ml + cyjanokobalamina 0,05 mg/ml. Uwaga: nazwa w Subiekcie zawiera 0,5 mg/ml — zweryfikować nazwę towaru; urzędowa ChPL podaje 0,05 mg/ml.",
+  "pdfPath": "data/ChPL/RPL/Charakterystyka-40841-2025-10-23-6235_W-2025-12-03.pdf",
+  "variants": [
+    {
+      "species": "Bydło",
+      "route": "dożylna (i.v.)",
+      "dose": "5–10 ml/100 kg m.c.; wspomagająco przez 3 dni; w profilaktyce w ciągu 10 dni przed wycieleniem",
+      "indication": "Leczenie wspomagające i zapobieganie hipofosfatemii i niedoborom witaminy B12; wspomaganie przeżuwania po leczeniu przemieszczenia trawieńca z wtórną ketozą; uzupełnienie leczenia Ca/Mg porażenia poporodowego; profilaktyka ketozy",
+      "tissues": "0 dni",
+      "milk": "0 godzin",
+      "restrictions": "Bardzo powolne podanie dożylne; szybkie wstrzyknięcie może wywołać wstrząs.",
+      "compact": "tk. 0 dni, ml. 0 h"
+    },
+    {
+      "species": "Konie",
+      "route": "dożylna (i.v.)",
+      "dose": "5–10 ml/100 kg m.c.; w razie potrzeby powtarzać",
+      "indication": "Leczenie wspomagające i zapobieganie hipofosfatemii i niedoborom witaminy B12; wspomaganie po przeciążeniu mięśniowym",
+      "tissues": "0 dni",
+      "milk": "0 godzin",
+      "restrictions": "Bardzo powolne podanie dożylne; bezpieczeństwo podczas ciąży i laktacji u klaczy nieustalone.",
+      "compact": "tk. 0 dni, ml. 0 h"
+    },
+    {
+      "species": "Psy",
+      "route": "dożylna (i.v.)",
+      "dose": "0,1–0,15 ml/kg m.c.; w razie potrzeby powtarzać",
+      "indication": "Leczenie wspomagające i zapobieganie hipofosfatemii i niedoborom witaminy B12",
+      "tissues": "",
+      "milk": "",
+      "restrictions": "Bardzo powolne podanie dożylne; ostrożnie w przewlekłej niewydolności nerek.",
+      "compact": ""
+    },
+    {
+      "species": "Psy",
+      "route": "domięśniowa (i.m.)",
+      "dose": "0,1–0,15 ml/kg m.c.; w razie potrzeby powtarzać",
+      "indication": "Leczenie wspomagające i zapobieganie hipofosfatemii i niedoborom witaminy B12",
+      "tissues": "",
+      "milk": "",
+      "restrictions": "Ostrożnie w przewlekłej niewydolności nerek.",
+      "compact": ""
+    },
+    {
+      "species": "Psy",
+      "route": "podskórna (s.c.)",
+      "dose": "0,1–0,15 ml/kg m.c.; w razie potrzeby powtarzać",
+      "indication": "Leczenie wspomagające i zapobieganie hipofosfatemii i niedoborom witaminy B12",
+      "tissues": "",
+      "milk": "",
+      "restrictions": "Ostrożnie w przewlekłej niewydolności nerek.",
+      "compact": ""
+    }
+  ]
+}
