@@ -18,6 +18,93 @@ internal sealed partial class SharedArchive
         return CreateBackup(db, folder, "kopia", compress);
     }
 
+    // SQL Server writes the native .bak in its own default backup directory.
+    // The Windows workstation then copies it to the user-selected file.
+    // This is deliberately not BACKUP TO DISK = E:\\...: a workstation's
+    // drive letter is not the same drive on a remote SQL Server.
+    internal DatabaseBackupResult BackupToLocalFile(string destination)
+    {
+        if (!Path.IsPathFullyQualified(destination) ||
+            !destination.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Wybierz pełną ścieżkę pliku .bak na swoim komputerze.", nameof(destination));
+
+        string folder = Path.GetDirectoryName(destination)
+            ?? throw new InvalidOperationException("Nieprawidłowa lokalizacja kopii.");
+        if (!Directory.Exists(folder))
+            throw new DirectoryNotFoundException("Wybrany folder lub pendrive nie jest dostępny: " + folder);
+
+        // Verify destination write access before starting a potentially long backup.
+        string probe = Path.Combine(folder, ".kartyleczenia-" + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            using (File.Create(probe)) { }
+        }
+        finally { if (File.Exists(probe)) File.Delete(probe); }
+
+        DatabaseBackupResult serverBackup = BackupDatabase("", compress: false);
+        string serverPath = serverBackup.Path;
+        string? accessible = ResolveBackupSource(serverPath);
+        if (accessible is null)
+            throw new InvalidOperationException(
+                "SQL wykonał kopię na serwerze: " + serverPath + ". " +
+                "Nie udało się odczytać jej z tego stanowiska. " +
+                "Aby zapisywać kopie na pendrivie podłączonym do innego komputera, " +
+                "folder kopii serwera SQL musi być udostępniony w sieci z prawem odczytu. " +
+                "Kopia na serwerze nie została usunięta.");
+
+        // Write to a staging file on the destination volume first. The user
+        // never sees a truncated .bak when copying across the network fails.
+        string staging = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (var input = File.OpenRead(accessible))
+            using (var output = new FileStream(staging, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                input.CopyTo(output, 1024 * 1024);
+
+            var sourceInfo = new FileInfo(accessible);
+            var targetInfo = new FileInfo(staging);
+            if (targetInfo.Length == 0 || targetInfo.Length != sourceInfo.Length)
+                throw new IOException("Rozmiar skopiowanego archiwum jest niezgodny z kopią SQL.");
+            File.Move(staging, destination, overwrite: true);
+            return serverBackup with { Path = destination };
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new IOException(
+                "Nie udało się zapisać kopii na wybranym nośniku. " +
+                "Oryginalna kopia pozostała na serwerze: " + serverPath + ". " + ex.Message, ex);
+        }
+        finally
+        {
+            try { if (File.Exists(staging)) File.Delete(staging); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    string? ResolveBackupSource(string serverPath)
+    {
+        if (File.Exists(serverPath)) return serverPath;
+        // Use the Windows administrative share only when it is already
+        // accessible with the current Windows account. Never ask for a
+        // second SQL login, enable SMB, or change server permissions here.
+        string host = Server.Split('\\', ',')[0].Trim();
+        if (string.IsNullOrWhiteSpace(host) || host is "." or "(local)")
+            host = Environment.MachineName;
+        if (host.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase))
+            host = host[4..];
+        if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+            host = Environment.MachineName;
+
+        if (serverPath.Length >= 3 && char.IsLetter(serverPath[0]) &&
+            serverPath[1] == ':' && serverPath[2] == '\\')
+        {
+            string remote = @"\\" + host + @"\" + char.ToUpperInvariant(serverPath[0]) + "$" + serverPath[2..];
+            if (File.Exists(remote)) return remote;
+        }
+        return null;
+    }
+
     internal string? RestoreDatabase(string path)
     {
         // Reuse the same authenticated connection settings as daily work.
