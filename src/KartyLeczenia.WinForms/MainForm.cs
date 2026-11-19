@@ -422,7 +422,9 @@ internal sealed class MainForm : Form
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    DataGridView? ActiveGrid() => tabs.SelectedIndex switch { 0 => documents, 3 => treatment, _ => null };
+    // Legacy list parameters are only available for the editable WinForms grid.
+    // Documents, prices, expiry and saved cards use their own AntdUI column controls.
+    DataGridView? ActiveGrid() => tabs.SelectedIndex == 3 ? treatment : null;
 
     Task SelectKind(DocumentSearchKinds selected)
     {
