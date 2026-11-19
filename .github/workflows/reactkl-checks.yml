@@ -46,6 +46,8 @@ jobs:
         run: dotnet run --project tests/RegistryChecks -c Release
       - name: Connection settings
         run: dotnet run --project tests/ConnectionChecks -c Release
+      - name: ReactKL installation and update regression checks
+        run: dotnet run --project tests/ReactKLChecks -c Release
       - name: Publish standalone Windows preview
         run: dotnet publish src/KartyLeczenia.ReactKL/KartyLeczenia.ReactKL.csproj -c Release -r win-x64 --self-contained true -o ReactKL-preview
       - name: Add React preview launcher
