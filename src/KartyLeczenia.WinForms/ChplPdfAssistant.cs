@@ -154,6 +154,13 @@ internal static class ChplPdfAssistant
                 warnings.Add($"{animal}: nie rozpoznano drogi podania. Wymagana ręczna weryfikacja.");
                 routes = [""];
             }
+            else if (routes.Length > 1)
+            {
+                // A common section may contain different doses for each route.
+                // Never assign the complete mixed dosing text to all routes.
+                warnings.Add($"{animal}: rozpoznano kilka dróg podania. Dawki dla poszczególnych dróg trzeba rozdzielić ręcznie.");
+                doseForAnimal = "";
+            }
             if (string.IsNullOrWhiteSpace(doseForAnimal))
                 warnings.Add($"{animal}: brak jednoznacznego dawkowania dla tego gatunku.");
             foreach (string route in routes)
