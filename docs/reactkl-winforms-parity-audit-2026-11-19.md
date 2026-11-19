@@ -97,3 +97,15 @@
 - **Nadal wymagane:** kompilacja Windows/React, test rzeczywistego zapisu i odczytu SQL oraz podglądu/wydruku z pustym zgłoszeniem. Nie oznaczać całego P0 za zweryfikowany produkcyjnie.
 
 Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
+
+### P0: wspólne dane lecznicy i lekarza — implementacja ReactKL, wymagany test na SQL
+
+- Nowa usługa `SharedClinicService` czyta i zapisuje w istniejącej tabeli `dbo.clinic_settings`: nazwę, adres, telefon, lekarza oraz dwie opcjonalne pieczątki PNG.
+- Wcześniejszy `clinic.json` służy wyłącznie jako jednorazowy materiał wejściowy, i **tylko** gdy SQL nie ma żadnych danych lecznicy; przy istniejących danych SQL nie nadpisuje ich zawartością lokalną. Po odczycie SQL lokalny plik jest jedynie kopią zgodności.
+- Zapis ręczny sprawdza rewizję całego rekordu; w przypadku edycji z innego stanowiska zostaje odrzucony z komunikatem nakazującym odświeżenie.
+- Formularz React oferuje przyciski odświeżenia SQL, wyboru i usuwania PNG oraz włączenia/wyłączenia pieczątek; plik PNG ma limit 2 MB i jest sprawdzany przed wprowadzeniem do SQL.
+- Zapis i podgląd kart leczenia odczytują obecnie dane z SQL, a nie tylko lokalnie. Oba renderer-y uwzględniają aktywne pieczątki.
+- Testy `tests/ReactKLChecks/Program.cs`: pusta/pełna klinika SQL, zasady importu, zmiana rewizji i niepoprawny plik pieczątki.
+- **Nadal wymagane:** CI `.NET 10 + React`, test serwera Windows 11 (uprawnienia SELECT/INSERT/UPDATE do `clinic_settings`), pierwszego importu, dwóch stanowisk, odrzucenia równoczesnej edycji, zgodności podglądu i wydruku z PNG.
+- Nie ruszano automatycznych aktualizacji, numeru wersji, Subiekta ani danych katalogu.
+
