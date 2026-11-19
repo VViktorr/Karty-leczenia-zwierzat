@@ -186,7 +186,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedNumber, setSavedNumber] = useState("");
-  const [reported, setReported] = useState(() => localDateTime());
+  const [reported, setReported] = useState("");
   const [performed, setPerformed] = useState(() => localDateTime());
   const [findings, setFindings] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
@@ -435,7 +435,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     </Card>
     <Card className="treatment-meta">
       <Space wrap>
-        <label>Data zgłoszenia <Input type="datetime-local" value={reported} onChange={e=>setReported(e.target.value)}/></label>
+        <label>Data zgłoszenia (opcjonalnie) <Input type="datetime-local" value={reported} onChange={e=>setReported(e.target.value)}/></label>
         <label>Data wykonania <Input type="datetime-local" value={performed} onChange={e=>setPerformed(e.target.value)}/></label>
         <label>Wyniki badań <Input value={findings} onChange={e=>setFindings(e.target.value)} style={{width:340}}/></label>
       </Space>
