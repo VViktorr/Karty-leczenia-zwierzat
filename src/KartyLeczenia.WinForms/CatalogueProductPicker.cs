@@ -68,6 +68,7 @@ internal sealed class CatalogueProductPicker : Form
             query.SelectAll();
             await Search();
         };
+        AppearanceThemes.ApplySurface(this, AppearanceThemes.Current);
     }
 
     sealed record Item(MedicinePrice Product)
