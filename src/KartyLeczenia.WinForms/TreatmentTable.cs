@@ -60,7 +60,7 @@ internal sealed class TreatmentTable : AntdUI.Table
     private int ModelIndex(int displayedColumn)
     {
         if (displayedColumn < 0) return -1;
-        var sortedColumns = SortColumnsList;
+        var sortedColumns = SortColumnsList();
         string? key = displayedColumn < sortedColumns.Length ? sortedColumns[displayedColumn].Key : null;
         return key is null ? -1 : Array.IndexOf(viewKeys, key);
     }
