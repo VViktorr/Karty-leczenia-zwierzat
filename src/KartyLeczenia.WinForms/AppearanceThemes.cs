@@ -131,6 +131,7 @@ internal static class AppearanceThemes
         internal AppearanceOptions Options = new();
         internal Font? BoldFont;
         internal Font? ThemedFont;
+        internal readonly List<Font> OwnedFonts = [];
         internal int? AppliedRowHeight;
         internal readonly Color Background = grid.BackgroundColor;
         internal readonly Color GridColor = grid.GridColor;
@@ -158,20 +159,25 @@ internal static class AppearanceThemes
             };
             grid.Disposed += (_, _) =>
             {
-                state.BoldFont?.Dispose();
-                state.ThemedFont?.Dispose();
+                foreach (var font in state.OwnedFonts) font.Dispose();
+                state.OwnedFonts.Clear();
             };
         }
         state.Options = appearance;
         Normalize(appearance);
-        // Release only fonts owned by the theme engine, never a user-supplied font.
-        Font? previousFont = state.ThemedFont;
-        state.ThemedFont = null;
-        grid.Font = state.Font;
-        previousFont?.Dispose();
-        state.BoldFont?.Dispose();
-        state.BoldFont = new Font(state.Font.FontFamily, appearance.TableFontSize,
-            FontStyle.Bold, GraphicsUnit.Point);
+        // Some WinForms cells retain their previous styles while repainting.
+        // Cache owned fonts until grid disposal instead of invalidating them
+        // synchronously during a style/scale change.
+        Font CachedFont(int size, FontStyle style)
+        {
+            var existing = state.OwnedFonts.FirstOrDefault(font =>
+                Math.Abs(font.SizeInPoints - size) < .01f && font.Style == style);
+            if (existing is not null) return existing;
+            var created = new Font(state.Font.FontFamily, size, style, GraphicsUnit.Point);
+            state.OwnedFonts.Add(created);
+            return created;
+        }
+        state.BoldFont = CachedFont(appearance.TableFontSize, FontStyle.Bold);
         if (IsClassic(appearance))
         {
             // Restore the exact styles captured before the first theme change.
@@ -220,8 +226,7 @@ internal static class AppearanceThemes
         int previousAppliedHeight = state.AppliedRowHeight ?? state.RowHeight;
         grid.RowTemplate.Height = Math.Max(grid.RowTemplate.MinimumHeight, appearance.RowHeight);
         state.AppliedRowHeight = grid.RowTemplate.Height;
-        state.ThemedFont = new Font(state.Font.FontFamily, appearance.TableFontSize,
-            state.Font.Style, GraphicsUnit.Point);
+        state.ThemedFont = CachedFont(appearance.TableFontSize, state.Font.Style);
         grid.Font = state.ThemedFont;
         // Existing rows retain their old height unless it is explicitly applied.
         // Respect an operator's manually resized rows rather than rewriting them.
@@ -271,14 +276,13 @@ internal static class AppearanceThemes
         // Set stable colours for both states instead; changing Toggle only
         // switches the state and never requires reconstructing the palette.
         Color normal = surface;
-        Color active = style switch
-        {
-            1 => accent,
-            2 => Blend(surface, accent, dark ? .14f : .08f),
-            3 or 4 => Blend(surface, accent, dark ? .36f : .22f),
-            _ => Blend(surface, accent, dark ? .30f : .18f)
-        };
-        Color selectedFore = style == 1 ? ContrastingText(accent) : accent;
+        // All filled selector variants use a genuinely solid selected
+        // surface. The previous translucent card styles made active and
+        // inactive choices almost indistinguishable, especially in dark mode.
+        Color active = style == 2
+            ? Blend(surface, accent, dark ? .18f : .10f)
+            : accent;
+        Color selectedFore = style == 2 ? accent : ContrastingText(accent);
         bool hasBorder = style == 2;
         int radius = style == 4 ? 20 : Math.Clamp(options.CornerRadius, 4, 20);
 
@@ -310,8 +314,8 @@ internal static class AppearanceThemes
             button.ToggleFore = selectedFore;
             button.ToggleForeHover = selectedFore;
             button.ToggleForeActive = selectedFore;
-            button.ToggleBackHover = Blend(active, style == 1 ? Color.White : accent, .12f);
-            button.ToggleBackActive = Blend(active, style == 1 ? Color.Black : accent, .15f);
+            button.ToggleBackHover = Blend(active, Color.White, dark ? .12f : .08f);
+            button.ToggleBackActive = Blend(active, Color.Black, dark ? .08f : .12f);
             button.AutoToggle = false;
             button.WaveSize = 0;
             button.Margin = new Padding(3);
