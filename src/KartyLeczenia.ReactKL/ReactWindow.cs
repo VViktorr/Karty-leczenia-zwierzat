@@ -573,7 +573,8 @@ internal sealed class ReactWindow : Form
         if (action == "renderSavedCard")
             return new { html = cards.RenderSaved(Text(root, "id", 40), Flag(root, "trash")) };
         if (action == "savedCards")
-            return await ReadSavedCards(token, Flag(root, "trash"), Text(root, "query", 120));
+            return await ReadSavedCards(token, Flag(root, "trash"),
+                Text(root, "query", 120), Text(root, "date", 12));
         if (action == "savedCard")
             return await ReadSavedCard(token, Text(root, "id", 40), Flag(root, "trash"));
         if (action == "updateSavedCard")
@@ -986,28 +987,60 @@ internal sealed class ReactWindow : Form
         throw new InvalidOperationException("Nieznana operacja interfejsu: " + action);
     }
 
-    private async Task<object> ReadSavedCards(CancellationToken token, bool trash, string query)
+    private async Task<object> ReadSavedCards(CancellationToken token,
+        bool trash, string query, string date)
     {
-        await using var db = ArchiveDb();
-        await db.OpenAsync(token);
-        using var cmd = new SqlCommand("""
+        DateTime? day = null;
+        if (!string.IsNullOrWhiteSpace(date))
+        {
+            if (!DateTime.TryParseExact(date, "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed))
+                throw new ArgumentException("Niepoprawna data filtra kart leczenia.");
+            day = parsed;
+        }
+        var number = SavedCardSearch.ParseNumber(query);
+        // Exact K/N/YYYY searches use the existing unique SQL number index;
+        // free-text queries retain the legacy search_text behavior. Never
+        // derive a scan-heavy computed number per row.
+        string sql = number.HasValue ? """
             SELECT TOP (500) id, treatment_date, client, document, card_year, card_sequence
             FROM dbo.treatment_cards
             WHERE ((@trash=0 AND deleted_at_utc IS NULL) OR (@trash=1 AND deleted_at_utc IS NOT NULL))
-              AND (@query=N'' OR CHARINDEX(@query, search_text)>0)
+              AND card_year=@year AND card_sequence=@sequence
+              AND (@date IS NULL OR treatment_date=@date)
             ORDER BY treatment_date DESC, archive_order DESC;
-            """, db);
-        cmd.Parameters.AddWithValue("@trash", trash);
-        cmd.Parameters.AddWithValue("@query", query.ToUpperInvariant());
+            """ : """
+            SELECT TOP (500) id, treatment_date, client, document, card_year, card_sequence
+            FROM dbo.treatment_cards
+            WHERE ((@trash=0 AND deleted_at_utc IS NULL) OR (@trash=1 AND deleted_at_utc IS NOT NULL))
+              AND (@query=N'' OR CHARINDEX(@query,search_text)>0)
+              AND (@date IS NULL OR treatment_date=@date)
+            ORDER BY treatment_date DESC, archive_order DESC;
+            """;
+        await using var db = ArchiveDb();
+        await db.OpenAsync(token);
+        using var cmd = new SqlCommand(sql,db) { CommandTimeout=15 };
+        cmd.Parameters.Add("@trash", System.Data.SqlDbType.Bit).Value = trash;
+        cmd.Parameters.Add("@date", System.Data.SqlDbType.Date).Value =
+            day.HasValue ? day.Value : DBNull.Value;
+        if (number is { } cardNumber)
+        {
+            cmd.Parameters.Add("@year", System.Data.SqlDbType.Int).Value = cardNumber.Year;
+            cmd.Parameters.Add("@sequence", System.Data.SqlDbType.BigInt).Value = cardNumber.Sequence;
+        }
+        else
+            cmd.Parameters.Add("@query", System.Data.SqlDbType.NVarChar,-1).Value =
+                query.Trim().ToUpperInvariant();
         var result = new List<object>();
         await using var reader = await cmd.ExecuteReaderAsync(token);
         while (await reader.ReadAsync(token))
         {
-            string number = reader.IsDBNull(4) || reader.IsDBNull(5) ? "" :
+            string printedNumber = reader.IsDBNull(4) || reader.IsDBNull(5) ? "" :
                 $"K/{reader.GetInt64(5)}/{reader.GetInt32(4):D4}";
             result.Add(new { id = reader.GetGuid(0).ToString("N"),
                 date = reader.GetDateTime(1), client = reader.GetString(2),
-                document = reader.GetString(3), number });
+                document = reader.GetString(3), number = printedNumber });
         }
         return result;
     }

@@ -1216,6 +1216,12 @@ function Expiry() {
 function SavedCards() {
   const [trash,setTrash]=useState(false);
   const [query,setQuery]=useState("");
+  const [search,setSearch]=useState("");
+  const [treatmentDate,setTreatmentDate]=useState("");
+  useEffect(()=>{
+    const timer=setTimeout(()=>setSearch(query.trim()),300);
+    return()=>clearTimeout(timer);
+  },[query]);
   const [selected,setSelected]=useState<SavedCard | null>(null);
   const [card,setCard]=useState<StoredCard|null>(null);
   const [editDraft,setEditDraft]=useState<StoredCard|null>(null);
@@ -1229,7 +1235,8 @@ function SavedCards() {
   const [purgeBusy,setPurgeBusy]=useState(false);
   const [purgeError,setPurgeError]=useState("");
   const [notice,setNotice]=useState("");
-  const remote=useRemote<SavedCard[]>("savedCards",{trash,query},[trash,query]);
+  const remote=useRemote<SavedCard[]>("savedCards",
+    {trash,query:search,date:treatmentDate},[trash,search,treatmentDate]);
   const open=async (row: SavedCard) => {
     setEditing(false);setEditDraft(null);setCard(null);setSelected(row);
     try{
@@ -1330,8 +1337,14 @@ function SavedCards() {
         options={[{label:"Archiwum",value:"active"},{label:"Kosz",value:"trash"}]}/>
       <Button onClick={remote.reload}>Odśwież</Button></Space></div>
     <Card>
-      <Input.Search allowClear value={query} onChange={e=>setQuery(e.target.value)}
-        placeholder="Szukaj karty lub klienta" className="saved-search"/>
+      <Space wrap style={{marginBottom:12}}>
+        <Input.Search allowClear value={query} onChange={e=>setQuery(e.target.value)}
+          placeholder="Numer K/…/rok, klient lub dokument"
+          style={{minWidth:300}} className="saved-search"/>
+        <label>Data wykonania <Input type="date" aria-label="Filtr daty wykonania"
+          value={treatmentDate} onChange={e=>setTreatmentDate(e.target.value)}/></label>
+        {treatmentDate&&<Button onClick={()=>setTreatmentDate("")}>Wyczyść datę</Button>}
+      </Space>
       <ErrorNotice error={error || remote.error}/>
       {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
       <Table rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}

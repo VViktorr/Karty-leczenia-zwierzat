@@ -656,6 +656,12 @@ static class Program
             } catch (InvalidOperationException) { rowCountBlocked=true; }
             Check(rowCountBlocked,"saved-card updates must reject row count changes");
 
+            Check(SavedCardSearch.ParseNumber(" K/00014/2026 ") is (2026,14) &&
+                  SavedCardSearch.ParseNumber("k/8/2027") is (2027,8) &&
+                  SavedCardSearch.ParseNumber("K/0/2026") is null &&
+                  SavedCardSearch.ParseNumber("K/18446744073709551616/2026") is null &&
+                  SavedCardSearch.ParseNumber("FS 123") is null,
+                "card-number search must use a safe, exact indexed year/sequence");
             Console.WriteLine($"ReactKL regression checks passed: {checks}");
         }
         finally
