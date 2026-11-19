@@ -383,6 +383,74 @@ function SavedCards() {
   </>;
 }
 
+function ClinicSettingsPanel() {
+  const [form]=Form.useForm();
+  const [busy,setBusy]=useState(false);
+  const [notice,setNotice]=useState("");
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    invoke("getClinic").then(data=>form.setFieldsValue(data)).catch(e=>setError(String(e)));
+  },[form]);
+  const save=async(values:Record<string,unknown>)=>{
+    setBusy(true);setError("");setNotice("");
+    try{await invoke("saveClinic",values);setNotice("Dane lecznicy i lekarza zapisane.");}
+    catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy(false);}
+  };
+  return <Card className="settings-card">
+    <Typography.Title level={4}>Lecznica i lekarz</Typography.Title>
+    <ErrorNotice error={error}/>
+    {notice&&<Alert type="success" showIcon className="notice" message={notice}/>}
+    <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
+      <Form.Item label="Nazwa lecznicy" name="name" rules={[{required:true}]}>
+        <Input/>
+      </Form.Item>
+      <Form.Item label="Adres" name="address" rules={[{required:true}]}>
+        <Input.TextArea autoSize/>
+      </Form.Item>
+      <Form.Item label="Lekarz i numer prawa wykonywania zawodu" name="doctor" rules={[{required:true}]}>
+        <Input/>
+      </Form.Item>
+      <Form.Item label="Telefon" name="phone"><Input/></Form.Item>
+      <Button type="primary" htmlType="submit" loading={busy}>Zapisz dane lecznicy</Button>
+    </Form>
+  </Card>;
+}
+interface ArchiveConfig {
+  configured:boolean;server:string;windowsAuthentication:boolean;userName:string;trustCertificate:boolean;
+}
+function ArchiveSettingsPanel() {
+  const [form]=Form.useForm();
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  const [busy,setBusy]=useState(false);
+  useEffect(()=>{
+    invoke<ArchiveConfig>("getArchiveSettings").then(data=>form.setFieldsValue({...data,password:"",rememberPassword:false}))
+      .catch(e=>setError(String(e)));
+  },[form]);
+  async function save(values:Record<string,unknown>) {
+    setError("");setNotice("");setBusy(true);
+    try { await invoke("saveArchiveSettings",values);setNotice("Połączenie z archiwum kart SQL sprawdzone i zapisane."); }
+    catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally {setBusy(false);}
+  }
+  return <Card className="settings-card">
+    <Typography.Title level={4}>Archiwum kart SQL</Typography.Title>
+    <Typography.Text type="secondary">Baza programowa KartyLeczenia — niezależna od bazy Subiekta.</Typography.Text>
+    <ErrorNotice error={error}/>
+    {notice&&<Alert type="success" className="notice" showIcon message={notice}/>}
+    <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
+      <Form.Item label="Serwer bazy KartyLeczenia" name="server" rules={[{required:true}]}><Input/></Form.Item>
+      <Form.Item label="Uwierzytelnianie Windows" name="windowsAuthentication" valuePropName="checked"><Switch/></Form.Item>
+      <Form.Item label="Login SQL" name="userName"><Input/></Form.Item>
+      <Form.Item label="Hasło SQL" name="password"><Input.Password autoComplete="new-password"/></Form.Item>
+      <Form.Item name="rememberPassword" valuePropName="checked"><Checkbox>Zapamiętaj hasło (DPAPI)</Checkbox></Form.Item>
+      <Form.Item name="trustCertificate" valuePropName="checked"><Checkbox>Zaufaj certyfikatowi serwera</Checkbox></Form.Item>
+      <Button type="primary" htmlType="submit" loading={busy}>Sprawdź i zapisz archiwum</Button>
+    </Form>
+  </Card>;
+}
+
 function SettingsPage() {
   const [form]=Form.useForm();
   const [busy,setBusy]=useState(false);
@@ -404,7 +472,7 @@ function SettingsPage() {
     <div className="page-heading"><Typography.Title level={3}>Ustawienia połączenia Subiekta GT</Typography.Title></div>
     <Card className="settings-card">
       <Alert className="notice" showIcon type="info"
-        message="ReactKL korzysta z tej samej konfiguracji SQL co wcześniejsza aplikacja, ale ma własny interfejs ustawień."/>
+        message="Konfiguracja SQL jest zachowana z poprzedniej instalacji; nowy interfejs działa wyłącznie w React."/>
       <ErrorNotice error={error}/>
       {notice && <Alert className="notice" type="success" showIcon message={notice}/>}
       <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
@@ -426,6 +494,8 @@ function SettingsPage() {
         <Button type="primary" htmlType="submit" loading={busy}>Sprawdź i zapisz połączenie</Button>
       </Form>
     </Card>
+    <ClinicSettingsPanel/>
+    <ArchiveSettingsPanel/>
   </>;
 }
 
