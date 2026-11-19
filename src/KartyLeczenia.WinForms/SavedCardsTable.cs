@@ -53,6 +53,9 @@ internal sealed class SavedCardsTable : AntdUI.Table
     internal SavedTreatmentCard? SelectedCard() =>
         SelectedsReal().OfType<SavedTreatmentCard>().FirstOrDefault();
 
+    internal void ShowColumnsMenu(Control anchor) =>
+        AntdTableColumnMenu.Show(anchor, this, cardColumns);
+
     void RestoreLayout()
     {
         try
