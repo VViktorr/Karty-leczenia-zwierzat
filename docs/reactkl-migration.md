@@ -76,3 +76,25 @@ instalację. **Nie publikujemy już do osobnej tabeli react_program_update.**
 
 Nie zamieniaj instalatora produkcyjnego bez wcześniejszego sprawdzenia
 z prawdziwym serwerem SQL i stacjami Windows.
+
+
+## Kontrola archiwum i kosza (ReactKL)
+
+- Widoki zapisanych kart, kosza oraz ich drukowanie korzystają wyłącznie z bazy
+  programowej `KartyLeczenia`. Brak aktywnego połączenia z Subiektem GT nie
+  blokuje już tych czynności.
+- Kosz: przenoszenie, przywracanie i **trwałe usunięcie jednej karty**.
+  Nieodwracalne usunięcie wymaga, aby karta już znajdowała się w koszu,
+  dokładnego wpisania jej numeru, zgody Windows Hello i konta z uprawnieniem
+  `sysadmin` SQL. Na zwykłym koncie operatora usunięcie jest odrzucane.
+- Dodano `tests/ReactKLChecks` w GitHub Actions: sprawdzanie konfiguracji
+  `archive-installation.ini`, zachowania ról serwer/klient i numerów wersji
+  przy aktualizacji SQL (np. 2.2.2 = 2.2.2.0, bez cofania do starszej wersji).
+- Wydłużono limit oczekiwania WebView2 na instalator pobierany z SQL oraz
+  potwierdzenie Windows Hello przy operacji usuwania.
+- Z gałęzi ReactKL usunięto stare skrypty budowania instalatora WinForms/MAUI;
+  poprzednie wersje pozostają na gałęzi backup.
+
+**Przed użyciem produkcyjnym:** potwierdzić na testowej bazie SQL uprawnienia
+do kosza, skuteczność pojedynczego usunięcia i pełną ścieżkę aktualizacji
+instalatora. Samo przejście CI nie potwierdza wykonania operacji na żywym SQL.
