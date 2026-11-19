@@ -636,6 +636,82 @@ function RestorePanel() {
   </Card>;
 }
 
+interface UpdateRelease {
+  releaseId:string;version:string;currentVersion:string;sha256:string;
+  newer:boolean;publishedAtUtc:string;
+}
+interface UpdateResult {release:UpdateRelease|null;currentVersion:string;}
+function UpdatePanel(){
+  const [data,setData]=useState<UpdateResult|null>(null);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+  async function check(){
+    setBusy(true);setError("");setNotice("");
+    try{
+      const result=await invoke<UpdateResult>("checkUpdate");
+      setData(result);
+      setNotice(!result.release
+        ? "Na serwerze nie opublikowano jeszcze instalatora ReactKL."
+        : result.release.newer ? "Dostępna jest nowsza wersja ReactKL."
+          : "Masz aktualną wersję lub nowszą od tej opublikowanej w SQL.");
+    }catch(e){setError(e instanceof Error?e.message:String(e));setData(null);}
+    finally{setBusy(false);}
+  }
+  function install(){
+    if(!data?.release?.newer||busy)return;
+    Modal.confirm({
+      title:"Uruchomić aktualizację ReactKL?",
+      content:<div>
+        <Typography.Paragraph>
+          Zainstalowana wersja: <strong>{data.currentVersion}</strong>
+        </Typography.Paragraph>
+        <Typography.Paragraph>
+          Nowa wersja w SQL: <strong>{data.release.version}</strong>
+        </Typography.Paragraph>
+        <Typography.Paragraph>
+          Program pobierze instalator do folderu tymczasowego, sprawdzi SHA-256
+          i zgodność wersji, a następnie otworzy instalator Windows i zamknie ReactKL.
+        </Typography.Paragraph>
+      </div>,
+      okText:"Pobierz i uruchom instalator",
+      cancelText:"Anuluj",
+      onOk:async()=>{
+        setBusy(true);setError("");setNotice("");
+        try{
+          await invoke("installUpdate");
+          setNotice("Uruchomiono instalator ReactKL.");
+        }catch(e){setError(e instanceof Error?e.message:String(e));}
+        finally{setBusy(false);}
+      }
+    });
+  }
+  return <Card className="settings-card">
+    <Typography.Title level={4}>Aktualizacje ReactKL z SQL Server</Typography.Title>
+    <Typography.Paragraph type="secondary">
+      Osobny kanał ReactKL — nie zmienia instalatorów WinForms ani bazy Subiekta.
+      Publikacja nowego instalatora na serwerze wymaga uprawnień administratora SQL.
+    </Typography.Paragraph>
+    <ErrorNotice error={error}/>
+    {notice&&<Alert className="notice" showIcon
+      type={data?.release?.newer?"info":"success"} message={notice}/>}
+    <Space direction="vertical" size={12}>
+      <Typography.Text>Obecna wersja: <strong>{data?.currentVersion??"—"}</strong></Typography.Text>
+      {data?.release&&<div>
+        <Typography.Text>Opublikowana wersja: <strong>{data.release.version}</strong></Typography.Text>
+        <div><Typography.Text type="secondary" style={{fontSize:12}}>
+          Publikacja: {new Date(data.release.publishedAtUtc).toLocaleString("pl-PL")}
+        </Typography.Text></div>
+      </div>}
+      <Space wrap>
+        <Button loading={busy} onClick={()=>{void check();}}>Sprawdź aktualizację w SQL</Button>
+        <Button type="primary" loading={busy}
+          disabled={!data?.release?.newer} onClick={install}>Pobierz i zainstaluj</Button>
+      </Space>
+    </Space>
+  </Card>;
+}
+
 function SettingsPage() {
   const [form]=Form.useForm();
   const [busy,setBusy]=useState(false);
@@ -683,6 +759,7 @@ function SettingsPage() {
     <ArchiveSettingsPanel/>
     <BackupPanel/>
     <RestorePanel/>
+    <UpdatePanel/>
   </>;
 }
 
