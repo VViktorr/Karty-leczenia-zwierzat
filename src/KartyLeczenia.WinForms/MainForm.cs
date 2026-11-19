@@ -102,7 +102,7 @@ internal sealed class MainForm : Form
         ConfigurePrices();
         ConfigureExpiry();
         ConfigureCard();
-        var savedCardsTable = ConfigureSavedCards();
+        ConfigureSavedCards();
         ConfigureConnection(openSettings);
         var tables = new Dictionary<string, DataGridView>
         {
