@@ -38,6 +38,7 @@ internal sealed class PricePrintPreview : Form
         Controls.Add(browser);
         Controls.Add(bar);
         CancelButton = close;
+        AppearanceThemes.ApplySurface(this, AppearanceThemes.Current);
         if (direct)
         {
             Opacity = 0;
