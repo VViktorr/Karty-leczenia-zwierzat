@@ -11,7 +11,9 @@ internal sealed class MainForm : Form
         Padding = new Point(30, 9)
     };
     readonly DocumentGrid documents = NewGrid<DocumentGrid>();
-    readonly DataGridView prices = NewGrid(), treatment = NewGrid();
+    readonly DataGridView treatment = NewGrid();
+    readonly PriceTable prices;
+    List<MedicinePrice> priceRows = [];
     readonly ExpiryTable expiryTable;
     readonly TextBox search = new();
     Font? boldDocumentKindFont;
@@ -56,6 +58,7 @@ internal sealed class MainForm : Form
     {
         this.interfaceScale = interfaceScale;
         expiryTable = new ExpiryTable(interfaceScale);
+        prices = new PriceTable(interfaceScale);
         Text = $"KartyLeczenia — wersja {ServerUpdateGate.InstalledVersion}";
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(850, 550);
@@ -102,8 +105,7 @@ internal sealed class MainForm : Form
         ConfigureConnection(openSettings);
         var tables = new Dictionary<string, DataGridView>
         {
-            ["documents"] = documents, ["prices"] = prices,
-            ["treatment"] = treatment
+            ["documents"] = documents, ["treatment"] = treatment
         };
         if (interfaceScale != 100) ScaleInterface(tables.Values);
         var layout = new WindowLayout(this, rememberTreatment, tables, interfaceScale);
@@ -479,7 +481,7 @@ internal sealed class MainForm : Form
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    DataGridView? ActiveGrid() => tabs.SelectedIndex switch { 0 => documents, 1 => prices, 3 => treatment, _ => null };
+    DataGridView? ActiveGrid() => tabs.SelectedIndex switch { 0 => documents, 3 => treatment, _ => null };
 
     Task SelectKind(DocumentSearchKinds selected)
     {
@@ -633,10 +635,7 @@ internal sealed class MainForm : Form
 
     void ConfigurePrices()
     {
-        Column(prices, "Lek", "Name", 340);
-        Column(prices, "Najnowsza seria", "LatestBatch", 130);
-        Column(prices, "Cena", "Gross", 100, "N2");
-        Column(prices, "Karencja z katalogu", "Withdrawal", 520);
+        FormClosed += (_, _) => prices.SaveLayout();
         var levels = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
         var net = new CheckBox { Text = "Netto", AutoSize = true };
         bool loading = false;
@@ -697,8 +696,9 @@ internal sealed class MainForm : Form
                 var rows = await MedicineStockService.Prices(options, level.Number, work.Token, net: netPrice);
                 var catalogue = await RunArchive(archive.ReadCatalogue);
                 if (connection != options || sharedArchive != archive) return;
-                prices.Columns["Gross"]!.HeaderText = netPrice ? "Cena netto" : "Cena brutto";
-                prices.DataSource = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol) }).ToList();
+                priceRows = rows.Select(row => row with { Withdrawal = catalogue.Summary(row.Symbol) }).ToList();
+                prices.SetPriceHeading(netPrice);
+                prices.DataSource = priceRows;
                 status.Text = $"Pozycje cennika: {rows.Count}";
                 await RefreshMissing(options, archive, catalogue);
             }
@@ -709,7 +709,7 @@ internal sealed class MainForm : Form
         {
             var archive = Archive();
             var options = Connection();
-            var current = prices.CurrentRow?.DataBoundItem as MedicinePrice;
+            var current = prices.SelectedPrice();
             var pending = onlyMissing ? await RefreshMissing(options, archive) : null;
             if (connection != options || sharedArchive != archive) return;
             if (pending is { Length: 0 })
@@ -746,8 +746,8 @@ internal sealed class MainForm : Form
 
     async Task PreviewPrices(bool direct = false)
     {
-        var rows = prices.Rows.Cast<DataGridViewRow>().Select(row => row.DataBoundItem)
-            .OfType<MedicinePrice>().ToArray();
+        var rows = prices.SortList().OfType<MedicinePrice>().ToArray();
+        if (rows.Length == 0) rows = priceRows.ToArray();
         if (rows.Length == 0)
         {
             status.Text = "Wczytaj cennik przed otwarciem podglądu wydruku.";
@@ -756,7 +756,7 @@ internal sealed class MainForm : Form
         var archive = Archive();
         var catalogue = await RunArchive(archive.ReadCatalogue);
         if (sharedArchive != archive) return;
-        using var editor = new PricePrintEditor(pricePrintSettings, rows, prices.Columns["Gross"]!.HeaderText, catalogue);
+        using var editor = new PricePrintEditor(pricePrintSettings, rows, prices.PriceHeading, catalogue);
         if (direct)
         {
             using var preview = new PricePrintPreview(editor.Render(rows), pricePrintSettings.Landscape, pricePrintSettings.Margin, direct: true);
@@ -2383,7 +2383,9 @@ internal sealed class MainForm : Form
             cache.Clear();
             displayedDocuments = null;
             UpdateRefreshLabel();
-            documents.DataSource = prices.DataSource = null;
+            documents.DataSource = null;
+            prices.DataSource = null;
+            priceRows = [];
             expiryTable.ShowRows([]);
             selectedTreatmentVariants.Clear();
             excludedTreatmentRows.Clear();
@@ -2797,7 +2799,7 @@ internal sealed class MainForm : Form
             }
         };
 
-        foreach (var grid in new[] { documents, prices, treatment })
+        foreach (var grid in new[] { documents, treatment })
         {
             var menu = new ContextMenuStrip();
             menu.Items.Add("Parametry listy…", null, (_, _) => ListParameters.Show(this, grid));
