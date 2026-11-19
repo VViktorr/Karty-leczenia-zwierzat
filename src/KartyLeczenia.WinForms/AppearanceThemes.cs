@@ -502,14 +502,22 @@ internal static class AppearanceEditor
         var colorButtons = new CheckBox { Text = "Koloruj także zwykłe przyciski", AutoSize = true };
         var accent = new Button { Text = "Wybierz kolor…", AutoSize = true };
         var accentSample = new Label { Width = 28, Height = 24, AccessibleName = "Próbka akcentu" };
-        var preview = new DataGridView { Width = vertical ? 390 : 600, Height = 120, ReadOnly = true, RowHeadersVisible = false,
-            AllowUserToAddRows = false, AllowUserToResizeRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
-        preview.Columns.Add("document", "Dokument");
-        preview.Columns.Add("customer", "Kontrahent");
-        preview.Columns.Add("value", "Wartość");
-        preview.Rows.Add("FS 128/26", "Lecznica A", "248,00 zł");
-        preview.Rows.Add("FS 129/26", "Lecznica B", "560,00 zł");
-        preview.ClearSelection();
+        // Preview the actual AntdUI.Table used by Documents and Price lists,
+        // not the old native DataGridView, which has different selection paint.
+        var preview = new AntdUI.Table
+        {
+            Width = vertical ? 390 : 600, Height = 145,
+            EmptyHeader = true, Bordered = true,
+            RowHeight = 28, MultipleRows = false,
+            DataSource = new[]
+            {
+                new { Document = "FS 128/26", Customer = "Lecznica A", Amount = "248,00 zł" },
+                new { Document = "FS 129/26", Customer = "Lecznica B", Amount = "560,00 zł" }
+            }
+        };
+        preview.Columns.Add(new AntdUI.Column("Document", "Dokument") { Width = "120" });
+        preview.Columns.Add(new AntdUI.Column("Customer", "Kontrahent") { Width = "190" });
+        preview.Columns.Add(new AntdUI.Column("Amount", "Wartość") { Width = "120" });
         var tabPreview = new TabControl
         {
             Width = vertical ? 390 : 600, Height = 112,
@@ -546,7 +554,7 @@ internal static class AppearanceEditor
             previewWarehouse, previewFilter, previewAdditional, previewAction, previewCancel]);
         void RenderPreview()
         {
-            AppearanceThemes.ApplyGrid(preview, current);
+            AppearanceThemes.ApplySurface(preview, current);
             AppearanceThemes.ApplyTabs(tabPreview, current, InterfaceScale.Load());
             tabPreview.Invalidate();
             AppearanceThemes.ApplySurface(switchPreview, current);
