@@ -148,7 +148,7 @@ internal sealed class ExpiryTable : Table
 
     internal void ShowColumnsMenu(Control anchor)
     {
-        var menu = new ContextMenuStrip();
+        var menu = new System.Windows.Forms.ContextMenuStrip();
         int visibleColumns = expiryColumns.Count(column => column.Visible);
         foreach (var column in expiryColumns)
         {
