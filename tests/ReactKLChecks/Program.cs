@@ -107,6 +107,67 @@ static class Program
             try { TreatmentVariantApplier.Apply(previous, choice with { Route = "" }); }
             catch (InvalidOperationException) { incompleteRejected = true; }
             Check(incompleteRejected, "incomplete variant must be rejected");
+            var suggestedRow = new KartyLeczenia.TreatmentRow();
+            suggestedRow.Set("Symbol Subiekta", "VET-123", false);
+            suggestedRow.Set("Produkt", "Przykładowy lek", false);
+            var swine = new CatalogueVariantModel(
+                Id: 50, Species: "Świnie", Route: "im.", Dose: "1 ml/10 kg",
+                Tissues: "5 dni", Source: "ChPL/RPL",
+                Pdf: "ChPL/RPL/vet-123.pdf");
+            var cattle = swine with { Id = 51, Species = "Bydło", Dose = "2 ml/10 kg" };
+            var proposed = TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine]);
+            Check(proposed.Status == "ready" && proposed.VariantId == 50,
+                "default cattle must not prevent unique swine suggestion");
+            Check(suggestedRow.Get("Dawkowanie i okres stosowania") == "" &&
+                  suggestedRow.Get("Karencja") == "",
+                "suggestion must not modify treatment clinical values");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine,cattle])
+                  .Status == "ambiguous",
+                "multiple species are ambiguous when cattle is merely a default");
+            suggestedRow.Set("Gatunek", "Świnie");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine,cattle])
+                  .VariantId == 50,
+                "explicitly chosen species must select only compatible variant");
+            suggestedRow.Set("Droga podania", "iv.");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine,cattle])
+                  .Status == "noMatch",
+                "a mismatching route must never be guessed");
+            suggestedRow.Set("Droga podania", "im.");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                  [swine, swine with {Id=52, Dose="2 ml/10 kg"}]).Status=="ambiguous",
+                "multiple doses for one species and route require manual selection");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine])
+                  .Status=="ready",
+                "exact matching species and route may offer a single verified variant");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                  [swine with {Pdf=""}]).Status=="review",
+                "missing official ChPL PDF must prevent bulk autofill");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                  [swine with {Tissues="",Milk=""}]).Status=="review",
+                "missing withdrawal requires manual clinical review");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                  [swine with {Source=""}]).Status=="review",
+                "unattributed clinical source must prevent bulk autofill");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                  [swine with {Dose="wg ChPL"}]).Status=="review",
+                "placeholder dosing must prevent bulk autofill");
+            suggestedRow.Set("Dawkowanie i okres stosowania", "Dawka ręczna");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine])
+                  .Status=="existingData",
+                "existing manual dosing must never be overwritten automatically");
+            suggestedRow.Set("Dawkowanie i okres stosowania", "");
+            suggestedRow.Printed = false;
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine])
+                  .Status=="unselected",
+                "unselected row must not receive automatic suggestions");
+            suggestedRow.Printed = true;
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [])
+                  .Status=="notFound",
+                "unknown catalogue product must be left untouched");
+            suggestedRow.Set("Symbol Subiekta", "", false);
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine])
+                  .Status=="missingSymbol",
+                "missing exact Subiekt symbol must not fall back to fuzzy name match");
             Console.WriteLine($"ReactKL regression checks passed: {checks}");
         }
         finally
