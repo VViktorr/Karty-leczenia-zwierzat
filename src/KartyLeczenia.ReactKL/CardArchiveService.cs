@@ -11,6 +11,7 @@ namespace KartyLeczenia.ReactKL;
 /// </summary>
 internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore)
 {
+    private readonly SharedClinicService clinicService = new(connectionStore);
     private SqlConnection Open()
     {
         var saved = connectionStore.Load().Options ??
@@ -42,7 +43,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
                         $"Lek „{row.Product}”: wymagane pole „{column}” jest puste.");
         }
 
-        var clinic = ClinicSettingsStore.Load();
+        var clinic = clinicService.Load().Settings;
         string clinicInfo = clinic.CardText;
         string doctor = clinic.Doctor;
         if (string.IsNullOrWhiteSpace(clinicInfo) || string.IsNullOrWhiteSpace(doctor))
@@ -152,7 +153,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
 
     internal string RenderDraft(DocumentData source, DateTime? reported, DateTime performed, string findings)
     {
-        var clinic = ClinicSettingsStore.Load();
+        var clinic = clinicService.Load().Settings;
         var fields = new Dictionary<string, string>
         {
             ["Nr karty"] = "(wersja robocza)",
@@ -165,7 +166,11 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Dokument źródłowy"] = source.Number
         };
         return CardHtmlRenderer.Render(new Card(fields,
-            source.Rows.Select(x => new Dictionary<string,string>(x.Values)).ToList()));
+            source.Rows.Select(x => new Dictionary<string,string>(x.Values)).ToList())
+        {
+            ClinicStampPng = clinic.UseClinicStamp ? clinic.ClinicStampPng : null,
+            DoctorStampPng = clinic.UseDoctorStamp ? clinic.DoctorStampPng : null
+        });
     }
 
     private static SqlCommand Cmd(SqlConnection db, SqlTransaction tx, string query)
