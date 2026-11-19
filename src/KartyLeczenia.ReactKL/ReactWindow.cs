@@ -561,37 +561,7 @@ internal sealed class ReactWindow : Form
                 string.IsNullOrWhiteSpace(choice.Route) || string.IsNullOrWhiteSpace(choice.Dose))
                 throw new InvalidOperationException(
                     "Wybrany wariant jest niekompletny lub nie istnieje. Nie zmieniono karty.");
-            string withdrawal = string.Join(Environment.NewLine,new[] {
-                string.IsNullOrWhiteSpace(choice.Tissues) ? "" : "Tkanki jadalne: " + choice.Tissues.Trim(),
-                string.IsNullOrWhiteSpace(choice.Milk) ? "" : "Mleko: " + choice.Milk.Trim()
-            }.Where(x=>x.Length>0));
-            // This explicit SQL-catalogue selection supersedes any registry
-            // context previously cached for another product/variant.
-            // Otherwise TreatmentRow.Set(species/route) could silently
-            // recalculate dosing/withdrawal from the obsolete registry PDF.
-            row.Set("Dokument kontekstu JSON","",false);
-            row.Set("Produkt kontekstu","",false);
-            row.Set("Automatyczna karencja","",false);
-            row.Set("Automatyczne dawkowanie","",false);
-            row.Set("Pełna sekcja karencji źródła","",false);
-            row.Set("Pełna sekcja dawkowania źródła","",false);
-            row.Set("SHA256 źródła","",false);
-            row.Set("Gatunek",choice.Species);
-            row.Set("Droga podania",choice.Route);
-            row.Set("Dawkowanie i okres stosowania",choice.Dose);
-            // Never keep a previous species/variant's withdrawal time when the
-            // newly selected ChPL variant contains no withdrawal value.
-            // An empty result must be reviewed and completed manually.
-            row.Set("Karencja",withdrawal);
-            row.Set("Wskazanie ChPL",choice.Indication);
-            row.Set("Źródło karencji",choice.Source);
-            row.Set("Status karencji","Wariant katalogu SQL — zweryfikuj z aktualną ChPL");
-            row.Set("Domyślny gatunek","False");
-            return new {
-                species=row.Get("Gatunek"),route=row.Get("Droga podania"),
-                dosing=row.Get("Dawkowanie i okres stosowania"),
-                withdrawal=row.Get("Karencja"), indication=row.Get("Wskazanie ChPL")
-            };
+            return TreatmentVariantApplier.Apply(row, choice);
         }
         if (action == "updateDraft")
         {
