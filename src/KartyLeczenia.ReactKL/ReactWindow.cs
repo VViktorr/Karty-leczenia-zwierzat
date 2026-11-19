@@ -583,12 +583,33 @@ internal sealed class ReactWindow : Form
             // changed the clinical data.
             string id = Text(root, "id", 40);
             bool trash = Flag(root, "trash");
-            if (!Guid.TryParseExact(id, "N", out var cardId))
-                throw new ArgumentException("Nieprawidłowy identyfikator karty.");
-            var stored = JsonSerializer.Deserialize<Card>(cards.ReadSavedJson(id, trash))
-                ?? throw new InvalidDataException("Zapisana karta nie zawiera poprawnych danych.");
-            string fileName = CardPdfService.AttachmentName(
-                stored.Fields.GetValueOrDefault("Dokument źródłowy"));
+            Guid cardId = Guid.Empty;
+            DocumentData? draft = null;
+            string html;
+            string documentNumber;
+            if (id.Length > 0)
+            {
+                if (!Guid.TryParseExact(id, "N", out cardId))
+                    throw new ArgumentException("Nieprawidłowy identyfikator karty.");
+                var stored = JsonSerializer.Deserialize<Card>(cards.ReadSavedJson(id, trash))
+                    ?? throw new InvalidDataException("Zapisana karta nie zawiera poprawnych danych.");
+                html = CardHtmlRenderer.Render(stored);
+                documentNumber = stored.Fields.GetValueOrDefault("Dokument źródłowy", "");
+            }
+            else
+            {
+                string draftId = Text(root, "draftId", 30);
+                if (!drafts.TryGetValue(draftId, out draft))
+                    throw new InvalidOperationException("Ponownie otwórz dokument przed utworzeniem PDF.");
+                // Same validation and complete edited-row snapshot as
+                // previewDraft. No SQL insert or new card number is created.
+                object rendered = await Handle("previewDraft", root, token);
+                html = JsonSerializer.SerializeToElement(rendered)
+                    .GetProperty("html").GetString() ??
+                    throw new InvalidDataException("Nie udało się uzyskać podglądu karty.");
+                documentNumber = draft.Number;
+            }
+            string fileName = CardPdfService.AttachmentName(documentNumber);
             string? destination = null;
             if (action == "saveCardPdf")
             {
@@ -606,7 +627,7 @@ internal sealed class ReactWindow : Form
             // Render a separate WebView2 page on this UI/STA thread; never
             // navigate the main React editor away from the current screen.
             string temporary = await CardPdfService.RenderAsync(
-                this, CardHtmlRenderer.Render(stored), token);
+                this, html, token);
             try
             {
                 if (destination is not null)
@@ -615,7 +636,9 @@ internal sealed class ReactWindow : Form
                     return new { cancelled = false,
                         fileName = Path.GetFileName(destination), recipient = "" };
                 }
-                var (payerId, scope) = await ReadSavedCardPayer(cardId, trash, token);
+                var (payerId, scope) = draft is not null
+                    ? (draft.PayerId, draft.Scope)
+                    : await ReadSavedCardPayer(cardId, trash, token);
                 string? recipient = null;
                 var source = subiekt.Load().Options;
                 if (payerId is > 0 && source is not null &&
