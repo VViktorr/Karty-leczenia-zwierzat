@@ -1,7 +1,7 @@
-using System.Drawing.Drawing2D;
-
 global using Button = AntdUI.Button;
 global using CheckBox = AntdUI.Checkbox;
+
+using System.Drawing.Drawing2D;
 
 namespace KartyLeczenia.Windows;
 
