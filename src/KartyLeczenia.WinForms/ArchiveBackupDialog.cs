@@ -103,5 +103,6 @@ internal sealed class ArchiveBackupDialog : Form
         Controls.Add(grid);
         AcceptButton = apply;
         CancelButton = cancel;
+        AppearanceThemes.ApplySurface(this, AppearanceThemes.Current);
     }
 }
