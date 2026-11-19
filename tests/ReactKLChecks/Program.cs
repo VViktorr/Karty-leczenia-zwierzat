@@ -191,6 +191,47 @@ static class Program
             }
             Check(errors==2, "SQL errors must not be cached as successful lists");
 
+            var priceClock = new DateTimeOffset(2026, 11, 19, 18, 0, 0, TimeSpan.Zero);
+            var stockCache = new TimedSqlCache<int>(TimeSpan.FromSeconds(30),
+                clock: () => priceClock);
+            int stockQueries=0;
+            Task<int> FetchStock(CancellationToken ct)
+            {
+                ct.ThrowIfCancellationRequested();
+                return Task.FromResult(++stockQueries);
+            }
+            var stockOne = stockCache.ReadAsync("stock", false,
+                FetchStock, CancellationToken.None).GetAwaiter().GetResult();
+            var stockTwo = stockCache.ReadAsync("stock", false,
+                FetchStock, CancellationToken.None).GetAwaiter().GetResult();
+            Check(stockQueries==1 && !stockOne.Cached && stockTwo.Cached,
+                "switching between price and expiry screens should reuse recent stock snapshot");
+            var forceStock = stockCache.ReadAsync("stock", true,
+                FetchStock, CancellationToken.None).GetAwaiter().GetResult();
+            Check(stockQueries==2 && !forceStock.Cached,
+                "manual stock refresh must bypass short cache");
+            priceClock=priceClock.AddSeconds(31);
+            _ = stockCache.ReadAsync("stock", false, FetchStock,
+                CancellationToken.None).GetAwaiter().GetResult();
+            Check(stockQueries==3,
+                "stock and prices must not use stale snapshots after thirty seconds");
+            var stop = new CancellationTokenSource();
+            async Task<int> SlowStock(CancellationToken ct)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                return 1;
+            }
+            var staleStock = stockCache.ReadAsync("obsolete-filter", false, SlowStock, stop.Token);
+            stop.Cancel();
+            bool stopped = false;
+            try { _ = staleStock.GetAwaiter().GetResult(); }
+            catch (OperationCanceledException) { stopped = true; }
+            Check(stopped, "obsolete price/stock SQL reads must be cancellable");
+            var freshStock = stockCache.ReadAsync("obsolete-filter", false,
+                FetchStock, CancellationToken.None).GetAwaiter().GetResult();
+            Check(!freshStock.Cached,
+                "cancelled SQL query must never be reused by the next viewer");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
