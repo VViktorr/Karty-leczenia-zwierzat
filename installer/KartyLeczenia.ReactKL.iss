@@ -412,7 +412,7 @@ end;
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (CurPageID = wpFinished) and (not ExistingInstallAtStart) and IsServerInstall then
-    WizardForm.FinishedLabel.Caption := 'Serwer SQL KartyLeczenia został przygotowany.' +
-      #13#10 + 'Adres dla innych stanowisk: ' + InstallerArchiveServer('') +
-      #13#10 + 'Przy pierwszym uruchomieniu program opublikuje instalator w SQL.';
+    WizardForm.FinishedLabel.Caption := 'Serwer SQL KartyLeczenia został przygotowany.' + #13#10 +
+      'Adres dla innych stanowisk: ' + InstallerArchiveServer('') + #13#10 +
+      'Przy pierwszym uruchomieniu program opublikuje instalator w SQL.';
 end;
