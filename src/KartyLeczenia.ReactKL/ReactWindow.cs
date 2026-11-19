@@ -25,6 +25,10 @@ internal sealed class ReactWindow : Form
     private readonly TimedSqlCache<List<MedicineExpiry>> expiryLists = new(TimeSpan.FromSeconds(30));
     private readonly TimedSqlCache<List<MedicinePrice>> priceLists = new(TimeSpan.FromSeconds(30));
     private readonly TimedSqlCache<MedicinePriceLevel[]> priceLevelLists = new(TimeSpan.FromMinutes(10));
+    // Full Subiekt drug-group scan is only triggered by the explicit
+    // "Sprawdź braki w katalogu" command, never by typing in the editor.
+    private readonly TimedSqlCache<MedicinePrice[]> catalogueSubiektLists =
+        new(TimeSpan.FromMinutes(2));
     // A single catalogue SELECT per minute is shared by all price levels.
     private readonly TimedSqlCache<PriceCatalogueSnapshot> priceCatalogueLists =
         new(TimeSpan.FromMinutes(1));
@@ -221,6 +225,25 @@ internal sealed class ReactWindow : Form
                 ?? throw new ArgumentException("Nieprawidłowe ustawienia wydruku.");
             await Task.Run(() => PricePrintOptionsStore.Save(settings), token);
             return new { saved = true };
+        }
+        if (action == "missingCatalogueProducts")
+        {
+            var settings = subiekt.Load().Options ??
+                throw new InvalidOperationException("Skonfiguruj połączenie Subiekta przed sprawdzaniem braków.");
+            bool refresh = Flag(root,"refresh");
+            string key = DocumentListCache.Key(settings,DocumentSearchKinds.None,
+                "catalogue-missing",null,null);
+            var products = await catalogueSubiektLists.ReadAsync(
+                key,refresh,
+                ct => MedicineStockService.FindCatalogueProducts(
+                    settings,"",ct,limit:int.MaxValue),token);
+            var snapshot = await priceCatalogueLists.ReadAsync(
+                "price-catalogue",refresh,
+                ct => priceCatalogueService.ReadAsync(ct),token);
+            var missing = products.Value
+                .Where(item => snapshot.Value.Format(item).NeedsCompletion)
+                .Select(item => new {symbol=item.Symbol,name=item.Name}).ToArray();
+            return new {items=missing,count=missing.Length,total=products.Value.Length};
         }
         if (action == "searchCatalogue")
         {
