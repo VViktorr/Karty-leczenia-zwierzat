@@ -795,7 +795,7 @@ function Treatment({draft, onDocuments}: {draft: Draft | null; onDocuments: () =
     {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
     <Card><Table<DraftRow> rowKey="index" dataSource={sortedRows}
-      columns={columns.filter(column=>visibleColumns.includes(String(column.key??column.dataIndex)))} size="small"
+      columns={columns.filter(column=>visibleColumns.includes(String(column.key??("dataIndex" in column?column.dataIndex:""))))} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
       scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
