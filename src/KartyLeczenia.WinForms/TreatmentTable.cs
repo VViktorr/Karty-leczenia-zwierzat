@@ -31,6 +31,8 @@ internal sealed class TreatmentTable : AntdUI.Table
     }
 
     private readonly DataGridView source;
+    private DataGridViewRow? selectedSource;
+    internal DataGridViewRow? SelectedModelRow => selectedSource?.DataGridView == source ? selectedSource : null;
     private readonly BindingList<DisplayRow> displayed = [];
     private bool pending;
     private readonly string[] keys =
@@ -44,6 +46,24 @@ internal sealed class TreatmentTable : AntdUI.Table
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     [Browsable(false)]
     internal Func<DataGridViewRow, string, Task>? EditRequested { get; set; }
+
+    private readonly string[] viewKeys =
+    [
+        nameof(DisplayRow.Print), nameof(DisplayRow.Product), nameof(DisplayRow.Quantity),
+        nameof(DisplayRow.Batch), nameof(DisplayRow.Species), nameof(DisplayRow.Route),
+        nameof(DisplayRow.Dosing), nameof(DisplayRow.Withdrawal),
+        nameof(DisplayRow.Replacement), nameof(DisplayRow.Animals),
+        nameof(DisplayRow.Diagnosis), nameof(DisplayRow.Indication),
+        nameof(DisplayRow.Description)
+    ];
+
+    private int ModelIndex(int displayedColumn)
+    {
+        if (displayedColumn < 0) return -1;
+        var sortedColumns = SortColumnsList;
+        string? key = displayedColumn < sortedColumns.Length ? sortedColumns[displayedColumn].Key : null;
+        return key is null ? -1 : Array.IndexOf(viewKeys, key);
+    }
 
     internal TreatmentTable(DataGridView source, int interfaceScale)
     {
@@ -85,8 +105,9 @@ internal sealed class TreatmentTable : AntdUI.Table
         CellClick += (_, e) =>
         {
             if (e.Record is not DisplayRow row) return;
-            SelectSource(row.Source, e.ColumnIndex);
-            if (e.ColumnIndex == 0)
+            int modelIndex = ModelIndex(e.ColumnIndex);
+            SelectSource(row.Source, modelIndex);
+            if (modelIndex == 0)
             {
                 row.Source.Cells["Drukuj"].Value =
                     row.Source.Cells["Drukuj"].Value is not true;
@@ -95,12 +116,12 @@ internal sealed class TreatmentTable : AntdUI.Table
         };
         CellDoubleClick += async (_, e) =>
         {
-            if (e.Record is not DisplayRow row || e.ColumnIndex < 0 ||
-                e.ColumnIndex >= keys.Length || e.ColumnIndex == 0)
-                return;
-            SelectSource(row.Source, e.ColumnIndex);
+            if (e.Record is not DisplayRow row) return;
+            int modelIndex = ModelIndex(e.ColumnIndex);
+            if (modelIndex <= 0 || modelIndex >= keys.Length) return;
+            SelectSource(row.Source, modelIndex);
             if (EditRequested is { } edit)
-                await edit(row.Source, keys[e.ColumnIndex]);
+                await edit(row.Source, keys[modelIndex]);
         };
         KeyDown += async (_, e) =>
         {
@@ -125,6 +146,7 @@ internal sealed class TreatmentTable : AntdUI.Table
         try
         {
             if (row.DataGridView != source) return;
+            selectedSource = row;
             row.Selected = true;
             source.CurrentCell = row.Cells[Math.Clamp(col, 0, row.Cells.Count - 1)];
         }
@@ -149,7 +171,7 @@ internal sealed class TreatmentTable : AntdUI.Table
         pending = false;
         if (IsDisposed || source.IsDisposed) return;
         DisplayRow? selected = SelectedsReal().OfType<DisplayRow>().FirstOrDefault();
-        DataGridViewRow? selectedSource = selected?.Source;
+        DataGridViewRow? selectedBeforeRefresh = selected?.Source ?? selectedSource;
         displayed.RaiseListChangedEvents = false;
         try
         {
@@ -188,8 +210,9 @@ internal sealed class TreatmentTable : AntdUI.Table
             displayed.RaiseListChangedEvents = true;
             displayed.ResetBindings();
         }
-        if (selectedSource is not null &&
-            displayed.FirstOrDefault(row => ReferenceEquals(row.Source, selectedSource)) is { } updated)
+        if (selectedBeforeRefresh is not null &&
+            displayed.FirstOrDefault(row => ReferenceEquals(row.Source, selectedBeforeRefresh)) is { } updated)
             SetSelected(updated);
+        else selectedSource = null;
     }
 }
