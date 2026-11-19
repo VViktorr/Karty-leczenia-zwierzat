@@ -53,7 +53,8 @@ internal sealed class CatalogueVariantsTable : AntdUI.Table
             var native = source.Columns[i];
             Columns.Add(new AntdUI.Column(Keys[i], native.HeaderText)
             {
-                Width = Math.Max(80, native.Width).ToString(CultureInfo.InvariantCulture),
+                Width = Math.Max(55, (int)Math.Round(native.Width * InterfaceScale.Load() / 100d))
+                    .ToString(CultureInfo.InvariantCulture),
                 Ellipsis = true, ReadOnly = i == 10
             });
         }
