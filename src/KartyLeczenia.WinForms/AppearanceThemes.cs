@@ -23,22 +23,21 @@ internal sealed record AppearanceOptions
     public int CornerRadius { get; set; } = 8;
     public bool ColorButtons { get; set; } = true;
 
-    internal static string[] Names { get; } = ["Antd Jasny", "Antd Ciemny", "Antd Morski", "Antd Śliwkowy", "Klasyczny", "Jasny", "Ciemny", "Błękitny", "Zielony", "Fioletowy", "Grafitowy", "Kompaktowy", "Wygodny", "Własny"];
+    // All contemporary presets use AntdUI's built-in color algorithm.
+    // Klasyczny is the sole retained legacy/compatibility preset.
+    internal static string[] Names { get; } =
+        ["Antd Jasny", "Antd Ciemny", "Antd Morski", "Antd Śliwkowy", "Antd Fioletowy", "Antd Pomarańczowy", "Antd Grafitowy", "Klasyczny"];
     internal static AppearanceOptions ForPreset(string name) => name switch
     {
         "Antd Jasny" => new() { Preset = name, RowHeight = 28, AccentArgb = Color.FromArgb(22, 119, 255).ToArgb() },
         "Antd Ciemny" => new() { Preset = name, RowHeight = 28, AccentArgb = Color.FromArgb(82, 153, 255).ToArgb() },
         "Antd Morski" => new() { Preset = name, RowHeight = 28, WideTabs = true, AccentArgb = Color.FromArgb(0, 116, 112).ToArgb() },
         "Antd Śliwkowy" => new() { Preset = name, RowHeight = 30, WideTabs = true, AccentArgb = Color.FromArgb(193, 146, 244).ToArgb() },
-        "Jasny" => new() { Preset = name, RowHeight = 30, TableFontSize = 10, WideTabs = true },
-        "Ciemny" => new() { Preset = name, RowHeight = 30, TableFontSize = 10, WideTabs = true, AccentArgb = Color.FromArgb(83, 157, 235).ToArgb() },
-        "Błękitny" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(20, 108, 200).ToArgb() },
-        "Zielony" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(32, 126, 86).ToArgb() },
-        "Fioletowy" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(118, 72, 177).ToArgb() },
-        "Grafitowy" => new() { Preset = name, WideTabs = true, AccentArgb = Color.FromArgb(93, 122, 150).ToArgb() },
-        "Kompaktowy" => new() { Preset = name, RowHeight = 22, TableFontSize = 9, AlternatingRows = false, CornerRadius = 4 },
-        "Wygodny" => new() { Preset = name, RowHeight = 36, TableFontSize = 12, WideTabs = true, CornerRadius = 12 },
-        _ => new() { Preset = name }
+        "Antd Fioletowy" => new() { Preset = name, RowHeight = 30, WideTabs = true, AccentArgb = Color.FromArgb(114, 46, 209).ToArgb() },
+        "Antd Pomarańczowy" => new() { Preset = name, RowHeight = 30, AccentArgb = Color.FromArgb(250, 140, 22).ToArgb() },
+        "Antd Grafitowy" => new() { Preset = name, RowHeight = 28, AccentArgb = Color.FromArgb(93, 122, 150).ToArgb() },
+        "Klasyczny" => new() { Preset = name },
+        _ => ForPreset("Antd Jasny")
     };
 }
 
@@ -65,7 +64,21 @@ internal static class AppearanceThemes
         value.PrintPreviewZoom = Math.Clamp(value.PrintPreviewZoom, 50, 200);
         value.SwitchStyle = Math.Clamp(value.SwitchStyle, 0, 2);
         value.CornerRadius = Math.Clamp(value.CornerRadius, 0, 20);
-        if (!AppearanceOptions.Names.Contains(value.Preset)) value.Preset = "Klasyczny";
+        // Migrate earlier settings without losing the operator's fonts,
+        // layout preferences, print zoom or a manually chosen accent.
+        if (!AppearanceOptions.Names.Contains(value.Preset))
+        {
+            value.Preset = value.Preset switch
+            {
+                "Ciemny" => "Antd Ciemny",
+                "Grafitowy" => "Antd Grafitowy",
+                "Zielony" => "Antd Morski",
+                "Fioletowy" => "Antd Fioletowy",
+                "Wygodny" or "Kompaktowy" or "Jasny" or "Błękitny" or "Własny" => "Antd Jasny",
+                _ => "Antd Jasny"
+            };
+            // Existing custom accent still works after the legacy preset is removed.
+        }
         return value;
     }
 
@@ -81,7 +94,7 @@ internal static class AppearanceThemes
         finally { File.Delete(temp); }
     }
 
-    internal static bool IsDark(AppearanceOptions options) => options.Preset is "Antd Ciemny" or "Antd Śliwkowy" or "Ciemny" or "Grafitowy";
+    internal static bool IsDark(AppearanceOptions options) => options.Preset is "Antd Ciemny" or "Antd Śliwkowy" or "Antd Grafitowy";
     internal static bool IsClassic(AppearanceOptions options) =>
         options == AppearanceOptions.ForPreset("Klasyczny");
     internal static Color Accent(AppearanceOptions options) =>
@@ -94,6 +107,7 @@ internal static class AppearanceThemes
         "Antd Ciemny" => Color.FromArgb(20, 20, 24),
         "Antd Śliwkowy" => Color.FromArgb(35, 28, 47),
         "Antd Morski" => Color.FromArgb(236, 247, 246),
+        "Antd Grafitowy" => Color.FromArgb(29, 35, 44),
         _ => IsDark(options) ? Color.FromArgb(32, 37, 45) : Color.FromArgb(245, 247, 250)
     };
 
@@ -441,8 +455,7 @@ internal static class AppearanceEditor
         preset.SelectedIndexChanged += (_, _) =>
         {
             if (preset.SelectedItem is not string name) return;
-            if (name == "Własny") current.Preset = name;
-            else current = AppearanceOptions.ForPreset(name) with
+            current = AppearanceOptions.ForPreset(name) with
             {
                 RememberLastTab = current.RememberLastTab,
                 StartMaximized = current.StartMaximized,
