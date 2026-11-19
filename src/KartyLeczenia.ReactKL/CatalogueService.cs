@@ -75,10 +75,10 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         using var db = Open();
         CheckImported(db);
         using var tx = db.BeginTransaction(IsolationLevel.RepeatableRead);
-        string name, rpl, description, revision;
+        string name, rpl, description, revision, canonicalSymbol;
         using (var command = Command(db, """
             SELECT name,COALESCE(rpl_id,N''),COALESCE(description,N''),revision,
-                   COALESCE(decision,N'')
+                   COALESCE(decision,N''),symbol
             FROM dbo.catalog_products WHERE UPPER(symbol)=UPPER(@symbol);
             """, tx))
         {
@@ -92,6 +92,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             rpl = reader.GetString(1);
             description = reader.GetString(2);
             revision = Convert.ToBase64String(reader.GetFieldValue<byte[]>(3));
+            canonicalSymbol = reader.GetString(5);
             if (reader.Read()) throw new InvalidOperationException("Niejednoznaczny symbol kartoteki.");
         }
 
@@ -105,7 +106,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             WHERE v.symbol=@symbol ORDER BY v.id;
             """, tx))
         {
-            command.Parameters.Add("@symbol", SqlDbType.NVarChar, 128).Value = symbol.Trim();
+            command.Parameters.Add("@symbol", SqlDbType.NVarChar, 128).Value = canonicalSymbol;
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
@@ -116,7 +117,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             }
         }
         tx.Commit();
-        return new(symbol.Trim(), name, rpl, description, revision, variants);
+        return new(canonicalSymbol, name, rpl, description, revision, variants);
     }
 
     /// <summary>
