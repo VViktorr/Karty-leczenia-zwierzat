@@ -148,6 +148,11 @@ END;
 IF DATABASE_PRINCIPAL_ID(N'KartyLeczeniaOperator') IS NULL
     CREATE ROLE KartyLeczeniaOperator AUTHORIZATION dbo;
 
+-- Operator may make native, checksum-verified copies of the SQL archive
+-- without broad sysadmin or destructive database permissions.
+-- RESTORE remains an administrator-only operation in the application.
+GRANT BACKUP DATABASE TO KartyLeczeniaOperator;
+
 GRANT SELECT ON dbo.program_update TO KartyLeczeniaOperator;
 
 GRANT SELECT, INSERT, UPDATE ON dbo.treatment_cards TO KartyLeczeniaOperator;
