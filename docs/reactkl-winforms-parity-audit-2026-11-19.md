@@ -84,3 +84,16 @@
   `7ed39214` (numer i godzina), `bcf34074` (grupy zwierząt),
   `cc54faf8` (podgląd), `130a4f08` (manifesty przy instalacji),
   `5860acd4` (pełny .bak), `caa7c0c7` (aktualizacja SQL).
+
+
+## Postęp po audycie — 19.11.2026
+
+### P0: daty i rok numeracji kart — poprawiono w kodzie, oczekuje testu integracyjnego
+
+- `CardArchiveService.Save` wyznacza `card_year`, numer `K/numer/rok` i `treatment_date` z daty **wykonania**, a nie zgłoszenia. Wspólny pomocnik `GetCardDate` pozwala sprawdzić zmianę roku bez połączenia SQL.
+- Data zgłoszenia jest opcjonalna: puste pole React jest przekazywane jako `null` i zapisywane w polu treści karty jako pusty tekst; wpisana data zachowuje walidację formatu.
+- `RenderDraft` oraz `Save` obsługują brak daty zgłoszenia spójnie.
+- Dodano dwa testy regresyjne w `tests/ReactKLChecks/Program.cs` obejmujące przełom roku.
+- **Nadal wymagane:** kompilacja Windows/React, test rzeczywistego zapisu i odczytu SQL oraz podglądu/wydruku z pustym zgłoszeniem. Nie oznaczać całego P0 za zweryfikowany produkcyjnie.
+
+Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
