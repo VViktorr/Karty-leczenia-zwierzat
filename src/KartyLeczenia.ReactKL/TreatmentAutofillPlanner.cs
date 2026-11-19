@@ -30,10 +30,10 @@ internal static class TreatmentAutofillPlanner
         bool hasPdf) =>
         Same(species, suggestion.Species) &&
         Same(route, suggestion.Route) &&
-        Same(dosing, suggestion.Dosing) &&
-        Same(withdrawal, suggestion.Withdrawal) &&
-        Same(source, suggestion.Source) &&
-        Same(pdfPath, suggestion.PdfPath) &&
+        string.Equals(dosing.Trim(), suggestion.Dosing.Trim(), StringComparison.Ordinal) &&
+        string.Equals(withdrawal.Trim(), suggestion.Withdrawal.Trim(), StringComparison.Ordinal) &&
+        string.Equals(source.Trim(), suggestion.Source.Trim(), StringComparison.Ordinal) &&
+        string.Equals(pdfPath.Trim(), suggestion.PdfPath.Trim(), StringComparison.Ordinal) &&
         hasPdf == suggestion.HasPdf;
 
     private static bool Same(string a, string b) =>
