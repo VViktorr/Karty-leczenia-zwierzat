@@ -592,6 +592,69 @@ static class Program
                 confirmed.Species, confirmed.Route, confirmed.Dosing,
                 confirmed.Withdrawal, confirmed.Source, confirmed.PdfPath, false),
                 "missing official PDF flag must reject prior approval");
+            // SQL archive revisions: editing never allocates a new number,
+            // changes source identity, loses stamps or silently accepts a
+            // treatment year that differs from the assigned card number.
+            var savedRow = new Dictionary<string,string> {
+                ["Drukuj"]="True", ["Sekcja (II lub III)"]="II",
+                ["Produkt"]="Produkt źródłowy",["Symbol Subiekta"]="SUB-123",
+                ["Gatunek"]="Bydło",["Droga podania"]="domięśniowo",
+                ["Dawkowanie i okres stosowania"]="1 ml",["Karencja"]="28 dni",
+                ["Rozpoznanie"]="Rozpoznanie",["Status karencji"]=CardSchema.RegistryVerified
+            };
+            var savedFields = new Dictionary<string,string> {
+                ["Nr karty"]="K/14/2026",["Dokument źródłowy"]="FS 123",
+                ["Zgłoszenie — data i godzina"]="",
+                ["Wykonanie — data i godzina"]="19.11.2026 13:30",
+                ["Wyniki badań"]="Przed zabiegiem"
+            };
+            var originalSaved = new Card(savedFields, [savedRow]) {
+                DoctorStampPng = [0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A]
+            };
+            var changedFields = new Dictionary<string,string>(savedFields) {
+                ["Nr karty"]="K/999/2026", // tampering must not change SQL number
+                ["Wyniki badań"]="Po zabiegu"
+            };
+            var changedRow = new Dictionary<string,string>(savedRow) {
+                ["Produkt"]="Zamieniony produkt źródłowy",
+                ["Symbol Subiekta"]="NIE-ISTNIEJE",
+                ["Karencja"]="Sprawdzono ręcznie",
+                ["Zamiennik produktu"]="Zamiennik A"
+            };
+            var editedSaved = SavedCardRevisionService.ApplyChanges(
+                originalSaved,changedFields,[changedRow],2026,14);
+            Check(editedSaved.Fields["Nr karty"]=="K/14/2026" &&
+                  editedSaved.Fields["Dokument źródłowy"]=="FS 123" &&
+                  editedSaved.Rows[0]["Produkt"]=="Produkt źródłowy" &&
+                  editedSaved.Rows[0]["Symbol Subiekta"]=="SUB-123" &&
+                  editedSaved.Rows[0]["Zamiennik produktu"]=="Zamiennik A" &&
+                  editedSaved.Rows[0]["Status karencji"]==
+                    "Zmieniono ręcznie — sprawdź przed wydrukiem" &&
+                  editedSaved.DoctorStampPng?.SequenceEqual(originalSaved.DoctorStampPng!)==true,
+                "saved card editing must preserve numbering, source and stamps, flag manual clinical changes");
+            Check(SavedCardRevisionService.Revision(
+                  System.Text.Json.JsonSerializer.Serialize(originalSaved)) !=
+                  SavedCardRevisionService.Revision(
+                    System.Text.Json.JsonSerializer.Serialize(editedSaved)),
+                "saved-card revision must change after edits");
+            Check(CardHtmlRenderer.Render(editedSaved).Contains("Zamiennik A"),
+                "revised card print must include explicitly entered replacement");
+            bool changedYearBlocked=false;
+            try {
+                var wrongYear = new Dictionary<string,string>(savedFields) {
+                    ["Wykonanie — data i godzina"]="01.01.2027 09:00"
+                };
+                _=SavedCardRevisionService.ApplyChanges(
+                    originalSaved,wrongYear,[savedRow],2026,14);
+            } catch (ArgumentException) { changedYearBlocked=true; }
+            Check(changedYearBlocked,"updating a card must not silently change numbering year");
+            bool rowCountBlocked=false;
+            try {
+                _=SavedCardRevisionService.ApplyChanges(
+                    originalSaved,savedFields,[],2026,14);
+            } catch (InvalidOperationException) { rowCountBlocked=true; }
+            Check(rowCountBlocked,"saved-card updates must reject row count changes");
+
             Console.WriteLine($"ReactKL regression checks passed: {checks}");
         }
         finally
