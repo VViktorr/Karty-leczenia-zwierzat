@@ -57,3 +57,9 @@
 .catalogue-variants .ant-table-thead>tr>th{white-space:nowrap}
 .catalogue-variants .ant-table-cell{vertical-align:top}
 @media(max-width:1120px){.catalogue-layout{grid-template-columns:1fr}.catalogue-list .ant-table-body{max-height:170px!important}}
+
+/* ChPL extraction evidence is intentionally displayed verbatim and is never
+   applied directly to SQL. Keep long veterinary instructions readable. */
+.chpl-evidence{max-height:32vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;
+  border:1px solid var(--line);border-radius:8px;padding:14px 16px;
+  background:var(--shell-bg);color:var(--text);font:12px/1.55 Consolas,"Cascadia Code",monospace}
