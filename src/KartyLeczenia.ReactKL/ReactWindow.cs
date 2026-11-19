@@ -265,6 +265,7 @@ internal sealed class ReactWindow : Form
         if (action == "getUpdateStatus")
             return new
             {
+                installed = ReactInstallUpdates.IsInstalled,
                 isServer = ReactInstallUpdates.IsServer,
                 pending = ReactInstallUpdates.HasPendingPublication,
                 installedVersion = ReactInstallUpdates.InstalledVersion,
@@ -281,12 +282,17 @@ internal sealed class ReactWindow : Form
         }
         if (action == "checkUpdate")
         {
+            if (!ReactInstallUpdates.IsInstalled)
+                throw new InvalidOperationException(
+                    "Sprawdzanie aktualizacji SQL jest dostępne po zainstalowaniu ReactKL. Paczka testowa nie aktualizuje programu.");
             checkedUpdate = await updates.Check(token);
             return new { release = checkedUpdate,
                 currentVersion = ReactUpdateService.CurrentVersion };
         }
         if (action == "installUpdate")
         {
+            if (!ReactInstallUpdates.IsInstalled)
+                throw new InvalidOperationException("Najpierw zainstaluj ReactKL w standardowym katalogu.");
             if (backupRunning || restoreRunning)
                 throw new InvalidOperationException(
                     "Aktualizacja może rozpocząć się dopiero po zakończeniu archiwizacji lub odtwarzania.");
