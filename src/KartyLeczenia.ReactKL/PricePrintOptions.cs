@@ -141,7 +141,18 @@ internal static class PricePrintOptionsStore
         }
 
         var defaults = new PricePrintOptions();
-        var sizes = Ints(root, "FontSizes", defaults.ColumnSizes);
+        var sizes = Ints(root, "FontSizes", [0,0,0,0,0,0]);
+        var legacySizes = Ints(root, "Sizes", [0,0,0,0,0,0]);
+        var fontIndices = Ints(root, "Fonts", [0,0,0,0,0,0]);
+        var fontNames = Strings(root, "FontNames", defaults.ColumnFonts);
+        string[] oldFonts = ["Arial", "Calibri", "Tahoma", "Segoe UI", "Times New Roman"];
+        for (int i = 0; i < 6; i++)
+        {
+            if (string.IsNullOrWhiteSpace(fontNames[i]) && fontIndices[i] is >= 1 and <= 5)
+                fontNames[i] = oldFonts[fontIndices[i] - 1];
+            if (sizes[i] == 0 && legacySizes[i] is >= 1 and <= 5)
+                sizes[i] = 7 + legacySizes[i];
+        }
         var weights = Ints(root, "FontWeights", defaults.ColumnWeights);
         var aligns = Ints(root, "Alignments", [0,0,0,0,2,0]);
         return (defaults with
@@ -152,7 +163,7 @@ internal static class PricePrintOptionsStore
             Padding = Decimal(root, "Padding", 0.5m),
             Font = Str(root, "Font", "Arial"),
             Size = (int)Decimal(root, "Size", 10),
-            FontWeight = Int(root, "FontWeight", 400),
+            FontWeight = Int(root, "FontWeight", 400) is var weight && weight is >= 400 and <= 900 ? weight : 400,
             Number = Bool(root, "Number", true),
             Batch = Bool(root, "Batch", true),
             Price = Bool(root, "Price", true),
@@ -162,7 +173,7 @@ internal static class PricePrintOptionsStore
             Legend = !Bool(root, "Legend", true) ? "hidden" :
                 Bool(root, "LegendEveryPage", false) ? "every" : "start",
             Widths = Ints(root, "Widths", defaults.Widths),
-            ColumnFonts = Strings(root, "FontNames", defaults.ColumnFonts),
+            ColumnFonts = fontNames,
             ColumnSizes = sizes.Select(x => x is >= 6 and <= 48 ? x : 10).ToArray(),
             ColumnWeights = weights.Select(x => x is >= 400 and <= 900 ? x : 400).ToArray(),
             ColumnAlignments = aligns.Select(x => x switch
