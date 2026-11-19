@@ -4,7 +4,7 @@
 
 [Setup]
 AppId=pl.kartyleczenia.winforms.sql
-AppName=KartyLeczenia
+AppName=SQL KartyLeczenia
 AppVersion={#ReleaseVersion}
 VersionInfoVersion={#ReleaseVersion}.0
 VersionInfoProductVersion={#ReleaseVersion}.0
