@@ -591,18 +591,12 @@ internal sealed class ReactWindow : Form
                     string.Equals(Text(current, "withdrawal", 3000),
                         row.Get("Karencja").Trim(), StringComparison.Ordinal) &&
                     Flag(current, "selected") == row.Printed;
-                bool catalogueUnchanged =
-                    string.Equals(Text(request,"species",3000),proposal.Species.Trim(),
-                        StringComparison.Ordinal) &&
-                    string.Equals(Text(request,"route",3000),proposal.Route.Trim(),
-                        StringComparison.Ordinal) &&
-                    string.Equals(Text(request,"dosing",3000),proposal.Dosing.Trim(),
-                        StringComparison.Ordinal) &&
-                    string.Equals(Text(request,"withdrawal",3000),proposal.Withdrawal.Trim(),
-                        StringComparison.Ordinal) &&
-                    string.Equals(Text(request,"source",3000),proposal.Source.Trim(),
-                        StringComparison.Ordinal) &&
-                    Flag(request,"hasPdf")==proposal.HasPdf;
+                bool catalogueUnchanged = TreatmentAutofillPlanner.MatchesReviewed(
+                    proposal,
+                    Text(request,"species",3000), Text(request,"route",3000),
+                    Text(request,"dosing",3000), Text(request,"withdrawal",3000),
+                    Text(request,"source",3000), Text(request,"pdfPath",450),
+                    Flag(request,"hasPdf"));
                 if (!unchanged || !catalogueUnchanged || proposal.Status != "ready" ||
                     proposal.VariantId != variantId ||
                     !variants.TryGetValue(proposal.Symbol, out var matches))
