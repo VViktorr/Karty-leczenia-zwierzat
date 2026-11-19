@@ -2558,27 +2558,12 @@ internal sealed class MainForm : Form
             if (sharedArchive is { } archive) await RefreshClinic(archive);
         };
         form = Section("Kopia zapasowa SQL");
-        Message(form, "Kopię zapasową SQL KartyLeczenia wykonasz zapisanym loginem i hasłem archiwum. " +
-            "Odtwarzanie bazy nadal wymaga konta administratora SQL Server. " +
-            "Plik .bak zapisuje usługa SQL Server w folderze dostępnym dla serwera.",
-            multiline: true);
-        var backupWithArchiveLogin = Option("Kopia: użyj zapisanego połączenia SQL KartyLeczenia (zalecane)", true);
-        var maintenanceAuth = Authentication(useWindows: true);
-        var maintenanceUser = Field("Login administratora SQL (do odtwarzania)", "");
-        var maintenancePassword = Field("Hasło administratora SQL (do odtwarzania)", "", password: true);
-        void UpdateMaintenanceCredentials()
-        {
-            // Administrative credentials remain editable for the separate
-            // Restore action even when backups use the stored SQL login.
-            maintenanceUser.Enabled = maintenancePassword.Enabled =
-                maintenanceAuth.SelectedIndex == 0;
-        }
-        maintenanceAuth.SelectedIndexChanged += (_, _) => UpdateMaintenanceCredentials();
-        UpdateMaintenanceCredentials();
-        Add("", backupWithArchiveLogin);
+        Message(form, "Archiwizacja i odtwarzanie używają aktualnego połączenia SQL KartyLeczenia. " +
+            "Do wykonania kopii wystarcza uprawnienie BACKUP DATABASE. " +
+            "Odtworzenie wymaga uprawnień sysadmin dla aktualnego konta SQL. " +
+            "Plik .bak musi być dostępny dla usługi SQL Server.", multiline: true);
+        // Credentials are taken exclusively from the current SQL archive connection.
         var backupFolder = Field("Folder kopii na serwerze", "", "Puste pole = domyślny folder SQL Servera");
-        var restoreServer = Field("Serwer docelowy odtwarzania", "", "Puste pole = zapisany serwer archiwum");
-        var restoreTrust = Option("Zaufaj certyfikatowi wpisanego serwera docelowego", false);
         var restoreFile = Field("Plik kopii na serwerze", "", @"np. D:\Kopie\KartyLeczenia.bak");
         var maintenanceStatus = Message(form, "", multiline: true);
         bool maintainingArchive = false;
@@ -2592,18 +2577,7 @@ internal sealed class MainForm : Form
         async Task MaintainArchive(bool restoring)
         {
             if (maintainingArchive) return;
-            string target = restoring ? restoreServer.Text.Trim() : "";
-            var archive = target.Length == 0 ? Archive() : new SharedArchive(new ConnectionOptions(
-                target, SharedArchive.DatabaseName, true, "", "", restoreTrust.Checked));
-            // Restoring always requires explicit administrator credentials.
-            // Backups default to the already configured archive login.
-            bool useArchiveLogin = !restoring && backupWithArchiveLogin.Checked;
-            bool windows = maintenanceAuth.SelectedIndex == 1;
-            if (!useArchiveLogin && !windows)
-            {
-                Require(maintenanceUser, "Wpisz login SQL do operacji na bazie.");
-                Require(maintenancePassword, "Wpisz hasło SQL do operacji na bazie.");
-            }
+            var archive = Archive();
 
             using var archiveDialog = new ArchiveBackupDialog(restoring,
                 (restoring ? restoreFile : backupFolder).Text.Trim());
@@ -2627,8 +2601,6 @@ internal sealed class MainForm : Form
                     MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
 
-            var administrator = new ConnectionOptions(archive.Server, SharedArchive.DatabaseName, windows,
-                maintenanceUser.Text, maintenancePassword.Text, false);
             maintainingArchive = true;
             tabs.Enabled = false;
             UseWaitCursor = true;
@@ -2638,10 +2610,8 @@ internal sealed class MainForm : Form
             try
             {
                 string? backup = await Task.Run(() => restoring
-                    ? archive.RestoreDatabase(administrator, path)
-                    : useArchiveLogin
-                        ? archive.BackupDatabase(path, compressBackup)
-                        : archive.BackupDatabase(administrator, path, compressBackup));
+                    ? archive.RestoreDatabase(path)
+                    : archive.BackupDatabase(path, compressBackup));
                 if (restoring && ReferenceEquals(archive, sharedArchive))
                 {
                     sharedClinic = null;
@@ -2672,7 +2642,6 @@ internal sealed class MainForm : Form
             }
             finally
             {
-                maintenancePassword.Clear();
                 maintainingArchive = false;
                 UseWaitCursor = false;
                 tabs.Enabled = true;
