@@ -106,6 +106,91 @@ static class Program
             Check(missingStampRejected,
                 "enabled doctor stamp without PNG must be rejected");
 
+            // Fast-list regression checks run without any live SQL instance.
+            var clock = new DateTimeOffset(2026, 11, 19, 18, 0, 0, TimeSpan.Zero);
+            var fastLists = new DocumentListCache(() => clock);
+            int databaseQueries = 0;
+            Task<IReadOnlyList<KartyLeczenia.DocumentSuggestion>> FetchList(CancellationToken ct)
+            {
+                ct.ThrowIfCancellationRequested();
+                databaseQueries++;
+                return Task.FromResult<IReadOnlyList<KartyLeczenia.DocumentSuggestion>>(
+                    [new KartyLeczenia.DocumentSuggestion(1, "FS 1/2026")]);
+            }
+            var originalList = fastLists.GetAsync("invoices-all", false, FetchList,
+                CancellationToken.None).GetAwaiter().GetResult();
+            var fromMemory = fastLists.GetAsync("invoices-all", false, FetchList,
+                CancellationToken.None).GetAwaiter().GetResult();
+            Check(databaseQueries == 1 && !originalList.Cached && fromMemory.Cached,
+                "switching back to a document list within five minutes must avoid SQL");
+            Check(originalList.LoadedAt == fromMemory.LoadedAt,
+                "cached document list must retain its actual SQL read timestamp");
+            var explicitlyRefreshed = fastLists.GetAsync("invoices-all", true, FetchList,
+                CancellationToken.None).GetAwaiter().GetResult();
+            Check(databaseQueries == 2 && !explicitlyRefreshed.Cached,
+                "F5 must bypass the five-minute list cache");
+            clock = clock.Add(DocumentListCache.Lifetime).AddSeconds(1);
+            _ = fastLists.GetAsync("invoices-all", false, FetchList,
+                CancellationToken.None).GetAwaiter().GetResult();
+            Check(databaseQueries == 3,
+                "expired document lists must be refreshed, not silently reused");
+            var gate = new TaskCompletionSource<IReadOnlyList<KartyLeczenia.DocumentSuggestion>>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            int concurrentQueries = 0;
+            Task<IReadOnlyList<KartyLeczenia.DocumentSuggestion>> SharedFetch(CancellationToken ct)
+            {
+                System.Threading.Interlocked.Increment(ref concurrentQueries);
+                return gate.Task;
+            }
+            var firstReader = fastLists.GetAsync("same-query-in-flight", false,
+                SharedFetch, CancellationToken.None);
+            var secondReader = fastLists.GetAsync("same-query-in-flight", false,
+                SharedFetch, CancellationToken.None);
+            gate.SetResult([new KartyLeczenia.DocumentSuggestion(2, "PA 2/2026")]);
+            Task.WhenAll(firstReader, secondReader).GetAwaiter().GetResult();
+            Check(concurrentQueries == 1,
+                "two simultaneous identical list requests should share one SQL query");
+            var subiektA = new KartyLeczenia.ConnectionOptions(
+                "sqlhost", "Subiekt", true, "", "", true, WarehouseId: 1);
+            var subiektB = subiektA with { WarehouseId = 2 };
+            Check(DocumentListCache.Key(subiektA, KartyLeczenia.DocumentSearchKinds.Invoices,
+                "", null, null) !=
+                DocumentListCache.Key(subiektB, KartyLeczenia.DocumentSearchKinds.Invoices,
+                "", null, null),
+                "warehouse change must never reuse previous document list");
+            Check(DocumentListCache.Key(subiektA, KartyLeczenia.DocumentSearchKinds.Invoices,
+                "", null, null) !=
+                DocumentListCache.Key(subiektA, KartyLeczenia.DocumentSearchKinds.Receipts,
+                "", null, null),
+                "document type must be part of SQL list cache identity");
+            for(int i=0;i<35;i++)
+                _ = fastLists.GetAsync("bounded-"+i, false, FetchList,
+                    CancellationToken.None).GetAwaiter().GetResult();
+            var evicted = fastLists.GetAsync("bounded-0", false, FetchList,
+                CancellationToken.None).GetAwaiter().GetResult();
+            Check(!evicted.Cached,
+                "oldest cache entry must be evicted to bound memory usage");
+            fastLists.Clear();
+            var cleared = fastLists.GetAsync("invoices-all", false, FetchList,
+                CancellationToken.None).GetAwaiter().GetResult();
+            Check(!cleared.Cached, "changing SQL connection must clear previous cached lists");
+            int errors = 0;
+            Task<IReadOnlyList<KartyLeczenia.DocumentSuggestion>> Fail(CancellationToken ct)
+            {
+                errors++;
+                throw new InvalidOperationException("Test failure");
+            }
+            for(int retry=0;retry<2;retry++)
+            {
+                try
+                {
+                    _ = fastLists.GetAsync("failed-query", false, Fail,
+                        CancellationToken.None).GetAwaiter().GetResult();
+                }
+                catch (InvalidOperationException) { /* expected */ }
+            }
+            Check(errors==2, "SQL errors must not be cached as successful lists");
+
             var previous = new KartyLeczenia.TreatmentRow();
             previous.Set("Produkt", "Example product", false);
             previous.Set("Karencja", "Tkanki jadalne: 28 dni", false);
