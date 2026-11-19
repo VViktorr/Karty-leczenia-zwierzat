@@ -64,7 +64,9 @@ internal sealed class ReactWindow : Form
         MinimumSize = new Size(900, 600);
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;
+        ReactWindowPlacement.Restore(this);
         Controls.Add(web);
+        FormClosed += (_, _) => ReactWindowPlacement.Save(this);
         Shown += async (_, _) =>
         {
             await StartAsync();
