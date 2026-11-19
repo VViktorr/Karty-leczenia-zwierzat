@@ -88,84 +88,139 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
+  const forceRefresh = useRef(false);
   // Keys are primitive strings/numbers, not serialized SQL credentials.
   const key = JSON.stringify(deps);
   useEffect(() => {
     let expired = false;
+    const refresh = forceRefresh.current;
+    forceRefresh.current = false;
     setBusy(true); setError("");
-    invoke<T>(action, payload)
+    invoke<T>(action, refresh ? {...payload, refresh:true} : payload)
       .then(result => { if (!expired) setData(result); })
       .catch(reason => { if (!expired) setError(reason instanceof Error ? reason.message : String(reason)); })
       .finally(() => { if (!expired) setBusy(false); });
     return () => { expired = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action, key, tick]);
-  return {data, busy, error, reload: () => setTick(n => n + 1)};
+  return {data, busy, error, reload: () => {
+    forceRefresh.current = true;
+    setTick(n => n + 1);
+  }};
 }
 
 function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
   const [kind, setKind] = useState<DocumentKind>("invoices");
-  const [period, setPeriod] = useState<DatePeriod>("month");
+  const [period, setPeriod] = useState<DatePeriod>("all");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedId,setSelectedId] = useState<number|null>(null);
+  const [startDate,setStartDate] = useState(() => localDateTime().slice(0,10));
+  const [endDate,setEndDate] = useState(() => localDateTime().slice(0,10));
+  const [selectedMonth,setSelectedMonth] = useState(() => localDateTime().slice(0,7));
   const [readError, setReadError] = useState("");
   const [reading, setReading] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setSearch(query.trim()), 300);
     return () => clearTimeout(timer);
   }, [query]);
+  const from = period==="customMonth" ? selectedMonth+"-01" : period==="custom" ? startDate : "";
+  const until = period==="custom" ? endDate : "";
   const {data, busy, error, reload} = useRemote<DocumentsResult>(
-    "searchDocuments", {kind, period, query: search}, [kind, period, search]);
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => {
-      if (event.key === "F5") { event.preventDefault(); reload(); }
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [reload]);
-  const columns: ColumnsType<DocumentRow> = [
-    {title: "Data", dataIndex: "date", width: 125, render: date,
-      sorter: (a, b) => (a.date || "").localeCompare(b.date || "")},
-    {title: "Numer", dataIndex: "number", width: 175,
-      sorter: (a, b) => a.number.localeCompare(b.number)},
-    {title: "Kontrahent", dataIndex: "shortPayer", ellipsis: true,
-      render: (value: string, row) => <span title={row.payer}>{value || row.payer}</span>},
-    {title: "Brutto", dataIndex: "gross", align: "right", width: 145,
-      render: (value: number | null, row) => currency(value, row.currency || "zł"),
-      sorter: (a, b) => (a.gross ?? 0) - (b.gross ?? 0)},
-    {title: "Powiązania", dataIndex: "relatedText", ellipsis: true, width: 230}
-  ];
+    "searchDocuments", {kind, period, query: search, startDate:from, endDate:until},
+    [kind, period, search, from, until]);
   const open = async (row: DocumentRow) => {
+    if(reading)return;
     setReading(true); setReadError("");
     try {
+      // Always fetch the selected DOCUMENT from SQL; cache covers lists only.
       const draft = await invoke<Draft>("readDocument", {documentId: row.id, number: row.number});
       onOpen(draft);
     } catch (e) { setReadError(String(e instanceof Error ? e.message : e)); }
     finally { setReading(false); }
   };
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "F5") { event.preventDefault(); reload(); return; }
+      if(event.altKey && !event.ctrlKey && !event.shiftKey){
+        const chosen = event.code==="Digit1"?"invoices":
+          event.code==="Digit2"?"receipts":event.code==="Digit4"?"warehouse":null;
+        if(chosen){event.preventDefault();setKind(chosen);return;}
+      }
+      if(event.key==="Enter" && event.target instanceof HTMLElement &&
+        event.target.closest("tr[data-row-key]")){
+        const id=Number(event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key"));
+        const row=data?.items.find(item=>item.id===id);
+        if(row){event.preventDefault();void open(row);}
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [reload,data,reading]);
+  const columns: ColumnsType<DocumentRow> = [
+    {title:"Data",dataIndex:"date",width:125,render:date,
+      sorter:(a,b)=>(a.date||"").localeCompare(b.date||"")},
+    {title:"Numer",dataIndex:"number",width:175,
+      sorter:(a,b)=>a.number.localeCompare(b.number)},
+    {title:"Kontrahent",dataIndex:"shortPayer",ellipsis:true,
+      render:(value:string,row)=><span title={row.payer}>{value||row.payer}</span>},
+    {title:"Brutto",dataIndex:"gross",align:"right",width:145,
+      render:(value:number|null,row)=>currency(value,row.currency||"zł"),
+      sorter:(a,b)=>(a.gross??0)-(b.gross??0)},
+    {title:"Powiązania",dataIndex:"relatedText",ellipsis:true,width:230}
+  ];
+  const periods: Array<{label:string;value:DatePeriod}> = [
+    {label:"(nieokreślony)",value:"all"},
+    {label:"Bieżący dzień",value:"today"},
+    {label:"Bieżący tydzień",value:"currentWeek"},
+    {label:"Bieżący miesiąc",value:"currentMonth"},
+    {label:"Bieżący kwartał",value:"currentQuarter"},
+    {label:"Bieżący rok",value:"currentYear"},
+    {label:"Ostatnie 7 dni",value:"week"},
+    {label:"Ostatnie 30 dni",value:"month"},
+    {label:"Dowolny miesiąc",value:"customMonth"},
+    {label:"Dowolny okres",value:"custom"}
+  ];
   return <>
     <div className="page-heading"><div>
       <Typography.Title level={3}>Dokumenty Subiekta GT</Typography.Title>
-      <Typography.Text type="secondary">Faktury, paragony i WZ z aktualnej bazy.</Typography.Text>
+      <Typography.Text type="secondary">Lista z jednego magazynu. Bufor 5 minut, F5 pobiera świeże dane SQL.</Typography.Text>
     </div><Button onClick={reload} loading={busy}>Odśwież · F5</Button></div>
     <Card>
       <div className="document-filters">
-        <Segmented block size="large" value={kind} onChange={value => setKind(value as DocumentKind)}
-          options={[{label:"Faktury",value:"invoices"}, {label:"Paragony",value:"receipts"},
-            {label:"WZ",value:"warehouse"}, {label:"Wszystkie",value:"all"}]}/>
+        <Segmented block size="large" value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
+          options={[{label:"Faktury · Alt+1",value:"invoices"},
+            {label:"Paragony · Alt+2",value:"receipts"},
+            {label:"WZ · Alt+4",value:"warehouse"},
+            {label:"Wszystkie",value:"all"}]}/>
         <Input.Search allowClear size="large" value={query}
-          onChange={e => setQuery(e.target.value)} placeholder="Numer lub kontrahent"/>
-        <Select value={period} size="large" onChange={setPeriod} options={[
-          {label:"Ostatnie 30 dni", value:"month"}, {label:"Ostatnie 7 dni",value:"week"},
-          {label:"Dzisiaj",value:"today"}, {label:"Wszystkie",value:"all"}]}/>
+          onChange={e=>setQuery(e.target.value)}
+          onSearch={text=>{setSearch(text.trim());}}
+          onPressEnter={()=>{setSearch(query.trim());reload();}}
+          placeholder="Numer lub kontrahent"/>
+        <Select value={period} size="large" onChange={next=>{setPeriod(next);setSelectedId(null);}}
+          options={periods}/>
+        {period==="customMonth"&&<Input type="month" aria-label="Wybrany miesiąc"
+          value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)}/>}
+        {period==="custom"&&<>
+          <Input type="date" aria-label="Od dnia" value={startDate} onChange={e=>setStartDate(e.target.value)}/>
+          <Input type="date" aria-label="Do dnia" value={endDate} onChange={e=>setEndDate(e.target.value)}/>
+        </>}
       </div>
-      <ErrorNotice error={error || readError}/>
-      {data?.truncated && <Alert className="notice" type="info" showIcon message="Pokazano 200 dokumentów. Zawęź wyszukiwanie."/>}
-      <Table rowKey="id" loading={busy || reading} dataSource={data?.items ?? []} columns={columns}
+      <ErrorNotice error={error||readError}/>
+      {data?.truncated&&<Alert className="notice" type="info" showIcon
+        message="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
+      <Table rowKey="id" loading={busy||reading} dataSource={data?.items??[]} columns={columns}
+        rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
         size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={{pageSize:25,showSizeChanger:true}}
-        onRow={row => ({onDoubleClick: () => {void open(row);}})}
+        onRow={row=>({tabIndex:0,onClick:()=>setSelectedId(row.id),
+          onDoubleClick:()=>{void open(row);}})}
         locale={{emptyText:<Empty description="Brak dokumentów"/>}}/>
-      <Typography.Text type="secondary">Dwuklik otwiera kartę leczenia w React.</Typography.Text>
+      <Typography.Text type="secondary">
+        {data?.loadedAt?"Ostatni odczyt "+new Date(data.loadedAt).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})+
+          (data.cached?" · z pamięci (bez zapytania SQL)":" · odświeżono z SQL")+" · ":""}
+        {data?.items.length??0} dokumentów. Dwuklik lub Enter na wierszu otwiera kartę.
+      </Typography.Text>
     </Card>
   </>;
 }
