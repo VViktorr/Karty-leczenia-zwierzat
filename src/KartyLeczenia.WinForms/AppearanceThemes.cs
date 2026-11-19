@@ -441,6 +441,11 @@ internal static class AppearanceEditor
         var wide = new CheckBox { Text = "Powiększone zakładki", AutoSize = true };
         var customAccent = new CheckBox { Text = "Własny kolor zaznaczenia i przełączników", AutoSize = true };
         var switchStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
+        var tabStyle = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
+        tabStyle.Items.AddRange(["Linia (AntdUI Line)", "Karty (AntdUI Card)", "Karty tonalne", "Klasyczne"]);
+        var tabPosition = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+        tabPosition.Items.AddRange(["U góry", "Na dole"]);
+        var tabSpacing = new NumericUpDown { Minimum = 2, Maximum = 24, Width = 80 };
         switchStyle.Items.AddRange(["Subtelne", "Pełne wypełnienie", "Kontur", "Tonalne (Material 3)", "Pastylki"]);
         var cornerRadius = new NumericUpDown { Minimum = 0, Maximum = 20, Width = 80 };
         var colorButtons = new CheckBox { Text = "Koloruj także zwykłe przyciski", AutoSize = true };
@@ -529,6 +534,9 @@ internal static class AppearanceEditor
             wide.Checked = current.WideTabs;
             customAccent.Checked = current.UseCustomAccent;
             switchStyle.SelectedIndex = current.SwitchStyle;
+            tabStyle.SelectedIndex = current.MainTabStyle;
+            tabPosition.SelectedIndex = current.MainTabPosition;
+            tabSpacing.Value = current.MainTabSpacing;
             cornerRadius.Value = current.CornerRadius;
             colorButtons.Checked = current.ColorButtons;
             accent.Enabled = customAccent.Checked;
@@ -553,7 +561,10 @@ internal static class AppearanceEditor
             current.ShowToolTips = tooltips.Checked;
             current.WideTabs = wide.Checked;
             current.UseCustomAccent = customAccent.Checked;
-            current.SwitchStyle = switchStyle.SelectedIndex < 0 ? 1 : switchStyle.SelectedIndex;
+            current.SwitchStyle = switchStyle.SelectedIndex < 0 ? 3 : switchStyle.SelectedIndex;
+            current.MainTabStyle = tabStyle.SelectedIndex < 0 ? 0 : tabStyle.SelectedIndex;
+            current.MainTabPosition = tabPosition.SelectedIndex < 0 ? 0 : tabPosition.SelectedIndex;
+            current.MainTabSpacing = (int)tabSpacing.Value;
             current.CornerRadius = (int)cornerRadius.Value;
             current.ColorButtons = colorButtons.Checked;
             accent.Enabled = customAccent.Checked;
@@ -576,6 +587,9 @@ internal static class AppearanceEditor
         height.ValueChanged += (_, _) => Capture();
         zoom.ValueChanged += (_, _) => Capture();
         switchStyle.SelectedIndexChanged += (_, _) => Capture();
+        tabStyle.SelectedIndexChanged += (_, _) => Capture();
+        tabPosition.SelectedIndexChanged += (_, _) => Capture();
+        tabSpacing.ValueChanged += (_, _) => Capture();
         cornerRadius.ValueChanged += (_, _) => Capture();
         colorButtons.CheckedChanged += (_, _) => Capture();
         accent.Click += (_, _) =>
@@ -616,6 +630,12 @@ internal static class AppearanceEditor
         panel.Controls.Add(previewSelection);
         panel.Controls.Add(preview);
 
+        Heading("Główne zakładki");
+        AddLabeled("Wygląd zakładek", tabStyle);
+        AddLabeled("Położenie nagłówków", tabPosition);
+        AddLabeled("Odstępy zakładek (px)", tabSpacing);
+        panel.Controls.Add(wide);
+
         Heading("Kolory i przełączniki");
         AddLabeled("Styl przełączników", switchStyle);
         AddLabeled("Zaokrąglenie narożników (px)", cornerRadius);
@@ -634,7 +654,6 @@ internal static class AppearanceEditor
         panel.Controls.Add(tooltips);
 
         Heading("Okno i wydruki");
-        panel.Controls.Add(wide);
         panel.Controls.Add(last);
         panel.Controls.Add(maximize);
         AddLabeled("Powiększenie podglądu wydruku (%)", zoom);
