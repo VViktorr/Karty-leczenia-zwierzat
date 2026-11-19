@@ -10,6 +10,7 @@ internal sealed class MainForm : Form
         DrawMode = TabDrawMode.OwnerDrawFixed,
         Padding = new Point(30, 9)
     };
+    TabControl? settingsTabs;
     readonly DocumentsTable documents;
     readonly DataGridView treatment = NewGrid();
     readonly PriceTable prices;
@@ -120,6 +121,14 @@ internal sealed class MainForm : Form
             AntdUI.Style.SetPrimary(AppearanceThemes.Accent(appearance));
             AppearanceThemes.ApplySurface(this, appearance);
             AppearanceThemes.ApplyTabs(tabs, appearance, interfaceScale);
+            // Nested Settings pages previously retained the native Windows
+            // tab frame regardless of the selected AntdUI-inspired theme.
+            if (settingsTabs is { } nested)
+            {
+                var nestedAppearance = appearance with { MainTabPosition = 0, WideTabs = false };
+                AppearanceThemes.ApplyTabs(nested, nestedAppearance, interfaceScale);
+                nested.Invalidate();
+            }
             tabs.Invalidate();
         }
         applyAppearance = ApplyAppearance;
@@ -1958,7 +1967,15 @@ internal sealed class MainForm : Form
         if (saved is { WarehouseId: not null } && (saved.WindowsAuthentication || saved.Password.Length > 0))
             connection = saved;
 
-        var sections = new TabControl { Dock = DockStyle.Fill, Multiline = true };
+        var sections = new TabControl
+        {
+            Dock = DockStyle.Fill, Multiline = true,
+            DrawMode = TabDrawMode.OwnerDrawFixed,
+            Padding = new Point(20, 9)
+        };
+        settingsTabs = sections;
+        sections.DrawItem += (_, e) => MainTabPainter.Draw(sections, e,
+            appearance with { MainTabPosition = 0, WideTabs = false });
         // At increased application scale use a vertical field layout. A fixed label
         // column plus 360px inputs otherwise pushes controls outside the viewport.
         bool compactSettings = (interfaceScale > 100 || DeviceDpi > 120);
