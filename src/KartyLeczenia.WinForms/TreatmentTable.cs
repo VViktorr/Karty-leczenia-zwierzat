@@ -149,6 +149,9 @@ internal sealed class TreatmentTable : AntdUI.Table
         };
     }
 
+    internal void ShowColumnsMenu(Control anchor) =>
+        AntdTableColumnMenu.Show(anchor, this, Columns.ToArray());
+
     private void SelectSource(DataGridViewRow row, int col)
     {
         try
