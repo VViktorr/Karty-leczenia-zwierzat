@@ -21,6 +21,9 @@ internal sealed class ReactWindow : Form
     private readonly DocumentService documents = new();
     private readonly CardArchiveService cards;
     private readonly SqlBackupService backups;
+    private readonly SqlRestoreService restores;
+    private string? selectedRestoreFile;
+    private bool restoreRunning;
     private readonly CatalogueService catalogue;
     private readonly Dictionary<string, byte[]> pendingCataloguePdfs = new(StringComparer.Ordinal);
     private bool backupRunning;
@@ -32,6 +35,7 @@ internal sealed class ReactWindow : Form
     {
         cards = new CardArchiveService(archive);
         backups = new SqlBackupService(archive);
+        restores = new SqlRestoreService(archive);
         catalogue = new CatalogueService(archive);
         base.Text = "KartyLeczenia — ReactKL";
         MinimumSize = new Size(900, 600);
@@ -41,10 +45,10 @@ internal sealed class ReactWindow : Form
         Shown += async (_, _) => await StartAsync();
         FormClosing += (_, e) =>
         {
-            if (backupRunning)
+            if (backupRunning || restoreRunning)
             {
                 e.Cancel = true;
-                MessageBox.Show(this, "Archiwizacja SQL trwa. Zamknięcie programu jest chwilowo zablokowane.",
+                MessageBox.Show(this, "Trwa operacja konserwacyjna SQL. Zamknięcie programu jest chwilowo zablokowane.",
                     "KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -103,7 +107,8 @@ internal sealed class ReactWindow : Form
             requestId = Text(root, "id", 80);
             string action = Text(root, "action", 40);
             if (string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(action)) return;
-            cancel = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+            cancel = new CancellationTokenSource(action is "backupDatabase" or "restoreDatabase"
+                ? TimeSpan.FromMinutes(45) : TimeSpan.FromSeconds(45));
             active[requestId] = cancel;
             object result = await Handle(action, root, cancel.Token);
             if (!cancel.IsCancellationRequested) Send(requestId, result);
@@ -211,6 +216,49 @@ internal sealed class ReactWindow : Form
                 ? pending : await Task.Run(() => catalogue.ReadPdf(path), token);
             return new { base64 = Convert.ToBase64String(data), name = Path.GetFileName(path) };
         }
+        if (action == "chooseRestoreFile")
+        {
+            if (restoreRunning || backupRunning)
+                throw new InvalidOperationException("Na stanowisku trwa operacja konserwacyjna SQL.");
+            using var dialog = new OpenFileDialog
+            {
+                Title = "Wybierz pełną kopię bazy KartyLeczenia",
+                Filter = "Kopia zapasowa SQL (*.bak)|*.bak",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return new { cancelled = true };
+            selectedRestoreFile = dialog.FileName;
+            var info = new FileInfo(dialog.FileName);
+            return new { cancelled = false, fileName = info.Name,
+                path = info.FullName, bytes = info.Length,
+                modified = info.LastWriteTime };
+        }
+        if (action == "restoreDatabase")
+        {
+            if (restoreRunning || backupRunning)
+                throw new InvalidOperationException("Na stanowisku trwa już archiwizacja lub odtwarzanie SQL.");
+            if (selectedRestoreFile is null ||
+                Text(root, "path", 1000) != selectedRestoreFile)
+                throw new InvalidOperationException("Ponownie wybierz plik .bak w systemowym oknie Windows.");
+            if (Text(root, "confirmation", 40) != "KartyLeczenia")
+                throw new InvalidOperationException("Potwierdź nazwę bazy KartyLeczenia.");
+            restoreRunning = true;
+            try
+            {
+                if (!await WindowsHelloConsent.VerifyAsync(this,
+                    "odtworzenie bazy KartyLeczenia (zastąpienie danych)"))
+                    return new { cancelled = true };
+                string request = Text(root,"id",80);
+                var progress = new Progress<SqlBackupProgress>(value => SendProgress(request,value));
+                var result = await Task.Run(() => restores.Run(selectedRestoreFile,progress));
+                selectedRestoreFile = null;
+                return new { cancelled = false, result.Database,result.SourcePath,
+                    result.SafetyBackupPath,result.Message };
+            }
+            finally { restoreRunning = false; }
+        }
         if (action == "getBackupSettings")
             return SqlBackupService.Load();
         if (action == "chooseArchiveFolder")
@@ -230,7 +278,8 @@ internal sealed class ReactWindow : Form
         }
         if (action == "backupDatabase")
         {
-            if (backupRunning) throw new InvalidOperationException("Archiwizacja już trwa.");
+            if (backupRunning || restoreRunning)
+                throw new InvalidOperationException("Na stanowisku trwa operacja konserwacyjna SQL.");
             var config = SqlBackupService.Load();
             if (!await WindowsHelloConsent.VerifyAsync(this,"wykonanie pełnej kopii SQL"))
                 return new {cancelled = true};
