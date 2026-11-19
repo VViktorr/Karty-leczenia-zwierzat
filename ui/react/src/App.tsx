@@ -8,6 +8,7 @@ import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
 import {useExpiryTableLayout} from "./ExpiryTableLayout";
+import {useListColumnLayout} from "./ListColumnLayout";
 import DialogPlacement from "./DialogPlacement";
 import { defaultPricePrint, normalizePriceSettings, withdrawalText,
   PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
@@ -211,6 +212,7 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
       sorter:(a,b)=>(a.gross??0)-(b.gross??0)},
     {title:"Powiązania",dataIndex:"relatedText",ellipsis:true,width:230}
   ];
+  const listLayout=useListColumnLayout("documents",columns);
   const periods: Array<{label:string;value:DatePeriod}> = [
     {label:"(nieokreślony)",value:"all"},
     {label:"Bieżący dzień",value:"today"},
@@ -227,7 +229,10 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
     <div className="page-heading"><div>
       <Typography.Title level={3}>Dokumenty Subiekta GT</Typography.Title>
       <Typography.Text type="secondary">Lista z jednego magazynu. Bufor 5 minut, F5 pobiera świeże dane SQL.</Typography.Text>
-    </div><Button onClick={reload} loading={busy}>Odśwież · F5</Button></div>
+    </div><Space wrap>
+      <Button onClick={listLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
+      <Button onClick={reload} loading={busy}>Odśwież · F5</Button>
+    </Space></div>
     <Card>
       <div className="document-filters">
         <Segmented block size="large" value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
@@ -252,7 +257,7 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
       <ErrorNotice error={error||readError}/>
       {data?.truncated&&<Alert className="notice" type="info" showIcon
         message="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
-      <Table rowKey="id" loading={busy||reading} dataSource={data?.items??[]} columns={columns}
+      <Table rowKey="id" loading={busy||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
         size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={{pageSize:25,showSizeChanger:true}}
         onRow={row=>({tabIndex:0,onClick:()=>setSelectedId(row.id),
@@ -264,6 +269,7 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
         {data?.items.length??0} dokumentów. Dwuklik lub Enter na wierszu otwiera kartę.
       </Typography.Text>
     </Card>
+    {listLayout.dialog}
   </>;
 }
 
@@ -1104,7 +1110,7 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
   }
   const priceHeading=net?"Cena netto":"Cena brutto";
   const columns:ColumnsType<PricePrintRow>=[
-    {title:"Druk",width:65,render:(_value,row)=>
+    {key:"selected",title:"Druk",width:65,render:(_value,row)=>
       <Checkbox checked={!excluded.has(row.symbol)}
         onChange={e=>toggle(row.symbol,e.target.checked)}/>},
     {title:"Lek",dataIndex:"name",width:260,
@@ -1125,6 +1131,7 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
         ? <Tag color="orange">Do uzupełnienia</Tag>
         : <Tag color="green">Warianty SQL</Tag>}
   ];
+  const listLayout=useListColumnLayout("prices",columns);
   return <>
     <div className="page-heading"><div>
       <Typography.Title level={3}>Cennik leków</Typography.Title>
@@ -1132,6 +1139,7 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
         Ceny i stany z Subiekta; karencje z katalogu SQL KartyLeczenia.
       </Typography.Text>
     </div><Space wrap>
+      <Button onClick={listLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={prices.reload} disabled={level===null} loading={prices.busy}>Odśwież z SQL</Button>
       <Button onClick={()=>setShowSettings(true)} disabled={settingsBusy||!all.length}>
         Ustawienia wydruku
@@ -1173,7 +1181,7 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
         })}>Odznacz widoczne</Button>
       </Space>
       <Table rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
-        dataSource={rows} columns={columns}
+        dataSource={rows} columns={listLayout.columns}
         pagination={{pageSize:40,showSizeChanger:true}}
         size="middle" scroll={{x:1180,y:"calc(100vh - 425px)"}}/>
       <Typography.Text type="secondary">
@@ -1182,6 +1190,7 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
         Zmiana formatu karencji i filtra nie odczytuje ponownie SQL.
       </Typography.Text>
     </Card>
+    {listLayout.dialog}
     {showSettings&&<PricePrintSettingsPanel initial={settings}
       onSave={setSettings} onClose={()=>setShowSettings(false)}
       onPreview={values=>{
