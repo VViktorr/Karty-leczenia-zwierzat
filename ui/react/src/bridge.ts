@@ -73,7 +73,8 @@ export function invoke<T>(action: string, fields: Record<string, unknown> = {},
         pending.delete(id);clearTimeout(timeout);clean();
         // Native host cancels the linked SQL request by original request id.
         // No response is expected for this fire-and-forget cancellation.
-        bridge.postMessage({id:String(++sequence),action:"cancelRequest",requestId:id});
+        try { bridge.postMessage({id:String(++sequence),action:"cancelRequest",requestId:id}); }
+        catch { /* WebView2 can already be closed during unmount. */ }
         reject(new Error("Anulowano nieaktualne wyszukiwanie."));
       };
       signal.addEventListener("abort",abort,{once:true});
