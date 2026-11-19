@@ -545,6 +545,97 @@ function BackupPanel() {
   </Card>;
 }
 
+interface RestorePickerResult {
+  cancelled:boolean;fileName?:string;path?:string;bytes?:number;modified?:string;
+}
+interface RestoreOutcome {
+  cancelled:boolean;database?:string;sourcePath?:string;
+  safetyBackupPath?:string|null;message?:string;
+}
+function RestorePanel() {
+  const [file,setFile]=useState<RestorePickerResult|null>(null);
+  const [confirmation,setConfirmation]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [step,setStep]=useState<BackupProgress|null>(null);
+  const [error,setError]=useState("");
+  const [result,setResult]=useState("");
+  async function browse(){
+    if(busy)return;
+    setError("");setResult("");setConfirmation("");
+    try {
+      const selected=await invoke<RestorePickerResult>("chooseRestoreFile");
+      if(!selected.cancelled)setFile(selected);
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+  }
+  function requestRestore(){
+    if(!file?.path||confirmation!=="KartyLeczenia"||busy)return;
+    Modal.confirm({
+      title:"Zastąpić całą bazę KartyLeczenia?",
+      content:<div>
+        <Typography.Paragraph strong>Ta operacja przerwie dostęp pozostałych stanowisk i nadpisze aktualne dane bazy programowej.</Typography.Paragraph>
+        <Typography.Paragraph>Plik: {file.fileName}</Typography.Paragraph>
+        <Typography.Paragraph>Program sprawdzi kopię i utworzy dodatkowe archiwum aktualnej bazy na serwerze SQL przed jej zastąpieniem. Wymagane jest Windows Hello i uprawnienie sysadmin SQL.</Typography.Paragraph>
+        <Typography.Paragraph>Nie dotyczy bazy Subiekta GT.</Typography.Paragraph>
+      </div>,
+      okText:"Tak, odtwórz bazę",
+      okType:"danger",
+      cancelText:"Anuluj",
+      onOk:async()=>{
+        setBusy(true);setError("");setResult("");setStep(null);
+        try {
+          const restored=await invoke<RestoreOutcome>("restoreDatabase",{
+            path:file.path,confirmation
+          },setStep);
+          if(restored.cancelled){
+            setResult("Odtwarzanie anulowane. Baza SQL nie została zmieniona.");
+          }else{
+            setResult((restored.message||"Odtwarzanie zakończone.")+
+              (restored.safetyBackupPath?"\nKopia sprzed odtwarzania: "+restored.safetyBackupPath:"")+
+              "\nZalecane ponowne uruchomienie ReactKL i odświeżenie pozostałych stanowisk.");
+            setFile(null);setConfirmation("");
+          }
+        }catch(e){setError(e instanceof Error?e.message:String(e));}
+        finally{setBusy(false);}
+      }
+    });
+  }
+  return <Card className="settings-card">
+    <Typography.Title level={4}>Odtwarzanie archiwum SQL</Typography.Title>
+    <Alert className="notice" type="warning" showIcon
+      message="Operacja administracyjna — zastępuje całą bazę programową KartyLeczenia"
+      description="Wykonuj na komputerze z SQL po zakończeniu pracy pozostałych stanowisk. Nie odtwarza danych Subiekta. Plik .bak musi być pełną kopią właściwej bazy."/>
+    <ErrorNotice error={error}/>
+    {result&&<Alert className="notice" type="success" showIcon
+      message={<span style={{whiteSpace:"pre-wrap"}}>{result}</span>}/>}
+    <Space direction="vertical" style={{width:"100%"}} size={13}>
+      <Space wrap>
+        <Button disabled={busy} onClick={()=>{void browse();}}>Wybierz archiwum .bak</Button>
+        <Typography.Text>{file?.fileName??"Nie wybrano pliku"}</Typography.Text>
+      </Space>
+      {file?.path&&<Typography.Text type="secondary" copyable>
+        {file.path} ({((file.bytes??0)/1048576).toFixed(1)} MB)
+      </Typography.Text>}
+      <div>
+        <Typography.Text strong>Wpisz KartyLeczenia, aby odblokować odtwarzanie:</Typography.Text>
+        <Input style={{maxWidth:330,display:"block",marginTop:7}}
+          value={confirmation} autoComplete="off"
+          placeholder="KartyLeczenia"
+          onChange={event=>setConfirmation(event.target.value)}
+          disabled={busy||!file?.path}/>
+      </div>
+      <Button danger type="primary" loading={busy}
+        disabled={!file?.path||confirmation!=="KartyLeczenia"}
+        onClick={requestRestore}>Odtwórz bazę SQL z archiwum</Button>
+    </Space>
+    {busy&&<div className="backup-progress">
+      <Typography.Text strong>{step?.stage??"Przygotowanie odtwarzania"}</Typography.Text>
+      <Progress status="active" percent={step?.percent??0}
+        format={step?.percent==null?()=>"…":undefined}/>
+      <Typography.Text type="secondary">{step?.detail||"Nie zamykaj aplikacji."}</Typography.Text>
+    </div>}
+  </Card>;
+}
+
 function SettingsPage() {
   const [form]=Form.useForm();
   const [busy,setBusy]=useState(false);
@@ -591,6 +682,7 @@ function SettingsPage() {
     <ClinicSettingsPanel/>
     <ArchiveSettingsPanel/>
     <BackupPanel/>
+    <RestorePanel/>
   </>;
 }
 
