@@ -98,14 +98,14 @@ internal sealed class MainForm : Form
         ConfigurePrices();
         ConfigureExpiry();
         ConfigureCard();
-        var savedCardsGrid = ConfigureSavedCards();
+        var savedCardsTable = ConfigureSavedCards();
         ConfigureConnection(openSettings);
         var tables = new Dictionary<string, DataGridView>
         {
             ["documents"] = documents, ["prices"] = prices,
             ["treatment"] = treatment
         };
-        if (interfaceScale != 100) ScaleInterface(tables.Values.Append(savedCardsGrid));
+        if (interfaceScale != 100) ScaleInterface(tables.Values);
         var layout = new WindowLayout(this, rememberTreatment, tables, interfaceScale);
         void ApplyAppearance(AppearanceOptions options)
         {
@@ -1870,13 +1870,10 @@ internal sealed class MainForm : Form
             OpenCardPreview(saved.Card, saved.PayerId, saved.Scope);
     }
 
-    DataGridView ConfigureSavedCards()
+    SavedCardsTable ConfigureSavedCards()
     {
-        var grid = NewGrid();
-        Column(grid, "Nr karty", nameof(SavedTreatmentCard.Number), 125);
-        Column(grid, "Data leczenia", nameof(SavedTreatmentCard.Date), 115, "dd.MM.yyyy");
-        Column(grid, "Klient", nameof(SavedTreatmentCard.Client), 350);
-        Column(grid, "Dokument", nameof(SavedTreatmentCard.Document), 180);
+        var grid = new SavedCardsTable(interfaceScale);
+        FormClosed += (_, _) => grid.SaveLayout();
         var query = new TextBox { Width = 250, PlaceholderText = "Klient, nr karty lub dokumentu" };
         var trash = new CheckBox { Text = "Pokaż kosz", AutoSize = true, Anchor = AnchorStyles.Left };
         var day = new DateTimePicker { Format = DateTimePickerFormat.Short, ShowCheckBox = true, Checked = false, Width = 125 };
@@ -1899,13 +1896,13 @@ internal sealed class MainForm : Form
 
         async Task OpenSavedCard()
         {
-            if (grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
+            if (grid.SelectedCard() is not SavedTreatmentCard row) return;
             await PreviewSavedCard(Archive(), row.Id, trash.Checked);
         }
 
         async Task ExportSavedCard()
         {
-            if (grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
+            if (grid.SelectedCard() is not SavedTreatmentCard row) return;
             var archive = Archive();
             bool inTrash = trash.Checked;
             var saved = await RunArchive(() => archive.ReadCard(row.Id, forPrint: false, inTrash: inTrash));
@@ -1915,7 +1912,7 @@ internal sealed class MainForm : Form
         bool movingCard = false;
         async Task MoveSavedCard()
         {
-            if (movingCard || grid.CurrentRow?.DataBoundItem is not SavedTreatmentCard row) return;
+            if (movingCard || grid.SelectedCard() is not SavedTreatmentCard row) return;
             var archive = Archive();
             bool toTrash = !trash.Checked;
             movingCard = true;
