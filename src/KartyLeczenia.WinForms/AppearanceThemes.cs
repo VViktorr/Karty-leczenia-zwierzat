@@ -16,6 +16,10 @@ internal sealed record AppearanceOptions
     public bool StartMaximized { get; set; }
     public bool ShowToolTips { get; set; } = true;
     public bool WideTabs { get; set; }
+    // 0 = AntdUI-style line, 1 = Card, 2 = tonal cards, 3 = classic tabs.
+    public int MainTabStyle { get; set; } = 0;
+    public int MainTabPosition { get; set; } = 0; // top or bottom
+    public int MainTabSpacing { get; set; } = 8;
     public bool UseCustomAccent { get; set; }
     public int AccentArgb { get; set; } = Color.FromArgb(0, 100, 190).ToArgb();
     public int PrintPreviewZoom { get; set; } = 100;
@@ -67,6 +71,9 @@ internal static class AppearanceThemes
         value.PrintPreviewZoom = Math.Clamp(value.PrintPreviewZoom, 50, 200);
         value.SwitchStyle = Math.Clamp(value.SwitchStyle, 0, 4);
         value.CornerRadius = Math.Clamp(value.CornerRadius, 0, 20);
+        value.MainTabStyle = Math.Clamp(value.MainTabStyle, 0, 3);
+        value.MainTabPosition = Math.Clamp(value.MainTabPosition, 0, 1);
+        value.MainTabSpacing = Math.Clamp(value.MainTabSpacing, 2, 24);
         // Migrate earlier settings without losing the operator's fonts,
         // layout preferences, print zoom or a manually chosen accent.
         if (!AppearanceOptions.Names.Contains(value.Preset))
@@ -250,50 +257,51 @@ internal static class AppearanceThemes
 
     internal static void ApplyButton(Button button, AppearanceOptions options)
     {
-        // Use one design system for every supported AntdUI button. Avoid
-        // mixing the old native outline with a forced bright-filled surface.
         bool selector = button is ThemeSelector;
         bool selected = selector && button.Toggle;
         bool classic = IsClassic(options);
         bool dark = IsDark(options);
         int style = classic ? 0 : options.SwitchStyle;
-        Color canvas = Canvas(options);
-        Color surface = button.Parent?.BackColor ?? canvas;
+        Color surface = Canvas(options);
         Color ink = Ink(options);
         Color accent = Accent(options);
-        Color toned = Blend(surface, accent, dark ? .26f : .12f);
 
+        // One visual surface per button: AntdUI must not paint its primary
+        // background over a second manually assigned ToggleBack/BackColor.
+        // ToggleType follows Type, preventing a switch to a second renderer
+        // when the selected state changes.
         bool filled = selected && style == 1;
-        bool tonal = selected && (style == 3 || style == 4);
-        bool outlined = selected && style == 2;
-        bool pill = style == 4;
-        bool isAction = !selector;
-        Color fill = filled ? accent : tonal ? toned : surface;
-        Color foreground = filled ? ContrastingText(accent) : selected ? accent : ink;
+        bool tonal = selected && (style is 3 or 4);
+        bool primaryAction = !selector && options.ColorButtons && !classic && style == 1;
+        bool bright = filled || primaryAction;
+        bool outlined = selector && selected && style == 2;
+        Color foreground = bright ? ContrastingText(accent) : selected ? accent : ink;
+        Color background = bright ? accent : tonal
+            ? Blend(surface, accent, dark ? .27f : .13f)
+            : surface;
 
-        // For ordinary actions use AntdUI's own surface and hover engine,
-        // reserving the primary fill for the active selector and emphasized
-        // actions. This keeps dialogs and toolbars consistent.
-        bool primaryAction = isAction && options.ColorButtons && !classic && style == 1;
-        if (primaryAction)
-        {
-            fill = accent;
-            foreground = ContrastingText(accent);
-        }
-
-        Color hover = Blend(fill, primaryAction || filled ? foreground : accent, .11f);
-        Color active = Blend(fill, primaryAction || filled ? foreground : accent, .20f);
         button.ColorScheme = dark ? AntdUI.TAMode.Dark : AntdUI.TAMode.Light;
-        button.Radius = pill ? 20 : style == 0 ? 6 : Math.Clamp(options.CornerRadius, 4, 20);
-        button.Type = filled || primaryAction ? AntdUI.TTypeMini.Primary : AntdUI.TTypeMini.Default;
-        button.BorderWidth = outlined ? 2 : style == 2 && !selected ? 1 : 0;
-        button.DefaultBorderColor = outlined ? accent : Blend(surface, ink, .22f);
-        button.DefaultBack = button.BackColor = button.ToggleBack = fill;
+        button.Radius = style == 4 ? 20 : Math.Clamp(options.CornerRadius, 4, 20);
+        button.Type = AntdUI.TTypeMini.Default;
+        button.ToggleType = AntdUI.TTypeMini.Default;
+        button.BorderWidth = outlined ? 2f : style == 2 ? 1f : 0f;
+        button.DefaultBorderColor = outlined ? accent : Blend(surface, ink, dark ? .28f : .19f);
+        button.Ghost = false;
+        button.BackExtend = button.ToggleBackExtend = null;
+        button.DefaultBack = background;
+        button.BackColor = background;
+        button.ToggleBack = background;
         button.ForeColor = button.ToggleFore = foreground;
-        button.ForeHover = button.ToggleForeHover = filled || primaryAction ? foreground : accent;
-        button.ForeActive = button.ToggleForeActive = filled || primaryAction ? foreground : accent;
-        button.BackHover = button.ToggleBackHover = hover;
-        button.BackActive = button.ToggleBackActive = active;
+        button.BackHover = button.ToggleBackHover = Blend(background, bright ? Color.White : accent, .10f);
+        button.BackActive = button.ToggleBackActive = Blend(background, bright ? Color.Black : accent, .16f);
+        button.ForeHover = button.ToggleForeHover = foreground;
+        button.ForeActive = button.ToggleForeActive = foreground;
+        if (selector)
+        {
+            button.WaveSize = 0;
+            button.Margin = new Padding(3, 3, 3, 3);
+            button.MinimumSize = new Size(0, 32);
+        }
         if (button.Tag is string shortcut)
             button.AccessibleDescription = selected ? shortcut + " · wybrano" : shortcut;
         button.Invalidate();
