@@ -16,6 +16,9 @@ try {
 
     Copy-Item -LiteralPath 'src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite' -Destination $stage
     Copy-Item -LiteralPath 'data/ChPL' -Destination $stage -Recurse
+    # Versioned additive entries ship with the installer and run only against
+    # the server archive. They are idempotent and preserve operator changes.
+    Copy-Item -LiteralPath 'scripts/catalogue-additions' -Destination $stage -Recurse
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = Join-Path $repository 'catalog-seed-win-x64.zip'
     $temporaryZip = Join-Path $repository ('catalog-seed-' + [Guid]::NewGuid().ToString('N') + '.tmp')
