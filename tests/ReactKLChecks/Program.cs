@@ -662,6 +662,9 @@ static class Program
                   SavedCardSearch.ParseNumber("K/18446744073709551616/2026") is null &&
                   SavedCardSearch.ParseNumber("FS 123") is null,
                 "card-number search must use a safe, exact indexed year/sequence");
+            Check(CardArchiveService.SafeJsonFileName("K/14/2026")=="K_14_2026" &&
+                  CardArchiveService.SafeJsonFileName(" : / ")=="Karta-leczenia",
+                "saved-card JSON filenames must be Windows-safe");
             Console.WriteLine($"ReactKL regression checks passed: {checks}");
         }
         finally

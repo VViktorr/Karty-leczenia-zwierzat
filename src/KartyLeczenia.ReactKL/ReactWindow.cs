@@ -572,6 +572,32 @@ internal sealed class ReactWindow : Form
         // They must remain available when Subiekt GT is temporarily offline.
         if (action == "renderSavedCard")
             return new { html = cards.RenderSaved(Text(root, "id", 40), Flag(root, "trash")) };
+        if (action == "exportSavedCardJson")
+        {
+            // A read-only operation; the Windows user chooses the destination
+            // on their own workstation. Do not send any patient JSON over UI.
+            string id = Text(root, "id", 40);
+            bool trash = Flag(root, "trash");
+            string raw = await Task.Run(() => cards.ReadSavedJson(id, trash), token);
+            var card = JsonSerializer.Deserialize<Card>(raw) ??
+                throw new InvalidDataException("Nie można odczytać karty do eksportu.");
+            string baseName = CardArchiveService.SafeJsonFileName(
+                card.Fields.GetValueOrDefault("Nr karty", ""));
+            using var dialog = new SaveFileDialog
+            {
+                Title = "Eksport karty leczenia do JSON",
+                Filter = "Pliki JSON (*.json)|*.json",
+                AddExtension = true, DefaultExt = "json",
+                FileName = baseName + ".json",
+                OverwritePrompt = true
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return new { cancelled = true, fileName = "" };
+            using var parsed = JsonDocument.Parse(raw);
+            File.WriteAllText(dialog.FileName,JsonSerializer.Serialize(parsed.RootElement,
+                new JsonSerializerOptions { WriteIndented = true }));
+            return new { cancelled = false, fileName = Path.GetFileName(dialog.FileName) };
+        }
         if (action == "savedCards")
             return await ReadSavedCards(token, Flag(root, "trash"),
                 Text(root, "query", 120), Text(root, "date", 12));

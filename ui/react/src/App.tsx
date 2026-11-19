@@ -1252,6 +1252,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
   const [purgeTarget,setPurgeTarget]=useState<SavedCard|null>(null);
   const [purgeConfirmation,setPurgeConfirmation]=useState("");
   const [purgeBusy,setPurgeBusy]=useState(false);
+  const [exportingId,setExportingId]=useState<string|null>(null);
   const [purgeError,setPurgeError]=useState("");
   const [notice,setNotice]=useState("");
   const remote=useRemote<SavedCard[]>("savedCards",
@@ -1348,6 +1349,16 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       setPrintHtml(result.html);setError("");
     } catch(e) {setError(e instanceof Error?e.message:String(e));}
   }
+  async function exportJson(row:SavedCard){
+    if(exportingId)return;
+    setExportingId(row.id);setError("");setNotice("");
+    try{
+      const result=await invoke<{cancelled:boolean;fileName:string}>(
+        "exportSavedCardJson",{id:row.id,trash});
+      if(!result.cancelled)setNotice("Wyeksportowano kartę do pliku "+result.fileName+".");
+    }catch(error){setError(error instanceof Error?error.message:String(error));}
+    finally{setExportingId(null);}
+  }
   async function purgeCard(){
     const expected=purgeTarget?.number || purgeTarget?.document || "";
     if(!purgeTarget || !expected || purgeConfirmation!==expected || purgeBusy)return;
@@ -1396,9 +1407,11 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           {title:"Data",dataIndex:"date",render:date,width:145},
           {title:"Kontrahent",dataIndex:"client",ellipsis:true},
           {title:"Dokument",dataIndex:"document",width:175},
-          {title:"Czynności",width:230,render:(_,row)=><Space>
+          {title:"Czynności",width:430,render:(_,row)=><Space>
             <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
             <Button size="small" onClick={()=>{void printSaved(row);}}>Drukuj</Button>
+            <Button size="small" loading={exportingId===row.id}
+              onClick={()=>{void exportJson(row);}}>Eksport JSON</Button>
             <Button size="small" danger={!trash} onClick={()=>changeTrash(row)}>{trash?"Przywróć":"Kosz"}</Button>
             {trash&&<Button size="small" danger onClick={()=>{setPurgeTarget(row);setPurgeConfirmation("");setPurgeError("");setNotice("");}}>
               Usuń trwale
