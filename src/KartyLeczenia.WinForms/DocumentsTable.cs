@@ -70,6 +70,9 @@ internal sealed class DocumentsTable : AntdUI.Table
         Invalidate();
     }
 
+    internal void ShowColumnsMenu(Control anchor) =>
+        AntdTableColumnMenu.Show(anchor, this, documentColumns);
+
     void RestoreLayout()
     {
         try
