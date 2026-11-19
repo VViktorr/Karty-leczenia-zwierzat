@@ -45,21 +45,39 @@ if (window.chrome?.webview) {
 }
 export function isDesktop() { return !!window.chrome?.webview; }
 export function invoke<T>(action: string, fields: Record<string, unknown> = {},
-  onProgress?: (progress: BackupProgress) => void): Promise<T> {
+  onProgress?: (progress: BackupProgress) => void, signal?: AbortSignal): Promise<T> {
   const bridge = window.chrome?.webview;
   if (!bridge) return Promise.reject(new Error(
     "Dane SQL i Subiekta są dostępne po uruchomieniu aplikacji KartyLeczenia.ReactKL.exe."
   ));
+  if(signal?.aborted)return Promise.reject(new Error("Operacja anulowana."));
   const id = String(++sequence);
   return new Promise<T>((resolve, reject) => {
+    let abort: (() => void)|null = null;
+    const clean = () => {if(abort)signal?.removeEventListener("abort",abort);};
     const timeout = setTimeout(() => {
-      pending.delete(id);
+      pending.delete(id);clean();
       reject(new Error("Serwer nie odpowiedział w wyznaczonym czasie."));
     }, action === "backupDatabase" || action === "restoreDatabase" ? 2700000 :
       action === "installUpdate" ? 900000 :
       action === "purgeTrashedCard" ? 180000 :
       action === "analyseCataloguePdf" ? 120000 : 40000);
-    pending.set(id, {resolve: value => resolve(value as T), reject, timeout, onProgress});
+    pending.set(id, {
+      resolve: value => {clean();resolve(value as T);},
+      reject: error => {clean();reject(error);},
+      timeout, onProgress
+    });
+    if(signal){
+      abort=()=>{
+        if(!pending.has(id))return;
+        pending.delete(id);clearTimeout(timeout);clean();
+        // Native host cancels the linked SQL request by original request id.
+        // No response is expected for this fire-and-forget cancellation.
+        bridge.postMessage({id:String(++sequence),action:"cancelRequest",requestId:id});
+        reject(new Error("Anulowano nieaktualne wyszukiwanie."));
+      };
+      signal.addEventListener("abort",abort,{once:true});
+    }
     bridge.postMessage({id, action, ...fields});
   });
 }
