@@ -3,7 +3,8 @@ using KartyLeczenia;
 namespace KartyLeczenia.ReactKL;
 
 internal sealed record AppliedTreatmentVariant(
-    string Species, string Route, string Dosing, string Withdrawal, string Indication);
+    string Species, string Route, string Dosing, string Withdrawal,
+    string Indication, string Description);
 
 /// <summary>
 /// Applies only a deliberately chosen SQL catalogue variant. Clears stale
@@ -51,6 +52,7 @@ internal static class TreatmentVariantApplier
         return new(
             row.Get("Gatunek"), row.Get("Droga podania"),
             row.Get("Dawkowanie i okres stosowania"),
-            row.Get("Karencja"), row.Get("Wskazanie ChPL"));
+            row.Get("Karencja"), row.Get("Wskazanie ChPL"),
+            row.Get("Opis zwierząt / numer siedziby stada"));
     }
 }
