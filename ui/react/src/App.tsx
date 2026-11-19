@@ -599,6 +599,20 @@ export default function App() {
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
   const [section,setSection]=useState<Section>("documents");
   const [draft,setDraft]=useState<Draft|null>(null);
+  const [catalogueDirty,setCatalogueDirty]=useState(false);
+  const navigate=(next:Section)=>{
+    if(next===section)return;
+    if(section==="catalogue"&&catalogueDirty){
+      Modal.confirm({
+        title:"Niezapisane zmiany w katalogu",
+        content:"Czy chcesz opuścić edytor i odrzucić niezapisane dane?",
+        okText:"Odrzuć zmiany",cancelText:"Pozostań",
+        onOk:()=>{setCatalogueDirty(false);setSection(next);}
+      });
+      return;
+    }
+    setSection(next);
+  };
   useEffect(()=>{try{localStorage.setItem("kl.layout",layout);}catch{/* no storage */}},[layout]);
   useEffect(()=>{try{localStorage.setItem("kl.palette",palette);}catch{/* no storage */}},[palette]);
   const primary=palette==="sea"?"#15836f":palette==="dark"?"#78a5fa":"#1768d8";
@@ -612,7 +626,7 @@ export default function App() {
   const nav=<nav aria-label="Nawigacja KartyLeczenia" className="main-nav">
     {sections.map(x=><button key={x.id} type="button"
       className={"nav-item "+(section===x.id?"is-active":"")}
-      onClick={()=>setSection(x.id)}>{x.name}</button>)}
+      onClick={()=>navigate(x.id)}>{x.name}</button>)}
   </nav>;
   const controls=<div className="appearance-controls">
     <Select aria-label="Układ" value={layout} onChange={setLayout} options={[
@@ -623,7 +637,7 @@ export default function App() {
   </div>;
   const content=section==="documents"?<Documents onOpen={next=>{setDraft(next);setSection("treatment");}}/>:
     section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}/>:
-    section==="prices"?<Prices/>:section==="catalogue"?<CataloguePage/>:
+    section==="prices"?<Prices/>:section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards/>:<SettingsPage/>;
   return <ConfigProvider theme={appearance}>
