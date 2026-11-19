@@ -26,25 +26,34 @@ jobs:
             8.0.x
             10.0.x
       - name: Build Windows WebView2 host
-        run: dotnet build src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release
+        run: dotnet build src/KartyLeczenia.ReactKL/KartyLeczenia.ReactKL.csproj -c Release
       - name: Check React assets copied
         shell: pwsh
         run: |
-          $asset = Get-ChildItem src/KartyLeczenia.WinForms/bin/Release -Filter index.html -Recurse |
+          $asset = Get-ChildItem src/KartyLeczenia.ReactKL/bin/Release -Filter index.html -Recurse |
             Where-Object { $_.FullName -match 'react-ui' } | Select-Object -First 1
           if (!$asset) { throw 'Missing compiled React assets in desktop output.' }
+      - name: Ensure React-only Windows host has no legacy AntdUI dependency
+        shell: pwsh
+        run: |
+          if (Get-ChildItem src/KartyLeczenia.ReactKL/bin/Release -Filter AntdUI.dll -Recurse) {
+            throw 'ReactKL must not depend on AntdUI.'
+          }
+          if (Select-String -Path src/KartyLeczenia.ReactKL/*.cs -Pattern 'MainForm|AntdUI|openClassic') {
+            throw 'Old WinForms view referenced from React-only shell.'
+          }
       - name: Registry compatibility
         run: dotnet run --project tests/RegistryChecks -c Release
       - name: Connection settings
         run: dotnet run --project tests/ConnectionChecks -c Release
       - name: Publish standalone Windows preview
-        run: dotnet publish src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release -r win-x64 --self-contained true -o ReactKL-preview
+        run: dotnet publish src/KartyLeczenia.ReactKL/KartyLeczenia.ReactKL.csproj -c Release -r win-x64 --self-contained true -o ReactKL-preview
       - name: Add React preview launcher
         shell: pwsh
         run: |
           Set-Content -Path ReactKL-preview/Uruchom-ReactKL.cmd -Encoding ascii -Value @(
             '@echo off',
-            'start "" "%~dp0KartyLeczenia.WinForms.exe" --react'
+            'start "" "%~dp0KartyLeczenia.ReactKL.exe"'
           )
       - name: Check published React frontend
         shell: pwsh
