@@ -5,7 +5,8 @@ namespace KartyLeczenia.ReactKL;
 internal sealed record TreatmentSuggestion(
     int Index, string Symbol, string Status, string Message,
     int? VariantId = null, string Species = "", string Route = "",
-    string Dosing = "", string Withdrawal = "", string Source = "", bool HasPdf = false);
+    string Dosing = "", string Withdrawal = "", string Source = "",
+    bool HasPdf = false, string PdfPath = "");
 
 /// <summary>
 /// Conservative, read-only matching. No clinical value changes until the user
@@ -18,6 +19,22 @@ internal static class TreatmentAutofillPlanner
         "do weryfikacji", "weryfikacji", "wg chpl", "zgodnie z ulotką",
         "do ustalenia", "brak danych", "nie zweryfikowano", "niepotwierdzon"
     ];
+
+    /// <summary>
+    /// A concurrent SQL edit must never replace the values the user reviewed.
+    /// Compare the dose, withdrawal, source and exact PDF reference, not just ID.
+    /// </summary>
+    internal static bool MatchesReviewed(
+        TreatmentSuggestion suggestion, string species, string route,
+        string dosing, string withdrawal, string source, string pdfPath,
+        bool hasPdf) =>
+        Same(species, suggestion.Species) &&
+        Same(route, suggestion.Route) &&
+        Same(dosing, suggestion.Dosing) &&
+        Same(withdrawal, suggestion.Withdrawal) &&
+        Same(source, suggestion.Source) &&
+        Same(pdfPath, suggestion.PdfPath) &&
+        hasPdf == suggestion.HasPdf;
 
     private static bool Same(string a, string b) =>
         string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -84,6 +101,6 @@ internal static class TreatmentAutofillPlanner
                 ? "Jeden wariant, ale brakuje potwierdzonych danych, karencji lub PDF. Sprawdź ręcznie."
                 : "Jednoznaczny wariant z katalogu SQL — wymaga zatwierdzenia przed zapisem.",
             candidate.Id, candidate.Species, candidate.Route, candidate.Dose,
-            withdrawal, candidate.Source, candidate.Pdf.Length > 0);
+            withdrawal, candidate.Source, candidate.Pdf.Length > 0, candidate.Pdf);
     }
 }
