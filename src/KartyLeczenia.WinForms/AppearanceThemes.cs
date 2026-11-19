@@ -265,7 +265,7 @@ internal static class AppearanceThemes
         bool selector = button is ThemeSelector;
         bool dark = IsDark(options);
         bool classic = IsClassic(options);
-        int style = classic ? 0 : options.SwitchStyle;
+        int style = options.SwitchStyle; // User-selected fill applies in every preset, including Klasyczny.
         Color surface = Canvas(options);
         Color accent = Accent(options);
         Color ink = Ink(options);
