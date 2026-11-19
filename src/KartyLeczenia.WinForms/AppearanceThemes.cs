@@ -459,6 +459,17 @@ internal static class AppearanceEditor
         preview.Rows.Add("FS 128/26", "Lecznica A", "248,00 zł");
         preview.Rows.Add("FS 129/26", "Lecznica B", "560,00 zł");
         preview.ClearSelection();
+        var tabPreview = new TabControl
+        {
+            Width = vertical ? 390 : 600, Height = 112,
+            DrawMode = TabDrawMode.OwnerDrawFixed,
+            Padding = new Point(24, 8)
+        };
+        tabPreview.TabPages.Add("Dokumenty");
+        tabPreview.TabPages.Add("Cennik leków");
+        tabPreview.TabPages.Add("Karta leczenia");
+        tabPreview.TabPages.Add("Ustawienia");
+        tabPreview.DrawItem += (_, e) => MainTabPainter.Draw(tabPreview, e, current);
         var switchPreview = new FlowLayoutPanel
         {
             AutoSize = true, Width = vertical ? 390 : 600, WrapContents = true,
@@ -485,6 +496,8 @@ internal static class AppearanceEditor
         void RenderPreview()
         {
             AppearanceThemes.ApplyGrid(preview, current);
+            AppearanceThemes.ApplyTabs(tabPreview, current, InterfaceScale.Load());
+            tabPreview.Invalidate();
             AppearanceThemes.ApplySurface(switchPreview, current);
             AppearanceThemes.ApplySurface(previewSelection, current);
             accentSample.BackColor = AppearanceThemes.Accent(current);
@@ -631,6 +644,7 @@ internal static class AppearanceEditor
         panel.Controls.Add(preview);
 
         Heading("Główne zakładki");
+        panel.Controls.Add(tabPreview);
         AddLabeled("Wygląd zakładek", tabStyle);
         AddLabeled("Położenie nagłówków", tabPosition);
         AddLabeled("Odstępy zakładek (px)", tabSpacing);
