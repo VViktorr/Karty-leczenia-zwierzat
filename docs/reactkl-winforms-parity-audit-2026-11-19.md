@@ -145,3 +145,17 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 6. W cenniku przełączać netto/brutto i poziomy, następnie otworzyć Terminy; w ciągu 30 s **bez powtarzania kosztownego SELECT dostaw**.
 7. Sprawdzić świeżość serii, cen i stanów przy ręcznym odświeżeniu; brak jakiegokolwiek wpływu cache na zapis kart, katalog ChPL i aktualizacje.
 
+
+
+### P0/P1: cennik i wydruk A4 w ReactKL — wdrożone w kodzie, testy Windows pozostały
+
+- Odczyt `PriceCatalogueService` odtwarza logikę końcowego WinForms w oparciu o tabelę `dbo.catalog_price_withdrawal` i aktywne warianty `dbo.catalog_variants` w bazie programowej. Nie korzysta z zapisów karencji w Subiekcie ani z lokalnego SQLite.
+- Jeden odczyt z katalogu SQL przygotowuje w pamięci **6 kombinacji**: pełna / zwięzła wg wariantów / zwięzła wg gatunków, z kodami (IM/IV/...) lub polskimi nazwami drogi podania. Brak danych nie jest zastępowany zgadywaną karencją.
+- Warianty referencyjne i archiwalne są pomijane, podobnie jak w ostatnim WinForms. Wiersze z brakami oznaczane są jako wymagające uzupełnienia.
+- Zmiana formatów, filtrowanie po nazwie/symbolu oraz zaznaczanie leków do wydruku nie generują kolejnych odczytów SQL. Snapshot katalogu w pamięci maksymalnie 1 minuta; cache cen i dostaw 30 sekund; F5 / przycisk odświeżania wymusza świeży odczyt. Po edycji kartoteki React unieważnia bufory cen i katalogu.
+- Dodano przyciski **Ustawienia wydruku** oraz **Drukuj** i nowy moduł `ui/react/src/PricePrint.tsx`. Wydruk A4 ma podgląd oddzielnych stron, numerację, nagłówki tabeli i powtarzalną legendę. Numeracja stron i rozkład są obliczane lokalnie z wysokości elementów strony w przeglądarce WebView2.
+- Sekcje ustawień: **Strona A4** (orientacja, marginesy, typografia), **Tabela** (wiersze, odstępy), **Treść i kolumny** (widoczność, szerokości, czcionki, rozmiary, wyrównanie, grubość), **Legenda i karencja**. Ustawienia przechowywane lokalnie w `price-print-react.json`.
+- Jednorazowa zgodność ustawień: import z `price-print-winforms.json`, bez nadpisywania oryginalnego pliku. Skrócone formaty wybrane bezpośrednio na liście są zapisywane w pliku lokalnym bez SQL.
+- Testy regresyjne w `tests/ReactKLChecks/Program.cs` obejmują formaty karencji, brak katalogu, niepełny wariant, migrację orientacji, szerokości, legendy i formatów oraz odrzucenie złych parametrów.
+- **Nadal wymagane:** uruchomienie workflow Windows (.NET + frontend), prawdziwy wydruk na kilku stronach A4 w WebView2, drukarka i „Microsoft Print to PDF”, bardzo długie wiersze, powtarzanie legendy i fonty Windows. Nie oznaczać wersji za w pełni zweryfikowaną produkcyjnie. Nie dotykano instalatora, autoaktualizacji, danych Subiekta ani klinicznych wartości SQLite.
+
