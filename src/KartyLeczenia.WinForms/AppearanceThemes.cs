@@ -400,11 +400,14 @@ internal static class AppearanceThemes
         // Owner-drawn tab headers need their padding scaled too. Otherwise the
         // font grows but the tab hit area stays small and captions are cut off.
         float scale = Math.Max(1f, tabs.DeviceDpi / 96f) * interfaceScale / 100f;
-        int horizontal = appearance.WideTabs ? 36 : 30;
+        int horizontal = (appearance.WideTabs ? 30 : 20) + appearance.MainTabSpacing;
         int vertical = appearance.WideTabs ? 12 : 9;
+        tabs.Alignment = appearance.MainTabPosition == 1 ? TabAlignment.Bottom : TabAlignment.Top;
         tabs.Padding = new Point((int)Math.Ceiling(horizontal * scale),
             (int)Math.Ceiling(vertical * scale));
-        tabs.Multiline = scale > 1.01f;
+        // WinForms TabControl is still used for the content pages. Its
+        // owner-drawn header mirrors the AntdUI Line and Card design choices.
+        tabs.Multiline = scale > 1.01f || tabs.Alignment == TabAlignment.Bottom;
         tabs.Invalidate();
     }
 }
