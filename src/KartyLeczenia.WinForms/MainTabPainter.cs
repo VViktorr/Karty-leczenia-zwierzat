@@ -11,9 +11,11 @@ internal static class MainTabPainter
     {
         if (e.Index < 0 || e.Index >= tabs.TabCount) return;
         bool selected = e.Index == tabs.SelectedIndex;
-        bool classic = AppearanceThemes.IsClassic(appearance) || appearance.MainTabStyle == 3;
+        // Tab styling is independent of the application color preset.
+        // Even users of the Classic palette may choose the Line/Card header.
+        bool classic = appearance.MainTabStyle == 3;
         bool dark = AppearanceThemes.IsDark(appearance);
-        int style = classic ? 3 : appearance.MainTabStyle;
+        int style = appearance.MainTabStyle;
         var rect = e.Bounds;
         rect.Inflate(-2, -2);
         if (rect.Width <= 4 || rect.Height <= 4) return;
