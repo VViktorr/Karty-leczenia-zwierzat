@@ -30,7 +30,7 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
         // Never retain the connection string (including SQL password) in cache
         // keys or diagnostics; include warehouse, authentication and dates.
         string text = string.Join("\u001f", options.BuildConnectionString(),
-            options.WarehouseId?.ToString() ?? "", ((int)kinds).ToString(),
+            options.WarehouseId?.ToString() ?? "", options.DrugGroup.Trim(), ((int)kinds).ToString(),
             query.Trim(), start?.ToString("O") ?? "", until?.ToString("O") ?? "");
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
