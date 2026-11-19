@@ -135,7 +135,15 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         return new(false, null, number, id);
     }
 
-    internal string RenderSaved(string id, bool trash)
+    internal static string SafeJsonFileName(string cardNumber)
+    {
+        // Invalid Windows filename characters include the slashes in K/N/YYYY.
+        string safe = string.Concat(cardNumber.Select(c =>
+            char.IsControl(c) || "<>:\\"/\\|?*".Contains(c) ? '_' : c)).Trim(' ', '.', '_');
+        return string.IsNullOrWhiteSpace(safe) ? "Karta-leczenia" : safe;
+    }
+
+    internal string ReadSavedJson(string id, bool trash)
     {
         using var db = Open();
         using var command = new SqlCommand("""
@@ -144,9 +152,13 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             """, db);
         command.Parameters.Add("@id", SqlDbType.UniqueIdentifier).Value = Guid.ParseExact(id,"N");
         command.Parameters.Add("@trash", SqlDbType.Bit).Value = trash;
-        string json = command.ExecuteScalar() as string ??
+        return command.ExecuteScalar() as string ??
             throw new InvalidOperationException("Nie znaleziono zapisanej karty.");
-        var card = JsonSerializer.Deserialize<Card>(json) ??
+    }
+
+    internal string RenderSaved(string id, bool trash)
+    {
+        var card = JsonSerializer.Deserialize<Card>(ReadSavedJson(id,trash)) ??
             throw new InvalidDataException("Nie można odczytać zapisanej karty.");
         return CardHtmlRenderer.Render(card);
     }
