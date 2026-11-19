@@ -109,3 +109,11 @@ Pozostałe punkty P0/P1 z tabeli i listy priorytetów pozostają otwarte.
 - **Nadal wymagane:** CI `.NET 10 + React`, test serwera Windows 11 (uprawnienia SELECT/INSERT/UPDATE do `clinic_settings`), pierwszego importu, dwóch stanowisk, odrzucenia równoczesnej edycji, zgodności podglądu i wydruku z PNG.
 - Nie ruszano automatycznych aktualizacji, numeru wersji, Subiekta ani danych katalogu.
 
+
+### P0: przegląd ostrzeżeń przed kartą — podstawowa obsługa React
+
+- Przed `saveDraft` i `previewDraft` ReactKL wyświetla zbiorczy przegląd wybranych pozycji z brakami: seria, liczba zwierząt, karencja, wskazanie niejednoznacznego/niezweryfikowanego wariantu ChPL.
+- Brak wymaganych pól (produkt, gatunek, droga, dawkowanie, rozpoznanie) blokuje kontynuację; pozostałe ostrzeżenia można jawnie potwierdzić.
+- Każda pozycja zawiera akcję „Przejdź do pozycji”, kierującą do odpowiedniego wiersza tabeli.
+- Kontrola działa przy zapisie i otwieraniu podglądu. To pierwszy etap parytetu: **wymagany test UI i potwierdzenie scenariuszy klinicznych**; pozostałe walidacje backendu nadal pozostają obowiązujące.
+
