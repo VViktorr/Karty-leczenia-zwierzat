@@ -45,7 +45,19 @@ function place(modal:HTMLElement,b:Bounds){
 }
 function current(modal:HTMLElement):Bounds {
   const rect=modal.getBoundingClientRect();
-  return {left:rect.left,top:rect.top,width:rect.width,height:rect.height};
+  // getBoundingClientRect includes animation transforms and document zoom.
+  // offset dimensions and positioned CSS coordinates are layout pixels:
+  // saving transformed geometry would grow/shrink a dialog at each reopen.
+  const zoom=Number.parseFloat(getComputedStyle(document.documentElement).zoom);
+  const factor=Number.isFinite(zoom)&&zoom>0?zoom:1;
+  const left=Number.parseFloat(modal.style.left);
+  const top=Number.parseFloat(modal.style.top);
+  return {
+    left:Number.isFinite(left)?left:rect.left/factor,
+    top:Number.isFinite(top)?top:rect.top/factor,
+    width:modal.offsetWidth||rect.width/factor,
+    height:modal.offsetHeight||rect.height/factor
+  };
 }
 
 /**
@@ -54,11 +66,15 @@ function current(modal:HTMLElement):Bounds {
  */
 export default function DialogPlacement(){
   useEffect(()=>{
-    const initialized=new WeakSet<HTMLElement>();
-    const cleanups:Array<()=>void>=[];
+    // Clean removed dialogs immediately: PDF and confirmation dialogs may
+    // be mounted thousands of times without restarting the Windows app.
+    const live=new Map<HTMLElement,()=>void>();
     const scan=()=>{
+      for(const [modal,cleanup] of live){
+        if(!modal.isConnected){cleanup();live.delete(modal);}
+      }
       document.querySelectorAll<HTMLElement>(".ant-modal-wrap .ant-modal").forEach(modal=>{
-        if(initialized.has(modal))return;
+        if(live.has(modal))return;
         const wrapper=modal.closest<HTMLElement>(".ant-modal-wrap");
         if(!wrapper||wrapper.getClientRects().length===0)return;
         // Ant Design's programmatic Modal.confirm has no .ant-modal-header.
@@ -66,7 +82,7 @@ export default function DialogPlacement(){
         const header=modal.querySelector<HTMLElement>(
           ".ant-modal-header, .ant-modal-confirm-title");
         if(!header)return;
-        initialized.add(modal);
+
         const key=dialogKey(modal);
         const rect=current(modal);
         // Preserve declared modal width on first open. The header is draggable
@@ -81,7 +97,8 @@ export default function DialogPlacement(){
         let moving=false;
         let startX=0,startY=0,originX=0,originY=0;
         const persist=()=>{
-          if(active||moving||!modal.isConnected)return;
+          if(active||moving||!modal.isConnected||
+            !wrapper.getClientRects().length||!modal.getClientRects().length)return;
           try{localStorage.setItem(key,JSON.stringify(fit(current(modal))));}
           catch{/* Geometry is still usable until this window closes. */}
         };
@@ -115,7 +132,7 @@ export default function DialogPlacement(){
         resize.observe(modal);
         active=true;
         const ready=requestAnimationFrame(()=>{active=false;});
-        cleanups.push(()=>{
+        live.set(modal,()=>{
           cancelAnimationFrame(ready);
           resize.disconnect();
           header.removeEventListener("pointerdown",onDown);
@@ -138,7 +155,7 @@ export default function DialogPlacement(){
     window.addEventListener("resize",onResize);
     return ()=>{
       observer.disconnect();window.removeEventListener("resize",onResize);
-      cleanups.forEach(clean=>clean());
+      live.forEach(clean=>clean());live.clear();
     };
   },[]);
   return null;
