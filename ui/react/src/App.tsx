@@ -335,6 +335,10 @@ function SavedCards() {
   const [printHtml,setPrintHtml]=useState<string|null>(null);
   const printFrame=useRef<HTMLIFrameElement>(null);
   const [error,setError]=useState("");
+  const [purgeTarget,setPurgeTarget]=useState<SavedCard|null>(null);
+  const [purgeConfirmation,setPurgeConfirmation]=useState("");
+  const [purgeBusy,setPurgeBusy]=useState(false);
+  const [notice,setNotice]=useState("");
   const remote=useRemote<SavedCard[]>("savedCards",{trash,query},[trash,query]);
   const open=async (row: SavedCard) => {
     try {setSelected(row);setCard(await invoke<StoredCard>("savedCard",{id:row.id,trash}));setError("");}
@@ -345,6 +349,22 @@ function SavedCards() {
       const result=await invoke<{html:string}>("renderSavedCard",{id:row.id,trash});
       setPrintHtml(result.html);setError("");
     } catch(e) {setError(e instanceof Error?e.message:String(e));}
+  }
+  async function purgeCard(){
+    const expected=purgeTarget?.number || purgeTarget?.document || "";
+    if(!purgeTarget || !expected || purgeConfirmation!==expected || purgeBusy)return;
+    setPurgeBusy(true);setError("");setNotice("");
+    try{
+      const result=await invoke<{deleted:boolean;cancelled:boolean}>("purgeTrashedCard",{
+        id:purgeTarget.id,confirmation:purgeConfirmation
+      });
+      if(result.deleted){
+        setPurgeTarget(null);setPurgeConfirmation("");
+        setNotice("Karta została trwale usunięta z kosza SQL.");
+        remote.reload();
+      }else if(result.cancelled)setNotice("Usuwanie anulowane przez Windows Hello.");
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setPurgeBusy(false);}
   }
   const changeTrash=(row:SavedCard)=>{
     Modal.confirm({title:trash?"Przywrócić kartę?":"Przenieść kartę do kosza?",
@@ -360,6 +380,7 @@ function SavedCards() {
       <Input.Search allowClear value={query} onChange={e=>setQuery(e.target.value)}
         placeholder="Szukaj karty lub klienta" className="saved-search"/>
       <ErrorNotice error={error || remote.error}/>
+      {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
       <Table rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
         scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={{pageSize:35}}
         onRow={row=>({onDoubleClick:()=>{void open(row);}})}
@@ -372,9 +393,33 @@ function SavedCards() {
             <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
             <Button size="small" onClick={()=>{void printSaved(row);}}>Drukuj</Button>
             <Button size="small" danger={!trash} onClick={()=>changeTrash(row)}>{trash?"Przywróć":"Kosz"}</Button>
+            {trash&&<Button size="small" danger onClick={()=>{setPurgeTarget(row);setPurgeConfirmation("");setNotice("");}}>
+              Usuń trwale
+            </Button>}
           </Space>}
         ]}/>
     </Card>
+    <Modal open={purgeTarget!==null} title="Trwale usunąć kartę leczenia?"
+      onCancel={()=>{if(!purgeBusy){setPurgeTarget(null);setPurgeConfirmation("");}}}
+      closable={!purgeBusy} maskClosable={!purgeBusy} keyboard={!purgeBusy}
+      footer={<Space>
+        <Button disabled={purgeBusy} onClick={()=>{setPurgeTarget(null);setPurgeConfirmation("");}}>Anuluj</Button>
+        <Button type="primary" danger loading={purgeBusy}
+          disabled={!purgeTarget || purgeConfirmation!==(purgeTarget.number||purgeTarget.document)}
+          onClick={()=>{void purgeCard();}}>Usuń trwale z SQL</Button>
+      </Space>}>
+      <Alert className="notice" type="warning" showIcon
+        message="Nieodwracalna operacja — wymaga Windows Hello i uprawnień administratora SQL"
+        description="Usuwana jest tylko wskazana karta znajdująca się już w koszu. Po usunięciu nie będzie jej można przywrócić z kosza."/>
+      <Typography.Paragraph>
+        Karta: <strong>{purgeTarget?.number||purgeTarget?.document}</strong>
+        {purgeTarget?.client&&<> · {purgeTarget.client}</>}
+      </Typography.Paragraph>
+      <Typography.Paragraph>Wpisz dokładnie numer karty, aby potwierdzić:</Typography.Paragraph>
+      <Input autoComplete="off" value={purgeConfirmation} disabled={purgeBusy}
+        onChange={e=>setPurgeConfirmation(e.target.value)}
+        placeholder={purgeTarget?.number||purgeTarget?.document||""}/>
+    </Modal>
     <Modal open={!!selected} title={selected?.number||"Karta leczenia"}
       width={1100} footer={<Button onClick={()=>{setSelected(null);setCard(null);}}>Zamknij</Button>}
       onCancel={()=>{setSelected(null);setCard(null);}}>
