@@ -852,8 +852,10 @@ internal sealed class MainForm : Form
             };
         }
 
+        var columnsButton = new Button { Text = "Kolumny", AutoSize = true };
+        columnsButton.Click += (_, _) => expiryTable.ShowColumnsMenu(columnsButton);
         page = Page("Terminy ważności", expiryTable, Action("Odśwież", LoadExpiries),
-            filters[0].Button, filters[1].Button, filters[2].Button, filters[3].Button);
+            filters[0].Button, filters[1].Button, filters[2].Button, filters[3].Button, columnsButton);
         tabs.SelectedIndexChanged += async (_, _) =>
         {
             if (tabs.SelectedTab != page || connection is null) return;
