@@ -181,8 +181,18 @@ internal sealed partial class SharedArchive
         string backupSql = compress
             ? "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM, COMPRESSION;"
             : "BACKUP DATABASE [KartyLeczenia] TO DISK = @path WITH COPY_ONLY, CHECKSUM, NO_COMPRESSION;";
-        using (var backup = MaintenanceCommand(db, backupSql, path))
+        try
+        {
+            using var backup = MaintenanceCommand(db, backupSql, path);
             backup.ExecuteNonQuery();
+        }
+        catch (SqlException ex) when (ex.Errors.Cast<SqlError>().Any(error => error.Number is 3201 or 3202 or 3013))
+        {
+            throw new InvalidOperationException(
+                "SQL Server nie może utworzyć pliku .bak w podanym folderze. " +
+                "Upewnij się, że folder istnieje NA SERWERZE SQL i konto usługi SQL Server ma tam prawo zapisu. " +
+                $"Ścieżka: {path}. Szczegóły: {ex.Message}", ex);
+        }
         // A database backup operator can create a valid CHECKSUM backup, but
         // RESTORE VERIFYONLY additionally requires CREATE DATABASE permission
         // on the instance. Do not elevate the operator just for verification.
@@ -193,7 +203,8 @@ internal sealed partial class SharedArchive
             verify.ExecuteNonQuery();
             return new(path, true, "");
         }
-        catch (SqlException ex) when (ex.Number is 262 or 229 or 15247)
+        catch (SqlException ex) when (ex.Errors.Cast<SqlError>()
+            .Any(error => error.Number is 262 or 229 or 15247))
         {
             CrashLog.Write("SqlBackup.VerifyPermission", ex);
             return new(path, false,
