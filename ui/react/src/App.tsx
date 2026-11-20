@@ -2090,6 +2090,15 @@ function SettingsPage({onSubiektSaved}: {onSubiektSaved: () => void}) {
 }
 
 export default function App() {
+  const [runningVersion,setRunningVersion]=useState("");
+  useEffect(()=>{
+    if(!isDesktop())return;
+    let active=true;
+    void invoke<{version:string}>("getProgramVersion")
+      .then(result=>{if(active)setRunningVersion(result.version);})
+      .catch(()=>{if(active)setRunningVersion("niedostępna");});
+    return()=>{active=false;};
+  },[]);
   const [layout,setLayout]=useState<LayoutName>(()=>saved("kl.layout",layouts,"modern"));
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
   const [uiScale,setUiScale]=useState<number>(()=>{
@@ -2181,7 +2190,7 @@ export default function App() {
           </div>
           {content}
         </main>
-        <footer className="statusline"><span>ReactKL — WebView2 / C#</span>
+        <footer className="statusline"><span>Karty Leczenia{runningVersion&&" · Wersja "+runningVersion}</span>
           <span>Układ {layout} · motyw {palette} · skala {uiScale}%</span></footer>
       </div>
     </div>

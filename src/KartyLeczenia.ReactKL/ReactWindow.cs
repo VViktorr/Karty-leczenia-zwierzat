@@ -434,6 +434,8 @@ internal sealed class ReactWindow : Form
                 ? pending : await Task.Run(() => catalogue.ReadPdf(path), token);
             return new { base64 = Convert.ToBase64String(data), name = Path.GetFileName(path) };
         }
+        if (action == "getProgramVersion")
+            return new { version = ReactUpdateService.CurrentVersion };
         if (action == "getUpdateStatus")
             return new
             {
