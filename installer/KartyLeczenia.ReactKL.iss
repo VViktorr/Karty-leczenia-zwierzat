@@ -55,8 +55,8 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [INI]
 ; Preserve existing server role and address without prompting again on upgrade.
-Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Server"; String: "{code:InstallerArchiveServer}"; Check: IsNewInstallation
-Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Role"; String: "{code:InstallerRole}"; Check: IsNewInstallation
+Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Server"; String: "{code:InstallerArchiveServer}"; Check: ShouldWriteArchiveConfiguration
+Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "Role"; String: "{code:InstallerRole}"; Check: ShouldWriteArchiveConfiguration
 Filename: "{app}\archive-installation.ini"; Section: "Archive"; Key: "AppVersion"; String: "{#ReleaseVersion}"
 
 [InstallDelete]
@@ -109,9 +109,32 @@ begin
   Result := FileExists(AddBackslash(WizardDirValue) + 'archive-installation.ini');
 end;
 
-function IsNewInstallation: Boolean;
+function PreviousInstallationRole: String;
+var
+  Config: String;
 begin
-  Result := not ExistingInstallAtStart;
+  Config := AddBackslash(WizardDirValue) + 'archive-installation.ini';
+  if FileExists(Config) then
+    Result := Lowercase(Trim(GetIniString('Archive','Role','',Config)))
+  else
+    Result := '';
+end;
+
+function RoleChanged: Boolean;
+var
+  PreviousRole: String;
+begin
+  PreviousRole := PreviousInstallationRole;
+  Result := ((PreviousRole = 'server') and (RolePage.SelectedValueIndex <> 0)) or
+            ((PreviousRole = 'client') and (RolePage.SelectedValueIndex <> 1));
+end;
+
+// Preserve unchanged installations, but allow an explicit repair/change of
+// the server/client role on a re-install without deleting user SQL settings.
+function ShouldWriteArchiveConfiguration: Boolean;
+begin
+  Result := (not ExistingArchiveConfiguration) or RoleChanged or
+            (PreviousInstallationRole = '');
 end;
 
 function InstallerRole(Param: String): String;
@@ -138,25 +161,23 @@ begin
 end;
 
 function IsServerInstall: Boolean;
-var
-  Config: String;
 begin
-  Config := AddBackslash(WizardDirValue) + 'archive-installation.ini';
-  if FileExists(Config) then
-    Result := CompareText(GetIniString('Archive','Role','',Config),'server') = 0
-  else
-    Result := RolePage.SelectedValueIndex = 0;
+  // Selected role, rather than a stale INI, decides whether this setup
+  // publishes its executable to the server update channel.
+  Result := RolePage.SelectedValueIndex = 0;
 end;
 
 procedure InitializeWizard;
 begin
   RolePage := CreateInputOptionPage(wpWelcome,
     'Rodzaj stanowiska', 'Wybierz rolę komputera',
-    'Podczas aktualizacji zachowamy dotychczasową rolę i połączenie SQL.',
+    'Dotychczasowa rola jest zaznaczona. Możesz ją zmienić świadomie; istniejące dane SQL pozostaną zachowane.',
     True, False);
   RolePage.Add('Serwer SQL — publikuj instalator w bazie KartyLeczenia');
   RolePage.Add('Stanowisko zdalne — pobieraj aktualizacje z serwera');
   RolePage.SelectedValueIndex := 1;
+  if PreviousInstallationRole = 'server' then
+    RolePage.SelectedValueIndex := 0;
   ServerModePage := CreateInputOptionPage(RolePage.ID,
     'Instancja SQL Server', 'Gdzie przygotować bazę KartyLeczenia?',
     'Wybór tylko podczas nowej instalacji serwera. Dane istniejącej bazy będą zachowane.',
@@ -168,7 +189,8 @@ begin
     'Adres bazy KartyLeczenia', 'Podaj serwer SQL',
     'Przykład: SERWER,51433 lub SERWER\INSTANCJA');
   ServerPage.Add('Serwer:',False);
-  ServerPage.Values[0] := '';
+  ServerPage.Values[0] := GetIniString('Archive','Server','',
+    AddBackslash(WizardDirValue) + 'archive-installation.ini');
   DownloadPage := CreateDownloadPage('Pobieranie składników Microsoft',
     'Pobieranie brakujących składników SQL Server lub WebView2.', nil);
   ComponentProgress := CreateOutputMarqueeProgressPage(
@@ -177,10 +199,16 @@ end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  Result := (ExistingArchiveConfiguration and
-    ((PageID = RolePage.ID) or (PageID = ServerModePage.ID) or (PageID = ServerPage.ID)))
-    or ((PageID = ServerModePage.ID) and (RolePage.SelectedValueIndex <> 0))
-    or ((PageID = ServerPage.ID) and (RolePage.SelectedValueIndex = 0));
+  // Always show the role on a repair/re-install. Its default is the current
+  // installation's role; keeping it never reinitializes SQL.
+  Result := ((PageID = ServerModePage.ID) and
+               ((RolePage.SelectedValueIndex <> 0) or
+                (ExistingArchiveConfiguration and not RoleChanged and
+                 PreviousInstallationRole = 'server')))
+         or ((PageID = ServerPage.ID) and
+               ((RolePage.SelectedValueIndex = 0) or
+                (ExistingArchiveConfiguration and not RoleChanged and
+                 PreviousInstallationRole = 'client')));
 end;
 
 function ValidAddress(const Address: String): Boolean;
@@ -221,8 +249,16 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
+  if (CurPageID = RolePage.ID) and RoleChanged then
+  begin
+    Result := MsgBox('Zmieniasz rodzaj stanowiska zapisany w poprzedniej instalacji.' + #13#10 +
+      'Dotychczasowa baza SQL i hasla zostana zachowane.' + #13#10 +
+      'Jesli wybierzesz Serwer, kreator przygotuje polaczenie i ewentualny import SQL.' + #13#10 +
+      'Czy chcesz kontynuowac?',mbConfirmation,MB_YESNO) = IDYES;
+    if not Result then Exit;
+  end;
   if (CurPageID = ServerPage.ID) and
-     (not ExistingArchiveConfiguration) and
+     ShouldWriteArchiveConfiguration and
      (RolePage.SelectedValueIndex <> 0) and
      (not ValidAddress(Trim(ServerPage.Values[0]))) then
   begin
@@ -301,7 +337,7 @@ begin
 
   try
     ExtractTemporaryFile('Configure-SharedArchive.ps1');
-    if (not ExistingArchiveConfiguration) and (RolePage.SelectedValueIndex = 0) then
+    if ShouldWriteArchiveConfiguration and (RolePage.SelectedValueIndex = 0) then
     begin
       if WizardSilent then
       begin
@@ -380,7 +416,8 @@ begin
         end;
       end;
     end
-    else if (not ExistingArchiveConfiguration) and
+    else if ShouldWriteArchiveConfiguration and
+            (RolePage.SelectedValueIndex <> 0) and
             not ValidAddress(Trim(ServerPage.Values[0])) then
     begin
       Result := 'Podaj adres serwera archiwum. Przy instalacji cichej użyj /ARCHIVESERVER=nazwa-serwera.';
