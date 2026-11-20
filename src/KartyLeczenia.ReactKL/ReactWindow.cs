@@ -178,14 +178,14 @@ internal sealed class ReactWindow : Form
             if (root.ValueKind != JsonValueKind.Object) return;
             // Card/archive operations legitimately carry their own "id".
             // Never confuse that SQL identifier with the RPC response key.
-            requestId = Text(root, "_bridgeRequestId", 80);
+            requestId = ReadTextField(root, "_bridgeRequestId", 80);
             if (requestId.Length == 0)
-                requestId = Text(root, "id", 80);
-            string action = Text(root, "action", 40);
+                requestId = ReadTextField(root, "id", 80);
+            string action = ReadTextField(root, "action", 40);
             if (string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(action)) return;
             if (action == "cancelRequest")
             {
-                string cancelledId = Text(root, "requestId", 80);
+                string cancelledId = ReadTextField(root, "requestId", 80);
                 if (active.TryGetValue(cancelledId, out var runningRequest))
                     runningRequest.Cancel();
                 return;
@@ -197,7 +197,7 @@ internal sealed class ReactWindow : Form
                     ? TimeSpan.FromMinutes(15) : action == "purgeTrashedCard"
                         ? TimeSpan.FromMinutes(3) : TimeSpan.FromSeconds(45));
             active[requestId] = cancel;
-            object result = await Handle(action, root, cancel.Token);
+            object result = await HandleRequest(action, root, cancel.Token);
             if (!cancel.IsCancellationRequested) Send(requestId, result);
         }
         catch (OperationCanceledException) { Send(requestId, null, "Operacja została anulowana."); }
@@ -212,7 +212,7 @@ internal sealed class ReactWindow : Form
         }
     }
 
-    private async Task<object> Handle(string action, JsonElement root, CancellationToken token)
+    private async Task<object> HandleRequest(string action, JsonElement root, CancellationToken token)
     {
         if (action == "getPricePrintSettings")
             return PricePrintOptionsStore.Load();
@@ -248,12 +248,12 @@ internal sealed class ReactWindow : Form
         }
         if (action == "searchCatalogue")
         {
-            string search = Text(root, "query", 120);
+            string search = ReadTextField(root, "query", 120);
             return await Task.Run(() => catalogue.Search(search), token);
         }
         if (action == "readCatalogueProduct")
         {
-            string symbol = Text(root, "symbol", 128);
+            string symbol = ReadTextField(root, "symbol", 128);
             return await Task.Run(() => catalogue.Read(symbol), token);
         }
         if (action == "saveCatalogueProduct")
@@ -301,7 +301,7 @@ internal sealed class ReactWindow : Form
         }
         if (action == "analyseCataloguePdf")
         {
-            string pdfPath = Text(root, "path", 450);
+            string pdfPath = ReadTextField(root, "path", 450);
             byte[] bytes = pendingCataloguePdfs.TryGetValue(pdfPath, out var staged)
                 ? staged : await Task.Run(() => catalogue.ReadPdf(pdfPath), token);
             return await Task.Run(() =>
@@ -332,7 +332,7 @@ internal sealed class ReactWindow : Form
         }
         if (action == "readCataloguePdf")
         {
-            string path = Text(root, "path", 450);
+            string path = ReadTextField(root, "path", 450);
             byte[] data = pendingCataloguePdfs.TryGetValue(path, out var pending)
                 ? pending : await Task.Run(() => catalogue.ReadPdf(path), token);
             return new { base64 = Convert.ToBase64String(data), name = Path.GetFileName(path) };
@@ -414,9 +414,9 @@ internal sealed class ReactWindow : Form
             if (restoreRunning || backupRunning)
                 throw new InvalidOperationException("Na stanowisku trwa już archiwizacja lub odtwarzanie SQL.");
             if (selectedRestoreFile is null ||
-                Text(root, "path", 1000) != selectedRestoreFile)
+                ReadTextField(root, "path", 1000) != selectedRestoreFile)
                 throw new InvalidOperationException("Ponownie wybierz plik .bak w systemowym oknie Windows.");
-            if (Text(root, "confirmation", 40) != "KartyLeczenia")
+            if (ReadTextField(root, "confirmation", 40) != "KartyLeczenia")
                 throw new InvalidOperationException("Potwierdź nazwę bazy KartyLeczenia.");
             restoreRunning = true;
             try
@@ -424,7 +424,7 @@ internal sealed class ReactWindow : Form
                 if (!await WindowsHelloConsent.VerifyAsync(this,
                     "odtworzenie bazy KartyLeczenia (zastąpienie danych)"))
                     return new { cancelled = true };
-                string request = Text(root,"id",80);
+                string request = ReadTextField(root,"id",80);
                 var progress = new Progress<SqlBackupProgress>(value => SendProgress(request,value));
                 var result = await Task.Run(() => restores.Run(selectedRestoreFile,progress));
                 selectedRestoreFile = null;
@@ -458,7 +458,7 @@ internal sealed class ReactWindow : Form
             if (!await WindowsHelloConsent.VerifyAsync(this,"wykonanie pełnej kopii SQL"))
                 return new {cancelled = true};
             backupRunning = true;
-            string messageId = Text(root,"id",80);
+            string messageId = ReadTextField(root,"id",80);
             try
             {
                 var progress = new Progress<SqlBackupProgress>(value => SendProgress(messageId,value));
@@ -484,7 +484,7 @@ internal sealed class ReactWindow : Form
         }
         if (action == "chooseClinicStamp")
         {
-            string kind = Text(root, "kind", 12);
+            string kind = ReadTextField(root, "kind", 12);
             if (kind is not ("clinic" or "doctor"))
                 throw new ArgumentException("Nieznany rodzaj pieczątki.");
             using var dialog = new OpenFileDialog
@@ -506,15 +506,15 @@ internal sealed class ReactWindow : Form
         }
         if (action == "saveClinic")
         {
-            string expectedRevision = Text(root, "revision", 100);
+            string expectedRevision = ReadTextField(root, "revision", 100);
             if (expectedRevision.Length != 64)
                 throw new InvalidOperationException("Najpierw odśwież dane lecznicy z SQL.");
             var previous = await Task.Run(() => clinicService.Load(), token);
             var old = previous.Settings;
-            var updated = new ClinicSettings(Text(root, "name", 200),
-                Text(root, "address", 500), Text(root, "doctor", 200))
+            var updated = new ClinicSettings(ReadTextField(root, "name", 200),
+                ReadTextField(root, "address", 500), ReadTextField(root, "doctor", 200))
             {
-                Phone = Text(root, "phone", 100),
+                Phone = ReadTextField(root, "phone", 100),
                 UseClinicStamp = Flag(root, "useClinicStamp"),
                 UseDoctorStamp = Flag(root, "useDoctorStamp"),
                 ClinicStampPng = Flag(root, "removeClinicStamp") ? null : stagedClinicStamp ?? old.ClinicStampPng,
@@ -621,13 +621,13 @@ internal sealed class ReactWindow : Form
         // Archive browsing and trash management use the program database only.
         // They must remain available when Subiekt GT is temporarily offline.
         if (action == "renderSavedCard")
-            return new { html = cards.RenderSaved(Text(root, "id", 40), Flag(root, "trash")) };
+            return new { html = cards.RenderSaved(ReadTextField(root, "id", 40), Flag(root, "trash")) };
         if (action is "saveCardPdf" or "emailCardPdf")
         {
             // The archived SQL card is the single authoritative source. An
             // old preview must not produce a stale PDF after another station
             // changed the clinical data.
-            string id = Text(root, "id", 40);
+            string id = ReadTextField(root, "id", 40);
             bool trash = Flag(root, "trash");
             Guid cardId = Guid.Empty;
             DocumentData? draft = null;
@@ -644,12 +644,12 @@ internal sealed class ReactWindow : Form
             }
             else
             {
-                string draftId = Text(root, "draftId", 30);
+                string draftId = ReadTextField(root, "draftId", 30);
                 if (!drafts.TryGetValue(draftId, out draft))
                     throw new InvalidOperationException("Ponownie otwórz dokument przed utworzeniem PDF.");
                 // Same validation and complete edited-row snapshot as
                 // previewDraft. No SQL insert or new card number is created.
-                object rendered = await Handle("previewDraft", root, token);
+                object rendered = await HandleRequest("previewDraft", root, token);
                 html = JsonSerializer.SerializeToElement(rendered)
                     .GetProperty("html").GetString() ??
                     throw new InvalidDataException("Nie udało się uzyskać podglądu karty.");
@@ -726,7 +726,7 @@ internal sealed class ReactWindow : Form
         {
             // A read-only operation; the Windows user chooses the destination
             // on their own workstation. Do not send any patient JSON over UI.
-            string id = Text(root, "id", 40);
+            string id = ReadTextField(root, "id", 40);
             bool trash = Flag(root, "trash");
             string raw = await Task.Run(() => cards.ReadSavedJson(id, trash), token);
             var card = JsonSerializer.Deserialize<Card>(raw) ??
@@ -750,13 +750,13 @@ internal sealed class ReactWindow : Form
         }
         if (action == "savedCards")
             return await ReadSavedCards(token, Flag(root, "trash"),
-                Text(root, "query", 120), Text(root, "date", 12));
+                ReadTextField(root, "query", 120), ReadTextField(root, "date", 12));
         if (action == "savedCard")
-            return await ReadSavedCard(token, Text(root, "id", 40), Flag(root, "trash"));
+            return await ReadSavedCard(token, ReadTextField(root, "id", 40), Flag(root, "trash"));
         if (action == "updateSavedCard")
         {
-            string id = Text(root, "id", 40);
-            string revision = Text(root, "revision", 64);
+            string id = ReadTextField(root, "id", 40);
+            string revision = ReadTextField(root, "revision", 64);
             if (!root.TryGetProperty("fields", out var editFields) ||
                 editFields.ValueKind != JsonValueKind.Object ||
                 !root.TryGetProperty("rows", out var editRows) ||
@@ -775,11 +775,11 @@ internal sealed class ReactWindow : Form
                 savedCardEditor.Update(id, revision, fields, rows), token);
         }
         if (action == "trashCard")
-            return await TrashCard(token, Text(root, "id", 40), Flag(root, "trash"));
+            return await TrashCard(token, ReadTextField(root, "id", 40), Flag(root, "trash"));
         if (action == "purgeTrashedCard")
         {
-            string id = Text(root, "id", 40);
-            string confirmation = Text(root, "confirmation", 160);
+            string id = ReadTextField(root, "id", 40);
+            string confirmation = ReadTextField(root, "confirmation", 160);
             if (!Guid.TryParseExact(id, "N", out var cardId) ||
                 string.IsNullOrWhiteSpace(confirmation))
                 throw new ArgumentException("Wybierz kartę z kosza i potwierdź jej numer.");
@@ -792,7 +792,7 @@ internal sealed class ReactWindow : Form
             throw new InvalidOperationException("Brak konfiguracji Subiekta. Uzupełnij ustawienia połączenia.");
         if (action == "searchDocuments")
         {
-            string category = Text(root, "kind", 20);
+            string category = ReadTextField(root, "kind", 20);
             DocumentSearchKinds kind = category switch
             {
                 "invoices" => DocumentSearchKinds.Invoices,
@@ -808,14 +808,14 @@ internal sealed class ReactWindow : Form
             DateTime year = new(today.Year, 1, 1);
             static DateTime ParseDate(JsonElement element, string name)
             {
-                string value = Text(element, name, 12);
+                string value = ReadTextField(element, name, 12);
                 if (!DateTime.TryParseExact(value, "yyyy-MM-dd",
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None, out var date))
                     throw new ArgumentException("Wybierz prawidłową datę: " + name);
                 return date;
             }
-            string period = Text(root, "period", 20);
+            string period = ReadTextField(root, "period", 20);
             // Explicit target type makes nullable dates a valid tuple switch result.
             // A deconstruction target alone does not provide a switch-expression type.
             (DateTime? From, DateTime? To) periodBounds = period switch
@@ -840,7 +840,7 @@ internal sealed class ReactWindow : Form
             if (from >= to)
                 throw new ArgumentException("Data końcowa musi przypadać w dniu rozpoczęcia okresu lub później.");
 
-            string query = Text(root, "query", 120);
+            string query = ReadTextField(root, "query", 120);
             bool refresh = Flag(root, "refresh");
             string cacheKey = DocumentListCache.Key(options, kind, query, from, to);
             var watch = System.Diagnostics.Stopwatch.StartNew();
@@ -861,7 +861,7 @@ internal sealed class ReactWindow : Form
         if (action == "readDocument")
         {
             int id = Int(root, "documentId") ?? throw new ArgumentException("Brak numeru dokumentu.");
-            string number = Text(root, "number", 120);
+            string number = ReadTextField(root, "number", 120);
             var document = await documents.ReadAsync(options, number, 0, token, id);
             string key = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
             drafts[key] = document;
@@ -880,7 +880,7 @@ internal sealed class ReactWindow : Form
         }
         if (action == "treatmentSuggestions" || action == "applyTreatmentSuggestions")
         {
-            string draftId = Text(root, "draftId", 30);
+            string draftId = ReadTextField(root, "draftId", 30);
             if (!drafts.TryGetValue(draftId, out var draft))
                 throw new InvalidOperationException("Ponownie otwórz dokument przed doborem wariantów.");
             if (draft.Rows.Count > 500)
@@ -936,22 +936,22 @@ internal sealed class ReactWindow : Form
                 var proposal = proposals[index];
                 var current = snapshots[index];
                 bool unchanged = Int(current, "index") == index &&
-                    string.Equals(Text(current, "symbol", 128),
+                    string.Equals(ReadTextField(current, "symbol", 128),
                         row.Get("Symbol Subiekta").Trim(), StringComparison.Ordinal) &&
-                    string.Equals(Text(current, "species", 3000),
+                    string.Equals(ReadTextField(current, "species", 3000),
                         row.Get("Gatunek").Trim(), StringComparison.Ordinal) &&
-                    string.Equals(Text(current, "route", 3000),
+                    string.Equals(ReadTextField(current, "route", 3000),
                         row.Get("Droga podania").Trim(), StringComparison.Ordinal) &&
-                    string.Equals(Text(current, "dosing", 3000),
+                    string.Equals(ReadTextField(current, "dosing", 3000),
                         row.Get("Dawkowanie i okres stosowania").Trim(), StringComparison.Ordinal) &&
-                    string.Equals(Text(current, "withdrawal", 3000),
+                    string.Equals(ReadTextField(current, "withdrawal", 3000),
                         row.Get("Karencja").Trim(), StringComparison.Ordinal) &&
                     Flag(current, "selected") == row.Printed;
                 bool catalogueUnchanged = TreatmentAutofillPlanner.MatchesReviewed(
                     proposal,
-                    Text(request,"species",3000), Text(request,"route",3000),
-                    Text(request,"dosing",3000), Text(request,"withdrawal",3000),
-                    Text(request,"source",3000), Text(request,"pdfPath",450),
+                    ReadTextField(request,"species",3000), ReadTextField(request,"route",3000),
+                    ReadTextField(request,"dosing",3000), ReadTextField(request,"withdrawal",3000),
+                    ReadTextField(request,"source",3000), ReadTextField(request,"pdfPath",450),
                     Flag(request,"hasPdf"));
                 if (!unchanged || !catalogueUnchanged || proposal.Status != "ready" ||
                     proposal.VariantId != variantId ||
@@ -977,19 +977,19 @@ internal sealed class ReactWindow : Form
         }
         if (action == "readAnimalDescriptions" || action == "saveAnimalDescription")
         {
-            string id = Text(root, "draftId", 30);
+            string id = ReadTextField(root, "draftId", 30);
             if (!drafts.TryGetValue(id, out var draft))
                 throw new InvalidOperationException("Ponownie otwórz dokument.");
             if (action == "readAnimalDescriptions")
                 return new { items = await animalDescriptions.ReadAsync(
                     draft.Scope, draft.PayerId, token) };
             await animalDescriptions.SaveAsync(draft.Scope, draft.PayerId,
-                Text(root, "description", 2000), token);
+                ReadTextField(root, "description", 2000), token);
             return new { saved = true };
         }
         if (action == "readTreatmentChoices")
         {
-            string id = Text(root, "draftId", 30);
+            string id = ReadTextField(root, "draftId", 30);
             if (!drafts.TryGetValue(id, out var draft))
                 throw new InvalidOperationException("Ponownie otwórz dokument.");
             var saved = await treatmentChoices.ReadAsync(draft.Scope,
@@ -998,7 +998,7 @@ internal sealed class ReactWindow : Form
         }
         if (action == "setDraftSelections")
         {
-            string id = Text(root, "draftId", 30);
+            string id = ReadTextField(root, "draftId", 30);
             if (!drafts.TryGetValue(id, out var draft))
                 throw new InvalidOperationException("Ponownie otwórz dokument.");
             if (!root.TryGetProperty("selections", out var chosen) ||
@@ -1010,7 +1010,7 @@ internal sealed class ReactWindow : Form
             // Validate the entire snapshot before mutating any row.
             for (int index = 0; index < inputs.Length; index++)
                 if (Int(inputs[index], "index") != index ||
-                    !string.Equals(Text(inputs[index], "symbol", 128),
+                    !string.Equals(ReadTextField(inputs[index], "symbol", 128),
                         draft.Rows[index].Get("Symbol Subiekta").Trim(),
                         StringComparison.Ordinal))
                     throw new InvalidOperationException(
@@ -1021,7 +1021,7 @@ internal sealed class ReactWindow : Form
         }
         if (action == "treatmentVariants" || action == "applyTreatmentVariant")
         {
-            string draftId = Text(root,"draftId",30);
+            string draftId = ReadTextField(root,"draftId",30);
             int index = Int(root,"index") ?? -1;
             if (!drafts.TryGetValue(draftId,out var draft) ||
                 index<0 || index>=draft.Rows.Count)
@@ -1054,16 +1054,16 @@ internal sealed class ReactWindow : Form
         }
         if (action == "updateDraft")
         {
-            string id = Text(root, "draftId", 30);
+            string id = ReadTextField(root, "draftId", 30);
             int index = Int(root, "index") ?? -1;
-            string field = Text(root, "field", 80);
+            string field = ReadTextField(root, "field", 80);
             if (!drafts.TryGetValue(id, out var draft) || index < 0 || index >= draft.Rows.Count)
                 throw new InvalidOperationException("Ponownie otwórz dokument.");
             string[] allowed = ["Gatunek", "Droga podania", "Dawkowanie i okres stosowania",
                 "Karencja", "Opis zwierząt / numer siedziby stada", "Liczba zwierząt",
                 "Rozpoznanie", "Seria", "Zamiennik produktu", "Sekcja (II lub III)", "Drukuj"];
             if (!allowed.Contains(field, StringComparer.Ordinal)) throw new ArgumentException("Pole nie jest edytowalne.");
-            string value = field == "Drukuj" ? Flag(root, "checked").ToString() : Text(root, "value", 3000);
+            string value = field == "Drukuj" ? Flag(root, "checked").ToString() : ReadTextField(root, "value", 3000);
             draft.Rows[index].Set(field, value);
             return new { updated = true };
         }
@@ -1105,12 +1105,12 @@ internal sealed class ReactWindow : Form
         }
         if (action == "saveDraft" || action == "previewDraft")
         {
-            string draftId = Text(root, "draftId", 30);
+            string draftId = ReadTextField(root, "draftId", 30);
             if (!drafts.TryGetValue(draftId, out var draft))
                 throw new InvalidOperationException("Ponownie otwórz dokument przed zapisaniem.");
             static DateTime RequiredDate(JsonElement element, string name)
             {
-                string text = Text(element, name, 35);
+                string text = ReadTextField(element, name, 35);
                 if (!DateTime.TryParseExact(text, "yyyy-MM-ddTHH:mm",
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None, out var date))
@@ -1140,12 +1140,12 @@ internal sealed class ReactWindow : Form
                         ("animals", "Liczba zwierząt"), ("diagnosis", "Rozpoznanie"),
                         ("section", "Sekcja (II lub III)")
                     })
-                        treatment.Set(field, Text(item, key, 3000));
+                        treatment.Set(field, ReadTextField(item, key, 3000));
                 }
             }
             static DateTime? OptionalDate(JsonElement element, string name)
             {
-                string text = Text(element, name, 35);
+                string text = ReadTextField(element, name, 35);
                 if (string.IsNullOrWhiteSpace(text)) return null;
                 if (!DateTime.TryParseExact(text, "yyyy-MM-ddTHH:mm",
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -1155,7 +1155,7 @@ internal sealed class ReactWindow : Form
             }
             var reported = OptionalDate(root, "reported");
             var performed = RequiredDate(root, "performed");
-            string findings = Text(root, "findings", 2000);
+            string findings = ReadTextField(root, "findings", 2000);
             if (action == "previewDraft")
                 return new { html = cards.RenderDraft(draft, reported, performed, findings) };
             return cards.Save(draft, reported, performed, findings, Flag(root, "confirmDuplicate"));
@@ -1316,10 +1316,10 @@ internal sealed class ReactWindow : Form
 
     private ConnectionOptions SubiektConnectionFrom(JsonElement root)
     {
-        string server = Text(root, "server", 200);
-        string database = Text(root, "database", 200);
-        string username = Text(root, "userName", 200);
-        string password = Text(root, "password", 200);
+        string server = ReadTextField(root, "server", 200);
+        string database = ReadTextField(root, "database", 200);
+        string username = ReadTextField(root, "userName", 200);
+        string password = ReadTextField(root, "password", 200);
         bool windows = Flag(root, "windowsAuthentication");
         var previous = subiekt.Load().Options;
         if (!windows && password.Length == 0 && previous is not null &&
@@ -1328,15 +1328,15 @@ internal sealed class ReactWindow : Form
             string.Equals(previous.UserName, username, StringComparison.OrdinalIgnoreCase))
             password = previous.Password;
         return new(server, database, windows, username, password,
-            Flag(root, "trustCertificate"), Text(root, "drugGroup", 80),
+            Flag(root, "trustCertificate"), ReadTextField(root, "drugGroup", 80),
             Int(root, "warehouseId"));
     }
 
     private ConnectionOptions ArchiveConnectionFrom(JsonElement root)
     {
-        string server = Text(root, "server", 200);
-        string userName = Text(root, "userName", 200);
-        string password = Text(root, "password", 200);
+        string server = ReadTextField(root, "server", 200);
+        string userName = ReadTextField(root, "userName", 200);
+        string password = ReadTextField(root, "password", 200);
         bool windows = Flag(root, "windowsAuthentication");
         var previous = archive.Load().Options;
         if (!windows && password.Length == 0 && previous is not null &&
@@ -1385,10 +1385,10 @@ internal sealed class ReactWindow : Form
     }
 
     private static SqlBackupSettings BackupSettings(JsonElement root) => new(
-        DestinationFolder: Text(root,"destinationFolder",1000),
-        WorkingFolder: Text(root,"workingFolder",1000),
-        Naming: Text(root,"naming",20),
-        CustomName: Text(root,"customName",200),
+        DestinationFolder: ReadTextField(root,"destinationFolder",1000),
+        WorkingFolder: ReadTextField(root,"workingFolder",1000),
+        Naming: ReadTextField(root,"naming",20),
+        CustomName: ReadTextField(root,"customName",200),
         Overwrite: Flag(root,"overwrite"),
         Compress: Flag(root,"compress"));
     private void SendProgress(string id, SqlBackupProgress state)
@@ -1408,7 +1408,7 @@ internal sealed class ReactWindow : Form
     }
     private static bool Flag(JsonElement root, string name) =>
         root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
-    private static string Text(JsonElement root, string name, int maxLength)
+    private static string ReadTextField(JsonElement root, string name, int maxLength)
     {
         if (!root.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String) return "";
         string text = value.GetString()?.Trim() ?? "";
