@@ -95,9 +95,9 @@ internal sealed class ReactWindow : Form
                 archive.Load().Options is not null)
             {
                 var answer = MessageBox.Show(this,
-                    "Czy przed zamknięciem programu wykonać kopię zapasową bazy SQL KartyLeczenia?\\n\\n" +
-                    "Tak — archiwizuj i zamknij.\\n" +
-                    "Nie — zamknij bez archiwizacji.\\n" +
+                    "Czy przed zamknięciem programu wykonać kopię zapasową bazy SQL KartyLeczenia?\n\n" +
+                    "Tak — archiwizuj i zamknij.\n" +
+                    "Nie — zamknij bez archiwizacji.\n" +
                     "Anuluj — wróć do programu.",
                     "Archiwizacja przy zamykaniu",
                     MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question,
@@ -110,21 +110,28 @@ internal sealed class ReactWindow : Form
                 if (answer == DialogResult.Yes)
                 {
                     e.Cancel = true;
-                    if (!await WindowsHelloConsent.VerifyAsync(this,
-                            "archiwizację bazy przed zamknięciem"))
-                        return;
                     backupRunning = true;
                     UseWaitCursor = true;
                     try
                     {
+                        if (!await WindowsHelloConsent.VerifyAsync(this,
+                                "archiwizację bazy przed zamknięciem"))
+                            return;
                         var settings = SqlBackupService.Load();
+                        if (!Directory.Exists(settings.DestinationFolder))
+                        {
+                            string folder = ChooseArchiveFolder(settings.DestinationFolder);
+                            if (folder.Length == 0) return;
+                            settings = settings with { DestinationFolder = folder };
+                            SqlBackupService.Save(settings);
+                        }
                         var outcome = await Task.Run(() => backups.Run(settings,
                             new Progress<SqlBackupProgress>()), CancellationToken.None);
                         if (IsDisposed) return;
                         if (!outcome.SqlVerified)
                             MessageBox.Show(this,
-                                "Kopia została utworzona, ale SQL nie potwierdził pełnej weryfikacji.\\n" +
-                                outcome.Message + "\\n\\nPlik: " + outcome.Path,
+                                "Kopia została utworzona, ale SQL nie potwierdził pełnej weryfikacji.\n" +
+                                outcome.Message + "\n\nPlik: " + outcome.Path,
                                 "Kopia — ograniczona weryfikacja", MessageBoxButtons.OK,
                                 MessageBoxIcon.Warning);
                         closeAfterVerifiedBackup = true;
@@ -135,8 +142,8 @@ internal sealed class ReactWindow : Form
                         CrashLog.Write("ReactKL.BackupOnClose", error);
                         if (!IsDisposed)
                             MessageBox.Show(this,
-                                "Nie udało się wykonać kopii bazy KartyLeczenia.\\n\\n" +
-                                error.Message + "\\n\\nProgram pozostaje otwarty.",
+                                "Nie udało się wykonać kopii bazy KartyLeczenia.\n\n" +
+                                error.Message + "\n\nProgram pozostaje otwarty.",
                                 "Błąd archiwizacji", MessageBoxButtons.OK,
                                 MessageBoxIcon.Error);
                     }
@@ -519,14 +526,7 @@ internal sealed class ReactWindow : Form
         if (action == "getBackupSettings")
             return SqlBackupService.Load();
         if (action == "chooseArchiveFolder")
-        {
-            using var dialog = new FolderBrowserDialog
-            { Description = "Wybierz folder archiwum SQL na pendrivie" };
-            var existing = SqlBackupService.Load().DestinationFolder;
-            if (Directory.Exists(existing)) dialog.InitialDirectory = existing;
-            return new { folder = dialog.ShowDialog(this) == DialogResult.OK
-                ? dialog.SelectedPath : "" };
-        }
+            return new { folder = ChooseArchiveFolder(SqlBackupService.Load().DestinationFolder) };
         if (action == "saveBackupSettings")
         {
             var settings = BackupSettings(root);
@@ -1490,6 +1490,14 @@ internal sealed class ReactWindow : Form
         var connectionString = new SqlConnectionStringBuilder(
             saved.BuildConnectionString("KartyLeczenia")) {ApplicationIntent = ApplicationIntent.ReadWrite};
         return new SqlConnection(connectionString.ConnectionString);
+    }
+
+    private string ChooseArchiveFolder(string existing)
+    {
+        using var dialog = new FolderBrowserDialog
+        { Description = "Wybierz folder archiwum SQL na pendrivie lub innym dysku" };
+        if (Directory.Exists(existing)) dialog.InitialDirectory = existing;
+        return dialog.ShowDialog(this) == DialogResult.OK ? dialog.SelectedPath : "";
     }
 
     private static SqlBackupSettings BackupSettings(JsonElement root) => new(
