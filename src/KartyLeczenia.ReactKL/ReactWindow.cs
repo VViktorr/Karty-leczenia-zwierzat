@@ -530,64 +530,83 @@ internal sealed class ReactWindow : Form
                 hasDoctorStamp = updated.DoctorStampPng is { Length: > 0 }
             };
         }
+
         if (action == "getArchiveSettings")
         {
-            var setting = archive.Load().Options;
+            var current = archive.Load();
+            var setting = current.Options;
             return new
             {
                 configured = setting is not null,
+                current.Warning, current.Remembered,
                 server = setting?.Server ?? "",
                 windowsAuthentication = setting?.WindowsAuthentication ?? true,
                 userName = setting?.UserName ?? "",
-                trustCertificate = setting?.TrustCertificate ?? false
+                trustCertificate = setting?.TrustCertificate ?? false,
+                database = "KartyLeczenia"
             };
         }
-        if (action == "saveArchiveSettings")
+        if (action is "testArchiveSettings" or "saveArchiveSettings")
         {
-            string server = Text(root, "server", 200);
-            string userName = Text(root, "userName", 200);
-            bool windows = Flag(root, "windowsAuthentication");
-            string password = Text(root, "password", 200);
-            var current = archive.Load().Options;
-            if (!windows && password.Length == 0 && current?.Server == server &&
-                current.UserName == userName) password = current.Password;
-            var setting = new ConnectionOptions(server, "KartyLeczenia", windows,
-                userName, password, Flag(root, "trustCertificate"));
-            await using var db = new SqlConnection(new SqlConnectionStringBuilder(
-                setting.BuildConnectionString("KartyLeczenia"))
-                { ApplicationIntent = ApplicationIntent.ReadWrite }.ConnectionString);
-            await db.OpenAsync(token);
-            using var check = new SqlCommand("SELECT TOP (1) id FROM dbo.treatment_cards", db);
-            _ = await check.ExecuteScalarAsync(token);
-            archive.Save(setting, Flag(root, "rememberPassword"));
-            return new { saved = true };
+            var setting = ArchiveConnectionFrom(root);
+            await TestArchiveConnectionAsync(setting, token);
+            if (action == "saveArchiveSettings")
+                archive.Save(setting, Flag(root, "rememberPassword"));
+            return new
+            {
+                saved = action == "saveArchiveSettings",
+                server = setting.Server,
+                database = "KartyLeczenia",
+                message = action == "saveArchiveSettings"
+                    ? "Połączenie z bazą KartyLeczenia sprawdzone i zapisane na tym stanowisku."
+                    : "Połączenie z bazą KartyLeczenia działa. Ustawienia nie zostały zmienione."
+            };
         }
         if (action == "getSettings")
         {
-            var (saved, _, warning) = subiekt.Load();
+            var current = subiekt.Load();
+            var saved = current.Options;
             return new
             {
                 configured = saved is not null,
-                warning, server = saved?.Server ?? "", database = saved?.Database ?? "",
+                current.Warning, current.Remembered,
+                server = saved?.Server ?? "", database = saved?.Database ?? "",
                 windowsAuthentication = saved?.WindowsAuthentication ?? true,
-                userName = saved?.UserName ?? "", trustCertificate = saved?.TrustCertificate ?? false,
-                drugGroup = saved?.DrugGroup ?? "Leki", warehouseId = saved?.WarehouseId
+                userName = saved?.UserName ?? "",
+                trustCertificate = saved?.TrustCertificate ?? false,
+                drugGroup = saved?.DrugGroup ?? "Leki",
+                warehouseId = saved?.WarehouseId
+            };
+        }
+        if (action == "discoverSubiektDatabases")
+        {
+            var draft = SubiektConnectionFrom(root) with { Database = "" };
+            var companies = await new SubiektConnectionService().DiscoverAsync(draft, token);
+            return companies;
+        }
+        if (action == "testSubiektSettings")
+        {
+            var draft = SubiektConnectionFrom(root);
+            // Test credentials, SELECT-only permissions, group and warehouses.
+            // Do not require an already selected group or warehouse on first
+            // connection: the operator must receive lists to choose from.
+            var checkedConnection = await new SubiektConnectionService().TestAsync(
+                draft, token, validateSelections: false);
+            return new
+            {
+                checkedConnection.Company, checkedConnection.DrugGroups,
+                checkedConnection.Warehouses,
+                groupValid = checkedConnection.DrugGroups.Contains(
+                    draft.DrugGroup.Trim(), StringComparer.OrdinalIgnoreCase),
+                warehouseValid = draft.WarehouseId is int warehouseId &&
+                    checkedConnection.Warehouses.Any(item => item.Id == warehouseId),
+                message = "Dostęp do Subiekta sprawdzony. Wybierz grupę leków i magazyn."
             };
         }
         if (action == "saveSettings")
         {
-            string server = Text(root, "server", 200);
-            string database = Text(root, "database", 200);
-            string username = Text(root, "userName", 200);
-            string password = Text(root, "password", 200);
-            bool windows = Flag(root, "windowsAuthentication");
-            bool trust = Flag(root, "trustCertificate");
-            int? warehouse = Int(root, "warehouseId");
-            var previous = subiekt.Load().Options;
-            var config = new ConnectionOptions(server, database, windows, username,
-                password.Length == 0 && !windows && previous?.UserName == username &&
-                previous?.Server == server ? previous.Password : password,
-                trust, Text(root, "drugGroup", 80), warehouse);
+            var config = SubiektConnectionFrom(root);
+            // Only tested, existing group and warehouse may be saved.
             await new SubiektConnectionService().TestAsync(config, token);
             subiekt.Save(config, Flag(root, "rememberPassword"));
             documentLists.Clear();
@@ -595,7 +614,9 @@ internal sealed class ReactWindow : Form
             priceLists.Clear();
             priceLevelLists.Clear();
             priceCatalogueLists.Clear();
-            return new { saved = true };
+            catalogueSubiektLists.Clear();
+            return new { saved = true,
+                message = "Sprawdzono i zapisano połączenie Subiekta na tym stanowisku." };
         }
         // Archive browsing and trash management use the program database only.
         // They must remain available when Subiekt GT is temporarily offline.
@@ -1291,6 +1312,67 @@ internal sealed class ReactWindow : Form
         }
         await tx.CommitAsync(token);
         return new { deleted = true, cancelled = false };
+    }
+
+    private ConnectionOptions SubiektConnectionFrom(JsonElement root)
+    {
+        string server = Text(root, "server", 200);
+        string database = Text(root, "database", 200);
+        string username = Text(root, "userName", 200);
+        string password = Text(root, "password", 200);
+        bool windows = Flag(root, "windowsAuthentication");
+        var previous = subiekt.Load().Options;
+        if (!windows && password.Length == 0 && previous is not null &&
+            !previous.WindowsAuthentication &&
+            string.Equals(previous.Server, server, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(previous.UserName, username, StringComparison.OrdinalIgnoreCase))
+            password = previous.Password;
+        return new(server, database, windows, username, password,
+            Flag(root, "trustCertificate"), Text(root, "drugGroup", 80),
+            Int(root, "warehouseId"));
+    }
+
+    private ConnectionOptions ArchiveConnectionFrom(JsonElement root)
+    {
+        string server = Text(root, "server", 200);
+        string userName = Text(root, "userName", 200);
+        string password = Text(root, "password", 200);
+        bool windows = Flag(root, "windowsAuthentication");
+        var previous = archive.Load().Options;
+        if (!windows && password.Length == 0 && previous is not null &&
+            !previous.WindowsAuthentication &&
+            string.Equals(previous.Server, server, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(previous.UserName, userName, StringComparison.OrdinalIgnoreCase))
+            password = previous.Password;
+        // The program database name is fixed; this never points to Subiekt.
+        return new(server, "KartyLeczenia", windows, userName, password,
+            Flag(root, "trustCertificate"));
+    }
+
+    private static async Task TestArchiveConnectionAsync(ConnectionOptions options,
+        CancellationToken token)
+    {
+        await using var db = new SqlConnection(new SqlConnectionStringBuilder(
+            options.BuildConnectionString("KartyLeczenia"))
+            { ApplicationIntent = ApplicationIntent.ReadWrite }.ConnectionString);
+        await db.OpenAsync(token);
+        using var command = new SqlCommand("""
+            SELECT CASE WHEN
+                OBJECT_ID(N'dbo.treatment_cards',N'U') IS NOT NULL AND
+                OBJECT_ID(N'dbo.catalog_products',N'U') IS NOT NULL AND
+                OBJECT_ID(N'dbo.clinic_settings',N'U') IS NOT NULL
+                THEN 1 ELSE 0 END;
+            """, db) { CommandTimeout = 8 };
+        if (Convert.ToInt32(await command.ExecuteScalarAsync(token)) != 1)
+            throw new InvalidOperationException(
+                "Połączono z SQL, ale baza nie zawiera wymaganych tabel KartyLeczenia. " +
+                "Sprawdź serwer i konfigurację instalatora.");
+        foreach (string table in new[] { "treatment_cards", "catalog_products", "clinic_settings" })
+        {
+            using var read = new SqlCommand(
+                $"SELECT TOP (0) * FROM dbo.[{table}];", db) { CommandTimeout = 8 };
+            await using var reader = await read.ExecuteReaderAsync(token);
+        }
     }
 
     private SqlConnection ArchiveDb()
