@@ -12,6 +12,7 @@ export default defineConfig({
     assetsDir: 'assets',
     rollupOptions: {
       output: {
+        onlyExplicitManualChunks: true,
         manualChunks(id) {
           const file=id.replaceAll('\\', '/');
           if (!file.includes('/node_modules/')) return;
@@ -21,14 +22,12 @@ export default defineConfig({
               file.includes('/node_modules/@ant-design/cssinjs') ||
               file.includes('/node_modules/@ant-design/colors') ||
               file.includes('/node_modules/@ant-design/fast-color'))
-            return 'vendor-ant-design-icons';
+            return 'vendor-antd-components';
           if (file.includes('/node_modules/rc-') ||
               file.includes('/node_modules/@rc-component/'))
-            return 'vendor-rc-components';
+            return 'vendor-antd-components';
           if (file.includes('/node_modules/antd/'))
             return 'vendor-antd';
-          if (file.includes('/node_modules/dayjs/'))
-            return 'vendor-dayjs';
         }
       }
     }
