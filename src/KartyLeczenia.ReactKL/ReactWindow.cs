@@ -762,7 +762,12 @@ internal sealed class ReactWindow : Form
         // Archive browsing and trash management use the program database only.
         // They must remain available when Subiekt GT is temporarily offline.
         if (action == "renderSavedCard")
-            return new { html = cards.RenderSaved(ReadTextField(root, "id", 40), Flag(root, "trash")) };
+        {
+            string id = ReadTextField(root, "id", 40);
+            bool trash = Flag(root, "trash");
+            string html = await Task.Run(() => cards.RenderSaved(id, trash), token);
+            return new { html };
+        }
         if (action is "saveCardPdf" or "emailCardPdf")
         {
             // The archived SQL card is the single authoritative source. An

@@ -1210,7 +1210,7 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string) => void}) {
       <div className="document-filters">
         <Select loading={levels.busy} value={level} placeholder="Poziom ceny"
           onChange={setLevel} options={(levels.data??[]).map(x=>({label:x.name,value:x.number}))}/>
-        <Input.Search placeholder="Szukaj leku lub symbolu" value={filter}
+        <Input placeholder="Szukaj leku lub symbolu" value={filter}
           allowClear onChange={e=>setFilter(e.target.value)} style={{minWidth:190}}/>
         <Space><Switch checked={net} onChange={setNet}/> Cena netto</Space>
         <Select value={settings.withdrawalFormat}
@@ -1314,7 +1314,7 @@ function Expiry() {
         <Segmented className="expiry-filters" value={range} onChange={setRange} options={[
           {label:"Wszystkie",value:"all"}, {label:"Przeterminowane",value:"expired"},
           {label:"Do 30 dni",value:"30"}, {label:"Do 60 dni",value:"60"}]}/>
-        <Input.Search allowClear placeholder="Lek lub seria" value={query}
+        <Input allowClear placeholder="Lek lub seria" value={query}
           onChange={e=>setQuery(e.target.value)} style={{width:240}}/>
         <label>Przyjęto od <Input type="date" value={receivedFrom} onChange={e=>setReceivedFrom(e.target.value)}/></label>
         <label>do <Input type="date" value={receivedTo} onChange={e=>setReceivedTo(e.target.value)}/></label>
@@ -1351,7 +1351,9 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
   const [editDraft,setEditDraft]=useState<StoredCard|null>(null);
   const [editing,setEditing]=useState(false);
   const [editBusy,setEditBusy]=useState(false);
+  const [editConfirm,setEditConfirm]=useState(false);
   const [printHtml,setPrintHtml]=useState<string|null>(null);
+  const [previewBusy,setPreviewBusy]=useState<string|null>(null);
   const [printTarget,setPrintTarget]=useState<SavedCard|null>(null);
   const [pdfBusy,setPdfBusy]=useState<string|null>(null);
   const printFrame=useRef<HTMLIFrameElement>(null);
@@ -1429,36 +1431,34 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
         id:selected.id,revision:card.revision,
         fields:editDraft.fields,rows:editDraft.rows
       });
-      const refreshed=await invoke<StoredCard>("savedCard",{id:selected.id,trash:false});
-      setCard(refreshed);setEditDraft(null);setEditing(false);
+      setEditConfirm(false);setEditDraft(null);setEditing(false);
       setNotice("Zaktualizowano istniejącą kartę w SQL, zachowując jej numer.");
       remote.reload();
       try{
-        const result=await invoke<{html:string}>("renderSavedCard",{id:selected.id,trash:false});
-        setPrintTarget(selected);
-        setPrintHtml(result.html);
-      }catch(previewError){
-        setError("Karta została zaktualizowana, ale podgląd nie jest dostępny: "+
-          (previewError instanceof Error?previewError.message:String(previewError)));
+        const refreshed=await invoke<StoredCard>("savedCard",{id:selected.id,trash:false});
+        setCard(refreshed);
+      }catch(e){
+        setSelected(null);setCard(null);
+        setError("Zapisano kartę. Nie udało się jej ponownie odczytać: "+
+          (e instanceof Error?e.message:String(e)));
+        return;
       }
+      await printSaved(selected);
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setEditBusy(false);}
   }
   function confirmUpdate(){
     if(!selected||!editDraft||editBusy)return;
-    Modal.confirm({
-      title:"Zaktualizować istniejącą kartę?",
-      content:"Numer karty pozostanie bez zmian. Przed zatwierdzeniem sprawdź dawkowanie, "+
-        "karencję, gatunki i daty wykonania. Zmiany mogą być widoczne na innych stanowiskach.",
-      okText:"Zaktualizuj kartę",cancelText:"Wróć do edycji",
-      onOk:async()=>{await updateExisting();}
-    });
+    setError("");setEditConfirm(true);
   }
   async function printSaved(row: SavedCard) {
+    if(previewBusy)return;
+    setPreviewBusy(row.id);setError("");
     try {
       const result=await invoke<{html:string}>("renderSavedCard",{id:row.id,trash});
-      setPrintTarget(row);setPrintHtml(result.html);setError("");
+      setPrintTarget(row);setPrintHtml(result.html);
     } catch(e) {setError(e instanceof Error?e.message:String(e));}
+    finally{setPreviewBusy(null);}
   }
   async function cardPdf(row:SavedCard,mail:boolean){
     if(pdfBusy)return;
@@ -1534,7 +1534,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           {title:"Dokument",dataIndex:"document",width:175},
           {key:"actions",title:"Czynności",width:650,render:(_,row)=><Space wrap>
             <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
-            <Button size="small" onClick={()=>{void printSaved(row);}}>Drukuj</Button>
+            <Button size="small" loading={previewBusy===row.id}
+              onClick={()=>{void printSaved(row);}}>Podgląd karty</Button>
             <Button size="small" loading={pdfBusy===row.id}
               onClick={()=>{void cardPdf(row,false);}}>Zapisz PDF</Button>
             <Button size="small" loading={pdfBusy===row.id}
@@ -1558,6 +1559,11 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
     <Card>
       <Space wrap style={{marginBottom:12}}>
         <Input.Search allowClear value={query} onChange={e=>setQuery(e.target.value)}
+          onSearch={value=>{
+            const trimmed=value.trim();
+            if(trimmed===search)remote.reload();
+            else setSearch(trimmed);
+          }}
           placeholder="Numer K/…/rok, klient lub dokument"
           style={{minWidth:300}} className="saved-search"/>
         <label>Data wykonania <Input type="date" aria-label="Filtr daty wykonania"
@@ -1616,7 +1622,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           </Button>
         </> : <>
           {!trash&&<Button onClick={beginEdit} disabled={!card}>Edytuj zapisaną kartę</Button>}
-          {selected&&<Button type="primary" disabled={!card}
+          {selected&&<Button type="primary" disabled={!card} loading={previewBusy===selected.id}
             onClick={()=>{void printSaved(selected);}}>Podgląd karty</Button>}
           {selected&&<Button disabled={!!pdfBusy} onClick={()=>{void cardPdf(selected,false);}}>Zapisz PDF</Button>}
           {selected&&<Button disabled={!!pdfBusy} onClick={()=>{void cardPdf(selected,true);}}>Wyślij mailem</Button>}
@@ -1628,7 +1634,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
         {editing&&<Alert className="notice" type="warning" showIcon
           message="Edycja istniejącej karty — bez zmiany numeru"
           description="Zmiany pól klinicznych wymagają ponownej weryfikacji ChPL. Dane źródłowe Subiekta, numer karty i pieczątki pozostają zachowane."/>}
-        <ErrorNotice error={error}/>
+        {!editConfirm&&<ErrorNotice error={error}/>}
+        {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
         <Descriptions bordered column={2} size="small"
           items={Object.entries(editing&&editDraft?editDraft.fields:card.fields)
             .map(([key,value])=>({key,label:key,children:
@@ -1664,6 +1671,18 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           ]}/>
       </>}
     </Modal>
+    <Modal className="kl-dialog-update-saved-card" open={editConfirm}
+      title="Zaktualizować istniejącą kartę?" okText="Zaktualizuj kartę" cancelText="Wróć do edycji"
+      confirmLoading={editBusy} cancelButtonProps={{disabled:editBusy}}
+      closable={!editBusy} maskClosable={!editBusy} keyboard={!editBusy}
+      onCancel={()=>{if(!editBusy){setEditConfirm(false);setError("");}}}
+      onOk={()=>{void updateExisting();}}>
+      <ErrorNotice error={error}/>
+      <Typography.Paragraph>
+        Przed zatwierdzeniem sprawdź dawkowanie, karencję, gatunki i daty wykonania.
+        Karta zachowa dotychczasowy numer.
+      </Typography.Paragraph>
+    </Modal>
     <Modal className="kl-dialog-saved-preview" width="92vw" open={printHtml!==null} title="Podgląd zapisanej karty leczenia"
       onCancel={()=>setPrintHtml(null)} footer={<Space wrap>
         <Button onClick={()=>setPrintHtml(null)}>Zamknij</Button>
@@ -1673,6 +1692,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           onClick={()=>{void cardPdf(printTarget,true);}}>Wyślij mailem</Button>}
         <Button type="primary" onClick={()=>printFrame.current?.contentWindow?.print()}>Drukuj</Button>
       </Space>}>
+      <ErrorNotice error={error}/>
+      {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
       {printHtml&&<iframe ref={printFrame} title="Wydruk zapisanej karty" srcDoc={printHtml}
         style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
     </Modal>
@@ -1988,7 +2009,13 @@ function AutomaticUpdateCheck(){
           " jest dostępna na serwerze SQL. Obecna wersja: "+result.currentVersion+
           ". Czy pobrać instalator i zaktualizować program?",
         okText:"Pobierz i zainstaluj",cancelText:"Później",
-        onOk:async()=>{await invoke("installUpdate");}
+        onOk:async()=>{
+          try{await invoke("installUpdate");}
+          catch(error){
+            Modal.error({title:"Nie udało się uruchomić aktualizacji",
+              content:error instanceof Error?error.message:String(error)});
+          }
+        }
       });
     }).catch(()=>{/* Settings offers an explicit retry if SQL is temporarily unavailable. */});
   },[]);

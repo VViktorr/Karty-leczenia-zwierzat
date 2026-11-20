@@ -178,7 +178,7 @@ export default function CataloguePage({
 
   async function checkMissing() {
     if(missingBusy)return;
-    setMissingBusy(true);setError("");
+    setMissingBusy(true);setError("");setPickerError("");
     try{
       const data=await invoke<{items:SubiektProduct[];count:number;total:number}>(
         "missingCatalogueProducts",{refresh:true});
@@ -212,7 +212,7 @@ export default function CataloguePage({
       setMissingOpen(false);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      if (pickerOpen) setPickerError(reason);
+      if (pickerOpen || missingOpen) setPickerError(reason);
       else setError(reason);
     } finally { setWorking(false); }
   }
@@ -431,6 +431,11 @@ export default function CataloguePage({
       <Card className="catalogue-list">
         <Input.Search allowClear value={input}
           placeholder="Nazwa lub symbol leku..."
+          onSearch={value=>{
+            const trimmed=value.trim();
+            if(trimmed===query)setVersion(value=>value+1);
+            else setQuery(trimmed);
+          }}
           onChange={event => setInput(event.target.value)} />
         <Table<CatalogueListing> {...productsLayout.tableProps} rowKey="symbol" size="small"
           loading={listBusy} dataSource={list}
@@ -553,6 +558,7 @@ export default function CataloguePage({
       title={"Leki do uzupełnienia ("+(missingRows?.length??0)+" / "+missingTotal+")"}
       width={900} onCancel={()=>setMissingOpen(false)}
       footer={<Button onClick={()=>setMissingOpen(false)}>Zamknij</Button>}>
+      {pickerError&&<Alert className="notice" type="error" showIcon message={pickerError}/>}
       <Typography.Paragraph type="secondary">
         Lista obejmuje grupę leków z Subiekta, również produkty bez stanu w magazynie.
         Otwórz produkt, aby uzupełnić istniejącą kartotekę lub przygotować nową.
@@ -564,7 +570,7 @@ export default function CataloguePage({
           {title:"Symbol Subiekta",dataIndex:"symbol",width:210},
           {title:"Nazwa leku",dataIndex:"name"},
           {title:"Otwórz",key:"open",width:105,
-            render:(_value,row)=><Button size="small"
+            render:(_value,row)=><Button size="small" disabled={working}
               onClick={()=>{void openSubiektProduct(row.symbol);}}>Uzupełnij</Button>}
         ]}/>
     </Modal>
