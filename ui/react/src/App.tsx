@@ -19,7 +19,7 @@ import type { PricePrintOptions, PricePrintRow } from "./PricePrint";
 import type { BackupProgress } from "./bridge";
 import type { DocumentKind, DocumentRow, DocumentsResult, DatePeriod } from "./bridge";
 
-type LayoutName = "classic" | "modern" | "fluent";
+type LayoutName = "classic" | "modern" | "fluent" | "compact-tabs" | "compact-sidebar";
 type PaletteName = "light" | "dark" | "sea";
 type Section = "documents" | "prices" | "catalogue" | "treatment" | "saved" | "expiry" | "settings";
 interface DraftRow {
@@ -109,7 +109,11 @@ function saved<T extends string>(key: string, values: readonly T[], fallback: T)
   try { const value = localStorage.getItem(key); return values.find(item => item === value) ?? fallback; }
   catch { return fallback; }
 }
-const layouts = ["modern", "classic", "fluent"] as const;
+const layouts = ["modern", "classic", "fluent", "compact-tabs", "compact-sidebar"] as const;
+const layoutLabels: Record<LayoutName,string> = {
+  modern:"Modern — menu boczne", classic:"Classic — zakładki", fluent:"Fluent — Windows 11",
+  "compact-tabs":"Zakładki kompaktowe", "compact-sidebar":"Menu boczne kompaktowe"
+};
 const palettes = ["light", "dark", "sea"] as const;
 const currency = (n: number | null, unit = "zł") =>
   n === null ? "—" : new Intl.NumberFormat("pl-PL", {minimumFractionDigits: 2, maximumFractionDigits: 2})
@@ -364,10 +368,36 @@ function restoreColumnWidths():Record<string,number> {
   }catch{/* Use default widths. */}
   return {};
 }
-function Treatment({draft, onDocuments, onOpenSaved}: {
-  draft: Draft | null; onDocuments: () => void; onOpenSaved: (id:string)=>void;
+function TreatmentOptions({compact, label, children}: {
+  compact: boolean; label: string; children: React.ReactNode;
+}) {
+  return compact
+    ? <details className="treatment-options"><summary>{label}</summary>{children}</details>
+    : <>{children}</>;
+}
+
+function Treatment({draft, compact, onDocuments, onOpenSaved}: {
+  draft: Draft | null; compact: boolean; onDocuments: () => void; onOpenSaved: (id:string)=>void;
 }) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
+  const treatmentControls = useRef<HTMLDivElement>(null);
+  const [tableHeight, setTableHeight] = useState(180);
+  useEffect(()=>{
+    const controls=treatmentControls.current;
+    const main=controls?.closest<HTMLElement>("main");
+    if(!compact||!controls||!main)return;
+    const measure=()=>{
+      const padding=getComputedStyle(main);
+      const available=main.clientHeight-controls.offsetHeight
+        - parseFloat(padding.paddingTop)-parseFloat(padding.paddingBottom)-76;
+      setTableHeight(Math.max(180,Math.floor(available)));
+    };
+    const observer=new ResizeObserver(measure);
+    observer.observe(controls);
+    observer.observe(main);
+    measure();
+    return()=>observer.disconnect();
+  },[compact,draft]);
   const [showColumns,setShowColumns]=useState(false);
   const treatmentMouse = useTableMouseLayout("treatment");
   const [columnOrder,setColumnOrder]=useState<string[]>(restoreColumnOrder);
@@ -840,6 +870,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
     }))
   ];
   return <>
+    <div ref={treatmentControls} className="treatment-controls">
     <div className="page-heading"><div>
       <Typography.Title level={3}>Karta leczenia — {draft.number}</Typography.Title>
       <Typography.Text type="secondary">{draft.payer.split("\n")[0]}</Typography.Text>
@@ -849,6 +880,8 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
       <Button onClick={()=>{void printPreview();}} loading={busy} disabled={applyBusy||selectionBusy}>Podgląd wydruku</Button>
       <Button type="primary" onClick={()=>{void saveCard();}} loading={busy} disabled={applyBusy||selectionBusy}>Zapisz kartę do SQL</Button>
     </Space></div>
+    <div className="treatment-tools">
+    <TreatmentOptions compact={compact} label={"Podpowiedzi ChPL ("+readySuggestions.length+")"}>
     <Card className="treatment-autofill">
       <Space wrap>
         <Typography.Text strong>Podpowiedzi z katalogu SQL</Typography.Text>
@@ -872,6 +905,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
       {autofillMessage&&<Alert type="info" showIcon className="notice"
         message={autofillMessage}/>}
     </Card>
+    </TreatmentOptions>
     <Card className="treatment-species">
       <Space wrap>
         <Typography.Text strong>Filtr gatunku</Typography.Text>
@@ -887,6 +921,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
       </Space>
       {choiceError&&<Alert type="warning" className="notice" showIcon message={choiceError}/>}
     </Card>
+    <TreatmentOptions compact={compact} label="Wspólny opis i liczba zwierząt">
     <Card className="treatment-animals">
       <Typography.Text strong>Wspólny opis i liczba zwierząt</Typography.Text>
       <Typography.Paragraph type="secondary">
@@ -918,6 +953,8 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
         Zapamiętywanie wymaga płatnika z identyfikatorem Subiekta.
       </Typography.Text>}
     </Card>
+    </TreatmentOptions>
+    </div>
     <Card className="treatment-meta">
       <Space wrap>
         <label>Data zgłoszenia (opcjonalnie) <Input type="datetime-local" value={reported} onChange={e=>setReported(e.target.value)}/></label>
@@ -927,6 +964,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
     </Card>
     {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
+    </div>
     <Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
       columns={treatmentMouse.decorate(
         columns.filter(column=>visibleColumns.includes(treatmentColumnKey(column)))
@@ -937,7 +975,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
         (source,target)=>setColumnOrder(previous=>reorderColumn(previous,source,target)),
         60, 800, ["selected","product"])} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
-      scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
+      scroll={{x:1900,y:compact?tableHeight:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>
@@ -2132,6 +2170,8 @@ export default function App() {
     return()=>{active=false;};
   },[]);
   const [layout,setLayout]=useState<LayoutName>(()=>saved("kl.layout",layouts,"modern"));
+  const compact=layout==="compact-tabs"||layout==="compact-sidebar";
+  const topTabs=layout==="classic"||layout==="compact-tabs";
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
   const [uiScale,setUiScale]=useState<number>(()=>{
     try{const value=Number(localStorage.getItem("kl.uiScale"));return Number.isFinite(value)&&value>=80&&value<=200?value:100;}
@@ -2169,27 +2209,25 @@ export default function App() {
   const primary=palette==="sea"?"#15836f":palette==="dark"?"#78a5fa":"#1768d8";
   const appearance=useMemo(()=>({
     algorithm:palette==="dark"?theme.darkAlgorithm:theme.defaultAlgorithm,
-    token:{colorPrimary:primary,borderRadius:layout==="classic"?4:layout==="modern"?12:8,
-      fontFamily:"Segoe UI,system-ui,sans-serif",fontSize:14},
+    token:{colorPrimary:primary,borderRadius:topTabs?4:layout==="modern"?12:8, controlHeight:compact?26:32,
+      fontFamily:"Segoe UI,system-ui,sans-serif",fontSize:compact?13:14},
     components:{Segmented:{itemSelectedBg:primary,itemSelectedColor:"#fff"},
       Table:{headerBg:palette==="dark"?"#273447":"#f3f6fa"}}
-  }),[palette,layout,primary]);
+  }),[palette,layout,primary,topTabs,compact]);
   const nav=<nav aria-label="Nawigacja Karty Leczenia" className="main-nav">
     {sections.map(x=><button key={x.id} type="button"
       className={"nav-item "+(section===x.id?"is-active":"")}
       onClick={()=>navigate(x.id)}>{x.name}</button>)}
   </nav>;
   const controls=<div className="appearance-controls">
-    <Select aria-label="Układ" value={layout} onChange={setLayout} options={[
-      {label:"Modern — menu boczne",value:"modern"}, {label:"Classic — zakładki",value:"classic"},
-      {label:"Fluent — Windows 11",value:"fluent"}]}/>
+    <Select aria-label="Układ" value={layout} onChange={setLayout} options={layouts.map(value=>({value,label:layoutLabels[value]}))}/>
     <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
       {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
     <Select aria-label="Skalowanie interfejsu" value={uiScale} style={{minWidth:100}}
       onChange={setUiScale} options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
   </div>;
   const content=section==="documents"?null:
-    section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}
+    section==="treatment"?<Treatment draft={draft} compact={compact} onDocuments={()=>setSection("documents")}
       onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>:
     section==="prices"?<Prices onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
     section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}
@@ -2200,8 +2238,8 @@ export default function App() {
   return <ConfigProvider theme={appearance}>
     <DialogPlacement/>
     <AutomaticUpdateCheck onCheckError={setStartupUpdateError}/>
-    <div className={"app-shell layout-"+layout+" palette-"+palette}>
-      {layout!=="classic"&&<aside className="sidebar">
+    <div className={"app-shell layout-"+layout+" palette-"+palette+(compact?" layout-compact":"")}>
+      {!topTabs&&<aside className="sidebar">
         <div className="sidebar-brand"><div className="brand-mark">KL</div>
           <div><strong>Karty Leczenia</strong><small>ReactKL · SQL</small></div></div>
         {nav}
@@ -2209,10 +2247,10 @@ export default function App() {
       </aside>}
       <div className="workspace">
         <header className="topbar">
-          <div className="topbar-title"><strong>{layout==="classic"?"Karty Leczenia":sections.find(x=>x.id===section)?.name}</strong></div>
+          <div className="topbar-title"><strong>{topTabs?"Karty Leczenia":sections.find(x=>x.id===section)?.name}</strong></div>
           {controls}
         </header>
-        {layout==="classic"&&<div className="top-navigation">{nav}</div>}
+        {topTabs&&<div className="top-navigation">{nav}</div>}
         <main className="main-content">
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             message="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
@@ -2224,7 +2262,7 @@ export default function App() {
         </main>
         <footer className="statusline"><span>Karty Leczenia{runningVersion&&" · Wersja "+runningVersion}</span>
           {startupUpdateError&&<span title={startupUpdateError}>Błąd sprawdzania aktualizacji w SQL</span>}
-          <span>Układ {layout} · motyw {palette} · skala {uiScale}%</span></footer>
+          <span>Układ {layoutLabels[layout]} · motyw {palette} · skala {uiScale}%</span></footer>
       </div>
     </div>
   </ConfigProvider>;
