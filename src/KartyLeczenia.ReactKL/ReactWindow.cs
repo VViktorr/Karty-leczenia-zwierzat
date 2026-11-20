@@ -82,7 +82,10 @@ internal sealed class ReactWindow : Form
         Shown += async (_, _) =>
         {
             await StartAsync();
-            await PublishServerUpdateOnStartup();
+            if (ReactInstallUpdates.IsServer)
+                await PublishServerUpdateOnStartup();
+            else
+                await CheckClientUpdateOnStartup();
         };
         FormClosing += async (_, e) =>
         {
@@ -200,6 +203,72 @@ internal sealed class ReactWindow : Form
         }
     }
 
+    private async Task CheckClientUpdateOnStartup()
+    {
+        if (IsDisposed || !ReactInstallUpdates.IsInstalled) return;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+        try
+        {
+            var release = await updates.Check(timeout.Token);
+            if (!IsDisposed && release is { Newer: true })
+                await OfferAndInstallUpdate(release, timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("ReactKL.StartupUpdate", ex);
+            if (!IsDisposed)
+                MessageBox.Show(this, ex.Message, "Aktualizacja Karty Leczenia",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private async Task<object> OfferAndInstallUpdate(ReactUpdateInfo release, CancellationToken token)
+    {
+        if (backupRunning || restoreRunning)
+            throw new InvalidOperationException("Zakończ archiwizację lub odtwarzanie przed aktualizacją.");
+        if (installingUpdate || closingForUpdate)
+            throw new InvalidOperationException("Aktualizacja jest już pobierana.");
+        installingUpdate = true;
+        string? file = null;
+        string stage = "sprawdzanie publikacji SQL";
+        try
+        {
+            if (MessageBox.Show(this,
+                $"Dostępna wersja: {release.Version}. Obecna wersja: {release.CurrentVersion}.\n\nPobrać i uruchomić instalator?",
+                "Aktualizacja Karty Leczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Information,
+                MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return new { started = false };
+
+            UseWaitCursor = true;
+            var current = await updates.Check(token);
+            if (current is null || current.ReleaseId != release.ReleaseId ||
+                !current.Newer || !string.Equals(current.Sha256, release.Sha256, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Publikacja zmieniła się. Sprawdź wersję ponownie.");
+            stage = "pobieranie i weryfikacja instalatora";
+            file = await updates.Download(current, token);
+            token.ThrowIfCancellationRequested();
+            if (backupRunning || restoreRunning)
+                throw new InvalidOperationException("Zakończ archiwizację lub odtwarzanie przed aktualizacją.");
+            if (IsDisposed || Disposing) return new { started = false };
+            stage = "uruchamianie instalatora w Windows";
+            ReactUpdateService.Start(file);
+            closingForUpdate = true;
+            BeginInvoke(new Action(Close));
+            return new { started = true, version = current.Version };
+        }
+        catch (Exception ex) when (!token.IsCancellationRequested)
+        {
+            throw new InvalidOperationException($"Aktualizacja — {stage}. {ex.Message}", ex);
+        }
+        finally
+        {
+            installingUpdate = false;
+            if (!IsDisposed) UseWaitCursor = false;
+            if (file is not null && !closingForUpdate)
+                ReactUpdateService.DeleteDownloadFolder(Path.GetDirectoryName(file)!);
+        }
+    }
+
     private async Task StartAsync()
     {
         try
@@ -282,7 +351,8 @@ internal sealed class ReactWindow : Form
         catch (Exception ex)
         {
             CrashLog.Write("ReactKL.Message", ex);
-            Send(requestId, null, SubiektConnectionService.FriendlyError(ex));
+            Send(requestId, null, ex.Message.StartsWith("Aktualizacja — ", StringComparison.Ordinal)
+                ? ex.Message : SubiektConnectionService.FriendlyError(ex));
         }
         finally
         {
@@ -478,41 +548,12 @@ internal sealed class ReactWindow : Form
         {
             if (!ReactInstallUpdates.IsInstalled)
                 throw new InvalidOperationException("Najpierw zainstaluj ReactKL w standardowym katalogu.");
-            if (backupRunning || restoreRunning)
-                throw new InvalidOperationException(
-                    "Aktualizacja może rozpocząć się dopiero po zakończeniu archiwizacji lub odtwarzania.");
-            if (installingUpdate || closingForUpdate)
-                throw new InvalidOperationException("Aktualizacja jest już pobierana.");
             string expectedId = ReadTextField(root, "releaseId", 40);
             var release = checkedUpdate;
             if (release is null || !release.Newer || !Guid.TryParse(expectedId, out var releaseId) ||
                 release.ReleaseId != releaseId)
                 throw new InvalidOperationException("Sprawdź ponownie dostępność aktualizacji w SQL.");
-            installingUpdate = true;
-            string? file = null;
-            try
-            {
-                var current = await updates.Check(token);
-                if (current is null || current.ReleaseId != release.ReleaseId ||
-                    !current.Newer || !string.Equals(current.Sha256, release.Sha256,
-                        StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException(
-                        "Opublikowana aktualizacja zmieniła się. Sprawdź wersję ponownie.");
-                file = await updates.Download(current, token);
-                token.ThrowIfCancellationRequested();
-                if (backupRunning || restoreRunning)
-                    throw new InvalidOperationException("Zakończ archiwizację lub odtwarzanie przed aktualizacją.");
-                ReactUpdateService.Start(file);
-                closingForUpdate = true;
-                BeginInvoke(new Action(Close));
-                return new { started = true, version = current.Version };
-            }
-            finally
-            {
-                installingUpdate = false;
-                if (file is not null && !closingForUpdate)
-                    ReactUpdateService.DeleteDownloadFolder(Path.GetDirectoryName(file)!);
-            }
+            return await OfferAndInstallUpdate(release, token);
         }
         if (action == "chooseRestoreFile")
         {

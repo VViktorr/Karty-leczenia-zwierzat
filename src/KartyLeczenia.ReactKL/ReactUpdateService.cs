@@ -92,10 +92,9 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
             await db.OpenAsync(token);
             using var query=new SqlCommand("""
                 SELECT installer FROM dbo.program_update
-                WHERE id=1 AND release_id=@release AND version=@version AND sha256=@hash;
+                WHERE id=1 AND release_id=@release AND sha256=@hash;
                 """,db){CommandTimeout=300};
             query.Parameters.Add("@release",SqlDbType.UniqueIdentifier).Value=release.ReleaseId;
-            query.Parameters.Add("@version",SqlDbType.NVarChar,32).Value=release.Version;
             query.Parameters.Add("@hash",SqlDbType.Binary,32).Value=Convert.FromHexString(release.Sha256);
             using var reader=await query.ExecuteReaderAsync(
                 CommandBehavior.SequentialAccess|CommandBehavior.SingleRow,token);
@@ -140,11 +139,18 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
     {
         if (!File.Exists(file) || !file.EndsWith(".exe",StringComparison.OrdinalIgnoreCase))
             throw new FileNotFoundException("Brak zweryfikowanego instalatora aktualizacji.",file);
-        using var process=Process.Start(new ProcessStartInfo(file)
+        try
         {
-            UseShellExecute=true,
-            Verb="runas",
-            WorkingDirectory=Path.GetDirectoryName(file)!
-        }) ?? throw new InvalidOperationException("Windows nie uruchomił instalatora aktualizacji.");
+            using var process = Process.Start(new ProcessStartInfo(file)
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                WorkingDirectory = Path.GetDirectoryName(file)!
+            }) ?? throw new InvalidOperationException("Windows nie uruchomił instalatora aktualizacji.");
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            throw new InvalidOperationException("Anulowano zgodę Windows na uruchomienie instalatora. Możesz ponowić próbę.", ex);
+        }
     }
 }

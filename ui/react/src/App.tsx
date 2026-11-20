@@ -2151,37 +2151,6 @@ interface InstallUpdateStatus {
   installed:boolean; isServer:boolean; pending:boolean; installedVersion:string;
   server:string; publicationError:string|null;
 }
-function offerSqlUpdate(result: UpdateResult, onError: (message: string) => void) {
-  const release=result.release;
-  if(!release?.newer)return;
-  Modal.confirm({
-    className:"kl-dialog-sql-update",
-    title:"Dostępna aktualizacja Karty Leczenia",
-    content:"Wersja "+release.version+" jest dostępna na serwerze SQL. Obecna wersja: "+
-      result.currentVersion+". Czy pobrać i uruchomić instalator?",
-    okText:"Pobierz i zainstaluj",cancelText:"Później",
-    onOk:async()=>{
-      try{await invoke("installUpdate",{releaseId:release.releaseId});}
-      catch(error){onError(error instanceof Error?error.message:String(error));}
-    }
-  });
-}
-
-let checkedOnStartup=false;
-function AutomaticUpdateCheck({onCheckError}: {onCheckError: (message: string) => void}){
-  useEffect(()=>{
-    if(checkedOnStartup || !isDesktop())return;
-    checkedOnStartup=true;
-    void invoke<InstallUpdateStatus>("getUpdateStatus").then(async status=>{
-      if(status.isServer || !status.installed)return;
-      const result=await invoke<UpdateResult>("checkUpdate");
-      offerSqlUpdate(result, message=>Modal.error({
-        className:"kl-dialog-startup-update-error", title:"Nie udało się uruchomić aktualizacji",content:message
-      }));
-    }).catch(error=>onCheckError(error instanceof Error?error.message:String(error)));
-  },[onCheckError]);
-  return null;
-}
 function UpdatePanel(){
   const [data,setData]=useState<UpdateResult|null>(null);
   const [busy,setBusy]=useState(false);
@@ -2205,7 +2174,6 @@ function UpdatePanel(){
     try{
       const result=await invoke<UpdateResult>("checkUpdate");
       setData(result);
-      if(status?.isServer===false)offerSqlUpdate(result,setError);
       setNotice(!result.release
         ? "Na serwerze nie opublikowano jeszcze instalatora ReactKL."
         : result.release.newer ? "Dostępna jest nowsza wersja ReactKL."
@@ -2213,10 +2181,13 @@ function UpdatePanel(){
     }catch(e){setError(e instanceof Error?e.message:String(e));setData(null);}
     finally{setBusy(false);}
   }
-  function install(){
+  async function install(){
     if(!data?.release?.newer||busy)return;
-    setError("");
-    offerSqlUpdate(data,setError);
+    setBusy(true);setError("");
+    try{
+      await invoke("installUpdate",{releaseId:data.release.releaseId});
+    }catch(error){setError(error instanceof Error?error.message:String(error));}
+    finally{setBusy(false);}
   }
   return <Card className="settings-card">
     <Typography.Title level={4}>Aktualizacje ReactKL z SQL Server</Typography.Title>
@@ -2287,7 +2258,6 @@ function SettingsPage({onSubiektSaved}: {onSubiektSaved: () => void}) {
 
 export default function App() {
   const [runningVersion,setRunningVersion]=useState("");
-  const [startupUpdateError,setStartupUpdateError]=useState("");
   useEffect(()=>{
     if(!isDesktop())return;
     let active=true;
@@ -2364,7 +2334,6 @@ export default function App() {
       onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
   return <ConfigProvider theme={appearance}>
     <DialogPlacement/>
-    <AutomaticUpdateCheck onCheckError={setStartupUpdateError}/>
     <div className={"app-shell layout-"+layout+" palette-"+palette+(compact?" layout-compact":"")}>
       {!topTabs&&<aside className="sidebar">
         <div className="sidebar-brand"><div className="brand-mark">KL</div>
@@ -2388,7 +2357,6 @@ export default function App() {
           {content}
         </main>
         <footer className="statusline"><span>Karty Leczenia{runningVersion&&" · Wersja "+runningVersion}</span>
-          {startupUpdateError&&<span title={startupUpdateError}>Błąd sprawdzania aktualizacji w SQL</span>}
           <span>Układ {layoutLabels[layout]} · motyw {palette} · skala {uiScale}%</span></footer>
       </div>
     </div>
