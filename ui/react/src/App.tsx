@@ -124,7 +124,7 @@ function ErrorNotice({error}: {error: string}) {
 }
 function useRemote<T>(action: string, payload: Record<string, unknown>, deps: unknown[],
   enabled = true): {
-  data: T | null; busy: boolean; error: string; reload: () => void;
+  data: T | null; busy: boolean; error: string; reload: () => void; revalidate: () => void;
 } {
   const [data, setData] = useState<T | null>(null);
   const [busy, setBusy] = useState(false);
@@ -150,10 +150,10 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   return {data, busy, error, reload: () => {
     forceRefresh.current = true;
     setTick(n => n + 1);
-  }};
+  }, revalidate: () => setTick(n => n + 1)};
 }
 
-function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
+function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) => void}) {
   const [kind, setKind] = useState<DocumentKind>("invoices");
   const [period, setPeriod] = useState<DatePeriod>("all");
   const [pageSize,setPageSize] = useState<25|50|100|"all">(()=>{
@@ -171,15 +171,27 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
   const [selectedMonth,setSelectedMonth] = useState(() => localDateTime().slice(0,7));
   const [readError, setReadError] = useState("");
   const [reading, setReading] = useState(false);
+  const openedDocument = useRef<AbortController | null>(null);
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (!active) setReading(false);
+    return () => openedDocument.current?.abort();
+  }, [active]);
   useEffect(() => {
     const timer = setTimeout(() => setSearch(query.trim()), 300);
     return () => clearTimeout(timer);
   }, [query]);
   const from = period==="customMonth" ? selectedMonth+"-01" : period==="custom" ? startDate : "";
   const until = period==="custom" ? endDate : "";
-  const {data, busy, error, reload} = useRemote<DocumentsResult>(
+  const {data, busy, error, reload, revalidate} = useRemote<DocumentsResult>(
     "searchDocuments", {kind, period, query: search, startDate:from, endDate:until},
     [kind, period, search, from, until]);
+  useEffect(() => {
+    const returned = active && !wasActive.current;
+    wasActive.current = active;
+    if (returned && !busy && (error || !data ||
+      Date.now() - Date.parse(data.loadedAt) >= 5 * 60_000)) revalidate();
+  }, [active, busy, data, error, revalidate]);
   useEffect(()=>{setPage(1);},[kind,period,search,from,until]);
   const allPageSize=Math.max(500,data?.items.length??0);
   const effectivePageSize=pageSize==="all"?allPageSize:pageSize;
@@ -188,16 +200,23 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
     try{localStorage.setItem("kl.documents.pageSize",String(value));}catch{}
   }
   const open = async (row: DocumentRow) => {
-    if(reading)return;
+    if (openedDocument.current) return;
+    const request = new AbortController();
+    openedDocument.current = request;
     setReading(true); setReadError("");
     try {
-      // Always fetch the selected DOCUMENT from SQL; cache covers lists only.
-      const draft = await invoke<Draft>("readDocument", {documentId: row.id, number: row.number});
-      onOpen(draft);
-    } catch (e) { setReadError(String(e instanceof Error ? e.message : e)); }
-    finally { setReading(false); }
+      const draft = await invoke<Draft>("readDocument",
+        {documentId: row.id, number: row.number}, undefined, request.signal);
+      if (!request.signal.aborted) onOpen(draft);
+    } catch (error) {
+      if (!request.signal.aborted) setReadError(error instanceof Error ? error.message : String(error));
+    } finally {
+      openedDocument.current = null;
+      if (!request.signal.aborted) setReading(false);
+    }
   };
   useEffect(() => {
+    if (!active) return;
     const key = (event: KeyboardEvent) => {
       if (event.key === "F5") { event.preventDefault(); reload(); return; }
       if(event.altKey && !event.ctrlKey && !event.shiftKey){
@@ -214,7 +233,7 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [reload,data,reading]);
+  }, [active,reload,data,reading]);
   const columns: ColumnsType<DocumentRow> = [
     {title:"Data",dataIndex:"date",width:125,render:date,
       sorter:(a,b)=>(a.date||"").localeCompare(b.date||"")},
@@ -2029,7 +2048,7 @@ function UpdatePanel(){
   </Card>;
 }
 
-function SettingsPage() {
+function SettingsPage({onSubiektSaved}: {onSubiektSaved: () => void}) {
   const [active,setActive]=useState(()=>{
     try{return localStorage.getItem("kl.settings.activeTab")||"subiekt";}
     catch{return "subiekt";}
@@ -2044,7 +2063,7 @@ function SettingsPage() {
       <Typography.Title level={3}>Ustawienia — Karty Leczenia</Typography.Title>
     </div>
     <Tabs activeKey={active} onChange={choose} items={[
-      {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings/>},
+      {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings onSaved={onSubiektSaved}/>},
       {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
       {key:"backup",label:"Archiwizacja",children:<Space direction="vertical" size={18}
         style={{width:"100%"}}>
@@ -2068,6 +2087,7 @@ export default function App() {
     catch{return 100;}
   });
   const [section,setSection]=useState<Section>("documents");
+  const [subiektRevision,setSubiektRevision]=useState(0);
   const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
   const [draft,setDraft]=useState<Draft|null>(null);
   const [catalogueDirty,setCatalogueDirty]=useState(false);
@@ -2117,7 +2137,7 @@ export default function App() {
     <Select aria-label="Skalowanie interfejsu" value={uiScale} style={{minWidth:100}}
       onChange={setUiScale} options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
   </div>;
-  const content=section==="documents"?<Documents onOpen={next=>{setDraft(next);setSection("treatment");}}/>:
+  const content=section==="documents"?null:
     section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}
       onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>:
     section==="prices"?<Prices onCatalogue={symbol=>{setCataloguePickerSymbol(symbol);setSection("catalogue");}}/>:
@@ -2125,7 +2145,7 @@ export default function App() {
       initialPickerSymbol={cataloguePickerSymbol} onPickerOpened={()=>setCataloguePickerSymbol(null)}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards initialCardId={savedCardToOpen}
-      onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage/>;
+      onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
   return <ConfigProvider theme={appearance}>
     <DialogPlacement/>
     <AutomaticUpdateCheck/>
@@ -2145,6 +2165,10 @@ export default function App() {
         <main className="main-content">
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             message="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
+          <div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
+            <Documents key={subiektRevision} active={section==="documents"}
+              onOpen={next=>{setDraft(next);setSection("treatment");}}/>
+          </div>
           {content}
         </main>
         <footer className="statusline"><span>ReactKL — WebView2 / C#</span>

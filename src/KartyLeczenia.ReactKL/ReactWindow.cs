@@ -268,7 +268,11 @@ internal sealed class ReactWindow : Form
             object result = await HandleRequest(action, root, cancel.Token);
             if (!cancel.IsCancellationRequested) Send(requestId, result);
         }
-        catch (OperationCanceledException) { Send(requestId, null, "Operacja została anulowana."); }
+        catch (Exception) when (cancel?.IsCancellationRequested == true)
+        {
+            // SqlClient can report an aborted command as SqlException.
+            Send(requestId, null, "Operacja została anulowana lub przekroczyła limit czasu.");
+        }
         catch (Exception ex)
         {
             CrashLog.Write("ReactKL.Message", ex);

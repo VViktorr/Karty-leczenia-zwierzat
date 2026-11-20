@@ -50,3 +50,20 @@ test("Subiekt catalogue search and selection send distinct read-only requests", 
   deliver({data: {id: openRequest._bridgeRequestId, ok: true, data: draft}});
   assert.deepEqual(await open, draft);
 });
+
+test("cancelled document read cannot consume the response for the next view", async () => {
+  const controller = new AbortController();
+  const read = invoke("readDocument", {documentId: 123}, undefined, controller.signal);
+  const original = posted.at(-1);
+  controller.abort();
+  await assert.rejects(read, /Anulowano/);
+  assert.equal(posted.at(-1).action, "cancelRequest");
+  assert.equal(posted.at(-1).requestId, original._bridgeRequestId);
+
+  const next = invoke("searchDocuments", {kind: "invoices"});
+  const request = posted.at(-1);
+  deliver({data:{id:original._bridgeRequestId,ok:false,error:"SQL timeout"}});
+  const list = {items: []};
+  deliver({data:{id:request._bridgeRequestId,ok:true,data:list}});
+  assert.deepEqual(await next, list);
+});

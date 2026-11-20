@@ -72,7 +72,7 @@ function CredentialFields<T extends BaseSqlSettings>({form}:{form:FormInstance<T
   </>;
 }
 
-export function SubiektDatabaseSettings(){
+export function SubiektDatabaseSettings({onSaved}: {onSaved: () => void}){
   const [form]=Form.useForm<SubiektValues>();
   const [busy,setBusy]=useState<BusyAction>("load");
   const [error,setError]=useState("");
@@ -143,6 +143,7 @@ export function SubiektDatabaseSettings(){
     setBusy("save");setError("");setNotice("");
     try{
       await invoke("saveSettings",{...values});
+      onSaved();
       setChecked(true);
       setNotice(values.windowsAuthentication || values.rememberPassword
         ? "Połączenie z Subiektem GT sprawdzone i zapisane na tym stanowisku."
