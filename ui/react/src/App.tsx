@@ -1891,7 +1891,7 @@ function AutomaticUpdateCheck(){
       const result=await invoke<UpdateResult>("checkUpdate");
       if(!result.release?.newer)return;
       Modal.confirm({
-        title:"Dostępna aktualizacja KartyLeczenia",
+        title:"Dostępna aktualizacja Karty Leczenia",
         content:"Wersja "+result.release.version+
           " jest dostępna na serwerze SQL. Obecna wersja: "+result.currentVersion+
           ". Czy pobrać instalator i zaktualizować program?",
@@ -2068,7 +2068,7 @@ export default function App() {
     components:{Segmented:{itemSelectedBg:primary,itemSelectedColor:"#fff"},
       Table:{headerBg:palette==="dark"?"#273447":"#f3f6fa"}}
   }),[palette,layout,primary]);
-  const nav=<nav aria-label="Nawigacja KartyLeczenia" className="main-nav">
+  const nav=<nav aria-label="Nawigacja Karty Leczenia" className="main-nav">
     {sections.map(x=><button key={x.id} type="button"
       className={"nav-item "+(section===x.id?"is-active":"")}
       onClick={()=>navigate(x.id)}>{x.name}</button>)}

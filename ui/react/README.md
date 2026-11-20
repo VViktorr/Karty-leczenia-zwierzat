@@ -1,4 +1,4 @@
-# ReactKL — nowy interfejs bez AntdUI
+# Karty Leczenia — ReactKL (React + WebView2)
 
 **Jedynym interfejsem użytkownika na tej gałęzi jest React + TypeScript + WebView2.**
 WinForms służy wyłącznie jako natywne okno hostujące WebView2, bez dawnych formularzy.
@@ -41,8 +41,10 @@ na pendrive z Windows Hello i kontrolą SHA-256.
   Dopiero po zatwierdzeniu przenosi proponowane dane do edytora, bez automatycznego
   zapisu w SQL. Nadal nie ma OCR dla skanów, usuwania istniejących wariantów ani
   pełnej kontroli zgodności danych klinicznych.
-- Nadal brakuje wszystkich parametrów wydruków, odtwarzania kopii SQL i mechanizmu
-  publikacji aktualizacji. Tych funkcji nie wolno uważać za gotowe.
+- W kodzie są: podgląd/eksport PDF i e-mail karty, pełna kopia i odtworzenie SQL,
+  publikacja aktualizacji przez SQL oraz oddzielne formularze połączeń Subiekta
+  i bazy KartyLeczenia. Działanie na rzeczywistym Windows/SQL i przywracanie
+  archiwów wymagają testów integracyjnych.
 - Wymagane testy na Windows z rzeczywistym SQL, Subiektem i drukarką.
 
 Historyczna aplikacja WinForms jest zabezpieczona na gałęzi
@@ -51,7 +53,7 @@ Historyczna aplikacja WinForms jest zabezpieczona na gałęzi
 
 ## Aktualizacje i instalacja w miejsce poprzedniej wersji
 
-**ReactKL zastępuje dotychczasową instalację** — ten sam Inno Setup AppId
+**Karty Leczenia (ReactKL) zastępuje dotychczasową instalację** — ten sam Inno Setup AppId
 `pl.kartyleczenia.winforms.sql`, katalog `C:\Program Files\KartyLeczenia`,
 skróty i rola serwer/stanowisko w `archive-installation.ini`. Istniejący plik
 konfiguracji archiwum jest zachowywany. Stare EXE i AntdUI.dll są usuwane
@@ -82,3 +84,17 @@ instalację. **Nie publikujemy już do osobnej tabeli react_program_update.**
 
 Nie zamieniaj instalatora produkcyjnego bez wcześniejszego sprawdzenia
 z prawdziwym serwerem SQL i stacjami Windows.
+
+## Konfiguracja baz — osobne zakładki
+
+Ustawienia programu mają osobne zakładki **Subiekt GT**, **Baza Karty Leczenia**,
+**Archiwizacja**, **Dane lecznicy** i **Aktualizacje**. W Subiekcie dostępne jest
+pobieranie baz podmiotów, test połączenia, grupy leków i wybór magazynu według
+nazwy, bez ręcznego wpisywania ID. Zapis połączenia wymaga poprawnej grupy i
+magazynu. Archiwizacja dotyczy tej samej bazy programowej `KartyLeczenia`,
+nie bazy Subiekta. Test połączenia **nie zapisuje ustawień**.
+
+Widoczna nazwa programu, skrótów na pulpicie i w menu Start to
+**Karty Leczenia**. Techniczne nazwy pliku EXE, katalogu instalacji, bazy SQL
+i Inno AppId zachowano dla zgodności aktualizacji. Do budowania w `C:\React`
+użyj instrukcji z [głównego README](../../README.md).

@@ -84,7 +84,7 @@ internal sealed class ReactWindow : Form
             {
                 e.Cancel = true;
                 MessageBox.Show(this, "Trwa operacja konserwacyjna SQL. Zamknięcie programu jest chwilowo zablokowane.",
-                    "KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    "Karty Leczenia", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             foreach (var token in active.Values) token.Cancel();
@@ -123,7 +123,7 @@ internal sealed class ReactWindow : Form
                 MessageBox.Show(this,
                     "Instalator ReactKL nie został opublikowany w SQL:\n" + ex.Message +
                     "\nMożesz ponowić publikację w Ustawieniach → Aktualizacje.",
-                    "Aktualizacja KartyLeczenia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    "Aktualizacja Karty Leczenia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
