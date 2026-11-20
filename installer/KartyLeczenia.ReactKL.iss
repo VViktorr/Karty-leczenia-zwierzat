@@ -129,12 +129,27 @@ begin
             ((PreviousRole = 'client') and (RolePage.SelectedValueIndex <> 1));
 end;
 
-// Preserve unchanged installations, but allow an explicit repair/change of
-// the server/client role on a re-install without deleting user SQL settings.
-function ShouldWriteArchiveConfiguration: Boolean;
+function NeedsServerConfiguration: Boolean;
 begin
+  Result := (RolePage.SelectedValueIndex = 0) and
+     ((not ExistingArchiveConfiguration) or RoleChanged or
+      (PreviousInstallationRole = '') or
+      (ServerModePage.SelectedValueIndex <> 0));
+end;
+
+// Preserve unchanged installations. An explicit instance change, role change
+// or remote server address change intentionally updates only archive-installation.ini.
+function ShouldWriteArchiveConfiguration: Boolean;
+var
+  StoredServer: String;
+begin
+  StoredServer := GetIniString('Archive','Server','',
+    AddBackslash(WizardDirValue) + 'archive-installation.ini');
   Result := (not ExistingArchiveConfiguration) or RoleChanged or
-            (PreviousInstallationRole = '');
+            (PreviousInstallationRole = '') or
+            NeedsServerConfiguration or
+            ((RolePage.SelectedValueIndex = 1) and
+             (CompareText(Trim(ServerPage.Values[0]),StoredServer) <> 0));
 end;
 
 function InstallerRole(Param: String): String;
@@ -147,10 +162,13 @@ function InstallerArchiveServer(Param: String): String;
 begin
   if RolePage.SelectedValueIndex = 0 then
   begin
-    if ServerModePage.SelectedValueIndex = 0 then
+    if ServerModePage.SelectedValueIndex = 2 then
+      Result := GetComputerNameString + ',' + ArchivePort
+    else if ServerModePage.SelectedValueIndex = 1 then
       Result := ExistingServerAddress
     else
-      Result := GetComputerNameString + ',' + ArchivePort;
+      Result := GetIniString('Archive','Server','',
+        AddBackslash(WizardDirValue) + 'archive-installation.ini');
   end
   else
   begin
@@ -182,9 +200,13 @@ begin
     'Instancja SQL Server', 'Gdzie przygotować bazę KartyLeczenia?',
     'Wybór tylko podczas nowej instalacji serwera. Dane istniejącej bazy będą zachowane.',
     True, False);
-  ServerModePage.Add('Wybierz istniejącą instancję SQL Server na tym komputerze');
-  ServerModePage.Add('Zainstaluj lub użyj osobnej instancji KLARCHIVE');
-  ServerModePage.SelectedValueIndex := 0;
+  ServerModePage.Add('Zachowaj dotychczasowe polaczenie SQL bez zmian');
+  ServerModePage.Add('Wybierz istniejaca instancje SQL Server na tym komputerze');
+  ServerModePage.Add('Zainstaluj lub uzyj osobnej instancji KLARCHIVE');
+  if (ExistingArchiveConfiguration and (PreviousInstallationRole = 'server')) then
+    ServerModePage.SelectedValueIndex := 0
+  else
+    ServerModePage.SelectedValueIndex := 1;
   ServerPage := CreateInputQueryPage(ServerModePage.ID,
     'Adres bazy KartyLeczenia', 'Podaj serwer SQL',
     'Przykład: SERWER,51433 lub SERWER\INSTANCJA');
@@ -202,13 +224,9 @@ begin
   // Always show the role on a repair/re-install. Its default is the current
   // installation's role; keeping it never reinitializes SQL.
   Result := ((PageID = ServerModePage.ID) and
-               ((RolePage.SelectedValueIndex <> 0) or
-                (ExistingArchiveConfiguration and not RoleChanged and
-                 PreviousInstallationRole = 'server')))
+              (RolePage.SelectedValueIndex <> 0))
          or ((PageID = ServerPage.ID) and
-               ((RolePage.SelectedValueIndex = 0) or
-                (ExistingArchiveConfiguration and not RoleChanged and
-                 PreviousInstallationRole = 'client')));
+              (RolePage.SelectedValueIndex = 0));
 end;
 
 function ValidAddress(const Address: String): Boolean;
@@ -257,8 +275,16 @@ begin
       'Czy chcesz kontynuowac?',mbConfirmation,MB_YESNO) = IDYES;
     if not Result then Exit;
   end;
+  if (CurPageID = ServerModePage.ID) and
+     (ServerModePage.SelectedValueIndex = 0) and
+     ((not ExistingArchiveConfiguration) or RoleChanged) then
+  begin
+    MsgBox('Na tym stanowisku nie ma jeszcze zatwierdzonej konfiguracji serwera.' +
+      #13#10 + 'Wybierz istniejaca instancje SQL lub KLARCHIVE.',mbError,MB_OK);
+    Result := False;
+    Exit;
+  end;
   if (CurPageID = ServerPage.ID) and
-     ShouldWriteArchiveConfiguration and
      (RolePage.SelectedValueIndex <> 0) and
      (not ValidAddress(Trim(ServerPage.Values[0]))) then
   begin
@@ -337,7 +363,7 @@ begin
 
   try
     ExtractTemporaryFile('Configure-SharedArchive.ps1');
-    if ShouldWriteArchiveConfiguration and (RolePage.SelectedValueIndex = 0) then
+    if NeedsServerConfiguration then
     begin
       if WizardSilent then
       begin
@@ -347,7 +373,7 @@ begin
 
       Mode := 'Server';
       ReportPath := ExpandConstant('{tmp}\archive-server-result.txt');
-      if ServerModePage.SelectedValueIndex = 0 then
+      if ServerModePage.SelectedValueIndex = 1 then
       begin
         Mode := 'Existing';
         ExistingServerAddress := '';
