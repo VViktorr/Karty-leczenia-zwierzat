@@ -1084,7 +1084,8 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
   </>;
 }
 
-function Prices({onCatalogue}: {onCatalogue: () => void}) {
+function Prices({onCatalogue}: {onCatalogue: (symbol: string) => void}) {
+  const [activePriceSymbol,setActivePriceSymbol]=useState("");
   const levels=useRemote<PriceLevel[]>("priceLevels",{},[]);
   const [level,setLevel]=useState<number|null>(null);
   const [net,setNet]=useState(false);
@@ -1198,7 +1199,9 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
           onClick={()=>setOnlyMissing(prev=>!prev)}>
           Do uzupełnienia ({missingCount})
         </Button>
-        <Button onClick={onCatalogue}>Otwórz katalog / ChPL</Button>
+        <Button onClick={()=>onCatalogue(rows.some(row=>row.symbol===activePriceSymbol) ? activePriceSymbol : "")}>
+          Dodaj / edytuj w katalogu
+        </Button>
         <Button onClick={()=>setExcluded(current=>{
           const next=new Set(current);rows.forEach(row=>next.delete(row.symbol));return next;
         })}>Zaznacz widoczne</Button>
@@ -1207,6 +1210,7 @@ function Prices({onCatalogue}: {onCatalogue: () => void}) {
         })}>Odznacz widoczne</Button>
       </Space>
       <Table rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
+        onRow={row=>({onClick:()=>setActivePriceSymbol(row.symbol)})}
         dataSource={rows} columns={listLayout.columns}
         pagination={{pageSize:40,showSizeChanger:true}}
         size="middle" scroll={{x:1180,y:"calc(100vh - 425px)"}}/>
@@ -2062,6 +2066,7 @@ export default function App() {
   const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
   const [draft,setDraft]=useState<Draft|null>(null);
   const [catalogueDirty,setCatalogueDirty]=useState(false);
+  const [cataloguePickerSymbol,setCataloguePickerSymbol]=useState<string|null>(null);
   const navigate=(next:Section)=>{
     if(next===section)return;
     if(section==="catalogue"&&catalogueDirty){
@@ -2110,7 +2115,9 @@ export default function App() {
   const content=section==="documents"?<Documents onOpen={next=>{setDraft(next);setSection("treatment");}}/>:
     section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}
       onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>:
-    section==="prices"?<Prices onCatalogue={()=>setSection("catalogue")}/>:section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}/>:
+    section==="prices"?<Prices onCatalogue={symbol=>{setCataloguePickerSymbol(symbol);setSection("catalogue");}}/>:
+    section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}
+      initialPickerSymbol={cataloguePickerSymbol} onPickerOpened={()=>setCataloguePickerSymbol(null)}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards initialCardId={savedCardToOpen}
       onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage/>;

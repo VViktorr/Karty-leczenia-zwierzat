@@ -76,7 +76,7 @@ public static class MedicineStockService
         return result.ToArray();
     }
 
-    public static async Task<MedicinePrice[]> FindCatalogueProducts(ConnectionOptions options, string query, CancellationToken token, int limit = 100)
+    public static async Task<MedicinePrice[]> FindCatalogueProducts(ConnectionOptions options, string query, CancellationToken token, int limit = 100, bool exactSymbol = false)
     {
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
@@ -84,10 +84,12 @@ public static class MedicineStockService
             SELECT TOP (@limit) t.tw_Symbol, t.tw_Nazwa
             FROM dbo.tw__Towar t JOIN dbo.sl_GrupaTw g ON g.grt_Id = t.tw_IdGrupa
             WHERE g.grt_Nazwa = @group AND NULLIF(LTRIM(RTRIM(t.tw_Symbol)), '') IS NOT NULL
-                AND (@query = '' OR CHARINDEX(@query, t.tw_Symbol) > 0 OR CHARINDEX(@query, t.tw_Nazwa) > 0)
+                AND ((@exactSymbol = 1 AND UPPER(LTRIM(RTRIM(t.tw_Symbol))) = UPPER(@query))
+                    OR (@exactSymbol = 0 AND (@query = '' OR CHARINDEX(@query, t.tw_Symbol) > 0 OR CHARINDEX(@query, t.tw_Nazwa) > 0)))
             ORDER BY t.tw_Nazwa, t.tw_Symbol
             """, connection);
         command.Parameters.Add("@limit", SqlDbType.Int).Value = limit;
+        command.Parameters.Add("@exactSymbol", SqlDbType.Bit).Value = exactSymbol;
         command.Parameters.Add("@group", SqlDbType.NVarChar, 50).Value = options.DrugGroup;
         command.Parameters.Add("@query", SqlDbType.NVarChar, -1).Value = query.Trim();
         var result = new List<MedicinePrice>();

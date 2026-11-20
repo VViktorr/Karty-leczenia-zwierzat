@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert, Button, Card, Empty, Input, Modal, Space, Table,
   Tag, Typography, Tooltip, message
@@ -7,7 +7,7 @@ import type { ColumnsType } from "antd/es/table";
 import { invoke } from "./bridge";
 
 interface CatalogueListing { symbol: string; name: string; status: string; variants: number; }
-interface MissingMedicine { symbol:string; name:string; }
+interface SubiektProduct { symbol:string; name:string; }
 interface CatalogueVariant {
   id: number | null;
   species: string; indication: string; route: string; dose: string;
@@ -54,7 +54,13 @@ function emptyVariant(): UiVariant {
   };
 }
 
-export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: boolean) => void}) {
+export default function CataloguePage({
+  onDirtyChange, initialPickerSymbol, onPickerOpened
+}: {
+  onDirtyChange?: (value: boolean) => void;
+  initialPickerSymbol: string | null;
+  onPickerOpened: () => void;
+}) {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [list, setList] = useState<CatalogueListing[]>([]);
@@ -72,10 +78,17 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
   const [pdfName, setPdfName] = useState("");
   const [proposal, setProposal] = useState<PendingChplProposal | null>(null);
   const [version, setVersion] = useState(0);
-  const [missingRows,setMissingRows]=useState<MissingMedicine[]|null>(null);
+  const [missingRows,setMissingRows]=useState<SubiektProduct[]|null>(null);
   const [missingOpen,setMissingOpen]=useState(false);
   const [missingBusy,setMissingBusy]=useState(false);
   const [missingTotal,setMissingTotal]=useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerRows, setPickerRows] = useState<SubiektProduct[]>([]);
+  const [pickerSelection, setPickerSelection] = useState<string | null>(null);
+  const [pickerError, setPickerError] = useState("");
+  const [pickerBusy, setPickerBusy] = useState(false);
+  const pickerRequest = useRef(0);
   const [msgApi, contextHolder] = message.useMessage();
 
   useEffect(() => {
@@ -123,65 +136,87 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
     } finally { setWorking(false); }
   }
 
-  function startNewProduct(force=false) {
-    if(dirty&&!force){
-      Modal.confirm({
-        title:"Niezapisane zmiany katalogu",
-        content:"Odrzucić aktualne zmiany i rozpocząć nową kartotekę?",
-        okText:"Odrzuć i dodaj",cancelText:"Pozostań",
-        onOk:()=>startNewProduct(true)
-      });
-      return;
+  const searchSubiekt = useCallback(async (query: string) => {
+    const request = ++pickerRequest.current;
+    setPickerBusy(true);
+    setPickerError("");
+    setPickerRows([]);
+    setPickerSelection(null);
+    try {
+      const rows = await invoke<SubiektProduct[]>("searchSubiektCatalogue", { query: query.trim() });
+      if (request !== pickerRequest.current) return;
+      setPickerRows(rows);
+      if (rows.length === 1) setPickerSelection(rows[0].symbol);
+    } catch (error) {
+      if (request === pickerRequest.current)
+        setPickerError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (request === pickerRequest.current) setPickerBusy(false);
     }
-    setOriginal(null);
-    setEditing({symbol:"",name:"",rplId:"",description:"",
-      revision:"",variants:[]});
-    setVariants([]);setSelected([]);setSavedNotice("");
-    setError("");setDirty(true);
+  }, []);
+
+  useEffect(() => {
+    if (initialPickerSymbol === null) return;
+    setPickerQuery(initialPickerSymbol);
+    setPickerOpen(true);
+    void searchSubiekt(initialPickerSymbol);
+    onPickerOpened();
+  }, [initialPickerSymbol, onPickerOpened, searchSubiekt]);
+
+  function openPicker() {
+    const symbol = editing?.symbol ?? "";
+    setPickerQuery(symbol);
+    setPickerOpen(true);
+    void searchSubiekt(symbol);
+  }
+
+  function closePicker() {
+    ++pickerRequest.current;
+    setPickerOpen(false);
   }
 
   async function checkMissing() {
     if(missingBusy)return;
     setMissingBusy(true);setError("");
     try{
-      const data=await invoke<{items:MissingMedicine[];count:number;total:number}>(
+      const data=await invoke<{items:SubiektProduct[];count:number;total:number}>(
         "missingCatalogueProducts",{refresh:true});
       setMissingRows(data.items);setMissingTotal(data.total);setMissingOpen(true);
     }catch(error){setError(error instanceof Error?error.message:String(error));}
     finally{setMissingBusy(false);}
   }
 
-  async function editMissing(item:MissingMedicine,force=false) {
-    if(dirty&&!force){
+  async function openSubiektProduct(symbol: string, force = false) {
+    if (working) return;
+    if (dirty && !force) {
       Modal.confirm({
-        title:"Niezapisane zmiany katalogu",
-        content:"Odrzucić bieżące zmiany i przejść do wskazanego produktu Subiekta?",
-        okText:"Odrzuć i przejdź",cancelText:"Pozostań",
-        onOk:()=>{void editMissing(item,true);}
+        title: "Niezapisane zmiany katalogu",
+        content: "Odrzucić bieżące zmiany i przejść do wskazanego produktu Subiekta?",
+        okText: "Odrzuć i przejdź", cancelText: "Pozostań",
+        onOk: () => openSubiektProduct(symbol, true)
       });
       return;
     }
-    setMissingOpen(false);setWorking(true);setError("");
-    try{
-      const existing=await invoke<CatalogueProduct>(
-        "readCatalogueProduct",{symbol:item.symbol});
-      loadProduct(existing);
-    }catch(error){
-      const reason=error instanceof Error?error.message:String(error);
-      if(reason.includes("Nie znaleziono kartoteki.")){
-        // WinForms creates a new SQL catalogue record only after the
-        // operator explicitly saves; no clinical data are fabricated.
+    setWorking(true);
+    setError("");
+    setPickerError("");
+    try {
+      const product = await invoke<CatalogueProduct>("openSubiektCatalogueProduct", { symbol });
+      loadProduct(product);
+      if (!product.revision) {
         setOriginal(null);
-        setEditing({symbol:item.symbol,name:item.name,rplId:"",
-          description:"",revision:"",variants:[]});
-        setVariants([]);setSelected([]);setDirty(true);
-        setSavedNotice("");
-      }else setError(reason);
-    }finally{setWorking(false);}
+        setDirty(true);
+      }
+      closePicker();
+      setMissingOpen(false);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      if (pickerOpen) setPickerError(reason);
+      else setError(reason);
+    } finally { setWorking(false); }
   }
 
-  function changeField(field: "symbol" | "name" | "rplId" | "description", value: string) {
-    if(field==="symbol"&&original)return;
+  function changeField(field: "rplId" | "description", value: string) {
     setEditing(current => current ? { ...current, [field]: value } : current);
     setDirty(true);
   }
@@ -375,7 +410,7 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
         <Button disabled={missingBusy||working} loading={missingBusy}
           onClick={()=>{void checkMissing();}}>Sprawdź braki w katalogu</Button>
         <Button type="primary" disabled={working}
-          onClick={()=>startNewProduct()}>Nowa kartoteka</Button>
+          onClick={openPicker}>Dodaj / edytuj w katalogu</Button>
         <Button onClick={() => setVersion(value => value + 1)}
           loading={listBusy}>Odśwież katalog</Button>
       </Space>
@@ -433,13 +468,10 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
           </div>
           <div className="catalogue-product-fields">
             <label>Symbol leku (identyfikator w katalogu SQL)
-              <Input value={editing.symbol} disabled={!!original}
-                maxLength={128} placeholder="Symbol produktu"
-                onChange={event=>changeField("symbol",event.target.value.trim())}/>
+              <Input value={editing.symbol} readOnly />
             </label>
             <label>Nazwa leku
-              <Input value={editing.name}
-                onChange={event => changeField("name", event.target.value)} />
+              <Input value={editing.name} readOnly />
             </label>
             <label>Numer RPL
               <Input value={editing.rplId}
@@ -479,6 +511,39 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
         </>}
       </Card>
     </div>
+    <Modal open={pickerOpen} title="Wybierz kartotekę Subiekta" width={680}
+      onCancel={working ? undefined : closePicker} closable={!working} maskClosable={false}
+      keyboard={!working} cancelButtonProps={{ disabled: working }} cancelText="Anuluj"
+      okText="Wybierz" okButtonProps={{ disabled: !pickerSelection || pickerBusy }}
+      confirmLoading={working}
+      onOk={() => { if (pickerSelection) void openSubiektProduct(pickerSelection); }}>
+      <Space.Compact style={{ width: "100%", marginBottom: 12 }}>
+        <Input autoFocus aria-label="Symbol lub nazwa z Subiekta"
+          placeholder="Symbol lub nazwa z Subiekta" maxLength={128} value={pickerQuery}
+          onChange={event => setPickerQuery(event.target.value)}
+          onPressEnter={() => { if (!pickerBusy && !working) void searchSubiekt(pickerQuery); }} />
+        <Button disabled={working} loading={pickerBusy} onClick={() => void searchSubiekt(pickerQuery)}>
+          Szukaj
+        </Button>
+      </Space.Compact>
+      {pickerError && <Alert type="error" showIcon message={pickerError} />}
+      {pickerRows.length === 100 && <Typography.Text type="secondary">
+        Pokazano pierwsze 100 kartotek. Zawęź wyszukiwanie.
+      </Typography.Text>}
+      <Table<SubiektProduct> rowKey="symbol" size="small" dataSource={pickerRows}
+        loading={pickerBusy} pagination={false} scroll={{ y: 300 }}
+        locale={{ emptyText: pickerBusy ? "Wczytywanie kartotek…" : "Brak pasujących kartotek." }}
+        rowSelection={{ type: "radio", selectedRowKeys: pickerSelection ? [pickerSelection] : [],
+          onChange: keys => setPickerSelection(keys[0] == null ? null : String(keys[0])) }}
+        onRow={row => ({
+          onClick: () => setPickerSelection(row.symbol),
+          onDoubleClick: () => { void openSubiektProduct(row.symbol); }
+        })}
+        columns={[
+          { title: "Symbol", dataIndex: "symbol", width: 180 },
+          { title: "Nazwa", dataIndex: "name" }
+        ]} />
+    </Modal>
     <Modal className="kl-dialog-catalogue-missing" open={missingOpen}
       title={"Leki do uzupełnienia ("+(missingRows?.length??0)+" / "+missingTotal+")"}
       width={900} onCancel={()=>setMissingOpen(false)}
@@ -488,14 +553,14 @@ export default function CataloguePage({onDirtyChange}: {onDirtyChange?: (value: 
         Otwórz produkt, aby uzupełnić istniejącą kartotekę lub przygotować nową.
         Bez Twojego zatwierdzenia nic nie zapisuje się w SQL.
       </Typography.Paragraph>
-      <Table<MissingMedicine> rowKey="symbol" size="small"
+      <Table<SubiektProduct> rowKey="symbol" size="small"
         dataSource={missingRows??[]} pagination={{pageSize:20}}
         scroll={{y:420}} columns={[
           {title:"Symbol Subiekta",dataIndex:"symbol",width:210},
           {title:"Nazwa leku",dataIndex:"name"},
           {title:"Otwórz",key:"open",width:105,
             render:(_value,row)=><Button size="small"
-              onClick={()=>{void editMissing(row);}}>Uzupełnij</Button>}
+              onClick={()=>{void openSubiektProduct(row.symbol);}}>Uzupełnij</Button>}
         ]}/>
     </Modal>
     <Modal className="kl-dialog-catalogue-proposal" open={proposal !== null}

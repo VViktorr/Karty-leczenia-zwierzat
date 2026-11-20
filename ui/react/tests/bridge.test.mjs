@@ -31,3 +31,22 @@ test("simultaneous saved-card requests resolve by correlation, not by card GUID"
   assert.equal(await first,"first");
   assert.equal(await second,"second");
 });
+
+test("Subiekt catalogue search and selection send distinct read-only requests", async () => {
+  const search = invoke("searchSubiektCatalogue", {query: "symbol"});
+  const searchRequest = posted.at(-1);
+  assert.equal(searchRequest.action, "searchSubiektCatalogue");
+  assert.equal(searchRequest.query, "symbol");
+  deliver({data: {id: searchRequest._bridgeRequestId, ok: true,
+    data: [{symbol: "symbol", name: "Fixture"}]}});
+  const [row] = await search;
+
+  const open = invoke("openSubiektCatalogueProduct", {symbol: row.symbol});
+  const openRequest = posted.at(-1);
+  assert.equal(openRequest.action, "openSubiektCatalogueProduct");
+  assert.equal(openRequest.symbol, row.symbol);
+  assert.equal(Object.hasOwn(openRequest, "name"), false);
+  const draft = {...row, rplId: "", description: "", revision: "", variants: []};
+  deliver({data: {id: openRequest._bridgeRequestId, ok: true, data: draft}});
+  assert.deepEqual(await open, draft);
+});

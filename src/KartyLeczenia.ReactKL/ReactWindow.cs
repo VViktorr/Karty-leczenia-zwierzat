@@ -288,6 +288,28 @@ internal sealed class ReactWindow : Form
             await Task.Run(() => PricePrintOptionsStore.Save(settings), token);
             return new { saved = true };
         }
+        if (action is "searchSubiektCatalogue" or "openSubiektCatalogueProduct")
+        {
+            var settings = subiekt.Load().Options ??
+                throw new InvalidOperationException("Skonfiguruj połączenie z Subiektem przed wyborem kartoteki.");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(15));
+            if (action == "searchSubiektCatalogue")
+            {
+                string query = ReadTextField(root, "query", 128);
+                var matches = await MedicineStockService.FindCatalogueProducts(settings, query, timeout.Token);
+                return matches.Select(item => new { item.Symbol, item.Name }).ToArray();
+            }
+
+            string symbol = ReadTextField(root, "symbol", 128).Trim();
+            var products = await MedicineStockService.FindCatalogueProducts(
+                settings, symbol, timeout.Token, limit: 2, exactSymbol: true);
+            if (products.Length != 1)
+                throw new InvalidOperationException(products.Length == 0
+                    ? "Kartoteka nie jest już dostępna w grupie leków Subiekta."
+                    : "Symbol odpowiada kilku kartotekom Subiekta.");
+            return await Task.Run(() => catalogue.Read(products[0]), token);
+        }
         if (action == "missingCatalogueProducts")
         {
             var settings = subiekt.Load().Options ??

@@ -68,7 +68,11 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         return result;
     }
 
-    internal CatalogueProductModel Read(string symbol)
+    internal CatalogueProductModel Read(string symbol) => Read(symbol, null);
+
+    internal CatalogueProductModel Read(MedicinePrice item) => Read(item.Symbol, item.Name);
+
+    CatalogueProductModel Read(string symbol, string? subiektName)
     {
         if (string.IsNullOrWhiteSpace(symbol) || symbol.Length > 128)
             throw new ArgumentException("Wybierz kartotekę leku.");
@@ -84,8 +88,12 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         {
             command.Parameters.Add("@symbol", SqlDbType.NVarChar, 128).Value = symbol.Trim();
             using var reader = command.ExecuteReader();
-            if (!reader.Read()) throw new InvalidOperationException(
-                "Nie znaleziono kartoteki. Odśwież katalog.");
+            if (!reader.Read())
+            {
+                if (subiektName is not null)
+                    return new(symbol, subiektName, "", "", "", []);
+                throw new InvalidOperationException("Nie znaleziono kartoteki. Odśwież katalog.");
+            }
             if (reader.GetString(4) == "NOT_MEDICINE")
                 throw new InvalidOperationException("Produkt jest oznaczony jako nieleczniczy.");
             name = reader.GetString(0);
@@ -117,7 +125,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             }
         }
         tx.Commit();
-        return new(canonicalSymbol, name, rpl, description, revision, variants);
+        return new(canonicalSymbol, subiektName ?? name, rpl, description, revision, variants);
     }
 
     /// <summary>
