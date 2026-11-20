@@ -105,9 +105,7 @@ public sealed class SubiektConnectionService
         using (var command = new SqlCommand("SELECT grt_Nazwa FROM dbo.sl_GrupaTw ORDER BY grt_Nazwa", db) { CommandTimeout = 8 })
         await using (var reader = await command.ExecuteReaderAsync(token))
             while (await reader.ReadAsync(token)) if (!reader.IsDBNull(0)) groups.Add(reader.GetString(0).Trim());
-        if (validateSelections &&
-            !groups.Contains(options.DrugGroup.Trim(), StringComparer.OrdinalIgnoreCase))
-            throw new DrugGroupNotFoundException(groups);
+
         string company = options.Database;
         try
         {
@@ -116,11 +114,23 @@ public sealed class SubiektConnectionService
         }
         catch (SqlException ex) when (ex.Number is 229 or 207 or 208) { }
         var warehouses = await MedicineStockService.Warehouses(options, token);
-        if (validateSelections && (options.WarehouseId is not int selected ||
-            !warehouses.Any(warehouse => warehouse.Id == selected)))
+        if (validateSelections)
+            ValidateChoices(options, groups, warehouses);
+        return new(company, groups, warehouses);
+    }
+
+    // Same validation is used by the save operation and offline regression
+    // tests. Read-only inspection deliberately returns the selectable lists
+    // even if a previously chosen group or warehouse no longer exists.
+    public static void ValidateChoices(ConnectionOptions options,
+        IReadOnlyList<string> groups, IReadOnlyList<MedicineWarehouse> warehouses)
+    {
+        if (!groups.Contains(options.DrugGroup.Trim(), StringComparer.OrdinalIgnoreCase))
+            throw new DrugGroupNotFoundException(groups);
+        if (options.WarehouseId is not int selected ||
+            !warehouses.Any(warehouse => warehouse.Id == selected))
             throw new InvalidOperationException(
                 "Wybierz magazyn z listy pobranej z Subiekta i ponów sprawdzenie połączenia.");
-        return new(company, groups, warehouses);
     }
 
     public static string FriendlyError(Exception ex) => ex switch
