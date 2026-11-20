@@ -1586,6 +1586,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           </Button>
         </> : <>
           {!trash&&<Button onClick={beginEdit} disabled={!card}>Edytuj zapisaną kartę</Button>}
+          {selected&&<Button type="primary" disabled={!card}
+            onClick={()=>{void printSaved(selected);}}>Podgląd karty</Button>}
           {selected&&<Button disabled={!!pdfBusy} onClick={()=>{void cardPdf(selected,false);}}>Zapisz PDF</Button>}
           {selected&&<Button disabled={!!pdfBusy} onClick={()=>{void cardPdf(selected,true);}}>Wyślij mailem</Button>}
           <Button onClick={discardSaved}>Zamknij</Button>
