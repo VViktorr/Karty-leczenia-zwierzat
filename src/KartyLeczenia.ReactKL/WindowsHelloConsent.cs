@@ -59,11 +59,28 @@ internal static class WindowsHelloConsent
                 {
                     if (owner.WindowState == FormWindowState.Minimized)
                         owner.WindowState = stateBeforePrompt;
-                    // Activation can be denied after the system UI takes focus.
-                    // Raise the window independently of keyboard activation.
-                    SetWindowPos(owner.Handle, nint.Zero, 0, 0, 0, 0,
-                        SwpNoMove | SwpNoSize | SwpNoActivate);
-                    owner.Activate();
+                    // The consent result can arrive before Windows finishes
+                    // restoring the previous foreground window.
+                    bool wasTopMost = owner.TopMost;
+                    try
+                    {
+                        if (!wasTopMost) owner.TopMost = true;
+                        await Task.Delay(350);
+                        if (!owner.IsDisposed && !owner.Disposing && owner.Visible &&
+                            owner.WindowState != FormWindowState.Minimized)
+                            owner.Activate();
+                    }
+                    finally
+                    {
+                        if (!owner.IsDisposed && !owner.Disposing)
+                        {
+                            if (!wasTopMost) owner.TopMost = false;
+                            if (owner.IsHandleCreated && owner.Visible &&
+                                owner.WindowState != FormWindowState.Minimized)
+                                SetWindowPos(owner.Handle, nint.Zero, 0, 0, 0, 0,
+                                    SwpNoMove | SwpNoSize | SwpNoActivate);
+                        }
+                    }
                 }
             }
             if (outcome == UserConsentVerificationResult.Verified)
