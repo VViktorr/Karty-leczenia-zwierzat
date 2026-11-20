@@ -71,7 +71,7 @@ interface MedicineExpiry {
   warehouseName: string; deliveriesConfirmed: boolean; productId: number; movementId: number;
 }
 interface SavedCard { id: string; date: string; client: string; document: string; number: string; }
-interface SaveResult {duplicate: boolean; duplicateId: string | null; number: string | null; id: string | null;}
+interface SaveResult {duplicate: boolean; duplicateId: string | null; number: string | null; id: string | null; html: string | null;}
 interface StoredCard {
   fields: Record<string, string>;
   rows: Array<Record<string, string>>;
@@ -568,59 +568,55 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
   async function reviewBefore(action:"save"|"preview"):Promise<boolean> {
     const selected=rows.filter(row=>row.selected);
     if(!selected.length) {
-      setError("Zaznacz przynajmniej jeden lek do zapisania lub wydruku.");
+      setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk. Jeśli filtr gatunku ukrywa dostępne pozycje, wybierz Wszystkie.");
+      return false;
+    }
+    if(!performed){
+      setError("Podaj datę i godzinę wykonania czynności weterynaryjnych.");
       return false;
     }
     const warnings=selected.map(row=>{
-      const issues:string[]=[];
-      const blocking:string[]=[];
-      if(!row.product.trim()) blocking.push("Brak nazwy produktu");
-      if(!row.species.trim()) blocking.push("Brak gatunku");
-      if(!row.route.trim()) blocking.push("Brak drogi podania");
-      if(!row.dosing.trim()) blocking.push("Brak dawkowania");
-      if(!row.diagnosis.trim()) blocking.push("Brak rozpoznania");
-      if(!row.batch.trim()) issues.push("Nie wpisano serii");
-      if(!row.animals.trim()) issues.push("Nie wpisano liczby zwierząt");
-      if(!row.withdrawal.trim()) issues.push("Brak karencji — sprawdź, czy dotyczy tego gatunku");
+      const issues:{message:string; field?:keyof DraftRow}[]=[];
+      if(!row.batch.trim()) issues.push({message:"Nie wpisano serii",field:"batch"});
+      if(!row.animals.trim()) issues.push({message:"Nie wpisano liczby zwierząt",field:"animals"});
+      if(!row.withdrawal.trim()) issues.push({message:"Brak danych o karencji",field:"withdrawal"});
       const candidate=suggestions.find(item=>item.index===row.index);
-      if(candidate && ["review","ambiguous","notFound","noMatch","missingSymbol"].includes(candidate.status))
-        issues.push("Wariant ChPL wymaga ręcznego sprawdzenia");
-      return {row,issues,blocking};
-    }).filter(item=>item.issues.length||item.blocking.length);
+      if(!candidate || ["review","ambiguous","notFound","noMatch","missingSymbol"].includes(candidate.status))
+        issues.push({message:"Sprawdź wariant ChPL"});
+      return {row,issues};
+    }).filter(item=>item.issues.length);
     if(!warnings.length)return true;
-    const blocked=warnings.some(item=>item.blocking.length>0);
     return new Promise<boolean>(resolve=>{
       let resolved=false;
       const done=(accepted:boolean)=>{if(!resolved){resolved=true;resolve(accepted);}};
       let dialog:ReturnType<typeof Modal.confirm>|null=null;
       dialog=Modal.confirm({
-        title:blocked?"Uzupełnij wymagane dane karty":"Sprawdź ostrzeżenia przed "+
-          (action==="save"?"zapisem":"podglądem wydruku"),
+        title:"Sprawdź dane przed "+(action==="save"?"zapisem":"podglądem wydruku"),
         width:700,
         content:<div>
-          <Alert className="notice" type={blocked?"error":"warning"} showIcon
-            message={blocked
-              ?"Brak wymaganych pól — zapis i wydruk są zablokowane do czasu poprawy."
-              :"Sprawdź wymienione pozycje. Możesz świadomie kontynuować, gdy dane są prawidłowe."}/>
+          <Alert className="notice" type="warning" showIcon
+            message="Sprawdź wymienione pozycje przed kontynuowaniem."/>
           <div style={{maxHeight:350,overflowY:"auto",marginTop:12}}>
             {warnings.map(item=><div key={item.row.index} style={{padding:"9px 0",borderBottom:"1px solid var(--ant-color-border-secondary, #ddd)"}}>
               <Typography.Text strong>{item.row.index+1}. {item.row.product||"Bez nazwy produktu"}</Typography.Text>
               <ul style={{margin:"5px 0",paddingLeft:20}}>
-                {item.blocking.map((message,i)=><li key={"required-"+i}><Typography.Text type="danger">{message}</Typography.Text></li>)}
-                {item.issues.map((message,i)=><li key={"warning-"+i}>{message}</li>)}
+                {item.issues.map(issue=><li key={issue.message}>{issue.message}</li>)}
               </ul>
               <Button type="link" size="small" onClick={()=>{
                 dialog?.destroy();done(false);
+                const field=item.issues.find(issue=>issue.field)?.field;
+                if(field)setVisibleColumns(current=>current.includes(field)?current:[...current,field]);
                 window.setTimeout(()=>{
-                  document.querySelector('[data-row-key="'+item.row.index+'"]')
-                    ?.scrollIntoView({behavior:"smooth",block:"center"});
-                },80);
+                  const row=document.querySelector('.treatment-rows tr[data-row-key="'+item.row.index+'"]');
+                  const input=field?row?.querySelector<HTMLElement>('[data-treatment-field="'+field+'"]'):null;
+                  (input??row)?.scrollIntoView({behavior:"smooth",block:"center",inline:"nearest"});
+                  input?.focus({preventScroll:true});
+                },250);
               }}>Przejdź do pozycji</Button>
             </div>)}
           </div>
         </div>,
         okText:"Potwierdzam — "+(action==="save"?"zapisz kartę":"otwórz podgląd"),
-        okButtonProps:{disabled:blocked},
         cancelText:"Anuluj",
         onOk:()=>done(true),onCancel:()=>done(false)
       });
@@ -628,9 +624,9 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
   }
   async function saveCard(confirmDuplicate = false) {
     if (!draft || busy || applyBusy || selectionBusy) return;
-    if (!await reviewBefore("save")) return;
     setBusy(true); setError("");
     try {
+      if (!await reviewBefore("save")) return;
       const result = await invoke<SaveResult>("saveDraft", {
         draftId:draft.draftId, reported, performed, findings, confirmDuplicate, rows
       });
@@ -642,15 +638,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
         if (result.id) {
           setPreviewSavedId(result.id);
           setPdfMessage("");
-          try {
-            const printable=await invoke<{html:string}>("renderSavedCard",{
-              id:result.id,trash:false
-            });
-            setPreview(printable.html);
-          } catch (previewError) {
-            setError("Karta została zapisana w SQL, ale nie można otworzyć podglądu: "+
-              (previewError instanceof Error ? previewError.message : String(previewError)));
-          }
+          if(result.html)setPreview(result.html);
         }
       }
     } catch (e) {setError(e instanceof Error ? e.message : String(e));}
@@ -675,9 +663,9 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
   }
   async function printPreview() {
     if (!draft || busy || applyBusy || selectionBusy) return;
-    if (!await reviewBefore("preview")) return;
-    setBusy(true);
+    setBusy(true);setError("");
     try {
+      if (!await reviewBefore("preview")) return;
       const data = await invoke<{html:string}>("previewDraft", {
         draftId:draft.draftId, reported, performed, findings, rows
       });
@@ -783,7 +771,6 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
     if(key==="selected" && typeof value==="boolean")
       desiredChecks.current.set(index,value);
     if (!field || applyBusy) return;
-    const previous = rows;
     setRows(current => current.map(row => row.index === index ? {...row,[key]:value} : row));
     if(["species","route","dosing","withdrawal"].includes(String(key))){
       setSuggestions(current=>current.map(s=>s.index===index
@@ -791,8 +778,11 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
     }
     setSavedNumber("");
     try { await invoke("updateDraft", {draftId:draft.draftId,index,field,
-      ...(key === "selected" ? {checked:value} : {value})}); setError(""); }
-    catch (e) { setRows(previous); setError(e instanceof Error ? e.message : String(e)); }
+      ...(key === "selected" ? {checked:value} : {value})}); }
+    catch (e) {
+      setError("Nie udało się zsynchronizować pola. Wpis zachowano w edytorze: "+
+        (e instanceof Error ? e.message : String(e)));
+    }
   };
   const isCompatible=(row:DraftRow)=>speciesGroup==="all" ||
     (compatibility[row.index]??[]).includes(speciesGroup);
@@ -839,7 +829,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
             options={[{label:"II",value:"II"},{label:"III",value:"III"}]}
             onChange={next=>{void update(row.index,"section",next);}}/>
         : <Input.TextArea autoSize={{minRows:1,maxRows:3}}
-        aria-label={title} value={value} disabled={applyBusy}
+        aria-label={title} data-treatment-field={key} value={value} disabled={applyBusy||busy}
         onChange={e => {
           const next=e.target.value;
           setRows(current => current.map(item => item.index===row.index ? {...item,[key]:next} : item));
@@ -935,7 +925,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
     </Card>
     {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
-    <Card><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
+    <Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
       columns={treatmentMouse.decorate(
         columns.filter(column=>visibleColumns.includes(treatmentColumnKey(column)))
         .sort((a,b)=>columnOrder.indexOf(treatmentColumnKey(a))-

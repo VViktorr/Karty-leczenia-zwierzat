@@ -1272,41 +1272,43 @@ internal sealed class ReactWindow : Form
         {
             string draftId = ReadTextField(root, "draftId", 30);
             if (!drafts.TryGetValue(draftId, out var draft))
-                throw new InvalidOperationException("Ponownie otwórz dokument przed zapisaniem.");
-            static DateTime RequiredDate(JsonElement element, string name)
+                throw new InvalidOperationException("Ponownie otwórz dokument przed zapisaniem lub podglądem.");
+            static DateTime RequiredDate(JsonElement element, string name, string label)
             {
                 string text = ReadTextField(element, name, 35);
                 if (!DateTime.TryParseExact(text, "yyyy-MM-ddTHH:mm",
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None, out var date))
-                    throw new ArgumentException("Podaj datę i godzinę: " + name);
+                    throw new ArgumentException("Podaj datę i godzinę: " + label);
                 return date;
             }
             // The complete edited snapshot travels with save/preview to avoid a
             // WebView2 blur-vs-click race leaving the last cell unsaved.
-            if (root.TryGetProperty("rows", out var submitted) &&
-                submitted.ValueKind == JsonValueKind.Array)
+            if (!root.TryGetProperty("rows", out var submitted) ||
+                submitted.ValueKind != JsonValueKind.Array)
+                throw new InvalidOperationException("Nie przekazano aktualnych pozycji karty.");
+            var snapshot = draft with { Rows = draft.Rows.Select(row => new TreatmentRow(row.Values)).ToList() };
+            if (submitted.GetArrayLength() != draft.Rows.Count || draft.Rows.Count > 500)
+                throw new InvalidOperationException("Liczba pozycji zmieniła się. Ponownie otwórz dokument.");
+            var indexes = new HashSet<int>();
+            foreach (var item in submitted.EnumerateArray())
             {
-                if (submitted.GetArrayLength() != draft.Rows.Count || draft.Rows.Count > 500)
-                    throw new InvalidOperationException("Liczba pozycji zmieniła się. Ponownie otwórz dokument.");
-                foreach (var item in submitted.EnumerateArray())
-                {
-                    int index = Int(item, "index") ?? -1;
-                    if (index < 0 || index >= draft.Rows.Count)
-                        throw new InvalidOperationException("Niewłaściwy indeks pozycji.");
-                    var treatment = draft.Rows[index];
-                    treatment.Printed = Flag(item, "selected");
-                    foreach (var (key, field) in new[] {
-                        ("batch", "Seria"), ("replacement", "Zamiennik produktu"),
-                        ("species", "Gatunek"),
-                        ("route", "Droga podania"), ("dosing", "Dawkowanie i okres stosowania"),
-                        ("withdrawal", "Karencja"),
-                        ("description", "Opis zwierząt / numer siedziby stada"),
-                        ("animals", "Liczba zwierząt"), ("diagnosis", "Rozpoznanie"),
-                        ("section", "Sekcja (II lub III)")
-                    })
-                        treatment.Set(field, ReadTextField(item, key, 3000));
-                }
+                int index = Int(item, "index") ?? -1;
+                if (index < 0 || index >= draft.Rows.Count || !indexes.Add(index))
+                    throw new InvalidOperationException("Niewłaściwy indeks pozycji.");
+                var treatment = snapshot.Rows[index];
+                treatment.Printed = Flag(item, "selected");
+                foreach (var (key, field) in new[] {
+                    ("batch", "Seria"), ("replacement", "Zamiennik produktu"),
+                    ("species", "Gatunek"),
+                    ("route", "Droga podania"), ("dosing", "Dawkowanie i okres stosowania"),
+                    ("withdrawal", "Karencja"),
+                    ("description", "Opis zwierząt / numer siedziby stada"),
+                    ("animals", "Liczba zwierząt"), ("diagnosis", "Rozpoznanie")
+                })
+                    treatment.Set(field, ReadTextField(item, key, 3000));
+                string section = ReadTextField(item, "section", 3);
+                treatment.Set("Sekcja (II lub III)", section.Length == 0 ? "II" : section);
             }
             static DateTime? OptionalDate(JsonElement element, string name)
             {
@@ -1319,11 +1321,12 @@ internal sealed class ReactWindow : Form
                 return date;
             }
             var reported = OptionalDate(root, "reported");
-            var performed = RequiredDate(root, "performed");
+            var performed = RequiredDate(root, "performed", "wykonanie czynności weterynaryjnych");
             string findings = ReadTextField(root, "findings", 2000);
             if (action == "previewDraft")
-                return new { html = cards.RenderDraft(draft, reported, performed, findings) };
-            return cards.Save(draft, reported, performed, findings, Flag(root, "confirmDuplicate"));
+                return new { html = await Task.Run(() => cards.RenderDraft(snapshot, reported, performed, findings), token) };
+            bool confirmDuplicate = Flag(root, "confirmDuplicate");
+            return await Task.Run(() => cards.Save(snapshot, reported, performed, findings, confirmDuplicate), token);
         }
         throw new InvalidOperationException("Nieznana operacja interfejsu: " + action);
     }

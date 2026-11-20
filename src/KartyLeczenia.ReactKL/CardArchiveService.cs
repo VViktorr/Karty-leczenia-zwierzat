@@ -22,7 +22,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         return connection;
     }
 
-    internal sealed record SaveResult(bool Duplicate, string? DuplicateId, string? Number, string? Id);
+    internal sealed record SaveResult(bool Duplicate, string? DuplicateId, string? Number, string? Id, string? Html = null);
 
     // The performance date, not the optional reporting date, controls card numbering
     // and the treatment date stored in the archive.
@@ -34,21 +34,9 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
     {
         if (source.Rows.All(x => !x.Printed))
             throw new InvalidOperationException("Zaznacz przynajmniej jeden lek do wydruku.");
-        foreach (var row in source.Rows.Where(x => x.Printed))
-        {
-            foreach (var column in new[] { "Produkt", "Gatunek", "Droga podania",
-                         "Dawkowanie i okres stosowania", "Rozpoznanie" })
-                if (string.IsNullOrWhiteSpace(row.Get(column)))
-                    throw new InvalidOperationException(
-                        $"Lek „{row.Product}”: wymagane pole „{column}” jest puste.");
-        }
-
         var clinic = clinicService.Load().Settings;
         string clinicInfo = clinic.CardText;
         string doctor = clinic.Doctor;
-        if (string.IsNullOrWhiteSpace(clinicInfo) || string.IsNullOrWhiteSpace(doctor))
-            throw new InvalidOperationException(
-                "Uzupełnij w ustawieniach dane lecznicy i lekarza przed zapisaniem karty.");
 
         var fields = new Dictionary<string, string>
         {
@@ -59,9 +47,10 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Zgłoszenie — data i godzina"] = reported?.ToString("dd.MM.yyyy HH:mm") ?? "",
             ["Wykonanie — data i godzina"] = performed.ToString("dd.MM.yyyy HH:mm"),
             ["Wyniki badań"] = findings,
-            ["Dokument źródłowy"] = source.Number
+            ["Dokument źródłowy"] = source.Number,
+            ["Zakres mapowania towarów"] = source.Scope
         };
-        var rows = source.Rows.Select(x => new Dictionary<string, string>(x.Values)).ToList();
+        var rows = CaptureRows(source);
         var card = new Card(fields, rows)
         {
             ClinicStampPng = clinic.UseClinicStamp ? clinic.ClinicStampPng : null,
@@ -109,6 +98,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         }
         string number = $"K/{sequence}/{year:D4}";
         fields["Nr karty"] = number;
+        string html = CardHtmlRenderer.Render(card);
         string json = JsonSerializer.Serialize(card);
         using (var save = Cmd(db, tx, """
             INSERT INTO dbo.treatment_cards
@@ -132,7 +122,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             save.ExecuteNonQuery();
         }
         tx.Commit();
-        return new(false, null, number, id);
+        return new(false, null, number, id, html);
     }
 
     internal static string SafeJsonFileName(string cardNumber)
@@ -176,15 +166,26 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Zgłoszenie — data i godzina"] = reported?.ToString("dd.MM.yyyy HH:mm") ?? "",
             ["Wykonanie — data i godzina"] = performed.ToString("dd.MM.yyyy HH:mm"),
             ["Wyniki badań"] = findings,
-            ["Dokument źródłowy"] = source.Number
+            ["Dokument źródłowy"] = source.Number,
+            ["Zakres mapowania towarów"] = source.Scope
         };
         return CardHtmlRenderer.Render(new Card(fields,
-            source.Rows.Select(x => new Dictionary<string,string>(x.Values)).ToList())
+            CaptureRows(source))
         {
             ClinicStampPng = clinic.UseClinicStamp ? clinic.ClinicStampPng : null,
             DoctorStampPng = clinic.UseDoctorStamp ? clinic.DoctorStampPng : null
         });
     }
+
+    private static List<Dictionary<string, string>> CaptureRows(DocumentData source)
+        => source.Rows.Select(row =>
+        {
+            var values = new Dictionary<string, string>(row.Values);
+            const string description = "Opis zwierząt / numer siedziby stada";
+            if (row.Get("Domyślny gatunek") == "True" && row.Get(description) == "Bydło")
+                values[description] = "";
+            return values;
+        }).ToList();
 
     private static SqlCommand Cmd(SqlConnection db, SqlTransaction tx, string query)
         => new(query, db, tx) { CommandTimeout = 20 };
