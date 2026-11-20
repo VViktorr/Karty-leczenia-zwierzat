@@ -2065,11 +2065,12 @@ function SettingsPage({onSubiektSaved}: {onSubiektSaved: () => void}) {
     <Tabs activeKey={active} onChange={choose} items={[
       {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings onSaved={onSubiektSaved}/>},
       {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
+      {key:"administrator",label:"Konto administratora SQL",children:<ProgramDatabaseSettings administrator/>},
       {key:"backup",label:"Archiwizacja",children:<Space direction="vertical" size={18}
         style={{width:"100%"}}>
         <Alert type="info" className="notice" showIcon
           message="Archiwizacja dotyczy bazy KartyLeczenia — nie bazy Subiekta"
-          description="Połączenie ustawiasz w zakładce „Baza Karty Leczenia”. Tutaj wybierasz miejsce zapisania kopii .bak, wykonujesz kopię lub odtwarzasz dane."/>
+          description="Kopia korzysta z połączenia „Baza Karty Leczenia”. Do odtwarzania używane jest „Konto administratora SQL”."/>
         <BackupPanel/>
         <RestorePanel/>
       </Space>},

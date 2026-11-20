@@ -18,6 +18,9 @@ internal sealed class ReactWindow : Form
     private readonly ConnectionSettingsStore archive = new(Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "KartyLeczenia", "archive-connection.json"));
+    private readonly ConnectionSettingsStore administrator = new(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "KartyLeczenia", "administrator-connection.json"));
     private readonly DocumentService documents = new();
     private readonly DocumentListCache documentLists = new();
     // Short snapshots avoid the expensive delivery/stock query being repeated
@@ -41,7 +44,6 @@ internal sealed class ReactWindow : Form
     private byte[]? stagedClinicStamp;
     private byte[]? stagedDoctorStamp;
     private readonly SqlBackupService backups;
-    private readonly SqlRestoreService restores;
     private readonly ReactUpdateService updates;
     private ReactUpdateInfo? checkedUpdate;
     private string? startupPublicationError;
@@ -63,7 +65,6 @@ internal sealed class ReactWindow : Form
         treatmentChoices = new TreatmentChoiceService(archive);
         animalDescriptions = new AnimalDescriptionService(archive);
         backups = new SqlBackupService(archive);
-        restores = new SqlRestoreService(archive);
         updates = new ReactUpdateService(archive);
         catalogue = new CatalogueService(archive);
         priceCatalogueService = new PriceCatalogueService(archive);
@@ -512,6 +513,8 @@ internal sealed class ReactWindow : Form
                 throw new InvalidOperationException("Ponownie wybierz plik .bak w systemowym oknie Windows.");
             if (ReadTextField(root, "confirmation", 40) != "KartyLeczenia")
                 throw new InvalidOperationException("Potwierdź nazwę bazy KartyLeczenia.");
+            var adminOptions = AdministratorOptions();
+            string restorePath = selectedRestoreFile;
             restoreRunning = true;
             try
             {
@@ -520,7 +523,7 @@ internal sealed class ReactWindow : Form
                     return new { cancelled = true };
                 string request = ReadTextField(root,"id",80);
                 var progress = new Progress<SqlBackupProgress>(value => SendProgress(request,value));
-                var result = await Task.Run(() => restores.Run(selectedRestoreFile,progress));
+                var result = await Task.Run(() => SqlRestoreService.Run(adminOptions, restorePath, progress));
                 selectedRestoreFile = null;
                 return new { cancelled = false, result.Database,result.SourcePath,
                     result.SafetyBackupPath,result.Message };
@@ -618,6 +621,53 @@ internal sealed class ReactWindow : Form
             };
         }
 
+        if (action == "getAdministratorSettings")
+        {
+            var program = archive.Load().Options;
+            var current = administrator.Load();
+            var setting = current.Options;
+            bool sameServer = setting is not null && program is not null &&
+                string.Equals(setting.Server, program.Server, StringComparison.OrdinalIgnoreCase);
+            return new
+            {
+                configured = sameServer,
+                server = program?.Server ?? "",
+                windowsAuthentication = !sameServer || setting!.WindowsAuthentication,
+                userName = sameServer ? setting!.UserName : "",
+                remembered = sameServer && current.Remembered,
+                warning = program is null ? "Najpierw zapisz połączenie w zakładce Baza Karty Leczenia."
+                    : sameServer ? current.Warning : null
+            };
+        }
+        if (action is "testAdministratorSettings" or "saveAdministratorSettings")
+        {
+            var program = archive.Load().Options ??
+                throw new InvalidOperationException("Najpierw zapisz połączenie w zakładce Baza Karty Leczenia.");
+            var setting = ArchiveConnectionFrom(root, administrator, program);
+            bool save = action == "saveAdministratorSettings";
+            await using var db = AdministratorDb(setting, "master");
+            await db.OpenAsync(token);
+            using var cmd = new SqlCommand("""
+                SELECT SUSER_SNAME(), CONVERT(nvarchar(128), SERVERPROPERTY(N'ServerName')),
+                       ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0);
+                """, db) { CommandTimeout = 8 };
+            await using var reader = await cmd.ExecuteReaderAsync(token);
+            if (!await reader.ReadAsync(token))
+                throw new InvalidOperationException("SQL Server nie zwrócił informacji o koncie.");
+            string login = reader.GetString(0);
+            string instance = reader.IsDBNull(1) ? program.Server : reader.GetString(1);
+            if (reader.GetInt32(2) != 1)
+                throw new InvalidOperationException($"Konto „{login}” na instancji „{instance}” nie ma roli sysadmin.");
+            if (save)
+            {
+                if (archive.Load().Options != program)
+                    throw new InvalidOperationException("Zmieniono połączenie bazy programu. Sprawdź i zapisz konto ponownie.");
+                administrator.Save(setting, Flag(root, "rememberPassword"));
+            }
+            return new { saved = save, message = save
+                ? $"Zapisano konto administratora „{login}” na instancji „{instance}”."
+                : $"Konto „{login}” ma rolę sysadmin na instancji „{instance}”." };
+        }
         if (action == "getArchiveSettings")
         {
             var current = archive.Load();
@@ -870,10 +920,11 @@ internal sealed class ReactWindow : Form
             if (!Guid.TryParseExact(id, "N", out var cardId) ||
                 string.IsNullOrWhiteSpace(confirmation))
                 throw new ArgumentException("Wybierz kartę z kosza i potwierdź jej numer.");
+            var adminOptions = AdministratorOptions();
             if (!await WindowsHelloConsent.VerifyAsync(this,
                     "trwałe usunięcie jednej karty leczenia z kosza"))
                 return new { deleted = false, cancelled = true };
-            return await PurgeTrashedCard(token, cardId, confirmation);
+            return await PurgeTrashedCard(adminOptions, token, cardId, confirmation);
         }
         var options = subiekt.Load().Options ??
             throw new InvalidOperationException("Brak konfiguracji Subiekta. Uzupełnij ustawienia połączenia.");
@@ -1357,9 +1408,9 @@ internal sealed class ReactWindow : Form
     }
 
     private async Task<object> PurgeTrashedCard(
-        CancellationToken token, Guid cardId, string confirmation)
+        ConnectionOptions options, CancellationToken token, Guid cardId, string confirmation)
     {
-        await using var db = ArchiveDb();
+        await using var db = AdministratorDb(options, "KartyLeczenia");
         try
         {
             await db.OpenAsync(token);
@@ -1369,10 +1420,10 @@ internal sealed class ReactWindow : Form
             // Do not hide database connectivity failures behind the generic
             // Subiekt message (the Subiekt connection is unrelated).
             CrashLog.Write("ReactKL.Purge.SqlConnection", ex);
-            string server = archive.Load().Options?.Server ?? "(nieustawiony)";
+            string server = options.Server;
             throw new InvalidOperationException(
                 $"Nie można połączyć się z bazą KartyLeczenia na serwerze „{server}”. " +
-                "Sprawdź Ustawienia → Baza Karty Leczenia → Sprawdź połączenie. " +
+                "Sprawdź Ustawienia → Konto administratora SQL → Sprawdź konto. " +
                 $"Kod SQL: {ex.Number}. Karta pozostaje w koszu.", ex);
         }
         await using var tx = (SqlTransaction)await db.BeginTransactionAsync(
@@ -1390,7 +1441,7 @@ internal sealed class ReactWindow : Form
                     "uprawnień administratora serwera (sysadmin), wymaganych do " +
                     "trwałego usunięcia karty. Windows Hello potwierdza tożsamość " +
                     "użytkownika Windows, lecz nie nadaje uprawnień SQL. " +
-                    "Użyj konta administratora SQL na komputerze serwerowym.", ex);
+                    "Sprawdź konto w Ustawienia → Konto administratora SQL.", ex);
             }
         }
         using (var check = new SqlCommand("""
@@ -1444,13 +1495,14 @@ internal sealed class ReactWindow : Form
             Int(root, "warehouseId"));
     }
 
-    private ConnectionOptions ArchiveConnectionFrom(JsonElement root)
+    private ConnectionOptions ArchiveConnectionFrom(JsonElement root,
+        ConnectionSettingsStore? store = null, ConnectionOptions? program = null)
     {
-        string server = ReadTextField(root, "server", 200);
+        string server = program?.Server ?? ReadTextField(root, "server", 200);
         string userName = ReadTextField(root, "userName", 200);
         string password = ReadTextField(root, "password", 200);
         bool windows = Flag(root, "windowsAuthentication");
-        var previous = archive.Load().Options;
+        var previous = (store ?? archive).Load().Options;
         if (!windows && password.Length == 0 && previous is not null &&
             !previous.WindowsAuthentication &&
             string.Equals(previous.Server, server, StringComparison.OrdinalIgnoreCase) &&
@@ -1458,8 +1510,27 @@ internal sealed class ReactWindow : Form
             password = previous.Password;
         // The program database name is fixed; this never points to Subiekt.
         return new(server, "KartyLeczenia", windows, userName, password,
-            Flag(root, "trustCertificate"));
+            program?.TrustCertificate ?? Flag(root, "trustCertificate"));
     }
+
+    private ConnectionOptions AdministratorOptions()
+    {
+        var program = archive.Load().Options;
+        var admin = administrator.Load().Options;
+        if (program is null || admin is null ||
+            !string.Equals(program.Server, admin.Server, StringComparison.OrdinalIgnoreCase) ||
+            (!admin.WindowsAuthentication && string.IsNullOrEmpty(admin.Password)))
+            throw new InvalidOperationException(
+                "Zapisz konto dla bieżącej instancji w Ustawienia → Konto administratora SQL.");
+        return admin with { Server = program.Server, TrustCertificate = program.TrustCertificate };
+    }
+
+    internal static SqlConnection AdministratorDb(ConnectionOptions settings, string database) =>
+        new(new SqlConnectionStringBuilder(settings.BuildConnectionString(database))
+        {
+            ApplicationIntent = ApplicationIntent.ReadWrite,
+            Pooling = false
+        }.ConnectionString);
 
     private static async Task TestArchiveConnectionAsync(ConnectionOptions options,
         CancellationToken token)

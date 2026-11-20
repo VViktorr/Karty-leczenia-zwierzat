@@ -44,7 +44,7 @@ function ErrorNotice({message}:{message:string}) {
   return message?<Alert type="error" showIcon className="notice" message={message}/>:null;
 }
 
-function CredentialFields<T extends BaseSqlSettings>({form}:{form:FormInstance<T>}) {
+function CredentialFields<T extends BaseSqlSettings>({form, showTrust = true}:{form:FormInstance<T>; showTrust?: boolean}) {
   const windows=Form.useWatch("windowsAuthentication",form)!==false;
   return <>
     <Form.Item label="Sposób logowania" name="windowsAuthentication"
@@ -66,9 +66,9 @@ function CredentialFields<T extends BaseSqlSettings>({form}:{form:FormInstance<T
     <Form.Item name="rememberPassword" valuePropName="checked">
       <Checkbox disabled={windows}>Zapamiętaj hasło na tym stanowisku (Windows DPAPI)</Checkbox>
     </Form.Item>
-    <Form.Item name="trustCertificate" valuePropName="checked">
+    {showTrust && <Form.Item name="trustCertificate" valuePropName="checked">
       <Checkbox>Zaufaj certyfikatowi tego serwera SQL</Checkbox>
-    </Form.Item>
+    </Form.Item>}
   </>;
 }
 
@@ -220,7 +220,7 @@ export function SubiektDatabaseSettings({onSaved}: {onSaved: () => void}){
   </Card>;
 }
 
-export function ProgramDatabaseSettings(){
+export function ProgramDatabaseSettings({administrator = false}: {administrator?: boolean}){
   const [form]=Form.useForm<BaseSqlSettings>();
   const [busy,setBusy]=useState<BusyAction>("load");
   const [error,setError]=useState("");
@@ -229,7 +229,7 @@ export function ProgramDatabaseSettings(){
 
   useEffect(()=>{
     let active=true;
-    void invoke<SavedSqlSettings>("getArchiveSettings")
+    void invoke<SavedSqlSettings>(administrator?"getAdministratorSettings":"getArchiveSettings")
       .then(value=>{
         if(!active)return;
         form.setFieldsValue({...value,password:"",rememberPassword:value.remembered,
@@ -239,23 +239,30 @@ export function ProgramDatabaseSettings(){
       .catch(e=>{if(active)setError(e instanceof Error?e.message:String(e));})
       .finally(()=>{if(active)setBusy(null);});
     return()=>{active=false;};
-  },[form]);
+  },[form,administrator]);
 
-  async function run(action:"testArchiveSettings"|"saveArchiveSettings",
-    values?:BaseSqlSettings){
+  async function run(save: boolean, values?:BaseSqlSettings){
     if(busy)return;
-    setBusy(action==="testArchiveSettings"?"check":"save");
+    setBusy(save?"save":"check");
     setError("");setNotice("");setVerified(false);
     try{
+      const action = administrator
+        ? (save ? "saveAdministratorSettings" : "testAdministratorSettings")
+        : (save ? "saveArchiveSettings" : "testArchiveSettings");
       const result=await invoke<ArchiveCheck>(action,{
         ...(values??form.getFieldsValue(true))
       });
+      if (save && administrator) form.setFieldValue("password","");
       setVerified(true);setNotice(result.message);
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(null);}
   }
   return <Card className="settings-card" loading={busy==="load"}>
-    <Typography.Title level={4}>Połączenie z bazą Karty Leczenia</Typography.Title>
+    <Typography.Title level={4}>{administrator?"Konto administratora SQL":"Połączenie z bazą Karty Leczenia"}</Typography.Title>
+    {administrator ? <Typography.Paragraph type="secondary">
+      Konto z rolą sysadmin na serwerze bazy Karty Leczenia. Program używa go do
+      trwałego usuwania kart z kosza i odtwarzania bazy po potwierdzeniu Windows Hello.
+    </Typography.Paragraph> : <>
     <Typography.Paragraph type="secondary">
       Oddzielna baza programowa SQL Server zawierająca zapisane karty,
       katalog leków, ChPL i ustawienia lecznicy. Nie jest to baza Subiekta GT.
@@ -263,23 +270,24 @@ export function ProgramDatabaseSettings(){
     <Alert type="info" className="notice" showIcon
       message="Nazwa bazy SQL: KartyLeczenia"
       description="Ta techniczna nazwa pozostaje bez zmian podczas aktualizacji programu."/>
+    </>}
     <ErrorNotice message={error}/>
     {notice&&<Alert className="notice" type={verified?"success":"info"} showIcon message={notice}/>}
     <Form<BaseSqlSettings> form={form} layout="vertical"
       initialValues={{windowsAuthentication:true,rememberPassword:false}}
-      onFinish={values=>{void run("saveArchiveSettings",values);}}
+      onFinish={values=>{void run(true,values);}}
       onValuesChange={()=>{setVerified(false);}}>
       <Form.Item label="Serwer bazy Karty Leczenia" name="server"
         rules={[{required:true,message:"Podaj adres serwera SQL."}]}>
-        <Input placeholder="np. SERWER,51433 lub SERWER\\KLARCHIVE"/>
+        <Input readOnly={administrator} placeholder="np. SERWER,51433 lub SERWER\\KLARCHIVE"/>
       </Form.Item>
-      <CredentialFields form={form}/>
+      <CredentialFields form={form} showTrust={!administrator}/>
       <Space wrap>
         <Button disabled={!!busy&&busy!=="check"} loading={busy==="check"}
-          onClick={()=>{void run("testArchiveSettings");}}>Sprawdź połączenie</Button>
+          onClick={()=>{void run(false);}}>{administrator?"Sprawdź konto":"Sprawdź połączenie"}</Button>
         <Button type="primary" htmlType="submit"
           disabled={!!busy&&busy!=="save"} loading={busy==="save"}>
-          Sprawdź i zapisz bazę Karty Leczenia
+          {administrator?"Sprawdź i zapisz konto":"Sprawdź i zapisz bazę Karty Leczenia"}
         </Button>
       </Space>
     </Form>

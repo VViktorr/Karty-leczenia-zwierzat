@@ -13,11 +13,12 @@ internal sealed record SqlRestoreResult(
 /// choose a local .bak, type the database name and pass Windows Hello in the
 /// host BEFORE this class can run. Never operates on the Subiekt database.
 /// </summary>
-internal sealed class SqlRestoreService(ConnectionSettingsStore connectionStore)
+internal static class SqlRestoreService
 {
     private const string DatabaseName = "KartyLeczenia";
 
-    internal SqlRestoreResult Run(string selectedFile, IProgress<SqlBackupProgress> progress)
+    internal static SqlRestoreResult Run(ConnectionOptions settings, string selectedFile,
+        IProgress<SqlBackupProgress> progress)
     {
         if (string.IsNullOrWhiteSpace(selectedFile) ||
             !Path.IsPathFullyQualified(selectedFile) ||
@@ -29,14 +30,7 @@ internal sealed class SqlRestoreService(ConnectionSettingsStore connectionStore)
         if (info.Length < 512)
             throw new InvalidDataException("Plik kopii jest zbyt mały, aby zawierać bazę danych.");
 
-        var settings = connectionStore.Load().Options ??
-            throw new InvalidOperationException("Skonfiguruj połączenie do archiwum SQL przed odtwarzaniem.");
-        var login = new SqlConnectionStringBuilder(settings.BuildConnectionString("master"))
-        {
-            ApplicationIntent = ApplicationIntent.ReadWrite,
-            Pooling = false
-        };
-        using var db = new SqlConnection(login.ConnectionString);
+        using var db = ReactWindow.AdministratorDb(settings, "master");
         db.Open();
         using (var access = Sql(db, """
             IF ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1
