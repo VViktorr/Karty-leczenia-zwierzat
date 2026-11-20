@@ -156,6 +156,13 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
 function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
   const [kind, setKind] = useState<DocumentKind>("invoices");
   const [period, setPeriod] = useState<DatePeriod>("all");
+  const [pageSize,setPageSize] = useState<25|50|100|"all">(()=>{
+    try {
+      const stored=localStorage.getItem("kl.documents.pageSize");
+      return stored==="all"?"all":stored==="50"?50:stored==="100"?100:25;
+    }catch{return 25;}
+  });
+  const [page,setPage]=useState(1);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [selectedId,setSelectedId] = useState<number|null>(null);
@@ -173,6 +180,13 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
   const {data, busy, error, reload} = useRemote<DocumentsResult>(
     "searchDocuments", {kind, period, query: search, startDate:from, endDate:until},
     [kind, period, search, from, until]);
+  useEffect(()=>{setPage(1);},[kind,period,search,from,until]);
+  const visibleCount=Math.max(1,data?.items.length??1);
+  const effectivePageSize=pageSize==="all"?visibleCount:pageSize;
+  function changePageSize(value:25|50|100|"all"){
+    setPageSize(value);setPage(1);
+    try{localStorage.setItem("kl.documents.pageSize",String(value));}catch{}
+  }
   const open = async (row: DocumentRow) => {
     if(reading)return;
     setReading(true); setReadError("");
@@ -248,6 +262,12 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
           placeholder="Numer lub kontrahent"/>
         <Select value={period} size="large" onChange={next=>{setPeriod(next);setSelectedId(null);}}
           options={periods}/>
+        <Select size="large" aria-label="Liczba wyświetlanych dokumentów"
+          value={pageSize} style={{minWidth:175}}
+          onChange={changePageSize}
+          options={[{label:"25 dokumentów",value:25},{label:"50 dokumentów",value:50},
+            {label:"100 dokumentów",value:100},
+            {label:"Wszystkie pobrane",value:"all"}]}/>
         {period==="customMonth"&&<Input type="month" aria-label="Wybrany miesiąc"
           value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)}/>}
         {period==="custom"&&<>
@@ -260,14 +280,19 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
         message="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
       <Table rowKey="id" loading={busy||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
-        size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={{pageSize:25,showSizeChanger:true}}
+        size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={pageSize==="all"?false:{
+          current:page,pageSize:effectivePageSize,showSizeChanger:false,
+          onChange:next=>setPage(next)
+        }}
         onRow={row=>({tabIndex:0,onClick:()=>setSelectedId(row.id),
           onDoubleClick:()=>{void open(row);}})}
         locale={{emptyText:<Empty description="Brak dokumentów"/>}}/>
       <Typography.Text type="secondary">
         {data?.loadedAt?"Ostatni odczyt "+new Date(data.loadedAt).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})+
           (data.cached?" · z pamięci (bez zapytania SQL)":" · odświeżono z SQL")+" · ":""}
-        {data?.items.length??0} dokumentów. Dwuklik lub Enter na wierszu otwiera kartę.
+        {data?.items.length??0} dokumentów. {pageSize==="all"
+          ? "Pokazano wszystkie pobrane pozycje (limit SQL: 500). "
+          : ""}Dwuklik lub Enter na wierszu otwiera kartę.
       </Typography.Text>
     </Card>
     {listLayout.dialog}
