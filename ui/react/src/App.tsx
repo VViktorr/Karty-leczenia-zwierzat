@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Empty,
   Form, Input, InputNumber, Modal, Segmented, Select, Space, Spin, Switch, Table,
-  Tag, Typography, Progress, theme
+  Tag, Tabs, Typography, Progress, theme
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
@@ -10,6 +10,7 @@ import CataloguePage from "./CataloguePage";
 import {useExpiryTableLayout} from "./ExpiryTableLayout";
 import {useListColumnLayout} from "./ListColumnLayout";
 import DialogPlacement from "./DialogPlacement";
+import {SubiektDatabaseSettings,ProgramDatabaseSettings} from "./DatabaseSettings";
 import { defaultPricePrint, normalizePriceSettings, withdrawalText,
   PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
 import type { PricePrintOptions, PricePrintRow } from "./PricePrint";
@@ -1706,41 +1707,6 @@ function ClinicSettingsPanel() {
     </Form>
   </Card>;
 }
-interface ArchiveConfig {
-  configured:boolean;server:string;windowsAuthentication:boolean;userName:string;trustCertificate:boolean;
-}
-function ArchiveSettingsPanel() {
-  const [form]=Form.useForm();
-  const [error,setError]=useState("");
-  const [notice,setNotice]=useState("");
-  const [busy,setBusy]=useState(false);
-  useEffect(()=>{
-    invoke<ArchiveConfig>("getArchiveSettings").then(data=>form.setFieldsValue({...data,password:"",rememberPassword:false}))
-      .catch(e=>setError(String(e)));
-  },[form]);
-  async function save(values:Record<string,unknown>) {
-    setError("");setNotice("");setBusy(true);
-    try { await invoke("saveArchiveSettings",values);setNotice("Połączenie z archiwum kart SQL sprawdzone i zapisane."); }
-    catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally {setBusy(false);}
-  }
-  return <Card className="settings-card">
-    <Typography.Title level={4}>Archiwum kart SQL</Typography.Title>
-    <Typography.Text type="secondary">Baza programowa KartyLeczenia — niezależna od bazy Subiekta.</Typography.Text>
-    <ErrorNotice error={error}/>
-    {notice&&<Alert type="success" className="notice" showIcon message={notice}/>}
-    <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
-      <Form.Item label="Serwer bazy KartyLeczenia" name="server" rules={[{required:true}]}><Input/></Form.Item>
-      <Form.Item label="Uwierzytelnianie Windows" name="windowsAuthentication" valuePropName="checked"><Switch/></Form.Item>
-      <Form.Item label="Login SQL" name="userName"><Input/></Form.Item>
-      <Form.Item label="Hasło SQL" name="password"><Input.Password autoComplete="new-password"/></Form.Item>
-      <Form.Item name="rememberPassword" valuePropName="checked"><Checkbox>Zapamiętaj hasło (DPAPI)</Checkbox></Form.Item>
-      <Form.Item name="trustCertificate" valuePropName="checked"><Checkbox>Zaufaj certyfikatowi serwera</Checkbox></Form.Item>
-      <Button type="primary" htmlType="submit" loading={busy}>Sprawdź i zapisz archiwum</Button>
-    </Form>
-  </Card>;
-}
-
 interface BackupOptions {
   destinationFolder:string;workingFolder:string;naming:string;customName:string;
   overwrite:boolean;compress:boolean;
@@ -2030,53 +1996,33 @@ function UpdatePanel(){
 }
 
 function SettingsPage() {
-  const [form]=Form.useForm();
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState("");
-  const [notice,setNotice]=useState("");
-  useEffect(()=>{
-    invoke<SqlSettings>("getSettings").then(data=>{
-      form.setFieldsValue({...data,rememberPassword:false,password:""});
-      if(data.warning)setNotice(data.warning);
-    }).catch(e=>setError(String(e)));
-  },[form]);
-  const save=async(values:Record<string,unknown>)=>{
-    setBusy(true);setError("");setNotice("");
-    try{await invoke("saveSettings",values);setNotice("Połączenie sprawdzone i ustawienia zapisane.");}
-    catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally{setBusy(false);}
-  };
+  const [active,setActive]=useState(()=>{
+    try{return localStorage.getItem("kl.settings.activeTab")||"subiekt";}
+    catch{return "subiekt";}
+  });
+  function choose(key:string){
+    setActive(key);
+    try{localStorage.setItem("kl.settings.activeTab",key);}
+    catch{/* Workstation settings remain optional. */}
+  }
   return <>
-    <div className="page-heading"><Typography.Title level={3}>Ustawienia połączenia Subiekta GT</Typography.Title></div>
-    <Card className="settings-card">
-      <Alert className="notice" showIcon type="info"
-        message="Konfiguracja SQL jest zachowana z poprzedniej instalacji; nowy interfejs działa wyłącznie w React."/>
-      <ErrorNotice error={error}/>
-      {notice && <Alert className="notice" type="success" showIcon message={notice}/>}
-      <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
-        <Form.Item name="server" label="Serwer SQL" rules={[{required:true,message:"Podaj serwer"}]}>
-          <Input placeholder="NAZWA-SERWERA\INSTANCJA"/>
-        </Form.Item>
-        <Form.Item name="database" label="Baza podmiotu Subiekta" rules={[{required:true,message:"Podaj bazę"}]}>
-          <Input/>
-        </Form.Item>
-        <Form.Item name="windowsAuthentication" label="Uwierzytelnianie Windows" valuePropName="checked">
-          <Switch/>
-        </Form.Item>
-        <Form.Item name="userName" label="Login SQL"><Input autoComplete="username"/></Form.Item>
-        <Form.Item name="password" label="Hasło SQL (pozostaw puste, aby zachować zapamiętane)"><Input.Password autoComplete="new-password"/></Form.Item>
-        <Form.Item name="rememberPassword" valuePropName="checked"><Checkbox>Zapamiętaj hasło (ochrona DPAPI Windows)</Checkbox></Form.Item>
-        <Form.Item name="trustCertificate" valuePropName="checked"><Checkbox>Zaufaj certyfikatowi znanego serwera SQL</Checkbox></Form.Item>
-        <Form.Item name="drugGroup" label="Grupa leków"><Input/></Form.Item>
-        <Form.Item name="warehouseId" label="Identyfikator magazynu"><InputNumber min={1} style={{width:"100%"}}/></Form.Item>
-        <Button type="primary" htmlType="submit" loading={busy}>Sprawdź i zapisz połączenie</Button>
-      </Form>
-    </Card>
-    <ClinicSettingsPanel/>
-    <ArchiveSettingsPanel/>
-    <BackupPanel/>
-    <RestorePanel/>
-    <UpdatePanel/>
+    <div className="page-heading">
+      <Typography.Title level={3}>Ustawienia — Karty Leczenia</Typography.Title>
+    </div>
+    <Tabs activeKey={active} onChange={choose} items={[
+      {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings/>},
+      {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
+      {key:"backup",label:"Archiwizacja",children:<Space direction="vertical" size={18}
+        style={{width:"100%"}}>
+        <Alert type="info" className="notice" showIcon
+          message="Archiwizacja dotyczy bazy KartyLeczenia — nie bazy Subiekta"
+          description="Połączenie ustawiasz w zakładce „Baza Karty Leczenia”. Tutaj wybierasz miejsce zapisania kopii .bak, wykonujesz kopię lub odtwarzasz dane."/>
+        <BackupPanel/>
+        <RestorePanel/>
+      </Space>},
+      {key:"clinic",label:"Dane lecznicy",children:<ClinicSettingsPanel/>},
+      {key:"updates",label:"Aktualizacje",children:<UpdatePanel/>}
+    ]}/>
   </>;
 }
 
@@ -2149,13 +2095,13 @@ export default function App() {
     <div className={"app-shell layout-"+layout+" palette-"+palette}>
       {layout!=="classic"&&<aside className="sidebar">
         <div className="sidebar-brand"><div className="brand-mark">KL</div>
-          <div><strong>KartyLeczenia</strong><small>ReactKL · SQL</small></div></div>
+          <div><strong>Karty Leczenia</strong><small>ReactKL · SQL</small></div></div>
         {nav}
         <div className="sidebar-footer">Interfejs React + WebView2<br/>Dane pozostają w SQL Server</div>
       </aside>}
       <div className="workspace">
         <header className="topbar">
-          <div className="topbar-title"><strong>{layout==="classic"?"KartyLeczenia":sections.find(x=>x.id===section)?.name}</strong></div>
+          <div className="topbar-title"><strong>{layout==="classic"?"Karty Leczenia":sections.find(x=>x.id===section)?.name}</strong></div>
           {controls}
         </header>
         {layout==="classic"&&<div className="top-navigation">{nav}</div>}
