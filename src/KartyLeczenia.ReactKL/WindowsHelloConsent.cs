@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Windows.Security.Credentials.UI;
 
 namespace KartyLeczenia.ReactKL;
@@ -10,6 +11,15 @@ namespace KartyLeczenia.ReactKL;
 /// </summary>
 internal static class WindowsHelloConsent
 {
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoActivate = 0x0010;
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(nint window, nint insertAfter,
+        int x, int y, int width, int height, uint flags);
+
     internal static async Task<bool> VerifyAsync(Form owner, string purpose)
     {
         try
@@ -49,6 +59,10 @@ internal static class WindowsHelloConsent
                 {
                     if (owner.WindowState == FormWindowState.Minimized)
                         owner.WindowState = stateBeforePrompt;
+                    // Activation can be denied after the system UI takes focus.
+                    // Raise the window independently of keyboard activation.
+                    SetWindowPos(owner.Handle, nint.Zero, 0, 0, 0, 0,
+                        SwpNoMove | SwpNoSize | SwpNoActivate);
                     owner.Activate();
                 }
             }
