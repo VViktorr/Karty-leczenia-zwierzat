@@ -84,3 +84,17 @@ test("SQL update confirmation carries the release shown to the operator", async 
   deliver({data: {id: installRequest._bridgeRequestId, ok: true, data: {started: true}}});
   assert.deepEqual(await install, {started: true});
 });
+
+test("RPL PDF name uses the entry ID and excludes the date and later identifiers", async () => {
+  const {rplEntryFromPdfName} = await import("../src/cataloguePdfMetadata.ts");
+  assert.equal(rplEntryFromPdfName("Ulotka-46833-2025-10-29-6195_W-2025-11-18.pdf"), "46833");
+  assert.equal(rplEntryFromPdfName("charakterystyka-46833-2025-10-29.pdf"), "46833");
+  assert.equal(rplEntryFromPdfName("Skan-2025-10-29.pdf"), undefined);
+});
+
+test("compact withdrawal retains both conditions and leaves missing values empty", async () => {
+  const {compactWithdrawal} = await import("../src/cataloguePdfMetadata.ts");
+  assert.equal(compactWithdrawal("tekst tkanek", "● warunek A\n● warunek B"),
+    "tk. tekst tkanek · ml. warunek A; warunek B");
+  assert.equal(compactWithdrawal("", ""), "");
+});

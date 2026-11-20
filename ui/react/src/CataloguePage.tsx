@@ -1,8 +1,9 @@
+import {compactWithdrawal,rplEntryFromPdfName} from "./cataloguePdfMetadata";
 import {useListPagination} from "./ListPagination";
 import {useListColumnLayout} from "./ListColumnLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Button, Card, Empty, Input, Modal, Space, Table,
+  Alert, Button, Card, Checkbox, Empty, Input, Modal, Space, Table,
   Tag, Typography, Tooltip, message
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -79,6 +80,8 @@ export default function CataloguePage({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfName, setPdfName] = useState("");
   const [proposal, setProposal] = useState<PendingChplProposal | null>(null);
+  const [proposalVerified,setProposalVerified]=useState(false);
+  const [pdfNames,setPdfNames]=useState<Record<string,string>>({});
   const [version, setVersion] = useState(0);
   const [missingRows,setMissingRows]=useState<SubiektProduct[]|null>(null);
   const [missingOpen,setMissingOpen]=useState(false);
@@ -245,6 +248,25 @@ export default function CataloguePage({
     setDirty(true);
   }
 
+  function suggestRplEntry(filename: string) {
+    const rplId = rplEntryFromPdfName(filename);
+    if (rplId) setEditing(current => current && !current.rplId.trim()
+      ? {...current,rplId} : current);
+  }
+
+  function fillWithdrawal(row: UiVariant): UiVariant {
+    const compact = compactWithdrawal(row.tissues,row.milk);
+    if (!compact) return row;
+    const short = row.short.trim() ? row.short : compact;
+    return {...row,short,price:row.price.trim() ? row.price : short};
+  }
+
+  function fillSelectedWithdrawal() {
+    const chosen = new Set(selected);
+    setVariants(rows=>rows.map(row=>chosen.size===0||chosen.has(row.key) ? fillWithdrawal(row) : row));
+    setDirty(true);
+  }
+
   async function choosePdf() {
     if (!editing) return;
     if (selected.length === 0) {
@@ -257,6 +279,11 @@ export default function CataloguePage({
       const result = await invoke<{cancelled: boolean; path?: string; name?: string}>(
         "chooseCataloguePdf");
       if (!result.cancelled && result.path) {
+        const {path,name} = result;
+        if (name) {
+          setPdfNames(current=>({...current,[path]:name}));
+          suggestRplEntry(name);
+        }
         setVariants(rows => rows.map(item =>
           selected.includes(item.key) ? { ...item, pdf: result.path! } : item
         ));
@@ -278,6 +305,7 @@ export default function CataloguePage({
         "chooseCataloguePdf");
       if (picked.cancelled || !picked.path) return;
       const result = await invoke<ChplProposal>("analyseCataloguePdf", {path:picked.path});
+      setProposalVerified(false);
       setProposal({...result,path:picked.path,filename:picked.name ?? "ChPL.pdf"});
     } catch(e) {
       setError(e instanceof Error?e.message:String(e));
@@ -302,18 +330,23 @@ export default function CataloguePage({
       const match = next.find(row =>
         row.species.trim().toLocaleLowerCase("pl")===species.toLocaleLowerCase("pl") &&
         row.route.trim().toLocaleLowerCase("pl")===route.toLocaleLowerCase("pl"));
+      const source = proposalVerified ? "Zweryfikowane przez użytkownika — " + proposal.filename : suggestion.source;
       if (match) {
         const update = {...match};
-        for (const field of ["indication","dose","tissues","milk","source"] as const) {
+        for (const field of ["indication","dose","tissues","milk"] as const) {
           if (!update[field].trim() && suggestion[field]?.trim()) {
             update[field] = suggestion[field];filled++;
           }
         }
-        if (!update.pdf && proposal.path) {update.pdf=proposal.path;filled++;}
-        next[next.indexOf(match)] = update;
+        if (!update.source.trim() && source) {update.source=source;filled++;}
+        if (!update.pdf) {update.pdf=proposal.path;filled++;}
+        const formatted = fillWithdrawal(update);
+        if (formatted.short!==update.short) filled++;
+        if (formatted.price!==update.price) filled++;
+        next[next.indexOf(match)] = formatted;
       } else {
-        next.push({...emptyVariant(),...suggestion,id:null,key:"new-"+crypto.randomUUID(),
-          pdf:proposal.path});
+        next.push(fillWithdrawal({...emptyVariant(),...suggestion,id:null,key:"new-"+crypto.randomUUID(),
+          pdf:proposal.path,source}));
         added++;
       }
     }
@@ -321,6 +354,8 @@ export default function CataloguePage({
       void msgApi.info("Brak nowych danych do przeniesienia. Sprawdź, czy pola są już uzupełnione.");
       return;
     }
+    suggestRplEntry(proposal.filename);
+    setPdfNames(current=>({...current,[proposal.path]:proposal.filename}));
     setVariants(next);
     setDirty(true);
     void msgApi.info(
@@ -404,9 +439,14 @@ export default function CataloguePage({
       render: (_: unknown, row) => <Space direction="vertical" size={3}>
         <Tooltip title={row.pdf || "Brak powiązanego dokumentu PDF"}>
           <Typography.Text ellipsis style={{ width: 205, maxWidth: 205 }}>
-            {row.pdf ? row.pdf.split("/").at(-1) : "Nie przypisano"}
+            {row.pdf ? (pdfNames[row.pdf] ?? (/^ChPL\/[a-f0-9]{64}\.pdf$/i.test(row.pdf)
+              ? "Powiązany plik PDF" : row.pdf.split("/").at(-1))) : "Nie przypisano"}
           </Typography.Text>
         </Tooltip>
+        {row.pdf && <Typography.Text type="secondary">
+          {original?.variants.some(variant=>variant.id===row.id&&variant.pdf===row.pdf)
+            ? "Zapisano w SQL" : "Zostanie zapisany z kartoteką"}
+        </Typography.Text>}
         <Space>
           <Button size="small" disabled={!row.pdf}
             onClick={() => { void viewPdf(row.pdf); }}>Otwórz PDF</Button>
@@ -506,12 +546,12 @@ export default function CataloguePage({
             <label>Nazwa leku
               <Input value={editing.name} readOnly />
             </label>
-            <label>Numer RPL
+            <label>Numer RPL / identyfikator wpisu
               <Input value={editing.rplId}
                 onChange={event => changeField("rplId", event.target.value)} />
             </label>
-            <label>Opis
-              <Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }}
+            <label>Opis (opcjonalny)
+              <Input.TextArea placeholder="Np. postać leku, wielkość opakowania lub uwaga do kartoteki" autoSize={{ minRows: 1, maxRows: 3 }}
                 value={editing.description}
                 onChange={event => changeField("description", event.target.value)} />
             </label>
@@ -523,6 +563,9 @@ export default function CataloguePage({
               <Button disabled={!selected.length || working}
                 onClick={() => { void choosePdf(); }}>
                 Dołącz PDF do zaznaczonych ({selected.length})
+              </Button>
+              <Button disabled={working||!variants.length} onClick={fillSelectedWithdrawal}>
+                Uzupełnij skróty karencji
               </Button>
               <Button disabled={working} onClick={() => { void suggestFromPdf(); }}>
                 Wczytaj propozycje z ChPL
@@ -642,6 +685,9 @@ export default function CataloguePage({
             {title:"Tkanki",dataIndex:"tissues",width:180,ellipsis:true},
             {title:"Mleko",dataIndex:"milk",width:160,ellipsis:true}
           ]}/>
+        <Checkbox checked={proposalVerified} onChange={event=>setProposalVerified(event.target.checked)}>
+          Sprawdziłem przenoszone dane z aktualną ChPL
+        </Checkbox>
         <Typography.Title level={5} style={{marginTop:18}}>
           Rozpoznane fragmenty źródłowe (do weryfikacji)
         </Typography.Title>
