@@ -151,59 +151,82 @@ public sealed class DocumentService
         if ((!allowEmpty && fragment.Length < 1) || kinds == DocumentSearchKinds.None) return [];
         string escaped = fragment.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace("[", "~[");
         await using var con = new SqlConnection(options.BuildConnectionString());
-        await con.OpenAsync(token).ConfigureAwait(false);
-        string dateColumn = await DateColumn(con, token).ConfigureAwait(false);
-        var amounts = await DetectAmounts(con, token).ConfigureAwait(false);
-        string grossValue = amounts.Gross ? "d.dok_WartBrutto" : "CAST(NULL AS decimal(19,4))";
-        string netValue = amounts.Net ? "d.dok_WartNetto" : "CAST(NULL AS decimal(19,4))";
-        string currencyValue = amounts.Currency ? "d.dok_Waluta" : "CAST(NULL AS nvarchar(3))";
-        if (dateColumn.Length == 0 && (dateFrom.HasValue || dateUntil.HasValue))
-            throw new InvalidOperationException("Nie rozpoznano kolumny daty dokumentu. Wybierz wszystkie lata.");
-        string dateValue = dateColumn.Length > 0 ? "d." + dateColumn : "CAST(NULL AS datetime)";
-        string dateFilter = "";
-        if (dateColumn.Length > 0 && dateFrom.HasValue) dateFilter += $" AND d.{dateColumn}>=@from";
-        if (dateColumn.Length > 0 && dateUntil.HasValue) dateFilter += $" AND d.{dateColumn}<@until";
-        string searchFilter = fragment.Length == 0 ? "" : """
-            AND (d.dok_NrPelny LIKE @fragment ESCAPE N'~'
-              OR pl.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
-              OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
-              OR od.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
-              OR od.adrh_Nazwa LIKE @fragment ESCAPE N'~')
-            """;
-        string order = fragment.Length > 0 ? "CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, "
-            : dateColumn.Length > 0 ? dateValue + " DESC, " : "";
-        using var cmd = new SqlCommand($"""
-            SELECT TOP (@limit) d.dok_Id, d.dok_NrPelny,
-              COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_NazwaPelna)), N''), pl.adrh_Nazwa, N'') AS Payer,
-              COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient, {dateValue} AS DocumentDate, {grossValue} AS Gross, {currencyValue} AS Currency,
-              COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_Nazwa)), N''), pl.adrh_NazwaPelna, N''), {netValue}
-            FROM dbo.dok__Dokument d
-            LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
-            LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
-            WHERE ((@invoices=1 AND d.dok_NrPelny LIKE N'FS %') OR (@receipts=1 AND d.dok_NrPelny LIKE N'PA %') OR (@warehouse=1 AND d.dok_NrPelny LIKE N'WZ %'))
-              AND d.dok_MagId = @warehouseId
-              {searchFilter}
-              {dateFilter}
-            ORDER BY {order}d.dok_Id DESC
-            """, con) { CommandTimeout = 10 };
-        cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
-        cmd.Parameters.Add("@limit", SqlDbType.Int).Value = Math.Clamp(limit, 1, allowEmpty ? 501 : 101);
-        cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = (object?)dateFrom ?? DBNull.Value;
-        cmd.Parameters.Add("@until", SqlDbType.DateTime).Value = (object?)dateUntil ?? DBNull.Value;
-        cmd.Parameters.Add("@invoices", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Invoices);
-        cmd.Parameters.Add("@receipts", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Receipts);
-        cmd.Parameters.Add("@warehouse", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.WarehouseReleases);
-        cmd.Parameters.Add("@fragment", SqlDbType.NVarChar, 250).Value = "%" + escaped + "%";
-        cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
-        var found = new List<DocumentSuggestion>();
-        await using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
-        while (await reader.ReadAsync(token).ConfigureAwait(false)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-            reader.IsDBNull(4) ? null : reader.GetDateTime(4), reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5)), reader.IsDBNull(6) ? "" : reader.GetString(6).Trim())
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        string stage = "connection";
+        long connectionMs = 0, schemaMs = 0, headersMs = 0;
+        try
         {
-            ShortPayer = reader.GetString(7),
-            Net = reader.IsDBNull(8) ? null : Convert.ToDecimal(reader.GetValue(8))
-        });
-        return await AttachRelations(con, found, options.WarehouseId, kinds, token).ConfigureAwait(false);
+            await con.OpenAsync(token).ConfigureAwait(false);
+            connectionMs = watch.ElapsedMilliseconds;
+            watch.Restart();
+            stage = "schema";
+            string dateColumn = await DateColumn(con, token).ConfigureAwait(false);
+            var amounts = await DetectAmounts(con, token).ConfigureAwait(false);
+            schemaMs = watch.ElapsedMilliseconds;
+            watch.Restart();
+            stage = "headers";
+            string grossValue = amounts.Gross ? "d.dok_WartBrutto" : "CAST(NULL AS decimal(19,4))";
+            string netValue = amounts.Net ? "d.dok_WartNetto" : "CAST(NULL AS decimal(19,4))";
+            string currencyValue = amounts.Currency ? "d.dok_Waluta" : "CAST(NULL AS nvarchar(3))";
+            if (dateColumn.Length == 0 && (dateFrom.HasValue || dateUntil.HasValue))
+                throw new InvalidOperationException("Nie rozpoznano kolumny daty dokumentu. Wybierz wszystkie lata.");
+            string dateValue = dateColumn.Length > 0 ? "d." + dateColumn : "CAST(NULL AS datetime)";
+            string dateFilter = "";
+            if (dateColumn.Length > 0 && dateFrom.HasValue) dateFilter += $" AND d.{dateColumn}>=@from";
+            if (dateColumn.Length > 0 && dateUntil.HasValue) dateFilter += $" AND d.{dateColumn}<@until";
+            string searchFilter = fragment.Length == 0 ? "" : """
+                AND (d.dok_NrPelny LIKE @fragment ESCAPE N'~'
+                  OR pl.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
+                  OR pl.adrh_Nazwa LIKE @fragment ESCAPE N'~'
+                  OR od.adrh_NazwaPelna LIKE @fragment ESCAPE N'~'
+                  OR od.adrh_Nazwa LIKE @fragment ESCAPE N'~')
+                """;
+            string order = fragment.Length > 0 ? "CASE WHEN d.dok_NrPelny=@exact THEN 0 ELSE 1 END, "
+                : dateColumn.Length > 0 ? dateValue + " DESC, " : "";
+            using var cmd = new SqlCommand($"""
+                SELECT TOP (@limit) d.dok_Id, d.dok_NrPelny,
+                  COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_NazwaPelna)), N''), pl.adrh_Nazwa, N'') AS Payer,
+                  COALESCE(NULLIF(LTRIM(RTRIM(od.adrh_NazwaPelna)), N''), od.adrh_Nazwa, N'') AS Recipient, {dateValue} AS DocumentDate, {grossValue} AS Gross, {currencyValue} AS Currency,
+                  COALESCE(NULLIF(LTRIM(RTRIM(pl.adrh_Nazwa)), N''), pl.adrh_NazwaPelna, N''), {netValue}
+                FROM dbo.dok__Dokument d
+                LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
+                LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
+                WHERE ((@invoices=1 AND d.dok_NrPelny LIKE N'FS %') OR (@receipts=1 AND d.dok_NrPelny LIKE N'PA %') OR (@warehouse=1 AND d.dok_NrPelny LIKE N'WZ %'))
+                  AND d.dok_MagId = @warehouseId
+                  {searchFilter}
+                  {dateFilter}
+                ORDER BY {order}d.dok_Id DESC
+                """, con) { CommandTimeout = 10 };
+            cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
+            cmd.Parameters.Add("@limit", SqlDbType.Int).Value = Math.Clamp(limit, 1, allowEmpty ? 501 : 101);
+            cmd.Parameters.Add("@from", SqlDbType.DateTime).Value = (object?)dateFrom ?? DBNull.Value;
+            cmd.Parameters.Add("@until", SqlDbType.DateTime).Value = (object?)dateUntil ?? DBNull.Value;
+            cmd.Parameters.Add("@invoices", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Invoices);
+            cmd.Parameters.Add("@receipts", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.Receipts);
+            cmd.Parameters.Add("@warehouse", SqlDbType.Bit).Value = kinds.HasFlag(DocumentSearchKinds.WarehouseReleases);
+            cmd.Parameters.Add("@fragment", SqlDbType.NVarChar, 250).Value = "%" + escaped + "%";
+            cmd.Parameters.Add("@exact", SqlDbType.NVarChar, 100).Value = fragment;
+            var found = new List<DocumentSuggestion>();
+            await using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
+            while (await reader.ReadAsync(token).ConfigureAwait(false)) found.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetDateTime(4), reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5)), reader.IsDBNull(6) ? "" : reader.GetString(6).Trim())
+            {
+                ShortPayer = reader.GetString(7),
+                Net = reader.IsDBNull(8) ? null : Convert.ToDecimal(reader.GetValue(8))
+            });
+            headersMs = watch.ElapsedMilliseconds;
+            stage = "relations";
+            watch.Restart();
+            var result = await AttachRelations(con, found, options.WarehouseId, kinds, token).ConfigureAwait(false);
+            if (allowEmpty)
+                CrashLog.Write($"Subiekt.Documents.Timing kind={kinds} rows={result.Count} connectionMs={connectionMs} schemaMs={schemaMs} headersMs={headersMs} relationsMs={watch.ElapsedMilliseconds}");
+            return result;
+        }
+        catch (SqlException sql) when (allowEmpty)
+        {
+            CrashLog.Write($"Subiekt.Documents.SqlFailure stage={stage} code={sql.Number} elapsedMs={watch.ElapsedMilliseconds}");
+            throw;
+        }
     }
     public async Task<string?> ReadPayerEmailAsync(ConnectionOptions options, int payerId, CancellationToken token)
     {

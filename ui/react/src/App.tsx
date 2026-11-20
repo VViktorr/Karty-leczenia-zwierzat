@@ -125,7 +125,7 @@ function ErrorNotice({error}: {error: string}) {
 }
 function useRemote<T>(action: string, payload: Record<string, unknown>, deps: unknown[],
   enabled = true, sameKeyOnly = false): {
-  data: T | null; busy: boolean; error: string; reload: () => void; revalidate: () => void;
+  data: T | null; busy: boolean; error: string; reload: () => void;
 } {
   const [response, setResponse] = useState<{key:string;data:T} | null>(null);
   const [busy, setBusy] = useState(false);
@@ -152,7 +152,7 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   return {data, busy, error, reload: () => {
     forceRefresh.current = true;
     setTick(n => n + 1);
-  }, revalidate: () => setTick(n => n + 1)};
+  }};
 }
 
 function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) => void}) {
@@ -174,7 +174,6 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
   const [readError, setReadError] = useState("");
   const [reading, setReading] = useState(false);
   const openedDocument = useRef<AbortController | null>(null);
-  const wasActive = useRef(active);
   useEffect(() => {
     if (!active) setReading(false);
     return () => openedDocument.current?.abort();
@@ -185,16 +184,9 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
   }, [query]);
   const from = period==="customMonth" ? selectedMonth+"-01" : period==="custom" ? startDate : "";
   const until = period==="custom" ? endDate : "";
-  const {data, busy, error, reload, revalidate} = useRemote<DocumentsResult>(
+  const {data, busy, error, reload} = useRemote<DocumentsResult>(
     "searchDocuments", {kind, period, query: search, startDate:from, endDate:until},
     [kind, period, search, from, until], true, true);
-  useEffect(() => {
-    const returned = active && !wasActive.current;
-    wasActive.current = active;
-    if (returned && !busy && (error || !data ||
-      Date.now() - Date.parse(data.checkedAt ?? data.loadedAt) >= (data.warning ? 30_000 : 5 * 60_000)))
-      revalidate();
-  }, [active, busy, data, error, revalidate]);
   useEffect(()=>{setPage(1);},[kind,period,search,from,until]);
   const allPageSize=Math.max(500,data?.items.length??0);
   const effectivePageSize=pageSize==="all"?allPageSize:pageSize;
@@ -265,7 +257,7 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
   return <>
     <div className="page-heading"><div>
       <Typography.Title level={3}>Dokumenty Subiekta GT</Typography.Title>
-      <Typography.Text type="secondary">Lista z jednego magazynu. Zmiany sprawdzane przy powrocie na listę. F5 pobiera świeże dane SQL.</Typography.Text>
+      <Typography.Text type="secondary">Lista z jednego magazynu. F5 pobiera świeże dane SQL.</Typography.Text>
     </div><Space wrap>
       <Button onClick={listLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={reload} loading={busy}>Odśwież · F5</Button>
