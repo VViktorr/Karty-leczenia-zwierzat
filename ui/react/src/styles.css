@@ -85,7 +85,13 @@
 .kl-movable-modal .ant-modal-header,
 .kl-movable-modal .ant-modal-confirm-title { cursor: move; touch-action: none; user-select: none; }
 .kl-movable-modal .ant-modal-title { user-select: none; }
-.kl-modal-resize { position: absolute; touch-action: none; z-index: 2; }
+/* Ant Design disables pointer events on the modal shell, outside its content. */
+.kl-movable-modal > .kl-modal-resize {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 2;
+}
 .kl-modal-resize[data-edge="n"], .kl-modal-resize[data-edge="s"] {
   left: 10px; right: 10px; height: 7px; cursor: ns-resize;
 }
@@ -101,6 +107,18 @@
 .kl-modal-resize:is([data-edge="e"], [data-edge="se"], [data-edge="ne"]) { right: 0; }
 .kl-modal-resize:is([data-edge="nw"], [data-edge="se"]) { cursor: nwse-resize; }
 .kl-modal-resize:is([data-edge="ne"], [data-edge="sw"]) { cursor: nesw-resize; }
+.kl-modal-resize[data-edge="se"]::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  opacity: .45;
+  pointer-events: none;
+}
 .kl-modal-resize:hover { background: #5297da66; }
 .kl-movable-modal:is(.kl-dialog-treatment-pdf, .kl-dialog-treatment-preview,
   .kl-dialog-saved-preview, .kl-dialog-catalogue-pdf, .kl-dialog-price-preview)
