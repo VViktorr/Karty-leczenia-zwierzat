@@ -181,8 +181,8 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
     "searchDocuments", {kind, period, query: search, startDate:from, endDate:until},
     [kind, period, search, from, until]);
   useEffect(()=>{setPage(1);},[kind,period,search,from,until]);
-  const visibleCount=Math.max(1,data?.items.length??1);
-  const effectivePageSize=pageSize==="all"?visibleCount:pageSize;
+  const allPageSize=Math.max(500,data?.items.length??0);
+  const effectivePageSize=pageSize==="all"?allPageSize:pageSize;
   function changePageSize(value:25|50|100|"all"){
     setPageSize(value);setPage(1);
     try{localStorage.setItem("kl.documents.pageSize",String(value));}catch{}
@@ -262,12 +262,6 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
           placeholder="Numer lub kontrahent"/>
         <Select value={period} size="large" onChange={next=>{setPeriod(next);setSelectedId(null);}}
           options={periods}/>
-        <Select size="large" aria-label="Liczba wyświetlanych dokumentów"
-          value={pageSize} style={{minWidth:175}}
-          onChange={changePageSize}
-          options={[{label:"25 dokumentów",value:25},{label:"50 dokumentów",value:50},
-            {label:"100 dokumentów",value:100},
-            {label:"Wszystkie pobrane",value:"all"}]}/>
         {period==="customMonth"&&<Input type="month" aria-label="Wybrany miesiąc"
           value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)}/>}
         {period==="custom"&&<>
@@ -280,9 +274,20 @@ function Documents({onOpen}: {onOpen: (draft: Draft) => void}) {
         message="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
       <Table rowKey="id" loading={busy||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
-        size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={pageSize==="all"?false:{
-          current:page,pageSize:effectivePageSize,showSizeChanger:false,
-          onChange:next=>setPage(next)
+        size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={{
+          current:page,pageSize:effectivePageSize,position:["bottomRight"],
+          pageSizeOptions:[25,50,100,allPageSize],
+          showSizeChanger:{
+            "aria-label":"Liczba wyświetlanych dokumentów",
+            options:[{label:"25 dokumentów",value:25},{label:"50 dokumentów",value:50},
+              {label:"100 dokumentów",value:100},
+              {label:"Wszystkie pobrane",value:allPageSize}]
+          },
+          onChange:(next,size)=>{
+            if(size===effectivePageSize) setPage(next);
+            else if(size===25||size===50||size===100) changePageSize(size);
+            else if(size===allPageSize) changePageSize("all");
+          }
         }}
         onRow={row=>({tabIndex:0,onClick:()=>setSelectedId(row.id),
           onDoubleClick:()=>{void open(row);}})}
