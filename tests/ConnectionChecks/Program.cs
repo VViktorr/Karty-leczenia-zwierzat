@@ -45,4 +45,38 @@ try
     Check(store.Load().Options is null && store.Load().Warning != null, "Corrupt settings must produce a recoverable first-run message.");
 }
 finally { Directory.Delete(folder, true); }
+var knownGroups = new[] { "Leki", "Szczepionki" };
+var knownWarehouses = new[] {
+    new MedicineWarehouse(1, "Magazyn główny"),
+    new MedicineWarehouse(3, "Magazyn podręczny")
+};
+var selected = options with { DrugGroup = "Leki", WarehouseId = 3 };
+SubiektConnectionService.ValidateChoices(selected, knownGroups, knownWarehouses);
+passed++;
+SubiektConnectionService.ValidateChoices(selected with { DrugGroup = "leki" },
+    knownGroups, knownWarehouses);
+passed++;
+try
+{
+    SubiektConnectionService.ValidateChoices(selected with { DrugGroup = "Nieistniejąca" },
+        knownGroups, knownWarehouses);
+    throw new Exception("Missing medicine group accepted.");
+}
+catch (DrugGroupNotFoundException) { passed++; }
+try
+{
+    SubiektConnectionService.ValidateChoices(selected with { WarehouseId = 99 },
+        knownGroups, knownWarehouses);
+    throw new Exception("Nonexistent warehouse accepted.");
+}
+catch (InvalidOperationException ex) when (ex.Message.Contains("magazyn", StringComparison.OrdinalIgnoreCase))
+{ passed++; }
+try
+{
+    SubiektConnectionService.ValidateChoices(selected with { WarehouseId = null },
+        knownGroups, knownWarehouses);
+    throw new Exception("No warehouse accepted on save.");
+}
+catch (InvalidOperationException ex) when (ex.Message.Contains("magazyn", StringComparison.OrdinalIgnoreCase))
+{ passed++; }
 Console.WriteLine($"Passed {passed} connection checks.");
