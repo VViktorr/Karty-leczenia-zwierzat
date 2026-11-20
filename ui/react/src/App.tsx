@@ -1,3 +1,4 @@
+import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayout";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Empty,
@@ -246,7 +247,7 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
       sorter:(a,b)=>(a.gross??0)-(b.gross??0)},
     {title:"Powiązania",dataIndex:"relatedText",ellipsis:true,width:230}
   ];
-  const listLayout=useListColumnLayout("documents",columns);
+  const listLayout=useListColumnLayout("documents",columns,active);
   const periods: Array<{label:string;value:DatePeriod}> = [
     {label:"(nieokreślony)",value:"all"},
     {label:"Bieżący dzień",value:"today"},
@@ -291,7 +292,7 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
       <ErrorNotice error={error||readError}/>
       {data?.truncated&&<Alert className="notice" type="info" showIcon
         message="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
-      <Table rowKey="id" loading={busy||reading} dataSource={data?.items??[]} columns={listLayout.columns}
+      <Table {...listLayout.tableProps} rowKey="id" loading={busy||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
         size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={{
           current:page,pageSize:effectivePageSize,position:["bottomRight"],
@@ -370,6 +371,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
 }) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
   const [showColumns,setShowColumns]=useState(false);
+  const treatmentMouse = useTableMouseLayout("treatment");
   const [columnOrder,setColumnOrder]=useState<string[]>(restoreColumnOrder);
   const [columnWidths,setColumnWidths]=useState<Record<string,number>>(restoreColumnWidths);
   useEffect(()=>{
@@ -936,11 +938,15 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
     </Card>
     {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
-    <Card><Table<DraftRow> rowKey="index" dataSource={sortedRows}
-      columns={columns.filter(column=>visibleColumns.includes(treatmentColumnKey(column)))
+    <Card><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
+      columns={treatmentMouse.decorate(
+        columns.filter(column=>visibleColumns.includes(treatmentColumnKey(column)))
         .sort((a,b)=>columnOrder.indexOf(treatmentColumnKey(a))-
           columnOrder.indexOf(treatmentColumnKey(b)))
-        .map(column=>({...column,width:columnWidths[treatmentColumnKey(column)]??column.width}))} size="small"
+        .map(column=>({...column,width:columnWidths[treatmentColumnKey(column)]??column.width})), treatmentColumnKey,
+        (key,width)=>setColumnWidths(previous=>({...previous,[key]:width})),
+        (source,target)=>setColumnOrder(previous=>reorderColumn(previous,source,target)),
+        60, 800, ["selected","product"])} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
       scroll={{x:1900,y:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
@@ -1005,6 +1011,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
           setVisibleColumns(treatmentColumnKeys);
           setColumnOrder(treatmentColumnKeys);
           setColumnWidths({});
+          treatmentMouse.resetHeight();
         }}>Przywróć domyślne kolumny</Button>
     </Modal>
     <Modal className="kl-dialog-treatment-review" width="90vw" open={suggestReviewOpen}
@@ -1233,7 +1240,7 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string) => void}) {
           const next=new Set(current);rows.forEach(row=>next.add(row.symbol));return next;
         })}>Odznacz widoczne</Button>
       </Space>
-      <Table rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
+      <Table {...listLayout.tableProps} rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
         onRow={row=>({onClick:()=>setActivePriceSymbol(row.symbol)})}
         dataSource={rows} columns={listLayout.columns}
         pagination={{pageSize:40,showSizeChanger:true}}
@@ -1316,7 +1323,7 @@ function Expiry() {
         </Button>
       </Space>
       <ErrorNotice error={remote.error}/>
-      <Table rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
+      <Table {...expiryLayout.tableProps} rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
         loading={remote.busy} dataSource={rows}
         pagination={{pageSize:40,showSizeChanger:true}} scroll={{x:1040,y:"calc(100vh - 400px)"}}
         columns={expiryLayout.columns}/>
@@ -1539,7 +1546,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       </Space>
       <ErrorNotice error={error || remote.error}/>
       {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
-      <Table rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
+      <Table {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
         scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={{pageSize:35}}
         onRow={row=>({onDoubleClick:()=>{void open(row);}})}
         columns={savedLayout.columns}/>

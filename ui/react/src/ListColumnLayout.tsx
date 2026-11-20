@@ -1,10 +1,11 @@
+import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
 import {useEffect,useState} from "react";
 import {Button,Checkbox,InputNumber,Modal,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
 
 /** Workstation-local, WinForms-style column visibility, order and widths. */
 export function useListColumnLayout<T extends object>(
-  listId:string,columns:ColumnsType<T>
+  listId:string,columns:ColumnsType<T>,shortcutEnabled=true
 ) {
   const identity=(column:ColumnsType<T>[number]):string =>
     String(column.key ?? ("dataIndex" in column ? column.dataIndex : ""));
@@ -52,6 +53,7 @@ export function useListColumnLayout<T extends object>(
     catch{/* No SQL dependency; current session remains usable. */}
   },[storageKey,visible,order,widths]);
   useEffect(()=>{
+    if(!shortcutEnabled)return;
     const shortcut=(event:KeyboardEvent)=>{
       if(event.ctrlKey&&event.shiftKey&&event.code==="KeyL"){
         event.preventDefault();setOpen(value=>!value);
@@ -59,7 +61,7 @@ export function useListColumnLayout<T extends object>(
     };
     window.addEventListener("keydown",shortcut);
     return()=>window.removeEventListener("keydown",shortcut);
-  },[]);
+  },[shortcutEnabled]);
 
   const arranged=columns.filter(column=>visible.includes(identity(column)))
     .sort((a,b)=>order.indexOf(identity(a))-order.indexOf(identity(b)))
@@ -74,6 +76,11 @@ export function useListColumnLayout<T extends object>(
       return next;
     });
   }
+
+  const mouse = useTableMouseLayout(listId);
+  const mouseColumns = mouse.decorate(arranged, identity,
+    (key,width)=>setWidths(previous=>({...previous,[key]:width})),
+    (source,target)=>setOrder(previous=>moveColumn(previous,source,target)));
 
   const dialog=<Modal className={"kl-dialog-columns-"+listId} open={open}
       title="Parametry listy — kolumny" onCancel={()=>setOpen(false)}
@@ -112,8 +119,8 @@ export function useListColumnLayout<T extends object>(
       })}
     </div>
     <Button size="small" onClick={()=>{
-      setVisible([...keys]);setOrder([...keys]);setWidths({});
+      setVisible([...keys]);setOrder([...keys]);setWidths({});mouse.resetHeight();
     }}>Przywróć domyślne kolumny</Button>
   </Modal>;
-  return {columns:arranged,openColumns:()=>setOpen(true),dialog};
+  return {columns:mouseColumns,tableProps:mouse.tableProps,openColumns:()=>setOpen(true),dialog};
 }

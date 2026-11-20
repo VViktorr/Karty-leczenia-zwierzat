@@ -81,3 +81,26 @@
 .kl-movable-modal .ant-modal-header,
 .kl-movable-modal .ant-modal-confirm-title{cursor:move;touch-action:none;user-select:none}
 .kl-movable-modal .ant-modal-title{user-select:none}
+
+.kl-mouse-table .kl-movable-column { cursor: grab; }
+.kl-mouse-table .kl-movable-column:active { cursor: grabbing; }
+.kl-mouse-table :is(.ant-table-thead > tr > th, .ant-table-tbody > tr > td):not(.ant-table-cell-fix-left, .ant-table-cell-fix-right) { position: relative; }
+.kl-column-grip, .kl-row-grip { position: absolute; z-index: 1; touch-action: none; }
+.kl-column-grip, .kl-row-grip { display: none; }
+.kl-resizable-column > .kl-column-grip {
+  display: block; inset: 0 0 0 auto; width: 7px; cursor: col-resize;
+}
+.kl-resizable-row > .kl-row-grip { display: block; inset: auto 0 0; height: 5px; cursor: row-resize; }
+.kl-column-grip:hover, .kl-row-grip:hover { background: #5297da66; }
+.kl-mouse-table.kl-fixed-row-height .ant-table-tbody > tr[data-row-key] > td {
+  height: var(--kl-row-height);
+  padding-block: 0;
+}
+.kl-fixed-row-height .kl-row-content {
+  max-height: calc(var(--kl-row-height) - 6px);
+  overflow: clip;
+}
+.kl-mouse-table .ant-table-cell-ellipsis > .kl-row-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

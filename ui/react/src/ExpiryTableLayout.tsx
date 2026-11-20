@@ -1,3 +1,4 @@
+import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
 import {useEffect,useState} from "react";
 import {Button,Checkbox,InputNumber,Modal,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
@@ -80,6 +81,11 @@ export function useExpiryTableLayout<T extends object>(columns:ColumnsType<T>){
       ...column,width:widths[String(column.key)]??column.width
     }));
 
+  const mouse = useTableMouseLayout("expiry");
+  const mouseColumns = mouse.decorate(arranged, column=>String(column.key??""),
+    (key,width)=>setWidths(previous=>({...previous,[key]:width})),
+    (source,target)=>setOrder(previous=>moveColumn(previous,source,target)), 80, 650);
+
   const dialog=<Modal className="kl-dialog-expiry-columns" open={open}
     title="Parametry listy — terminy ważności"
     onCancel={()=>setOpen(false)} onOk={()=>setOpen(false)}
@@ -119,8 +125,8 @@ export function useExpiryTableLayout<T extends object>(columns:ColumnsType<T>){
     </div>
     <Button size="small" style={{marginTop:14}}
       onClick={()=>{
-        setVisible([...keys]);setOrder([...keys]);setWidths({});
+        setVisible([...keys]);setOrder([...keys]);setWidths({});mouse.resetHeight();
       }}>Przywróć domyślne kolumny</Button>
   </Modal>;
-  return {columns:arranged,dialog,openColumns:()=>setOpen(true)};
+  return {columns:mouseColumns,tableProps:mouse.tableProps,dialog,openColumns:()=>setOpen(true)};
 }

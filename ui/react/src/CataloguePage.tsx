@@ -1,3 +1,4 @@
+import {useListColumnLayout} from "./ListColumnLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert, Button, Card, Empty, Input, Modal, Space, Table,
@@ -397,6 +398,12 @@ export default function CataloguePage({
     }
   ];
 
+  const productsLayout = useListColumnLayout<CatalogueListing>("catalogue-products", [
+    { title: "Lek", dataIndex: "name", ellipsis: true },
+    { title: "Warianty", dataIndex: "variants", width: 85, align: "right" }
+  ], false);
+  const variantsLayout = useListColumnLayout("catalogue-variants", columns, false);
+
   return <>
     {contextHolder}
     <div className="page-heading">
@@ -425,7 +432,7 @@ export default function CataloguePage({
         <Input.Search allowClear value={input}
           placeholder="Nazwa lub symbol leku..."
           onChange={event => setInput(event.target.value)} />
-        <Table<CatalogueListing> rowKey="symbol" size="small"
+        <Table<CatalogueListing> {...productsLayout.tableProps} rowKey="symbol" size="small"
           loading={listBusy} dataSource={list}
           pagination={{ pageSize: 20, showSizeChanger: false }}
           scroll={{ y: "calc(100vh - 370px)" }}
@@ -435,10 +442,7 @@ export default function CataloguePage({
           rowClassName={row =>
             editing?.symbol === row.symbol ? "catalogue-selected" : ""}
           locale={{ emptyText: <Empty description="Brak produktów" /> }}
-          columns={[
-            { title: "Lek", dataIndex: "name", ellipsis: true },
-            { title: "Warianty", dataIndex: "variants", width: 85, align: "right" }
-          ]}
+          columns={productsLayout.columns}
         />
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           Pierwszych 200 kartotek spełniających filtr.
@@ -498,7 +502,8 @@ export default function CataloguePage({
               Istniejące warianty nie są kasowane przez pominięcie w edytorze.
             </Typography.Text>
           </div>
-          <Table<UiVariant> className="catalogue-variants"
+          <Table<UiVariant> {...variantsLayout.tableProps}
+            className={"catalogue-variants "+variantsLayout.tableProps.className}
             rowKey="key" dataSource={variants} size="small" pagination={false}
             loading={working}
             scroll={{ x: 1990, y: "calc(100vh - 530px)" }}
@@ -506,7 +511,7 @@ export default function CataloguePage({
               selectedRowKeys: selected,
               onChange: keys => setSelected(keys.map(String))
             }}
-            columns={columns}
+            columns={variantsLayout.columns}
           />
         </>}
       </Card>
