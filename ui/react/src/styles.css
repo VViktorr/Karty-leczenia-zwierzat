@@ -65,22 +65,56 @@
   background:var(--shell-bg);color:var(--text);font:12px/1.55 Consolas,"Cascadia Code",monospace}
 
 
-/* All ReactKL dialogs: independent, workstation-local movable/resizable windows.
-   Keeps AntD buttons accessible while allowing large ChPL/print previews. */
-.kl-movable-modal{
-  position:absolute!important;
-  margin:0!important;
-  padding-bottom:0!important;
-  max-width:calc(100vw - 16px)!important;
-  min-width:min(320px,calc(100vw - 16px));
-  min-height:190px;
-  max-height:calc(100vh - 16px);
-  resize:both;
-  overflow:auto;
+/* Dialog bounds are controlled by pointer handles in DialogPlacement. */
+.kl-movable-modal {
+  position: absolute !important;
+  margin: 0 !important;
+  padding-bottom: 0 !important;
+  max-width: none !important;
+}
+.kl-movable-modal > .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.kl-movable-modal > .ant-modal-content > .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 .kl-movable-modal .ant-modal-header,
-.kl-movable-modal .ant-modal-confirm-title{cursor:move;touch-action:none;user-select:none}
-.kl-movable-modal .ant-modal-title{user-select:none}
+.kl-movable-modal .ant-modal-confirm-title { cursor: move; touch-action: none; user-select: none; }
+.kl-movable-modal .ant-modal-title { user-select: none; }
+.kl-modal-resize { position: absolute; touch-action: none; z-index: 2; }
+.kl-modal-resize[data-edge="n"], .kl-modal-resize[data-edge="s"] {
+  left: 10px; right: 10px; height: 7px; cursor: ns-resize;
+}
+.kl-modal-resize[data-edge="e"], .kl-modal-resize[data-edge="w"] {
+  top: 10px; bottom: 10px; width: 7px; cursor: ew-resize;
+}
+.kl-modal-resize:is([data-edge="nw"], [data-edge="ne"], [data-edge="se"], [data-edge="sw"]) {
+  width: 10px; height: 10px;
+}
+.kl-modal-resize:is([data-edge="n"], [data-edge="nw"], [data-edge="ne"]) { top: 0; }
+.kl-modal-resize:is([data-edge="s"], [data-edge="sw"], [data-edge="se"]) { bottom: 0; }
+.kl-modal-resize:is([data-edge="w"], [data-edge="sw"], [data-edge="nw"]) { left: 0; }
+.kl-modal-resize:is([data-edge="e"], [data-edge="se"], [data-edge="ne"]) { right: 0; }
+.kl-modal-resize:is([data-edge="nw"], [data-edge="se"]) { cursor: nwse-resize; }
+.kl-modal-resize:is([data-edge="ne"], [data-edge="sw"]) { cursor: nesw-resize; }
+.kl-modal-resize:hover { background: #5297da66; }
+.kl-movable-modal:is(.kl-dialog-treatment-pdf, .kl-dialog-treatment-preview,
+  .kl-dialog-saved-preview, .kl-dialog-catalogue-pdf, .kl-dialog-price-preview)
+  > .ant-modal-content > .ant-modal-body {
+  display: flex;
+  flex-direction: column;
+}
+.kl-movable-modal:is(.kl-dialog-treatment-pdf, .kl-dialog-treatment-preview,
+  .kl-dialog-saved-preview, .kl-dialog-catalogue-pdf, .kl-dialog-price-preview)
+  > .ant-modal-content > .ant-modal-body > iframe {
+  flex: 1;
+  height: 0 !important;
+  min-height: 0;
+}
 
 .kl-mouse-table .kl-movable-column { cursor: grab; }
 .kl-mouse-table .kl-movable-column:active { cursor: grabbing; }

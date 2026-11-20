@@ -29,134 +29,160 @@ function read(key:string):Bounds|null {
     return obj as Bounds;
   }catch{return null;}
 }
-function fit(bounds:Bounds):Bounds {
-  const width=Math.max(320,Math.min(bounds.width,Math.max(320,window.innerWidth-16)));
-  const height=Math.max(190,Math.min(bounds.height,Math.max(190,window.innerHeight-16)));
-  return {width,height,
-    left:Math.max(0,Math.min(bounds.left,window.innerWidth-width)),
-    top:Math.max(0,Math.min(bounds.top,window.innerHeight-height))};
+const edges = ["n", "ne", "e", "se", "s", "sw", "w", "nw"] as const;
+type Edge = typeof edges[number];
+const minimum = {width: 320, height: 190};
+
+function fit(bounds: Bounds, wrapper: HTMLElement): Bounds {
+  const width = Math.min(Math.max(minimum.width, bounds.width), wrapper.clientWidth);
+  const height = Math.min(Math.max(minimum.height, bounds.height), wrapper.clientHeight);
+  return {width, height,
+    left: Math.max(0, Math.min(bounds.left, wrapper.clientWidth - width)),
+    top: Math.max(0, Math.min(bounds.top, wrapper.clientHeight - height))};
 }
-function place(modal:HTMLElement,b:Bounds){
-  const value=fit(b);
-  modal.style.left=value.left+"px";
-  modal.style.top=value.top+"px";
-  modal.style.width=value.width+"px";
-  modal.style.height=value.height+"px";
-}
-function current(modal:HTMLElement):Bounds {
-  const rect=modal.getBoundingClientRect();
-  // getBoundingClientRect includes animation transforms and document zoom.
-  // offset dimensions and positioned CSS coordinates are layout pixels:
-  // saving transformed geometry would grow/shrink a dialog at each reopen.
-  const zoom=Number.parseFloat(getComputedStyle(document.documentElement).zoom);
-  const factor=Number.isFinite(zoom)&&zoom>0?zoom:1;
-  const left=Number.parseFloat(modal.style.left);
-  const top=Number.parseFloat(modal.style.top);
-  return {
-    left:Number.isFinite(left)?left:rect.left/factor,
-    top:Number.isFinite(top)?top:rect.top/factor,
-    width:modal.offsetWidth||rect.width/factor,
-    height:modal.offsetHeight||rect.height/factor
+
+function attach(modal: HTMLElement, wrapper: HTMLElement) {
+  const header = modal.querySelector<HTMLElement>(
+    ".ant-modal-header, .ant-modal-confirm-title");
+  const content = modal.querySelector<HTMLElement>(".ant-modal-content");
+  if (!content) return;
+  const key = dialogKey(modal);
+  const originalWidth = modal.style.width;
+  const scale = () => wrapper.getBoundingClientRect().width / wrapper.clientWidth || 1;
+  let preferred = read(key) ?? {
+    left: modal.offsetLeft, top: modal.offsetTop,
+    width: modal.offsetWidth, height: content.offsetHeight
   };
+  let bounds = fit(preferred, wrapper);
+
+  function place(value: Bounds) {
+    bounds = value;
+    Object.assign(modal.style, {
+      left: value.left + "px", top: value.top + "px",
+      width: value.width + "px", height: value.height + "px"
+    });
+  }
+
+  let gesture: {target: HTMLElement; pointer: number; edge?: Edge;
+    x: number; y: number; origin: Bounds; zoom: number} | undefined;
+  const start = (event: PointerEvent) => {
+    if (gesture || event.button !== 0 || !(event.currentTarget instanceof HTMLElement) ||
+      (event.target instanceof Element &&
+        event.target.closest("button,input,select,textarea,a,[role=button]"))) return;
+    const target = event.currentTarget;
+    gesture = {target, pointer: event.pointerId, edge: target.dataset.edge as Edge | undefined,
+      x: event.clientX, y: event.clientY, origin: bounds, zoom: scale()};
+    target.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const move = (event: PointerEvent) => {
+    if (!gesture || event.pointerId !== gesture.pointer) return;
+    const {edge, origin, zoom} = gesture;
+    const dx = (event.clientX - gesture.x) / zoom;
+    const dy = (event.clientY - gesture.y) / zoom;
+    if (!edge) {
+      place(fit({...origin, left: origin.left + dx, top: origin.top + dy}, wrapper));
+      return;
+    }
+    let {left, top, width, height} = origin;
+    const minWidth = Math.min(minimum.width, wrapper.clientWidth);
+    const minHeight = Math.min(minimum.height, wrapper.clientHeight);
+    if (edge.includes("w")) {
+      left = Math.max(0, Math.min(left + dx, origin.left + width - minWidth));
+      width += origin.left - left;
+    }
+    if (edge.includes("e"))
+      width = Math.max(minWidth, Math.min(width + dx, wrapper.clientWidth - left));
+    if (edge.includes("n")) {
+      top = Math.max(0, Math.min(top + dy, origin.top + height - minHeight));
+      height += origin.top - top;
+    }
+    if (edge.includes("s"))
+      height = Math.max(minHeight, Math.min(height + dy, wrapper.clientHeight - top));
+    place({left, top, width, height});
+  };
+
+  const finish = (event: PointerEvent) => {
+    if (!gesture || event.pointerId !== gesture.pointer) return;
+    const {origin} = gesture;
+    gesture = undefined;
+    if (event.type !== "pointerup") {
+      place(fit(preferred, wrapper));
+      return;
+    }
+    if (origin.left === bounds.left && origin.top === bounds.top &&
+      origin.width === bounds.width && origin.height === bounds.height) return;
+    preferred = bounds;
+    try { localStorage.setItem(key, JSON.stringify(preferred)); }
+    catch { /* Keep the active geometry. */ }
+  };
+
+  const handles = edges.map(edge => {
+    const handle = document.createElement("span");
+    handle.className = "kl-modal-resize";
+    handle.dataset.edge = edge;
+    handle.setAttribute("aria-hidden", "true");
+    modal.append(handle);
+    return handle;
+  });
+  const targets = header ? [header, ...handles] : handles;
+  const events = [
+    ["pointerdown", start], ["pointermove", move], ["pointerup", finish],
+    ["pointercancel", finish], ["lostpointercapture", finish]
+  ] as const;
+  targets.forEach(target => events.forEach(([name, listener]) =>
+    target.addEventListener(name, listener)));
+  modal.classList.add("kl-movable-modal");
+  place(bounds);
+
+  const refit = new ResizeObserver(() => {
+    if (!gesture && wrapper.clientWidth && wrapper.clientHeight) place(fit(preferred, wrapper));
+  });
+  refit.observe(wrapper);
+  return () => {
+    refit.disconnect();
+    targets.forEach(target => events.forEach(([name, listener]) =>
+      target.removeEventListener(name, listener)));
+    handles.forEach(handle => handle.remove());
+    modal.classList.remove("kl-movable-modal");
+    for (const property of ["left", "top", "height"]) modal.style.removeProperty(property);
+    if (originalWidth) modal.style.width = originalWidth;
+    else modal.style.removeProperty("width");
+  };
+
 }
 
-/**
- * Applies to Ant Design Modal and Modal.confirm, including catalogue, ChPL,
- * card previews, backups and settings. No SQL calls; workstation-local.
- */
-export default function DialogPlacement(){
-  useEffect(()=>{
-    // Clean removed dialogs immediately: PDF and confirmation dialogs may
-    // be mounted thousands of times without restarting the Windows app.
-    const live=new Map<HTMLElement,()=>void>();
-    const scan=()=>{
-      for(const [modal,cleanup] of live){
-        if(!modal.isConnected){cleanup();live.delete(modal);}
+export default function DialogPlacement() {
+  useEffect(() => {
+    const live = new Map<HTMLElement, () => void>();
+    const scan = () => {
+      for (const [modal, cleanup] of live) {
+        if (!modal.isConnected) { cleanup(); live.delete(modal); }
       }
-      document.querySelectorAll<HTMLElement>(".ant-modal-wrap .ant-modal").forEach(modal=>{
-        if(live.has(modal))return;
-        const wrapper=modal.closest<HTMLElement>(".ant-modal-wrap");
-        if(!wrapper||wrapper.getClientRects().length===0)return;
-        // Ant Design's programmatic Modal.confirm has no .ant-modal-header.
-        // Use its title as the drag handle too (never the confirmation buttons).
-        const header=modal.querySelector<HTMLElement>(
-          ".ant-modal-header, .ant-modal-confirm-title");
-        if(!header)return;
-
-        const key=dialogKey(modal);
-        const rect=current(modal);
-        // Preserve declared modal width on first open. The header is draggable
-        // and native bottom-right CSS resize controls its dimensions.
-        modal.classList.add("kl-movable-modal");
-        place(modal,read(key)??{
-          left:Math.max(0,(window.innerWidth-rect.width)/2),
-          top:Math.max(0,rect.top),
-          width:Math.max(320,rect.width),height:Math.max(190,rect.height)
-        });
-        let active=false;
-        let moving=false;
-        let startX=0,startY=0,originX=0,originY=0;
-        const persist=()=>{
-          if(active||moving||!modal.isConnected||
-            !wrapper.getClientRects().length||!modal.getClientRects().length)return;
-          try{localStorage.setItem(key,JSON.stringify(fit(current(modal))));}
-          catch{/* Geometry is still usable until this window closes. */}
-        };
-        const onDown=(e:PointerEvent)=>{
-          if(e.button!==0||(e.target instanceof Element&&
-             e.target.closest("button,input,select,textarea,a,[role=button]")))return;
-          moving=true;startX=e.clientX;startY=e.clientY;
-          const b=current(modal);originX=b.left;originY=b.top;
-          header.setPointerCapture(e.pointerId);
-          e.preventDefault();
-        };
-        const onMove=(e:PointerEvent)=>{
-          if(!moving)return;
-          const b=current(modal);
-          place(modal,{left:originX+e.clientX-startX,top:originY+e.clientY-startY,
-            width:b.width,height:b.height});
-        };
-        const onUp=()=>{
-          if(!moving)return;
-          moving=false;persist();
-        };
-        header.addEventListener("pointerdown",onDown);
-        header.addEventListener("pointermove",onMove);
-        header.addEventListener("pointerup",onUp);
-        header.addEventListener("pointercancel",onUp);
-        // Native CSS resize may finish outside the element. Persist on the
-        // next pointer release even if ResizeObserver was not called yet.
-        const onRelease=()=>{if(!moving)persist();};
-        window.addEventListener("pointerup",onRelease);
-        const resize=new ResizeObserver(()=>{if(!active)persist();});
-        resize.observe(modal);
-        active=true;
-        const ready=requestAnimationFrame(()=>{active=false;});
-        live.set(modal,()=>{
-          cancelAnimationFrame(ready);
-          resize.disconnect();
-          header.removeEventListener("pointerdown",onDown);
-          header.removeEventListener("pointermove",onMove);
-          header.removeEventListener("pointerup",onUp);
-          header.removeEventListener("pointercancel",onUp);
-          window.removeEventListener("pointerup",onRelease);
-        });
+      document.querySelectorAll<HTMLElement>(".ant-modal-wrap .ant-modal").forEach(modal => {
+        if (live.has(modal)) return;
+        const wrapper = modal.closest<HTMLElement>(".ant-modal-wrap");
+        if (!wrapper?.clientWidth || !wrapper.clientHeight || !modal.offsetWidth) return;
+        const cleanup = attach(modal, wrapper);
+        if (cleanup) live.set(modal, cleanup);
       });
     };
-    const observer=new MutationObserver(scan);
-    observer.observe(document.body,{childList:true,subtree:true,
-      attributes:true,attributeFilter:["class"]});
+    const observer = new MutationObserver(changes => {
+      if (changes.some(change => change.type === "childList" ||
+        (change.target instanceof HTMLElement &&
+          (change.target.matches(".ant-modal-wrap") ||
+            (change.target.matches(".ant-modal") && !live.has(change.target))))))
+        scan();
+    });
+    observer.observe(document.body, {childList: true, subtree: true,
+      attributes: true, attributeFilter: ["class", "style"]});
     scan();
-    const onResize=()=>{
-      document.querySelectorAll<HTMLElement>(".kl-movable-modal").forEach(modal=>{
-        if(modal.getClientRects().length)place(modal,current(modal));
-      });
+    return () => {
+      observer.disconnect();
+      live.forEach(cleanup => cleanup());
     };
-    window.addEventListener("resize",onResize);
-    return ()=>{
-      observer.disconnect();window.removeEventListener("resize",onResize);
-      live.forEach(clean=>clean());live.clear();
-    };
-  },[]);
+  }, []);
   return null;
 }

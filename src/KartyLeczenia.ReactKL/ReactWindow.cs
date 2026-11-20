@@ -69,11 +69,13 @@ internal sealed class ReactWindow : Form
         catalogue = new CatalogueService(archive);
         priceCatalogueService = new PriceCatalogueService(archive);
         base.Text = "Karty Leczenia";
-        MinimumSize = new Size(900, 600);
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MinimumSize = new Size(480, 360);
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;
         ReactWindowPlacement.Restore(this);
         Controls.Add(web);
+        ResizeEnd += (_, _) => ReactWindowPlacement.Save(this);
         FormClosed += (_, _) => ReactWindowPlacement.Save(this);
         Shown += async (_, _) =>
         {
