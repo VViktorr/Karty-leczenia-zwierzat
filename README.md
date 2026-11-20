@@ -1,159 +1,75 @@
-# KartyLeczenia
+# Karty Leczenia — ReactKL
 
-Aplikacja dla Windows rozwijana w **Windows Forms (WinForms)**, w C# na .NET 10, z odczytem danych z Subiekta GT i wspólnym katalogiem leków w SQL Server.
+Windows 11, .NET 10, React + TypeScript oraz Microsoft Edge WebView2.
 
-**Aktywna i domyślna gałąź to `winforms`. Bieżące zmiany interfejsu wprowadzamy w projekcie [KartyLeczenia.WinForms](src/KartyLeczenia.WinForms).**
+**Aktywna gałąź prac:** `ReactKL`. Stara wersja WinForms służy tylko jako wzorzec funkcjonalny, zabezpieczony w `winforms-backup-2026-11-19`. W ReactKL nie używamy dawnego interfejsu ani AntdUI.
 
-## Budowanie na Windows
+## Budowanie lokalne w C:\React
 
-Wymagany jest .NET 10 SDK.
+Wymagane: Git, Node.js 22, .NET 10 SDK, Inno Setup 7 (do instalatora; skrypt obsługuje również Inno Setup 6). Na Windows 11 wymagany jest też WebView2 Runtime.
 
-```powershell
-dotnet build src/KartyLeczenia.WinForms/KartyLeczenia.WinForms.csproj -c Release
-```
-
-## Projekty i dane
-
-- [`src/KartyLeczenia.WinForms`](src/KartyLeczenia.WinForms) — aktywna aplikacja Windows Forms.
-- [`src/KartyLeczenia.Core`](src/KartyLeczenia.Core) — wspólna biblioteka, m.in. odczyt Subiekta GT.
-- [`src/KartyLeczenia`](src/KartyLeczenia) — wcześniejszy interfejs .NET MAUI. Plik `medicine-catalog.sqlite` zasila pierwszy import na serwerze.
-- [Gałąź `main`](https://github.com/VViktorr/Karty-leczenia-zwierzat/tree/main) — wcześniejszy etap projektu .NET MAUI i jego dokumentacja.
-
-## Wspólne archiwum WinForms
-
-Program łączy się z bazą Subiekta GT do odczytu kartotek, dokumentów, cen i
-stanów oraz ze wspólną bazą SQL `KartyLeczenia`. Wspólna baza przechowuje
-katalog leków, warianty, karencje, PDF-y ChPL, ustawienia lecznicy,
-zapamiętane wybory leczenia, karty i opisy zwierząt.
-
-1. Na serwerze uruchom instalator w trybie **Serwer**. Wybierz tę samą
-   instancję, jeśli masz już bazę `KartyLeczenia`. Instalator uzupełni schemat
-   i zaimportuje katalog z pakietu: SQLite wraz z PDF-ami ChPL. Import
-   dochodzi do skutku w jednej transakcji. Po jego zakończeniu kolejne
-   instalacje zostawiają katalog i zmiany użytkowników w bazie.
-2. Na każdym stanowisku w **Ustawienia → Archiwum SQL** zapisz połączenie
-   do tej samej instancji. W zakładce **Subiekt GT** wybierz bazę podmiotu
-   i magazyn. Użyj tej samej nazwy serwera i bazy podmiotu na stanowiskach,
-   żeby zachować powiązania z zapisanymi kartami, wyborami i opisami.
-3. W **Cennik leków → Dodaj / edytuj w katalogu** wyszukaj kartotekę
-   Subiekta po symbolu lub nazwie. Wprowadź dane, dodaj warianty i dołącz
-   ChPL do zaznaczonych wariantów. Zmiany będą dostępne na wszystkich
-   stanowiskach po odświeżeniu cennika lub ponownym otwarciu karty.
-
-`scripts/Setup-SharedArchive.sql` przygotowuje schemat i rolę operatora.
-Pakiet importu tworzy skrypt budowania instalatora, a podczas konfiguracji
-serwera uruchamia go `Configure-SharedArchive.ps1`. Aplikacja WinForms
-wczytuje katalog z SQL. Podgląd ChPL otwiera tymczasowy plik z treścią pobraną
-z serwera.
-
-Dane lecznicy edytuje się w **Ustawienia → Dane lecznicy**. Jeśli wspólna
-baza nie zawiera jeszcze tych danych, program może przenieść wcześniejsze
-ustawienia lecznicy z tego stanowiska przy pierwszym połączeniu z archiwum.
-
-## Aktualizacja katalogu w istniejącym archiwum
-
-Po zbudowaniu instalatora rozpakuj `catalog-seed-win-x64.zip` na serwerze
-SQL. Uruchom polecenia PowerShell z rozpakowanego folderu na koncie Windows
-z uprawnieniami do zapisu katalogu. Dla instancji domyślnej użyj `lpc:localhost`.
+**Pierwsze pobranie do pustego folderu:**
 
 ```powershell
-.\KartyLeczenia.CatalogImport.exe 'lpc:localhost\KLARCHIVE' . --preview-update
-.\KartyLeczenia.CatalogImport.exe 'lpc:localhost\KLARCHIVE' . --apply-update
+git clone --branch ReactKL --single-branch https://github.com/VViktorr/Karty-leczenia-zwierzat.git C:\React
+cd C:\React
 ```
 
-Podgląd pokazuje nowe symbole i liczbę wariantów. Zapis dodaje nowe kartoteki
-razem z wariantami, karencjami do cennika i powiązanymi PDF-ami w jednej
-transakcji. Istniejące symbole i ich ręczne poprawki są zachowywane.
-Jeśli istniejący PDF ma tę samą ścieżkę i inną treść, import zgłosi konflikt.
-
-## Aktualizacje programu z SQL
-
-Zainstaluj pierwszą wersję obsługującą aktualizacje SQL ręcznie na serwerze
-i na stanowiskach. W trybie **Serwer** instalator przygotowuje tabelę w
-bazie `KartyLeczenia` i zachowuje kopię uruchomionego pliku EXE. Przy
-pierwszym uruchomieniu programu potwierdź podniesienie uprawnień na koncie
-Windows, które może publikować w tej bazie. Po udanej publikacji program
-usuwa kopię roboczą. Przy błędzie można ponowić publikację w
-**Ustawienia → Aktualizacje**. Szczegóły zapisują się w
-`C:\ProgramData\KartyLeczenia\update-publish.log`.
-
-Stanowiska z zapisanym połączeniem z archiwum sprawdzają aktualizację przy
-starcie lub po kliknięciu **Sprawdź aktualizację w SQL**. Operator ma prawo
-odczytu instalatora. Program pobiera go lokalnie, weryfikuje SHA-256 i prosi
-o zatwierdzenie uruchomienia instalatora przez Windows.
-
-## Odtworzenie archiwum na innym serwerze
-
-Skopiuj plik `.bak` do miejsca dostępnego dla usługi docelowego SQL Servera.
-W **Ustawienia → Kopia zapasowa SQL** wpisz **Serwer docelowy odtwarzania**
-oraz ścieżkę widoczną z tego serwera. Zaloguj się kontem administratora SQL
-docelowej instancji. Program może utworzyć bazę z kopii i przenieść standardowe
-pliki danych i dziennika do domyślnych folderów docelowej instancji. Jeśli
-baza istnieje, program najpierw wykona kopię jej obecnej zawartości.
-
-Po odtworzeniu uruchom instalator w trybie **Serwer** na docelowej instancji,
-żeby uzupełnić schemat i skonfigurować dostęp operatora. Następnie zapisz nowy
-adres w **Ustawienia → Archiwum SQL** na stanowiskach. Loginy instancji SQL
-konfiguruje się na serwerze docelowym. Jeśli odtworzony użytkownik operatora
-ma inny identyfikator SID niż jego login na serwerze docelowym, administrator
-może powiązać go z właściwym, już istniejącym loginem. Dla domyślnego konta:
-
-```sql
-USE [KartyLeczenia];
-ALTER USER [KartyLeczeniaOperatorUser] WITH LOGIN = [KartyLeczeniaOperator];
-```
-
-## Instalator WinForms z wyborem stanowiska
-
-Z głównego katalogu repozytorium uruchom skrypt z zainstalowanym .NET 10 SDK
-i Inno Setup 7. Skrypt publikuje aplikację, tworzy pakiet pierwszego importu
-i kompiluje instalator.
+**Aktualizacja już pobranego folderu:**
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\Build-WinForms.ps1 -Version 1.0.7
+cd C:\React
+git switch ReactKL
+git pull --ff-only origin ReactKL
 ```
 
-Gdy `ISCC.exe` jest w innej lokalizacji, wskaż ścieżkę parametrem `-Iscc`.
+Jeśli repozytorium korzysta z Git LFS, wykonaj także `git lfs pull` (gdy Git LFS jest zainstalowany). Sprawdź, czy plik `src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite` zawiera rzeczywistą bazę, a nie wskaźnik LFS: skrypt budowania instalatora sam kontroluje ten warunek.
 
-Plik `KartyLeczenia-Setup-win-x64-v1.0.7.exe` pojawi się w głównym
-katalogu repozytorium. Użyj tego samego pliku na serwerze i stanowiskach.
-Domyślny katalog programu to `C:\Program Files\KartyLeczenia`.
-Instalator tworzy folder **KartyLeczenia** na liście wszystkich aplikacji menu
-Start, ze skrótem do programu i skrótem **Ustawienia KartyLeczenia**. Skrót na pulpicie dodaje po zaznaczeniu opcji w kreatorze.
-Brakujący WebView2 pobiera z Microsoftu. Kreator pokazuje pasek pobierania
-i osobny pasek aktywności podczas instalowania składników. Wybór instancji,
-logowania i hasła odbywa się w oknach dialogowych.
+**Podgląd programu bez instalacji:**
 
-- **Serwer → Wybierz istniejącą instancję** — w oknie konfiguracji pokażą się
-  lokalne instancje SQL Server z nazwą, wersją i stanem usługi. Wybierz
-  uruchomioną instancję. Przy pierwszej instalacji kreator podpowiada tę opcję,
-  jeśli wykryje działającą usługę SQL Server. Twoje konto Windows musi mieć uprawnienia
-  administratora SQL (`sysadmin`). Po potwierdzeniu instalator utworzy
-  osobną bazę `KartyLeczenia` albo użyje dotychczasowego archiwum o zgodnej
-  strukturze. W instancji z logowaniem mieszanym można wybrać konto SQL lub
-  konto albo grupę Windows. Instancja z logowaniem Windows wymaga konta lub
-  grupy rozpoznawanej także na stanowiskach. Kreator nie zmienia trybu
-  uwierzytelniania, usług, portów ani reguł zapory istniejącej instancji.
-  Jeśli instancja nie udostępnia SQL po TCP w sieci, jej administrator
-  przygotowuje dostęp ze stanowisk osobno.
-- **Serwer → Zainstaluj lub użyj osobnej instancji KLARCHIVE** — po
-  akceptacji licencji pobiera SQL Server 2025 Express, jeśli brakuje instancji `KLARCHIVE`. Przygotowuje osobną bazę `KartyLeczenia`,
-  port TCP `51433` i regułę zapory dla lokalnej podsieci w profilach
-  prywatnym i domenowym. Podczas pierwszej konfiguracji wpisz hasło dla
-  konta SQL `KartyLeczeniaOperator` w oknie dialogowym (dokładnie sześć cyfr). Zachowaj je do
-  ustawienia połączenia na stanowiskach. Instalator wyświetli adres archiwum.
-  Jeśli instalacja nowego SQL Server zatrzyma się z błędem ODBC 17 lub 18 (1706),
-  kreator pokaże instrukcję Microsoft i pozwoli otworzyć dziennik instalacji.
-- **Stanowisko zdalne** — wklej adres wskazany w instalacji serwerowej,
-  np. `SERWER,51433`, `SERWER,1433` albo `SERWER\INSTANCJA`. Sama nazwa
-  komputera lub adres IPv4 oznacza port `51433`. Po otwarciu programu
-  adres pojawi się w **Ustawienia → Archiwum SQL**. Wybierz metodę
-  logowania ustawioną na serwerze. Dla logowania SQL wpisz hasło operatora,
-  a następnie wybierz **Sprawdź i zapisz**. Połączenie używa szyfrowania i domyślnie weryfikuje certyfikat.
-  Jeżeli dedykowana instancja korzysta z certyfikatu własnego, możesz jawnie
-  zaznaczyć **Zaufaj certyfikatowi serwera archiwum** po sprawdzeniu adresu
-  prywatnego serwera. Dane Subiekta ustawiasz osobno.
+```powershell
+cd C:\React\ui\react
+npm install --no-audit --no-fund
+npm run test:bridge
+npm run build
+cd C:\React
+dotnet publish src\KartyLeczenia.ReactKL\KartyLeczenia.ReactKL.csproj -c Release -r win-x64 --self-contained true -o C:\React\ReactKL-preview
+.\ReactKL-preview\KartyLeczenia.ReactKL.exe
+```
 
-Ponowna instalacja zachowuje bazę i hasło istniejącego operatora. Odinstalowanie
-programu pozostawia instancję SQL i archiwum. Skróty nowej aplikacji mają nazwę
-**KartyLeczenia**.
+**Instalator z wersją wpisaną ręcznie przez operatora:**
+
+```powershell
+cd C:\React
+$wersja = Read-Host 'Podaj numer wersji (np. 2.2.5)'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\Build-ReactKL.ps1 -Version $wersja
+```
+
+Wynik w folderze `C:\React\Instalatory\KartyLeczenia-Setup-win-x64-v<wersja>.exe`. Nie wpisujemy numeru wersji automatycznie. Kompilacja z GitHub Actions znajduje się w `.github/workflows/reactkl-checks.yml`, a ręcznie uruchamiany instalator w `.github/workflows/reactkl-installer.yml`.
+
+## Ustawienia: trzy oddzielne obszary
+
+W **Ustawienia** programu znajdują się niezależne zakładki:
+
+- **Subiekt GT**: serwer, tryb logowania Windows/SQL, pobieranie baz podmiotów, wybór bazy, test połączenia (bez zapisu), lista grup leków, lista magazynów z nazwami i zapis. Dokumenty, ceny i stany magazynowe są z Subiekta **tylko odczytywane**. Do pracy wymagane jest konto z uprawnieniami SELECT, bez praw do modyfikacji bazy Subiekta.
+- **Baza Karty Leczenia**: odrębne połączenie SQL z bazą o niezmienionej, technicznej nazwie `KartyLeczenia`, test połączenia bez zapisu oraz sprawdzenie i zapis ustawień. W bazie są karty leczenia, katalog leków, ChPL, ustawienia lecznicy i aktualizacje programu.
+- **Archiwizacja**: ustawienia miejsca zapisu kopii `.bak` oraz wykonanie i odtworzenie kopii bazy `KartyLeczenia`; nie dotyka bazy Subiekta. To odrębny ekran, lecz **nie trzecia baza SQL ani oddzielne konto logowania**. Przywracanie wymaga uprawnień administracyjnych SQL oraz potwierdzenia Windows Hello.
+
+Dodatkowo: **Dane lecznicy** oraz **Aktualizacje**. Ustawienia połączeń są osobne na każdym stanowisku. Hasła SQL zapisuje Windows DPAPI w profilu użytkownika, jeśli operator wybierze zapamiętywanie.
+
+## Instalacja, nazwa i aktualizacje
+
+Wyświetlana nazwa programu i skrótów to **Karty Leczenia** (w menu Start i na pulpicie). Nazwa pliku `KartyLeczenia.ReactKL.exe`, identyfikator instalacji Inno Setup `pl.kartyleczenia.winforms.sql`, folder `C:\Program Files\KartyLeczenia` oraz nazwa bazy SQL `KartyLeczenia` **pozostają bez zmian**. Nowy instalator aktualizuje tę samą instalację zamiast tworzyć drugą. Stare skróty `SQL KartyLeczenia` są usuwane przez instalator; nowy skrót na pulpicie jest zaznaczony domyślnie.
+
+Na **serwerze** instalator tworzy/konfiguruje bazę `KartyLeczenia` w wybranej instancji SQL lub w `KLARCHIVE`. Pakiet uruchomieniowy dostarcza katalog i urzędowe PDF ChPL na pierwszą konfigurację, bez celowego nadpisywania ręcznych zmian istniejącej bazy. Po instalacji wersja jest publikowana w `dbo.program_update`, a stanowiska zdalne pobierają ją z SQL po zatwierdzeniu przez użytkownika i weryfikacji SHA-256.
+
+**Przed zastąpieniem instalacji produkcyjnej wykonaj pełną kopię .bak bazy KartyLeczenia.** Wynik kompilacji GitHub Actions nie jest testem na rzeczywistym SQL Server i Subiekcie, ani testem odtwarzania danych lub wysyłki PDF.
+
+## Dokumentacja i dalszy zakres
+
+- [ReactKL — dokumentacja interfejsu](ui/react/README.md)
+- [Audyt funkcjonalny](docs/reactkl-audyt-stanu-2026-11-19.md)
+- [Skrypt instalatora](installer/Build-ReactKL.ps1)
+- [Instalator](installer/KartyLeczenia.ReactKL.iss)
+
+Zasada: do ReactKL przenosimy wyłącznie funkcje potwierdzone w końcowej wersji WinForms; wszystkie nowe wymagają najpierw uzgodnienia. Motywy i wygląd WinForms są wyłączone z porównania.
