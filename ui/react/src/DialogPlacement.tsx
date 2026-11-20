@@ -182,11 +182,27 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
   modal.classList.add("kl-movable-modal");
   place(bounds);
 
+  // rc-dialog replaces className during enter/leave motion and React can
+  // reapply the declared width during a render. Restore only changed values
+  // so these repairs don't generate another mutation cycle.
+  const repair = new MutationObserver(() => {
+    if (!modal.classList.contains("kl-movable-modal"))
+      modal.classList.add("kl-movable-modal");
+    if (gesture && !modal.classList.contains("kl-modal-adjusting"))
+      modal.classList.add("kl-modal-adjusting");
+    for (const [property, value] of Object.entries(bounds) as [keyof Bounds, number][]) {
+      const pixels = value + "px";
+      if (modal.style[property] !== pixels) modal.style[property] = pixels;
+    }
+  });
+  repair.observe(modal, {attributes:true, attributeFilter:["class","style"]});
+
   const refit = new ResizeObserver(() => {
     if (!gesture && wrapper.clientWidth && wrapper.clientHeight) place(fit(preferred, wrapper));
   });
   refit.observe(wrapper);
   return () => {
+    repair.disconnect();
     refit.disconnect();
     removeWindowListeners();
     targets.forEach(target => events.forEach(([name, listener]) =>
@@ -210,9 +226,21 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
 export default function DialogPlacement() {
   useEffect(() => {
     const live = new Map<HTMLElement, () => void>();
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        scan();
+      });
+    };
     const scan = () => {
       for (const [modal, cleanup] of live) {
-        if (!modal.isConnected) { cleanup(); live.delete(modal); }
+        if (!modal.isConnected || !modal.offsetWidth ||
+            !modal.querySelector(".ant-modal-content > .kl-modal-resize")) {
+          cleanup();
+          live.delete(modal);
+        }
       }
       document.querySelectorAll<HTMLElement>(".ant-modal-wrap .ant-modal").forEach(modal => {
         if (live.has(modal)) return;
@@ -227,13 +255,14 @@ export default function DialogPlacement() {
         (change.target instanceof HTMLElement &&
           (change.target.matches(".ant-modal-wrap") ||
             (change.target.matches(".ant-modal") && !live.has(change.target))))))
-        scan();
+        schedule();
     });
     observer.observe(document.body, {childList: true, subtree: true,
       attributes: true, attributeFilter: ["class", "style"]});
     scan();
     return () => {
       observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
       live.forEach(cleanup => cleanup());
     };
   }, []);

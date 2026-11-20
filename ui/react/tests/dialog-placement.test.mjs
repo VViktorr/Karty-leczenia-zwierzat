@@ -11,7 +11,7 @@ const {attachDialog} = await import("data:text/javascript;base64," +
   Buffer.from(compiled).toString("base64"));
 
 class ElementFixture extends EventTarget {
-  classList = new class extends Set { remove(...items) { items.forEach(item => this.delete(item)); } };
+  classList = new class extends Set { contains(item) { return this.has(item); } remove(...items) { items.forEach(item => this.delete(item)); } };
   dataset = {};
   children = [];
   style = {removeProperty: key => delete this.style[key]};
@@ -38,6 +38,12 @@ test("dialog and PDF handles resize at zoom, persist per dialog, and clean up on
   globalThis.HTMLElement = globalThis.Element = ElementFixture;
   globalThis.document = {createElement: () => new ElementFixture()};
   globalThis.ResizeObserver = class {observe() {} disconnect() {}};
+  let repair;
+  globalThis.MutationObserver = class {
+    constructor(callback) { repair = callback; }
+    observe() {}
+    disconnect() {}
+  };
   const saved = new Map();
   globalThis.localStorage = {getItem: key => saved.get(key), setItem: (key, value) => saved.set(key, value)};
 
@@ -55,6 +61,11 @@ test("dialog and PDF handles resize at zoom, persist per dialog, and clean up on
   pointer(corner, "pointerup", 440, 380);
   assert.equal(modal.style.width, "700px");
   assert.equal(modal.style.height, "450px");
+  modal.classList.remove("kl-movable-modal");
+  modal.style.width = "520px";
+  repair();
+  assert.ok(modal.classList.has("kl-movable-modal"));
+  assert.equal(modal.style.width, "700px");
   assert.ok(!modal.classList.has("kl-modal-adjusting"));
   pointer(header, "pointerdown", 200, 120);
   pointer(header, "pointermove", 240, 160);
@@ -75,5 +86,28 @@ test("dialog and PDF handles resize at zoom, persist per dialog, and clean up on
     {key: "ArrowLeft", shiftKey: false}));
   assert.equal(modal.style.width, "688px");
   assert.equal(JSON.parse(saved.get(key)).width, 688);
+  closeAgain();
+});
+
+
+test("a dialog without a custom class can move, resize and restore its position", () => {
+  const wrapper = {clientWidth: 1024, clientHeight: 768, getBoundingClientRect: () => ({width: 1024})};
+  const modal = new ElementFixture(), content = new ElementFixture(), header = new ElementFixture();
+  const title = {textContent: "Numery i liczba leczonych zwierząt"};
+  modal.querySelector = selector => selector === ".ant-modal-content" ? content :
+    selector.includes(".ant-modal-title") ? title : header;
+  const cleanup = attachDialog(modal, wrapper);
+  const corner = content.children.find(handle => handle.dataset.edge === "se");
+  pointer(corner, "pointerdown", 500, 400);
+  pointer(corner, "pointermove", 450, 380);
+  pointer(corner, "pointerup", 450, 380);
+  pointer(header, "pointerdown", 150, 120);
+  pointer(header, "pointermove", 170, 150);
+  pointer(header, "pointerup", 170, 150);
+  cleanup();
+  const closeAgain = attachDialog(modal, wrapper);
+  assert.equal(modal.style.width, "850px");
+  assert.equal(modal.style.left, "120px");
+  assert.equal(modal.style.top, "110px");
   closeAgain();
 });
