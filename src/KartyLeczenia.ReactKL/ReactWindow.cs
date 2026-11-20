@@ -1115,7 +1115,13 @@ internal sealed class ReactWindow : Form
             if (action == "treatmentSuggestions")
                 return new
                 {
-                    items = proposals,
+                    items = proposals.Select(proposal => new
+                    {
+                        proposal.Index, proposal.Symbol, proposal.Status, proposal.Message,
+                        proposal.VariantId, proposal.Species, proposal.Route, proposal.Dosing,
+                        proposal.Withdrawal, proposal.Source, proposal.HasPdf, proposal.PdfPath,
+                        groups = TreatmentSpeciesGroup.CompatibleGroups([proposal.Species])
+                    }),
                     compatibility = draft.Rows.Select((row, index) =>
                     {
                         variants.TryGetValue(TreatmentAutofillPlanner.CatalogueSymbol(row), out var entries);
@@ -1138,6 +1144,7 @@ internal sealed class ReactWindow : Form
                 throw new InvalidOperationException(
                     "Stan edytora się zmienił. Odśwież propozycje katalogu.");
 
+            string autoGroup = ReadTextField(root, "autoGroup", 10);
             var snapshots = snapshot.EnumerateArray().ToArray();
             var accepted = requested.EnumerateArray().ToArray();
             var seen = new HashSet<int>();
@@ -1171,6 +1178,7 @@ internal sealed class ReactWindow : Form
                     ReadTextField(request,"source",3000), ReadTextField(request,"pdfPath",450),
                     Flag(request,"hasPdf"));
                 if (!unchanged || !catalogueUnchanged || proposal.Status != "ready" ||
+                    (autoGroup.Length > 0 && !TreatmentSpeciesGroup.Matches(autoGroup, [proposal.Species])) ||
                     proposal.VariantId != variantId ||
                     !variants.TryGetValue(proposal.Symbol, out var matches))
                 {

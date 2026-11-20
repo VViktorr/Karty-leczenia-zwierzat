@@ -42,7 +42,7 @@ interface TreatmentVariantList {
 interface TreatmentSuggestion {
   index:number;symbol:string;status:string;message:string;
   variantId:number|null;species:string;route:string;dosing:string;
-  withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;
+  withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;groups:SpeciesGroup[];
 }
 interface TreatmentSuggestionList {
   items:TreatmentSuggestion[];
@@ -497,7 +497,9 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [groupSection,setGroupSection]=useState("II");
   const selectionQueue=useRef<Promise<void>>(Promise.resolve());
   const selectionVersion=useRef(0);
+  const autoApplied=useRef(new Set<string>());
   useEffect(() => {
+    autoApplied.current.clear();
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
     setDuplicateId(null);setDateStep(null);setAnimalEdit(null);setReferenceEdit(null);
     setReported("");setPerformed(localDateTime());
@@ -775,27 +777,29 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const readySuggestions=suggestions.filter(s=>{
     if(s.status!=="ready" || s.variantId==null)return false;
     const row=rows.find(x=>x.index===s.index);
-    return !!row && row.selected && row.symbol===s.symbol &&
+    return !!row && row.selected && (row.referenceSymbol||row.symbol).trim().toUpperCase()===s.symbol.toUpperCase() &&
       !row.dosing?.trim() && !row.withdrawal?.trim();
   });
-  async function applySuggestions(){
-    if(!draft || !readySuggestions.length || applyBusy)return;
+  async function applySuggestions(candidates=readySuggestions, autoGroup?:SpeciesGroup){
+    if(!draft || !candidates.length || applyBusy)return;
     setApplyBusy(true);setAutofillMessage("");setError("");
     try{
       const result=await invoke<TreatmentBulkResult>("applyTreatmentSuggestions",{
-        draftId:draft.draftId, rows,
-        candidates:readySuggestions.map(s=>({index:s.index,variantId:s.variantId,
+        draftId:draft.draftId, rows, autoGroup,
+        candidates:candidates.slice(0,300).map(s=>({index:s.index,variantId:s.variantId,
           species:s.species,route:s.route,dosing:s.dosing,withdrawal:s.withdrawal,
           source:s.source,hasPdf:s.hasPdf,pdfPath:s.pdfPath}))
       });
       const applied=new Map(result.applied.map(item=>[item.index,item]));
       setRows(current=>current.map(row=>{
         const item=applied.get(row.index);
-        return item ? {...row,...item} : row;
+        const original=rows.find(value=>value.index===row.index);
+        return item ? {...row,...item,description:row.description===original?.description &&
+          !row.descriptionGroup?item.description:row.description} : row;
       }));
       setSuggestReviewOpen(false);
       setAutofillMessage(result.applied.length+
-        " jednoznacznych wariantów wstawiono do edytora. "+
+        (autoGroup?" jednoznacznych wariantów uzupełniono automatycznie. ":" jednoznacznych wariantów wstawiono do edytora. ")+
         "Sprawdź dawkowanie i karencję przed zapisem karty."+
         (result.skipped.length?" Pominięto: "+result.skipped.join(" "):""));
       setSuggestTick(value=>value+1);
@@ -803,6 +807,20 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setApplyBusy(false);}
   }
+
+  useEffect(()=>{
+    if(!draft||compatibilityDraftId!==draft.draftId||suggestBusy||selectionBusy||
+      applyBusy||busy||variantBusy||referenceBusy||suggestReviewOpen||dateStep)return;
+    const candidates=readySuggestions.filter(item=>{
+      const key=JSON.stringify([item.index,item.symbol,item.variantId]);
+      return !autoApplied.current.has(key) &&
+        (speciesGroup==="all"||item.groups?.includes(speciesGroup));
+    }).slice(0,300);
+    if(!candidates.length)return;
+    for(const item of candidates)
+      autoApplied.current.add(JSON.stringify([item.index,item.symbol,item.variantId]));
+    void applySuggestions(candidates,speciesGroup);
+  });
 
   async function openVariants(row:DraftRow){
     if(!draft || variantBusy || applyBusy)return;
