@@ -50,6 +50,7 @@ internal sealed class ReactWindow : Form
     private readonly CatalogueService catalogue;
     private readonly Dictionary<string, byte[]> pendingCataloguePdfs = new(StringComparer.Ordinal);
     private bool backupRunning;
+    private bool closeAfterVerifiedBackup;
 
     private readonly Dictionary<string, CancellationTokenSource> active = [];
     private readonly Dictionary<string, DocumentData> drafts = [];
@@ -78,14 +79,74 @@ internal sealed class ReactWindow : Form
             await StartAsync();
             await PublishServerUpdateOnStartup();
         };
-        FormClosing += (_, e) =>
+        FormClosing += async (_, e) =>
         {
             if (backupRunning || restoreRunning)
             {
                 e.Cancel = true;
-                MessageBox.Show(this, "Trwa operacja konserwacyjna SQL. Zamknięcie programu jest chwilowo zablokowane.",
+                MessageBox.Show(this,
+                    "Trwa operacja konserwacyjna SQL. Zamknięcie programu jest chwilowo zablokowane.",
                     "Karty Leczenia", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
+            }
+            // This is the original WinForms three-way choice. Never ask on a
+            // shutdown/update initiated by Windows or when no SQL archive is configured.
+            if (!closeAfterVerifiedBackup && e.CloseReason == CloseReason.UserClosing &&
+                archive.Load().Options is not null)
+            {
+                var answer = MessageBox.Show(this,
+                    "Czy przed zamknięciem programu wykonać kopię zapasową bazy SQL KartyLeczenia?\\n\\n" +
+                    "Tak — archiwizuj i zamknij.\\n" +
+                    "Nie — zamknij bez archiwizacji.\\n" +
+                    "Anuluj — wróć do programu.",
+                    "Archiwizacja przy zamykaniu",
+                    MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button1);
+                if (answer == DialogResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+                if (answer == DialogResult.Yes)
+                {
+                    e.Cancel = true;
+                    if (!await WindowsHelloConsent.VerifyAsync(this,
+                            "archiwizację bazy przed zamknięciem"))
+                        return;
+                    backupRunning = true;
+                    UseWaitCursor = true;
+                    try
+                    {
+                        var settings = SqlBackupService.Load();
+                        var outcome = await Task.Run(() => backups.Run(settings,
+                            new Progress<SqlBackupProgress>()), CancellationToken.None);
+                        if (IsDisposed) return;
+                        if (!outcome.SqlVerified)
+                            MessageBox.Show(this,
+                                "Kopia została utworzona, ale SQL nie potwierdził pełnej weryfikacji.\\n" +
+                                outcome.Message + "\\n\\nPlik: " + outcome.Path,
+                                "Kopia — ograniczona weryfikacja", MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                        closeAfterVerifiedBackup = true;
+                        BeginInvoke(new Action(Close));
+                    }
+                    catch (Exception error)
+                    {
+                        CrashLog.Write("ReactKL.BackupOnClose", error);
+                        if (!IsDisposed)
+                            MessageBox.Show(this,
+                                "Nie udało się wykonać kopii bazy KartyLeczenia.\\n\\n" +
+                                error.Message + "\\n\\nProgram pozostaje otwarty.",
+                                "Błąd archiwizacji", MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                    }
+                    finally
+                    {
+                        backupRunning = false;
+                        if (!IsDisposed) UseWaitCursor = false;
+                    }
+                    return;
+                }
             }
             foreach (var token in active.Values) token.Cancel();
         };
