@@ -73,7 +73,7 @@ public sealed class SubiektConnectionService
         return new(companies, skipped);
     }
 
-    public async Task<ConnectionTestResult> TestAsync(ConnectionOptions options, CancellationToken token)
+    public async Task<ConnectionTestResult> TestAsync(ConnectionOptions options, CancellationToken token, bool validateSelections = true)
     {
         await using var db = new SqlConnection(options.BuildConnectionString());
         await db.OpenAsync(token);
@@ -105,7 +105,8 @@ public sealed class SubiektConnectionService
         using (var command = new SqlCommand("SELECT grt_Nazwa FROM dbo.sl_GrupaTw ORDER BY grt_Nazwa", db) { CommandTimeout = 8 })
         await using (var reader = await command.ExecuteReaderAsync(token))
             while (await reader.ReadAsync(token)) if (!reader.IsDBNull(0)) groups.Add(reader.GetString(0).Trim());
-        if (!groups.Contains(options.DrugGroup.Trim(), StringComparer.OrdinalIgnoreCase))
+        if (validateSelections &&
+            !groups.Contains(options.DrugGroup.Trim(), StringComparer.OrdinalIgnoreCase))
             throw new DrugGroupNotFoundException(groups);
         string company = options.Database;
         try
@@ -114,7 +115,12 @@ public sealed class SubiektConnectionService
             company = (await title.ExecuteScalarAsync(token))?.ToString() ?? options.Database;
         }
         catch (SqlException ex) when (ex.Number is 229 or 207 or 208) { }
-        return new(company, groups, await MedicineStockService.Warehouses(options, token));
+        var warehouses = await MedicineStockService.Warehouses(options, token);
+        if (validateSelections && (options.WarehouseId is not int selected ||
+            !warehouses.Any(warehouse => warehouse.Id == selected)))
+            throw new InvalidOperationException(
+                "Wybierz magazyn z listy pobranej z Subiekta i ponów sprawdzenie połączenia.");
+        return new(company, groups, warehouses);
     }
 
     public static string FriendlyError(Exception ex) => ex switch
