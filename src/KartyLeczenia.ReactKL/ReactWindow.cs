@@ -1103,7 +1103,7 @@ internal sealed class ReactWindow : Form
             if (draft.Rows.Count > 500)
                 throw new InvalidOperationException(
                     "Dokument ma zbyt wiele pozycji do zbiorczych propozycji.");
-            var variants = await Task.Run(() =>
+            var (variants, nonMedicines) = await Task.Run(() =>
                 catalogue.VariantsForSymbols(draft.Rows.Select(row =>
                     TreatmentAutofillPlanner.CatalogueSymbol(row))), token);
             var proposals = draft.Rows.Select((row, index) =>
@@ -1120,7 +1120,9 @@ internal sealed class ReactWindow : Form
                         proposal.Index, proposal.Symbol, proposal.Status, proposal.Message,
                         proposal.VariantId, proposal.Species, proposal.Route, proposal.Dosing,
                         proposal.Withdrawal, proposal.Source, proposal.HasPdf, proposal.PdfPath,
-                        groups = TreatmentSpeciesGroup.CompatibleGroups([proposal.Species])
+                        groups = TreatmentSpeciesGroup.CompatibleGroups([proposal.Species]),
+                        variantCount = variants.TryGetValue(proposal.Symbol, out var matched) ? matched.Count : 0,
+                        nonMedicine = nonMedicines.Contains(proposal.Symbol)
                     }),
                     compatibility = draft.Rows.Select((row, index) =>
                     {
@@ -1259,7 +1261,7 @@ internal sealed class ReactWindow : Form
             var reference = symbol.Length > 0 ? await Task.Run(() => catalogue.Read(symbol), token) : null;
             var original = row.Get("Symbol Subiekta").Trim();
             string effective = reference?.Symbol ?? original;
-            var variants = await Task.Run(() => catalogue.VariantsForSymbols([effective]), token);
+            var (variants, _) = await Task.Run(() => catalogue.VariantsForSymbols([effective]), token);
             variants.TryGetValue(effective, out var entries);
             row.Set("Symbol zamiennika produktu", reference?.Symbol ?? "");
             row.Set("Zamiennik produktu", reference?.Name ?? "");

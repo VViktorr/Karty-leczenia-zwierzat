@@ -150,7 +150,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
     /// Never queries by fuzzy product name, and does not change clinical data.
     /// Parameterized batches avoid opening one SQL connection per row.
     /// </summary>
-    internal Dictionary<string, List<CatalogueVariantModel>> VariantsForSymbols(
+    internal (Dictionary<string, List<CatalogueVariantModel>> Variants, HashSet<string> NonMedicines) VariantsForSymbols(
         IEnumerable<string> symbols)
     {
         string[] unique = symbols.Select(x => x.Trim())
@@ -159,7 +159,8 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             .Take(500).ToArray();
         var result = new Dictionary<string, List<CatalogueVariantModel>>(
             StringComparer.OrdinalIgnoreCase);
-        if (unique.Length == 0) return result;
+        var nonMedicines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (unique.Length == 0) return (result, nonMedicines);
 
         using var db = Open();
         CheckImported(db);
@@ -169,12 +170,11 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             string query = """
                 SELECT p.symbol,v.id,v.species,v.indication,v.route,v.dose,
                        v.edible_tissues,v.milk,v.restrictions,v.source,
-                       v.withdrawal_short,COALESCE(w.compact_text,N''),v.pdf_path
+                       v.withdrawal_short,COALESCE(w.compact_text,N''),v.pdf_path,COALESCE(p.decision,N'')
                 FROM dbo.catalog_products p
-                INNER JOIN dbo.catalog_variants v ON v.symbol=p.symbol
+                LEFT JOIN dbo.catalog_variants v ON v.symbol=p.symbol
                 LEFT JOIN dbo.catalog_price_withdrawal w ON w.id=v.id
-                WHERE COALESCE(p.decision,N'')<>N'NOT_MEDICINE'
-                  AND UPPER(p.symbol) IN (
+                WHERE UPPER(p.symbol) IN (
                 """ + string.Join(",", args) + """
                 )
                 ORDER BY p.symbol,v.id;
@@ -189,6 +189,12 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 string Value(int index) => reader.IsDBNull(index)
                     ? "" : reader.GetString(index);
                 string symbol = reader.GetString(0);
+                if (Value(13) == "NOT_MEDICINE")
+                {
+                    nonMedicines.Add(symbol);
+                    continue;
+                }
+                if (reader.IsDBNull(1)) continue;
                 if (!result.TryGetValue(symbol, out var variants))
                 {
                     variants = [];
@@ -199,7 +205,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                     Value(9),Value(10),Value(11),Value(12)));
             }
         }
-        return result;
+        return (result, nonMedicines);
     }
 
     internal void Save(CatalogueProductModel product, IReadOnlyDictionary<string, byte[]> uploads)

@@ -42,7 +42,7 @@ interface TreatmentVariantList {
 interface TreatmentSuggestion {
   index:number;symbol:string;status:string;message:string;
   variantId:number|null;species:string;route:string;dosing:string;
-  withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;groups:SpeciesGroup[];
+  withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;groups:SpeciesGroup[];variantCount:number;nonMedicine:boolean;
 }
 interface TreatmentSuggestionList {
   items:TreatmentSuggestion[];
@@ -340,7 +340,7 @@ const editable: Array<{key: keyof DraftRow; field: string; title: string}> = [
   {key:"section",field:"Sekcja (II lub III)",title:"Sekcja"}
 ];
 const treatmentColumns=[{value:"selected",label:"Druk"},{value:"product",label:"Produkt"},
-  {value:"suggestion",label:"Dopasowanie z SQL"},{value:"variant",label:"Wariant ChPL"},
+  {value:"variant",label:"Wariant ChPL"},
   {value:"quantity",label:"Ilość"},{value:"indication",label:"Wskazanie z ChPL"},
   ...editable.map(({key,title})=>({value:key,label:title}))];
 const treatmentColumnKeys=treatmentColumns.map(column=>column.value);
@@ -352,10 +352,10 @@ function restoreColumnOrder():string[] {
     const savedOrder=JSON.parse(localStorage.getItem("kl.treatmentColumnOrder")??"null");
     if(Array.isArray(savedOrder))
       return ["selected","product",...Array.from(new Set(
-        savedOrder.filter((value:unknown)=>typeof value==="string"&&
+        savedOrder.map(value=>value==="suggestion"?"variant":value).filter((value:unknown)=>typeof value==="string"&&
           treatmentColumnKeys.includes(value)&&value!=="selected"&&value!=="product")
       )),...treatmentColumnKeys.filter(key=>key!=="selected"&&key!=="product"&&
-        !savedOrder.includes(key))];
+        !savedOrder.includes(key)&&!(key==="variant"&&savedOrder.includes("suggestion")))];
   }catch{/* Reset invalid legacy settings. */}
   return treatmentColumnKeys;
 }
@@ -423,7 +423,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     try{
       const stored=JSON.parse(localStorage.getItem("kl.treatmentColumns")??"null");
       if(Array.isArray(stored)){
-        const valid=stored.filter((value:unknown)=>typeof value==="string"&&
+        const valid=stored.map(value=>value==="suggestion"?"variant":value).filter((value:unknown)=>typeof value==="string"&&
           treatmentColumnKeys.includes(value));
         return Array.from(new Set([...valid,"selected","product"]));
       }
@@ -903,7 +903,14 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   };
   const isCompatible=(row:DraftRow)=>speciesGroup==="all" ||
     (compatibility[row.index]??[]).includes(speciesGroup);
+  const rowSuggestions=new Map(suggestions.map(item=>[item.index,item]));
+  const isUnambiguous=(row:DraftRow)=>{
+    const item=rowSuggestions.get(row.index);
+    return !!item && !item.nonMedicine && item.status!=="review" &&
+      (item.status==="ready"||item.variantCount===1);
+  };
   const sortedRows=rows.slice().sort((a,b)=>
+    Number(isUnambiguous(a))-Number(isUnambiguous(b))||
     Number(isCompatible(b))-Number(isCompatible(a))||a.index-b.index);
   const columns: ColumnsType<DraftRow> = [
     {title:"Druk",dataIndex:"selected",width:63,render:(value:boolean,row) =>
@@ -916,25 +923,22 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         {value}{row.replacement?.trim()&&<><br/><Typography.Text type="secondary">
           Zamiennik: {row.replacement}</Typography.Text></>}
       </span>},
-    {title:"Dopasowanie z SQL",key:"suggestion",width:185,
-      render:(_value:unknown,row:DraftRow)=>{
-        const item=suggestions.find(x=>x.index===row.index);
-        if(!item)return "—";
-        const color=item.status==="ready"?"green":
-          item.status==="review"||item.status==="ambiguous"?"orange":"default";
-        const label=item.status==="ready"?"Jednoznaczny":
-          item.status==="review"?"Sprawdź ChPL":
-          item.status==="ambiguous"?"Kilka wariantów":
-          item.status==="existingData"?"Dane istnieją":
-          item.status==="unselected"?"Odznaczony":"Wybór ręczny";
-        return <Tag color={color} title={item.message}>{label}</Tag>;
-      }},
     {title:"Wariant ChPL",key:"variant",width:150,
-      render:(_value:unknown,row:DraftRow)=><Button size="small"
-        disabled={!(row.referenceSymbol||row.symbol) || variantBusy || applyBusy || referenceBusy}
-        onClick={()=>{void openVariants(row);}}>
-        Wybierz wariant
-      </Button>},
+      render:(_value:unknown,row:DraftRow)=>{
+        const item=rowSuggestions.get(row.index);
+        if(!item)return "—";
+        const label=item.nonMedicine?"To nie lek":
+          item.variantCount===0?"Brak":
+          item.status==="review"?"Do uzupełnienia":
+          isUnambiguous(row)?"Jednoznaczny":"Kilka wariantów";
+        const color=label==="Jednoznaczny"?"green":
+          item.variantCount>0?"gold":"default";
+        if(item.nonMedicine||item.variantCount===0)
+          return <Tag title={item.nonMedicine?"Produkt oznaczony w katalogu jako nieleczniczy":item.message}>{label}</Tag>;
+        return <Button size="small" variant="outlined" color={color}
+          title={item.message} disabled={variantBusy||applyBusy||referenceBusy}
+          onClick={()=>{void openVariants(row);}}>{label}</Button>;
+      }},
     {title:"Ilość",dataIndex:"quantity",width:100},
     {title:"Wskazanie z ChPL",dataIndex:"indication",width:220,ellipsis:true,
       render:(value:string)=><span title={value}>{value||"—"}</span>},
