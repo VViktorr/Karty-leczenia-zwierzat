@@ -1356,6 +1356,9 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
   const [pdfBusy,setPdfBusy]=useState<string|null>(null);
   const printFrame=useRef<HTMLIFrameElement>(null);
   const [error,setError]=useState("");
+  const [trashTarget,setTrashTarget]=useState<{row:SavedCard; restore:boolean}|null>(null);
+  const [trashBusy,setTrashBusy]=useState(false);
+  const [trashError,setTrashError]=useState("");
   const [purgeTarget,setPurgeTarget]=useState<SavedCard|null>(null);
   const [purgeConfirmation,setPurgeConfirmation]=useState("");
   const [purgeBusy,setPurgeBusy]=useState(false);
@@ -1500,11 +1503,28 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
     }catch(e){setPurgeError(e instanceof Error?e.message:String(e));}
     finally{setPurgeBusy(false);}
   }
-  const changeTrash=(row:SavedCard)=>{
-    Modal.confirm({title:trash?"Przywrócić kartę?":"Przenieść kartę do kosza?",
-      content:row.number || row.document,okText:trash?"Przywróć":"Przenieś",cancelText:"Anuluj",
-      onOk:async()=>{await invoke("trashCard",{id:row.id,trash});remote.reload();}});
-  };
+  function changeTrash(row:SavedCard) {
+    setTrashError("");
+    setTrashTarget({row,restore:trash});
+  }
+
+  async function confirmTrash() {
+    if (!trashTarget || trashBusy) return;
+    const {row,restore} = trashTarget;
+    setTrashBusy(true);setTrashError("");setNotice("");setError("");
+    try {
+      const result=await invoke<{updated:boolean}>("trashCard",{id:row.id,trash:restore});
+      remote.reload();
+      if (!result.updated) {
+        setTrashError("Stan karty już się zmienił. Lista została odświeżona.");
+        return;
+      }
+      setTrashTarget(null);
+      setNotice(restore?"Przywrócono kartę z kosza.":"Przeniesiono kartę do kosza.");
+    } catch (error) {
+      setTrashError(error instanceof Error?error.message:String(error));
+    } finally {setTrashBusy(false);}
+  }
 
   const savedColumns:ColumnsType<SavedCard>=[
 
@@ -1552,6 +1572,16 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
         columns={savedLayout.columns}/>
     </Card>
     {savedLayout.dialog}
+    <Modal className="kl-dialog-card-trash" open={trashTarget!==null}
+      title={trashTarget?.restore?"Przywrócić kartę?":"Przenieść kartę do kosza?"}
+      okText={trashTarget?.restore?"Przywróć":"Przenieś"} cancelText="Anuluj"
+      confirmLoading={trashBusy} cancelButtonProps={{disabled:trashBusy}}
+      closable={!trashBusy} maskClosable={!trashBusy} keyboard={!trashBusy}
+      onCancel={()=>{if(!trashBusy)setTrashTarget(null);}}
+      onOk={()=>{void confirmTrash();}}>
+      {trashError&&<Alert className="notice" type="error" showIcon message={trashError}/>}
+      <Typography.Paragraph>{trashTarget?.row.number||trashTarget?.row.document}</Typography.Paragraph>
+    </Modal>
     <Modal className="kl-dialog-permanent-delete" open={purgeTarget!==null} title="Trwale usunąć kartę leczenia?"
       onCancel={()=>{if(!purgeBusy){setPurgeTarget(null);setPurgeConfirmation("");}}}
       closable={!purgeBusy} maskClosable={!purgeBusy} keyboard={!purgeBusy}
