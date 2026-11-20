@@ -33,8 +33,25 @@ internal static class WindowsHelloConsent
 
             // RequestVerificationAsync is for UWP; the WinForms desktop API
             // must be given the current window handle.
-            var outcome = await UserConsentVerifierInterop.RequestVerificationForWindowAsync(
-                owner.Handle, $"SQL KartyLeczenia — potwierdź: {purpose}");
+            var stateBeforePrompt = owner.WindowState;
+            UserConsentVerificationResult outcome;
+            try
+            {
+                outcome = await UserConsentVerifierInterop.RequestVerificationForWindowAsync(
+                    owner.Handle, $"SQL KartyLeczenia — potwierdź: {purpose}");
+            }
+            finally
+            {
+                // The system prompt can leave its owner behind another window.
+                // Restore only a window that was visible and not minimized before the prompt.
+                if (!owner.IsDisposed && !owner.Disposing && owner.IsHandleCreated &&
+                    owner.Visible && stateBeforePrompt != FormWindowState.Minimized)
+                {
+                    if (owner.WindowState == FormWindowState.Minimized)
+                        owner.WindowState = stateBeforePrompt;
+                    owner.Activate();
+                }
+            }
             if (outcome == UserConsentVerificationResult.Verified)
                 return true;
 
