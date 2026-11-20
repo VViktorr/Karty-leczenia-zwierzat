@@ -1334,14 +1334,39 @@ internal sealed class ReactWindow : Form
         CancellationToken token, Guid cardId, string confirmation)
     {
         await using var db = ArchiveDb();
-        await db.OpenAsync(token);
+        try
+        {
+            await db.OpenAsync(token);
+        }
+        catch (SqlException ex)
+        {
+            // Do not hide database connectivity failures behind the generic
+            // Subiekt message (the Subiekt connection is unrelated).
+            CrashLog.Write("ReactKL.Purge.SqlConnection", ex);
+            string server = archive.Load().Options?.Server ?? "(nieustawiony)";
+            throw new InvalidOperationException(
+                $"Nie można połączyć się z bazą KartyLeczenia na serwerze „{server}”. " +
+                "Sprawdź Ustawienia → Baza Karty Leczenia → Sprawdź połączenie. " +
+                $"Kod SQL: {ex.Number}. Karta pozostaje w koszu.", ex);
+        }
         await using var tx = (SqlTransaction)await db.BeginTransactionAsync(
             System.Data.IsolationLevel.Serializable, token);
         using (var access = new SqlCommand("""
             IF ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1
                 THROW 50041, N'Trwałe usunięcie wymaga uprawnienia sysadmin SQL Server.', 1;
             """, db, tx))
-            await access.ExecuteNonQueryAsync(token);
+        {
+            try { await access.ExecuteNonQueryAsync(token); }
+            catch (SqlException ex) when (ex.Number == 50041)
+            {
+                throw new InvalidOperationException(
+                    "Połączenie z bazą KartyLeczenia działa, ale konto SQL nie ma " +
+                    "uprawnień administratora serwera (sysadmin), wymaganych do " +
+                    "trwałego usunięcia karty. Windows Hello potwierdza tożsamość " +
+                    "użytkownika Windows, lecz nie nadaje uprawnień SQL. " +
+                    "Użyj konta administratora SQL na komputerze serwerowym.", ex);
+            }
+        }
         using (var check = new SqlCommand("""
             SELECT card_year,card_sequence,document
             FROM dbo.treatment_cards WITH (UPDLOCK,HOLDLOCK)
