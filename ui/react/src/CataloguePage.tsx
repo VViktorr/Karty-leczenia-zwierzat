@@ -120,7 +120,7 @@ export default function CataloguePage({
   async function openProduct(row: CatalogueListing, force = false) {
     if (dirty && !force) {
       Modal.confirm({
-        title: "Niezapisane zmiany",
+        className:"kl-dialog-catalogue-product-discard", title: "Niezapisane zmiany",
         content: "Zmiany w bieżącej kartotece nie zostały zapisane. Otworzyć inną kartotekę?",
         okText: "Odrzuć i otwórz",
         cancelText: "Pozostań",
@@ -198,7 +198,7 @@ export default function CataloguePage({
     if (working) return;
     if (dirty && !force) {
       Modal.confirm({
-        title: "Niezapisane zmiany katalogu",
+        className:"kl-dialog-catalogue-subiekt-discard", title: "Niezapisane zmiany katalogu",
         content: "Odrzucić bieżące zmiany i przejść do wskazanego produktu Subiekta?",
         okText: "Odrzuć i przejdź", cancelText: "Pozostań",
         onOk: () => openSubiektProduct(symbol, true)

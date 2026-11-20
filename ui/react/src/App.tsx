@@ -622,7 +622,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       const done=(accepted:boolean)=>{if(!resolved){resolved=true;resolve(accepted);}};
       let dialog:ReturnType<typeof Modal.confirm>|null=null;
       dialog=Modal.confirm({
-        title:"Sprawdź dane przed "+(action==="save"?"zapisem":"podglądem wydruku"),
+        className:"kl-dialog-treatment-warnings", title:"Sprawdź dane przed "+(action==="save"?"zapisem":"podglądem wydruku"),
         width:700,
         content:<div>
           <Alert className="notice" type="warning" showIcon
@@ -1433,7 +1433,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       JSON.stringify({fields:card.fields,rows:card.rows})!==
       JSON.stringify({fields:editDraft.fields,rows:editDraft.rows});
     if(changed)Modal.confirm({
-      title:"Odrzucić niezapisane zmiany karty?",
+      className:"kl-dialog-saved-card-discard", title:"Odrzucić niezapisane zmiany karty?",
       content:"Zmiany w edytorze zostaną odrzucone. Karta zapisana w SQL pozostanie bez zmian.",
       okText:"Odrzuć zmiany",cancelText:"Pozostań",onOk:finish
     });
@@ -1949,7 +1949,7 @@ function RestorePanel() {
   function requestRestore(){
     if(!file?.path||confirmation!=="KartyLeczenia"||busy)return;
     Modal.confirm({
-      title:"Zastąpić całą bazę KartyLeczenia?",
+      className:"kl-dialog-restore-confirm", title:"Zastąpić całą bazę KartyLeczenia?",
       content:<div>
         <Typography.Paragraph strong>Ta operacja przerwie dostęp pozostałych stanowisk i nadpisze aktualne dane bazy programowej.</Typography.Paragraph>
         <Typography.Paragraph>Plik: {file.fileName}</Typography.Paragraph>
@@ -2049,7 +2049,7 @@ function AutomaticUpdateCheck({onCheckError}: {onCheckError: (message: string) =
       if(status.isServer || !status.installed)return;
       const result=await invoke<UpdateResult>("checkUpdate");
       offerSqlUpdate(result, message=>Modal.error({
-        title:"Nie udało się uruchomić aktualizacji",content:message
+        className:"kl-dialog-startup-update-error", title:"Nie udało się uruchomić aktualizacji",content:message
       }));
     }).catch(error=>onCheckError(error instanceof Error?error.message:String(error)));
   },[onCheckError]);
@@ -2187,7 +2187,7 @@ export default function App() {
     if(next===section)return;
     if(section==="catalogue"&&catalogueDirty){
       Modal.confirm({
-        title:"Niezapisane zmiany w katalogu",
+        className:"kl-dialog-catalogue-navigation", title:"Niezapisane zmiany w katalogu",
         content:"Czy chcesz opuścić edytor i odrzucić niezapisane dane?",
         okText:"Odrzuć zmiany",cancelText:"Pozostań",
         onOk:()=>{setCatalogueDirty(false);setSection(next);}

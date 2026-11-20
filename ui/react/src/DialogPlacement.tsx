@@ -32,16 +32,17 @@ function read(key:string):Bounds|null {
 const edges = ["n", "ne", "e", "se", "s", "sw", "w", "nw"] as const;
 type Edge = typeof edges[number];
 const minimum = {width: 320, height: 190};
+const edgeMargin = 6;
 
 function fit(bounds: Bounds, wrapper: HTMLElement): Bounds {
-  const width = Math.min(Math.max(minimum.width, bounds.width), wrapper.clientWidth);
-  const height = Math.min(Math.max(minimum.height, bounds.height), wrapper.clientHeight);
+  const width = Math.min(Math.max(minimum.width, bounds.width), Math.max(1, wrapper.clientWidth - 2 * edgeMargin));
+  const height = Math.min(Math.max(minimum.height, bounds.height), Math.max(1, wrapper.clientHeight - 2 * edgeMargin));
   return {width, height,
-    left: Math.max(0, Math.min(bounds.left, wrapper.clientWidth - width)),
-    top: Math.max(0, Math.min(bounds.top, wrapper.clientHeight - height))};
+    left: Math.max(edgeMargin, Math.min(bounds.left, wrapper.clientWidth - width - edgeMargin)),
+    top: Math.max(edgeMargin, Math.min(bounds.top, wrapper.clientHeight - height - edgeMargin))};
 }
 
-function attach(modal: HTMLElement, wrapper: HTMLElement) {
+export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
   const header = modal.querySelector<HTMLElement>(
     ".ant-modal-header, .ant-modal-confirm-title");
   const content = modal.querySelector<HTMLElement>(".ant-modal-content");
@@ -73,6 +74,7 @@ function attach(modal: HTMLElement, wrapper: HTMLElement) {
     gesture = {target, pointer: event.pointerId, edge: target.dataset.edge as Edge | undefined,
       x: event.clientX, y: event.clientY, origin: bounds, zoom: scale()};
     target.setPointerCapture(event.pointerId);
+    modal.classList.add("kl-modal-adjusting");
     event.preventDefault();
     event.stopPropagation();
   };
@@ -87,20 +89,20 @@ function attach(modal: HTMLElement, wrapper: HTMLElement) {
       return;
     }
     let {left, top, width, height} = origin;
-    const minWidth = Math.min(minimum.width, wrapper.clientWidth);
-    const minHeight = Math.min(minimum.height, wrapper.clientHeight);
+    const minWidth = Math.min(minimum.width, Math.max(1, wrapper.clientWidth - 2 * edgeMargin));
+    const minHeight = Math.min(minimum.height, Math.max(1, wrapper.clientHeight - 2 * edgeMargin));
     if (edge.includes("w")) {
-      left = Math.max(0, Math.min(left + dx, origin.left + width - minWidth));
+      left = Math.max(edgeMargin, Math.min(left + dx, origin.left + width - minWidth));
       width += origin.left - left;
     }
     if (edge.includes("e"))
-      width = Math.max(minWidth, Math.min(width + dx, wrapper.clientWidth - left));
+      width = Math.max(minWidth, Math.min(width + dx, wrapper.clientWidth - left - edgeMargin));
     if (edge.includes("n")) {
-      top = Math.max(0, Math.min(top + dy, origin.top + height - minHeight));
+      top = Math.max(edgeMargin, Math.min(top + dy, origin.top + height - minHeight));
       height += origin.top - top;
     }
     if (edge.includes("s"))
-      height = Math.max(minHeight, Math.min(height + dy, wrapper.clientHeight - top));
+      height = Math.max(minHeight, Math.min(height + dy, wrapper.clientHeight - top - edgeMargin));
     place({left, top, width, height});
   };
 
@@ -108,6 +110,7 @@ function attach(modal: HTMLElement, wrapper: HTMLElement) {
     if (!gesture || event.pointerId !== gesture.pointer) return;
     const {origin} = gesture;
     gesture = undefined;
+    modal.classList.remove("kl-modal-adjusting");
     if (event.type !== "pointerup") {
       place(fit(preferred, wrapper));
       return;
@@ -124,7 +127,7 @@ function attach(modal: HTMLElement, wrapper: HTMLElement) {
     handle.className = "kl-modal-resize";
     handle.dataset.edge = edge;
     handle.setAttribute("aria-hidden", "true");
-    modal.append(handle);
+    content.append(handle);
     return handle;
   });
   const targets = header ? [header, ...handles] : handles;
@@ -146,7 +149,7 @@ function attach(modal: HTMLElement, wrapper: HTMLElement) {
     targets.forEach(target => events.forEach(([name, listener]) =>
       target.removeEventListener(name, listener)));
     handles.forEach(handle => handle.remove());
-    modal.classList.remove("kl-movable-modal");
+    modal.classList.remove("kl-movable-modal", "kl-modal-adjusting");
     for (const property of ["left", "top", "height"]) modal.style.removeProperty(property);
     if (originalWidth) modal.style.width = originalWidth;
     else modal.style.removeProperty("width");
@@ -165,7 +168,7 @@ export default function DialogPlacement() {
         if (live.has(modal)) return;
         const wrapper = modal.closest<HTMLElement>(".ant-modal-wrap");
         if (!wrapper?.clientWidth || !wrapper.clientHeight || !modal.offsetWidth) return;
-        const cleanup = attach(modal, wrapper);
+        const cleanup = attachDialog(modal, wrapper);
         if (cleanup) live.set(modal, cleanup);
       });
     };

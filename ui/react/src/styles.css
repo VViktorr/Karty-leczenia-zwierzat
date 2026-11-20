@@ -85,8 +85,9 @@
 .kl-movable-modal .ant-modal-header,
 .kl-movable-modal .ant-modal-confirm-title { cursor: move; touch-action: none; user-select: none; }
 .kl-movable-modal .ant-modal-title { user-select: none; }
-/* Ant Design disables pointer events on the modal shell, outside its content. */
-.kl-movable-modal > .kl-modal-resize {
+.kl-movable-modal > .ant-modal-content { position: relative; }
+.kl-modal-adjusting iframe { pointer-events: none; }
+.kl-movable-modal > .ant-modal-content > .kl-modal-resize {
   position: absolute;
   pointer-events: auto;
   touch-action: none;
@@ -99,7 +100,7 @@
   top: 10px; bottom: 10px; width: 7px; cursor: ew-resize;
 }
 .kl-modal-resize:is([data-edge="nw"], [data-edge="ne"], [data-edge="se"], [data-edge="sw"]) {
-  width: 10px; height: 10px;
+  width: 13px; height: 13px;
 }
 .kl-modal-resize:is([data-edge="n"], [data-edge="nw"], [data-edge="ne"]) { top: 0; }
 .kl-modal-resize:is([data-edge="s"], [data-edge="sw"], [data-edge="se"]) { bottom: 0; }
@@ -112,8 +113,8 @@
   position: absolute;
   right: 3px;
   bottom: 3px;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-right: 1px solid currentColor;
   border-bottom: 1px solid currentColor;
   opacity: .45;
