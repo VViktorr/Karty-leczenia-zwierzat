@@ -677,7 +677,14 @@ static class Program
                     "1 ml","10 dni","","Tkanki: 10 dni")),
                 ("MISSING",new PriceVariant("Świnie","doustnie","",
                     "5 ml","","",""))
+            ], [
+                (" NON-MEDICINE ", "not_medicine", ""),
+                ("LEGACY", "", "  Nie jest produktem leczniczym — status lokalny"),
+                ("OK", "", "Zweryfikowano")
             ]);
+            Check(!completeness.NeedsCompletion("non-medicine") &&
+                  !completeness.NeedsCompletion("legacy"),
+                "explicit and legacy non-medicine classification must suppress missing catalogue entries");
             Check(!completeness.NeedsCompletion("ok") &&
                   completeness.NeedsCompletion("MISSING") &&
                   completeness.NeedsCompletion("UNKNOWN"),

@@ -33,10 +33,15 @@ internal sealed record PricePresentation(
 /// withdrawal or route labels in React never queries either SQL database.
 /// </summary>
 internal sealed class PriceCatalogueSnapshot(
-    IReadOnlyDictionary<string, List<PriceVariant>> variants)
+    IReadOnlyDictionary<string, List<PriceVariant>> variants,
+    IReadOnlySet<string> nonMedicines)
 {
+    private static readonly string[] NonMedicineStatusPrefixes =
+        ["To nie jest lek", "To nie lek", "Nie lek", "Nie jest lekiem", "Nie jest produktem leczniczym"];
+
     internal static PriceCatalogueSnapshot FromRows(
-        IEnumerable<(string Symbol, PriceVariant Variant)> values)
+        IEnumerable<(string Symbol, PriceVariant Variant)> values,
+        IEnumerable<(string Symbol, string Decision, string Status)>? classifications = null)
     {
         var dictionary = new Dictionary<string, List<PriceVariant>>(
             StringComparer.OrdinalIgnoreCase);
@@ -49,12 +54,19 @@ internal sealed class PriceCatalogueSnapshot(
             }
             group.Add(variant);
         }
-        return new(dictionary);
+        var nonMedicines = (classifications ?? [])
+            .Where(entry => entry.Decision.Trim().Equals("NOT_MEDICINE", StringComparison.OrdinalIgnoreCase)
+                || NonMedicineStatusPrefixes.Any(prefix =>
+                    entry.Status.TrimStart().StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            .Select(entry => entry.Symbol.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return new(dictionary, nonMedicines);
     }
 
     internal bool NeedsCompletion(string symbol)
     {
-        if(!variants.TryGetValue(symbol.Trim(),out var all) || all.Count==0)
+        if (nonMedicines.Contains(symbol.Trim())) return false;
+        if (!variants.TryGetValue(symbol.Trim(), out var all) || all.Count == 0)
             return true;
         return all.Any(variant=>variant.Incomplete) ||
             !all.Any(variant=>variant.Withdrawal.Length>0);
@@ -62,7 +74,8 @@ internal sealed class PriceCatalogueSnapshot(
 
     internal PricePresentation Format(MedicinePrice price)
     {
-        if (!variants.TryGetValue(price.Symbol.Trim(), out var all)) all = [];
+        if (nonMedicines.Contains(price.Symbol.Trim()) ||
+            !variants.TryGetValue(price.Symbol.Trim(), out var all)) all = [];
         string Compose(int format, bool codes)
         {
             string Route(string route) => codes
@@ -120,6 +133,9 @@ internal sealed class PriceCatalogueService(ConnectionSettingsStore archive)
               AND COALESCE(v.scope,N'') NOT LIKE N'%referencyjne%'
               AND COALESCE(v.scope,N'') NOT LIKE N'%archiwalne%'
             ORDER BY p.symbol,v.id;
+
+            SELECT symbol, COALESCE(decision,N''), COALESCE(status,N'')
+            FROM dbo.catalog_products;
             """, db) { CommandTimeout = 25 };
         var rows = new List<(string Symbol, PriceVariant Variant)>();
         await using var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -129,6 +145,15 @@ internal sealed class PriceCatalogueService(ConnectionSettingsStore archive)
             rows.Add((Value(0), new PriceVariant(Value(1), Value(2), Value(3),
                 Value(4), Value(5), Value(6), Value(7))));
         }
-        return PriceCatalogueSnapshot.FromRows(rows);
+        var classifications = new List<(string Symbol, string Decision, string Status)>();
+        if (await reader.NextResultAsync(token).ConfigureAwait(false))
+        {
+            while (await reader.ReadAsync(token).ConfigureAwait(false))
+            {
+                if (!reader.IsDBNull(0))
+                    classifications.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            }
+        }
+        return PriceCatalogueSnapshot.FromRows(rows, classifications);
     }
 }
