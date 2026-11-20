@@ -606,6 +606,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   async function applyAnimalEdit(){
     if(!animalEdit||!draft||!animalEdit.checked.length)return;
     const description=animalEdit.description.trim(), animals=animalEdit.count.trim();
+    if(!animals)return;
     const group=window.crypto.randomUUID();
     setRows(current=>current.map(row=>animalEdit.checked.includes(row.index)
       ? {...row,description,animals,descriptionGroup:group,countGroup:group}:row));
@@ -1089,7 +1090,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     </Modal>
     <Modal className="kl-dialog-treatment-animals" open={animalEdit!==null}
       title="Numery i liczba leczonych zwierząt" okText="Zastosuj" cancelText="Anuluj"
-      okButtonProps={{disabled:!animalEdit?.checked.length}} onOk={()=>{void applyAnimalEdit();}}
+      okButtonProps={{disabled:!animalEdit?.checked.length||!animalEdit.count.trim()}} onOk={()=>{void applyAnimalEdit();}}
       onCancel={()=>setAnimalEdit(null)}>
       {animalEdit&&<Space direction="vertical" style={{width:"100%"}}>
         {animalEdit.candidates.length>1&&<Checkbox.Group value={animalEdit.checked}
@@ -1101,7 +1102,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         </Checkbox.Group>}
         <label>Numery zwierząt <Input.TextArea rows={4} value={animalEdit.description}
           onChange={e=>setAnimalEdit({...animalEdit,description:e.target.value})}/></label>
-        <label>Liczba leczonych zwierząt <Input value={animalEdit.count}
+        <label>Liczba leczonych zwierząt (wymagane) <Input required value={animalEdit.count}
           onChange={e=>setAnimalEdit({...animalEdit,count:e.target.value})}/></label>
       </Space>}
     </Modal>
