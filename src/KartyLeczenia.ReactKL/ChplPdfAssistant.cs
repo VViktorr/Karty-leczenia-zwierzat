@@ -65,6 +65,17 @@ internal static class ChplPdfAssistant
         return "";
     }
 
+    private static string ExtractLeafletSection(string text, int number, string heading)
+    {
+        var match = Regex.Match(text, @"(?im)^[ \t]*" + number +
+            @"\.[ \t]*(?:" + heading + @")[^\r\n]*\r?\n");
+        if (!match.Success) return "";
+        int start = match.Index + match.Length;
+        var next = Regex.Match(text[start..], @"(?m)^[ \t]*\d{1,2}\.[ \t]+\p{L}");
+        int length = next.Success ? next.Index : text.Length - start;
+        return Clean(text.Substring(start, Math.Min(length, 20000)));
+    }
+
     private static string ForSpecies(string text, string species, int count)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
@@ -126,20 +137,36 @@ internal static class ChplPdfAssistant
         var dose = ExtractSection(text, "3.9", "4.9");
         var withdrawal = ExtractSection(text, "3.12", "4.11");
 
+        bool leaflet = false;
         if (string.IsNullOrWhiteSpace(target))
-            warnings.Add("Nie rozpoznano sekcji gatunków docelowych (3.1/4.1). Nie utworzono wariantów.");
+        {
+            var heading = Regex.Match(text, @"(?im)^[ \t]*(?:B\.[ \t]*)?ULOTKA INFORMACYJNA\b");
+            if (heading.Success)
+            {
+                string leafletText = text[heading.Index..];
+                target = ExtractLeafletSection(leafletText, 3, "Docelowe gatunki zwierząt");
+                indications = ExtractLeafletSection(leafletText, 4, "Wskazania lecznicze");
+                dose = ExtractLeafletSection(leafletText, 8, "Dawkowanie dla każdego gatunku");
+                withdrawal = ExtractLeafletSection(leafletText, 10, "Okres(?:y)? karencji");
+                leaflet = true;
+                warnings.Add("Rozpoznano ulotkę informacyjną. Przed zapisem porównaj propozycje z aktualną ChPL.");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(target))
+            warnings.Add("Nie rozpoznano sekcji gatunków docelowych. Nie utworzono wariantów.");
         if (string.IsNullOrWhiteSpace(dose))
-            warnings.Add("Nie znaleziono sekcji dawkowania (3.9/4.9). Dawki pozostają puste.");
+            warnings.Add("Nie znaleziono sekcji dawkowania. Dawki pozostają puste.");
         if (string.IsNullOrWhiteSpace(indications))
-            warnings.Add("Nie znaleziono sekcji wskazań (3.2/4.2).");
+            warnings.Add("Nie znaleziono sekcji wskazań.");
         if (string.IsNullOrWhiteSpace(withdrawal))
-            warnings.Add("Nie znaleziono sekcji karencji (3.12/4.11).");
+            warnings.Add("Nie znaleziono sekcji karencji.");
 
         var species = Species.Where(x => Has(target, x.Pattern)).Select(x => x.Name).Distinct().ToArray();
         if (species.Length == 0 && !string.IsNullOrWhiteSpace(target))
             warnings.Add("Gatunki docelowe mają nieznany zapis. Uzupełnij je ręcznie.");
         if (species.Length > 1)
-            warnings.Add("ChPL obejmuje kilka gatunków. Uzupełniane są tylko sekcje jednoznacznie przypisane do gatunku.");
+            warnings.Add("Dokument obejmuje kilka gatunków. Uzupełniane są tylko sekcje jednoznacznie przypisane do gatunku.");
 
         var result = new List<CatalogueVariantModel>();
         foreach (var animal in species)
@@ -171,7 +198,8 @@ internal static class ChplPdfAssistant
                     Dose: doseForAnimal,
                     Tissues: ExtractWithdrawal(withdrawalForAnimal, false),
                     Milk: ExtractWithdrawal(withdrawalForAnimal, true),
-                    Source: "Propozycja automatyczna z ChPL – wymaga weryfikacji"));
+                    Source: leaflet ? "Propozycja z ulotki – wymaga weryfikacji z ChPL"
+                        : "Propozycja automatyczna z ChPL – wymaga weryfikacji"));
         }
 
         // Display full evidence to the operator, including extraction failures.
