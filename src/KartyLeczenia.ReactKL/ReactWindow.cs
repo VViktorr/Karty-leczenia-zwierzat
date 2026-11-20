@@ -66,7 +66,7 @@ internal sealed class ReactWindow : Form
         updates = new ReactUpdateService(archive);
         catalogue = new CatalogueService(archive);
         priceCatalogueService = new PriceCatalogueService(archive);
-        base.Text = "KartyLeczenia — ReactKL";
+        base.Text = "Karty Leczenia";
         MinimumSize = new Size(900, 600);
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;

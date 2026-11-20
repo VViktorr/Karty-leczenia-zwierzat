@@ -15,14 +15,14 @@
 ; SAME AppId as the existing SQL KartyLeczenia installer: an in-place upgrade,
 ; not a second installation. SQL/clinic settings remain in their original stores.
 AppId=pl.kartyleczenia.winforms.sql
-AppName=SQL KartyLeczenia
+AppName=Karty Leczenia
 AppVersion={#ReleaseVersion}
 VersionInfoVersion={#ReleaseFileVersion}
 VersionInfoProductVersion={#ReleaseFileVersion}
 VersionInfoTextVersion={#ReleaseVersion}
 VersionInfoProductTextVersion={#ReleaseVersion}
 DefaultDirName={autopf}\KartyLeczenia
-DefaultGroupName=KartyLeczenia
+DefaultGroupName=Karty Leczenia
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -39,7 +39,7 @@ WizardStyle=modern
 Name: "polish"; MessagesFile: "compiler:Languages\Polish.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Utwórz skrót na pulpicie"; Flags: unchecked
+Name: "desktopicon"; Description: "Utwórz skrót na pulpicie"
 
 [Files]
 ; Server-only first-time SQL initialization package. A client NEVER extracts
@@ -70,18 +70,20 @@ Type: files; Name: "{app}\AntdUI.dll"
 Type: files; Name: "{commonprograms}\KartyLeczenia\SQL KartyLeczenia.lnk"
 Type: files; Name: "{commonprograms}\KartyLeczenia\Ustawienia SQL KartyLeczenia.lnk"
 Type: files; Name: "{commondesktop}\SQL KartyLeczenia.lnk"
+Type: files; Name: "{commondesktop}\KartyLeczenia.lnk"
+Type: files; Name: "{commonprograms}\KartyLeczenia\KartyLeczenia.lnk"
 Type: files; Name: "{commonprograms}\Karty leczenia zwierząt (SQL).lnk"
 Type: files; Name: "{commondesktop}\Karty leczenia zwierząt (SQL).lnk"
 
 [Dirs]
-Name: "{commonprograms}\KartyLeczenia"
+Name: "{commonprograms}\Karty Leczenia"
 
 [Icons]
-Name: "{commonprograms}\KartyLeczenia\SQL KartyLeczenia"; Filename: "{app}\KartyLeczenia.ReactKL.exe"; WorkingDir: "{app}"
-Name: "{commondesktop}\SQL KartyLeczenia"; Filename: "{app}\KartyLeczenia.ReactKL.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{commonprograms}\Karty Leczenia\Karty Leczenia"; Filename: "{app}\KartyLeczenia.ReactKL.exe"; WorkingDir: "{app}"
+Name: "{commondesktop}\Karty Leczenia"; Filename: "{app}\KartyLeczenia.ReactKL.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\KartyLeczenia.ReactKL.exe"; Description: "Uruchom SQL KartyLeczenia (React)"; Flags: nowait postinstall skipifsilent runasoriginaluser
+Filename: "{app}\KartyLeczenia.ReactKL.exe"; Description: "Uruchom Karty Leczenia"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [Code]
 const
@@ -412,7 +414,7 @@ end;
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (CurPageID = wpFinished) and (not ExistingInstallAtStart) and IsServerInstall then
-    WizardForm.FinishedLabel.Caption := 'Serwer SQL KartyLeczenia został przygotowany.' + #13#10 +
+    WizardForm.FinishedLabel.Caption := 'Baza Karty Leczenia została przygotowana.' + #13#10 +
       'Adres dla innych stanowisk: ' + InstallerArchiveServer('') + #13#10 +
       'Przy pierwszym uruchomieniu program opublikuje instalator w SQL.';
 end;

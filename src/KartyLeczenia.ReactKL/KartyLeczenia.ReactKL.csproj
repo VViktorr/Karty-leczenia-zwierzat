@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>KartyLeczenia.ReactKL</AssemblyName>
+    <Product>Karty Leczenia</Product>
+    <Title>Karty Leczenia</Title>
     <ApplicationIcon>Assets/app-icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
