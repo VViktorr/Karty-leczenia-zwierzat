@@ -80,6 +80,7 @@ Name: "{commonprograms}\Karty Leczenia"
 
 [Icons]
 Name: "{commonprograms}\Karty Leczenia\Karty Leczenia"; Filename: "{app}\KartyLeczenia.ReactKL.exe"; WorkingDir: "{app}"
+Name: "{commonprograms}\Karty Leczenia\Odinstaluj Karty Leczenia"; Filename: "{uninstallexe}"; WorkingDir: "{app}"
 Name: "{commondesktop}\Karty Leczenia"; Filename: "{app}\KartyLeczenia.ReactKL.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
