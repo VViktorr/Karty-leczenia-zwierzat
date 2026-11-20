@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react";
 import {Alert,AutoComplete,Button,Card,Checkbox,Form,Input,Select,Space,Switch,Typography} from "antd";
 import {invoke} from "./bridge";
+import type {FormInstance} from "antd";
 
 interface BaseSqlSettings {
   server:string;
@@ -43,7 +44,7 @@ function ErrorNotice({message}:{message:string}) {
   return message?<Alert type="error" showIcon className="notice" message={message}/>:null;
 }
 
-function CredentialFields({form}:{form:ReturnType<typeof Form.useForm<BaseSqlSettings>>[0]}) {
+function CredentialFields<T extends BaseSqlSettings>({form}:{form:FormInstance<T>}) {
   const windows=Form.useWatch("windowsAuthentication",form)!==false;
   return <>
     <Form.Item label="Sposób logowania" name="windowsAuthentication"
