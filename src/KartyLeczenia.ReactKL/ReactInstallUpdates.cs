@@ -47,7 +47,17 @@ internal static class ReactInstallUpdates
 
     internal static bool HasPendingPublication => IsServer && File.Exists(PendingInstaller);
 
+    private static int publishing;
+
     internal static async Task PublishPending(CancellationToken token = default)
+    {
+        if (Interlocked.Exchange(ref publishing, 1) != 0)
+            throw new InvalidOperationException("Publikacja instalatora już trwa.");
+        try { await PublishPendingCore(token); }
+        finally { Interlocked.Exchange(ref publishing, 0); }
+    }
+
+    private static async Task PublishPendingCore(CancellationToken token)
     {
         if (!HasPendingPublication)
             throw new InvalidOperationException("Brak instalatora oczekującego na publikację na komputerze serwera SQL.");
@@ -74,9 +84,10 @@ internal static class ReactInstallUpdates
             InstalledVersion, "-Pending", "-TrustServerCertificate"
         })
             info.ArgumentList.Add(argument);
+        token.ThrowIfCancellationRequested();
         using var process = Process.Start(info)
             ?? throw new InvalidOperationException("Windows nie uruchomił publikacji aktualizacji.");
-        await process.WaitForExitAsync(token);
+        await process.WaitForExitAsync();
         if (process.ExitCode != 0)
             throw new InvalidOperationException("Nie udało się opublikować instalatora w SQL. Szczegóły: " +
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),

@@ -43,7 +43,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
         var options = store.Load().Options ??
             throw new InvalidOperationException("Skonfiguruj archiwum SQL przed sprawdzeniem aktualizacji.");
         return new(new SqlConnectionStringBuilder(options.BuildConnectionString("KartyLeczenia"))
-        { ApplicationIntent = ApplicationIntent.ReadOnly }.ConnectionString);
+        { ApplicationIntent = ApplicationIntent.ReadWrite }.ConnectionString);
     }
 
     internal async Task<ReactUpdateInfo?> Check(CancellationToken token)
@@ -63,7 +63,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
                 throw new InvalidDataException("Niepoprawny numer wersji publikacji w SQL.");
             var hash=reader.GetFieldValue<byte[]>(2);
             if(hash.Length!=32)throw new InvalidDataException("Błędna suma SHA-256 aktualizacji SQL.");
-            string installedVersion = CurrentVersion;
+            string installedVersion = ReactInstallUpdates.InstalledVersion;
             return new(reader.GetGuid(0),release.ToString(),installedVersion,
                 Convert.ToHexString(hash),IsNewer(release.ToString(),installedVersion),reader.GetDateTime(3));
         }
@@ -76,7 +76,7 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
 
     internal async Task<string> Download(ReactUpdateInfo release, CancellationToken token)
     {
-        Version current=Version.TryParse(CurrentVersion,out var local)?local:new Version(0,0);
+        Version current=Version.TryParse(ReactInstallUpdates.InstalledVersion,out var local)?local:new Version(0,0);
         if (!Version.TryParse(release.Version,out var advertised)||Normalize(advertised)<=Normalize(current))
             throw new InvalidOperationException("Brak nowszej wersji ReactKL do zainstalowania.");
         if(release.Sha256.Length!=64 || !release.Sha256.All(Uri.IsHexDigit))
@@ -113,8 +113,10 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
                 digest=await SHA256.HashDataAsync(file,token);
             if(!CryptographicOperations.FixedTimeEquals(digest,Convert.FromHexString(release.Sha256)))
                 throw new InvalidDataException("Błędna suma SHA-256 pobranego instalatora. Nie uruchomiono aktualizacji.");
-            var actualFileVersion=FileVersionInfo.GetVersionInfo(installer).FileVersion;
-            if (!Version.TryParse(actualFileVersion,out var fileVersion) || Normalize(fileVersion)!=Normalize(advertised))
+            var metadata = FileVersionInfo.GetVersionInfo(installer);
+            var fileVersion = new Version(metadata.FileMajorPart, metadata.FileMinorPart,
+                metadata.FileBuildPart, metadata.FilePrivatePart);
+            if (fileVersion != Normalize(advertised))
                 throw new InvalidDataException("Pobrany plik ma inną wersję niż opublikowana. Nie uruchomiono aktualizacji.");
             using(var stream=File.OpenRead(installer))
                 if(stream.ReadByte()!='M' || stream.ReadByte()!='Z')
@@ -124,14 +126,16 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
         }
         finally
         {
-            if(!valid)
-            {
-                try{Directory.Delete(folder,true);}
-                catch(Exception ex) when(ex is IOException or UnauthorizedAccessException)
-                {CrashLog.Write("ReactUpdate.Cleanup",ex);}
-            }
+            if(!valid) DeleteDownloadFolder(folder);
         }
     }
+    internal static void DeleteDownloadFolder(string folder)
+    {
+        try { Directory.Delete(folder, recursive: true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { CrashLog.Write("ReactUpdate.Cleanup", ex); }
+    }
+
     internal static void Start(string file)
     {
         if (!File.Exists(file) || !file.EndsWith(".exe",StringComparison.OrdinalIgnoreCase))

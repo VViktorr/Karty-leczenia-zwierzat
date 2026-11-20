@@ -53,6 +53,8 @@ internal sealed class ReactWindow : Form
     private readonly Dictionary<string, byte[]> pendingCataloguePdfs = new(StringComparer.Ordinal);
     private bool backupRunning;
     private bool closeAfterVerifiedBackup;
+    private bool installingUpdate;
+    private bool closingForUpdate;
 
     private readonly Dictionary<string, CancellationTokenSource> active = [];
     private readonly Dictionary<string, DocumentData> drafts = [];
@@ -94,7 +96,7 @@ internal sealed class ReactWindow : Form
             }
             // This is the original WinForms three-way choice. Never ask on a
             // shutdown/update initiated by Windows or when no SQL archive is configured.
-            if (!closeAfterVerifiedBackup && e.CloseReason == CloseReason.UserClosing &&
+            if (!closeAfterVerifiedBackup && !closingForUpdate && e.CloseReason == CloseReason.UserClosing &&
                 archive.Load().Options is not null)
             {
                 var answer = MessageBox.Show(this,
@@ -265,7 +267,8 @@ internal sealed class ReactWindow : Form
                 ? TimeSpan.FromMinutes(45) : action is "saveCardPdf" or "emailCardPdf"
                     ? TimeSpan.FromMinutes(3) : action == "missingCatalogueProducts"
                     ? TimeSpan.FromMinutes(2) : action == "installUpdate"
-                    ? TimeSpan.FromMinutes(15) : action == "purgeTrashedCard"
+                    ? TimeSpan.FromMinutes(15) : action == "publishPendingUpdate"
+                    ? TimeSpan.FromMinutes(7) : action == "purgeTrashedCard"
                         ? TimeSpan.FromMinutes(3) : TimeSpan.FromSeconds(45));
             active[requestId] = cancel;
             object result = await HandleRequest(action, root, cancel.Token);
@@ -461,7 +464,7 @@ internal sealed class ReactWindow : Form
                     "Sprawdzanie aktualizacji SQL jest dostępne po zainstalowaniu ReactKL. Paczka testowa nie aktualizuje programu.");
             checkedUpdate = await updates.Check(token);
             return new { release = checkedUpdate,
-                currentVersion = ReactUpdateService.CurrentVersion };
+                currentVersion = ReactInstallUpdates.InstalledVersion };
         }
         if (action == "installUpdate")
         {
@@ -470,24 +473,38 @@ internal sealed class ReactWindow : Form
             if (backupRunning || restoreRunning)
                 throw new InvalidOperationException(
                     "Aktualizacja może rozpocząć się dopiero po zakończeniu archiwizacji lub odtwarzania.");
+            if (installingUpdate || closingForUpdate)
+                throw new InvalidOperationException("Aktualizacja jest już pobierana.");
+            string expectedId = ReadTextField(root, "releaseId", 40);
             var release = checkedUpdate;
-            if (release is null || !release.Newer)
-                throw new InvalidOperationException(
-                    "Najpierw sprawdź dostępność nowszej wersji ReactKL w SQL.");
-            // Re-read SQL after the user's confirmation: a newer release may
-            // have replaced the one they saw in the meantime.
-            var current = await updates.Check(token);
-            if (current is null || current.ReleaseId != release.ReleaseId ||
-                !current.Newer || !string.Equals(current.Sha256,release.Sha256,
-                    StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(
-                    "Opublikowana aktualizacja zmieniła się. Sprawdź wersję ponownie.");
-            string file = await updates.Download(current,token);
-            ReactUpdateService.Start(file);
-            // The installer is already running. Exit the old app so Inno can
-            // replace its files without launching the old user interface.
-            BeginInvoke(new Action(Close));
-            return new { started = true, version = current.Version };
+            if (release is null || !release.Newer || !Guid.TryParse(expectedId, out var releaseId) ||
+                release.ReleaseId != releaseId)
+                throw new InvalidOperationException("Sprawdź ponownie dostępność aktualizacji w SQL.");
+            installingUpdate = true;
+            string? file = null;
+            try
+            {
+                var current = await updates.Check(token);
+                if (current is null || current.ReleaseId != release.ReleaseId ||
+                    !current.Newer || !string.Equals(current.Sha256, release.Sha256,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException(
+                        "Opublikowana aktualizacja zmieniła się. Sprawdź wersję ponownie.");
+                file = await updates.Download(current, token);
+                token.ThrowIfCancellationRequested();
+                if (backupRunning || restoreRunning)
+                    throw new InvalidOperationException("Zakończ archiwizację lub odtwarzanie przed aktualizacją.");
+                ReactUpdateService.Start(file);
+                closingForUpdate = true;
+                BeginInvoke(new Action(Close));
+                return new { started = true, version = current.Version };
+            }
+            finally
+            {
+                installingUpdate = false;
+                if (file is not null && !closingForUpdate)
+                    ReactUpdateService.DeleteDownloadFolder(Path.GetDirectoryName(file)!);
+            }
         }
         if (action == "chooseRestoreFile")
         {

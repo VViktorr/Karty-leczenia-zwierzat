@@ -60,6 +60,7 @@ export function invoke<T>(action: string, fields: Record<string, unknown> = {},
       reject(new Error("Serwer nie odpowiedział w wyznaczonym czasie."));
     }, action === "backupDatabase" || action === "restoreDatabase" ? 2700000 :
       action === "installUpdate" ? 900000 :
+      action === "publishPendingUpdate" ? 450000 :
       action === "purgeTrashedCard" ? 180000 :
       action === "analyseCataloguePdf" ? 120000 :
       action === "saveCardPdf" || action === "emailCardPdf" ? 180000 :

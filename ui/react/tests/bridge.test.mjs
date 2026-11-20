@@ -67,3 +67,20 @@ test("cancelled document read cannot consume the response for the next view", as
   deliver({data:{id:request._bridgeRequestId,ok:true,data:list}});
   assert.deepEqual(await next, list);
 });
+
+test("SQL update confirmation carries the release shown to the operator", async () => {
+  const releaseId = "d7908b62-1012-4db5-9f1d-139cb5461791";
+  const check = invoke("checkUpdate");
+  const checkRequest = posted.at(-1);
+  deliver({data: {id: checkRequest._bridgeRequestId, ok: true,
+    data: {release: {releaseId, version: "3.1.0", newer: true}, currentVersion: "3.0.5"}}});
+  const {release} = await check;
+  assert.equal(posted.at(-1).action, "checkUpdate");
+
+  const install = invoke("installUpdate", {releaseId: release.releaseId});
+  const installRequest = posted.at(-1);
+  assert.equal(installRequest.action, "installUpdate");
+  assert.equal(installRequest.releaseId, releaseId);
+  deliver({data: {id: installRequest._bridgeRequestId, ok: true, data: {started: true}}});
+  assert.deepEqual(await install, {started: true});
+});
