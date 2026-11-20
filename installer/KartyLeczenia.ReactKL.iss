@@ -279,8 +279,8 @@ begin
      (ServerModePage.SelectedValueIndex = 0) and
      ((not ExistingArchiveConfiguration) or RoleChanged) then
   begin
-    MsgBox('Na tym stanowisku nie ma jeszcze zatwierdzonej konfiguracji serwera.' +
-      #13#10 + 'Wybierz istniejaca instancje SQL lub KLARCHIVE.',mbError,MB_OK);
+    MsgBox('Na tym stanowisku nie ma jeszcze zatwierdzonej konfiguracji serwera.' + #13#10 +
+      'Wybierz istniejaca instancje SQL lub KLARCHIVE.',mbError,MB_OK);
     Result := False;
     Exit;
   end;
