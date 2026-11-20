@@ -124,10 +124,10 @@ function ErrorNotice({error}: {error: string}) {
   return error ? <Alert className="notice" type="error" showIcon message={error}/> : null;
 }
 function useRemote<T>(action: string, payload: Record<string, unknown>, deps: unknown[],
-  enabled = true): {
+  enabled = true, sameKeyOnly = false): {
   data: T | null; busy: boolean; error: string; reload: () => void; revalidate: () => void;
 } {
-  const [data, setData] = useState<T | null>(null);
+  const [response, setResponse] = useState<{key:string;data:T} | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
@@ -142,12 +142,13 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
     forceRefresh.current = false;
     setBusy(true); setError("");
     invoke<T>(action, refresh ? {...payload, refresh:true} : payload, undefined, controller.signal)
-      .then(result => { if (!expired) setData(result); })
+      .then(result => { if (!expired) setResponse({key,data:result}); })
       .catch(reason => { if (!expired) setError(reason instanceof Error ? reason.message : String(reason)); })
       .finally(() => { if (!expired) setBusy(false); });
     return () => { expired = true; controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action, key, tick, enabled]);
+  const data = response && (!sameKeyOnly || response.key===key) ? response.data : null;
   return {data, busy, error, reload: () => {
     forceRefresh.current = true;
     setTick(n => n + 1);
@@ -186,12 +187,13 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
   const until = period==="custom" ? endDate : "";
   const {data, busy, error, reload, revalidate} = useRemote<DocumentsResult>(
     "searchDocuments", {kind, period, query: search, startDate:from, endDate:until},
-    [kind, period, search, from, until]);
+    [kind, period, search, from, until], true, true);
   useEffect(() => {
     const returned = active && !wasActive.current;
     wasActive.current = active;
     if (returned && !busy && (error || !data ||
-      Date.now() - Date.parse(data.loadedAt) >= 5 * 60_000)) revalidate();
+      Date.now() - Date.parse(data.checkedAt ?? data.loadedAt) >= (data.warning ? 30_000 : 5 * 60_000)))
+      revalidate();
   }, [active, busy, data, error, revalidate]);
   useEffect(()=>{setPage(1);},[kind,period,search,from,until]);
   const allPageSize=Math.max(500,data?.items.length??0);
@@ -263,7 +265,7 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
   return <>
     <div className="page-heading"><div>
       <Typography.Title level={3}>Dokumenty Subiekta GT</Typography.Title>
-      <Typography.Text type="secondary">Lista z jednego magazynu. Bufor 5 minut, F5 pobiera świeże dane SQL.</Typography.Text>
+      <Typography.Text type="secondary">Lista z jednego magazynu. Zmiany sprawdzane przy powrocie na listę. F5 pobiera świeże dane SQL.</Typography.Text>
     </div><Space wrap>
       <Button onClick={listLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={reload} loading={busy}>Odśwież · F5</Button>
@@ -289,10 +291,13 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
           <Input type="date" aria-label="Do dnia" value={endDate} onChange={e=>setEndDate(e.target.value)}/>
         </>}
       </div>
-      <ErrorNotice error={error||readError}/>
+      <ErrorNotice error={readError || (!data ? error : "")}/>
+      {data&&(data.warning||error)&&<Alert className="notice" type="warning" showIcon
+        message="Nie udało się odświeżyć dokumentów. Pokazuję ostatnią wczytaną listę."
+        description={data.warning||error}/>}
       {data?.truncated&&<Alert className="notice" type="info" showIcon
         message="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
-      <Table {...listLayout.tableProps} rowKey="id" loading={busy||reading} dataSource={data?.items??[]} columns={listLayout.columns}
+      <Table {...listLayout.tableProps} rowKey="id" loading={(busy&&!data)||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
         size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={{
           current:page,pageSize:effectivePageSize,position:["bottomRight"],
@@ -314,7 +319,7 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
         locale={{emptyText:<Empty description="Brak dokumentów"/>}}/>
       <Typography.Text type="secondary">
         {data?.loadedAt?"Ostatni odczyt "+new Date(data.loadedAt).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})+
-          (data.cached?" · z pamięci (bez zapytania SQL)":" · odświeżono z SQL")+" · ":""}
+          (data.cached?" · lista z pamięci":" · odświeżono z SQL")+" · ":""}
         {data?.items.length??0} dokumentów. {pageSize==="all"
           ? "Pokazano wszystkie pobrane pozycje (limit SQL: 500). "
           : ""}Dwuklik lub Enter na wierszu otwiera kartę.

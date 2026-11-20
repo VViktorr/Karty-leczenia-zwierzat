@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using KartyLeczenia;
+using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia.ReactKL;
 
@@ -13,12 +14,17 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
 {
     internal const int MaxEntries = 32;
     internal static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(5);
+    internal static readonly TimeSpan FullReadInterval = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan FailureRetryInterval = TimeSpan.FromSeconds(30);
 
     internal sealed record Result(
         IReadOnlyList<DocumentSuggestion> Items, bool Truncated,
         DateTimeOffset LoadedAt, bool Cached)
     {
         internal long InsertionOrder { get; init; }
+        public DateTimeOffset CheckedAt { get; init; }
+        public string? Warning { get; init; }
+        internal int? LatestDocumentId { get; init; }
     }
 
     private readonly Func<DateTimeOffset> now = clock ?? (() => DateTimeOffset.UtcNow);
@@ -30,8 +36,12 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
         internal readonly CancellationTokenSource Source = new(TimeSpan.FromSeconds(25));
         internal readonly Lazy<Task<Result>> Work;
         internal int Waiters;
-        internal Flight(Func<CancellationToken, Task<Result>> operation)
-            => Work = new(() => operation(Source.Token));
+        internal bool Refresh { get; }
+        internal Flight(bool refresh, Func<CancellationToken, Task<Result>> operation)
+        {
+            Refresh = refresh;
+            Work = new(() => operation(Source.Token));
+        }
     }
     private readonly Dictionary<string, Flight> pending = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim querySlots = new(2, 2);
@@ -49,22 +59,24 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
 
     internal async Task<Result> GetAsync(string key, bool refresh,
         Func<CancellationToken, Task<IReadOnlyList<DocumentSuggestion>>> fetch,
-        CancellationToken token)
+        CancellationToken token, Func<CancellationToken, Task<int>>? readLatestId = null)
     {
         token.ThrowIfCancellationRequested();
         Flight flight;
         lock (gate)
         {
-            if (!refresh && stored.TryGetValue(key, out var hit) &&
-                now() - hit.LoadedAt < Lifetime)
+            stored.TryGetValue(key, out var hit);
+            if (!refresh && hit is not null &&
+                now() - hit.CheckedAt < (hit.Warning is null ? Lifetime : FailureRetryInterval))
                 return hit with { Cached = true };
 
-            if (pending.TryGetValue(key, out var existing))
+            if (pending.TryGetValue(key, out var existing) && (!refresh || existing.Refresh))
                 flight = existing;
             else
             {
                 Flight? created = null;
-                created = new Flight(ct => LoadAsync(key, fetch, ct, () => created!));
+                created = new Flight(refresh,
+                    ct => LoadAsync(key, hit, refresh, fetch, readLatestId, ct, () => created!));
                 pending[key] = created;
                 flight = created;
             }
@@ -94,35 +106,40 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
         }
     }
 
-    private async Task<Result> LoadAsync(string key,
+    private async Task<Result> LoadAsync(string key, Result? previous, bool refresh,
         Func<CancellationToken, Task<IReadOnlyList<DocumentSuggestion>>> fetch,
-        CancellationToken token, Func<Flight> owner)
+        Func<CancellationToken, Task<int>>? readLatestId, CancellationToken token, Func<Flight> owner)
     {
         try
         {
             await querySlots.WaitAsync(token).ConfigureAwait(false);
             try
             {
+                int? latestId = readLatestId is null ? null :
+                    await readLatestId(token).ConfigureAwait(false);
+                if (!refresh && previous is not null && latestId.HasValue &&
+                    latestId == previous.LatestDocumentId && now() - previous.LoadedAt < FullReadInterval)
+                    return Remember(key, owner(), previous with
+                    {
+                        CheckedAt = now(), Cached = true, Warning = null
+                    });
+
                 var found = await fetch(token).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
-                var snapshot = new Result(found.Take(500).ToArray(), found.Count > 500,
-                    now(), Cached: false);
-                lock (gate)
-                {
-                    // Timestamps can coincide under bursty requests. A strict
-                    // monotonic order prevents dictionary slot reuse from
-                    // retaining old entries while evicting newer ones.
-                    snapshot = snapshot with { InsertionOrder = ++nextInsertionOrder };
-                    stored[key] = snapshot;
-                    if (stored.Count > MaxEntries)
-                    {
-                        var oldest = stored.MinBy(entry => entry.Value.InsertionOrder);
-                        stored.Remove(oldest.Key);
-                    }
-                }
-                return snapshot;
+                var time = now();
+                return Remember(key, owner(), new Result(found.Take(500).ToArray(), found.Count > 500,
+                    time, Cached: false) { CheckedAt = time, LatestDocumentId = latestId });
             }
             finally { querySlots.Release(); }
+        }
+        catch (Exception ex) when (previous is not null && ex is (SqlException or OperationCanceledException))
+        {
+            // A departed UI waiter removes this flight. Do not cache its cancellation.
+            string reason = ex is SqlException sql ? $"Kod SQL: {sql.Number}." : "Przekroczono limit czasu.";
+            return Remember(key, owner(), previous with
+            {
+                CheckedAt = now(), Cached = true, Warning = reason
+            }, ex);
         }
         finally
         {
@@ -137,10 +154,27 @@ internal sealed class DocumentListCache(Func<DateTimeOffset>? clock = null)
         }
     }
 
+    private Result Remember(string key, Flight flight, Result snapshot, Exception? failure = null)
+    {
+        lock (gate)
+        {
+            if (!pending.TryGetValue(key, out var current) || !ReferenceEquals(current, flight))
+                return snapshot;
+            snapshot = snapshot with { InsertionOrder = ++nextInsertionOrder };
+            stored[key] = snapshot;
+            if (stored.Count > MaxEntries)
+                stored.Remove(stored.MinBy(entry => entry.Value.InsertionOrder).Key);
+        }
+        if (failure is not null) CrashLog.Write("ReactKL.Documents.Revalidate", failure);
+        return snapshot;
+    }
+
     internal void Clear()
     {
-        lock (gate) stored.Clear();
-        // Pending requests are not disposed while SQL may still be using them.
-        // Their hashed configuration keys prevent cross-connection reuse.
+        lock (gate)
+        {
+            stored.Clear();
+            pending.Clear();
+        }
     }
 }

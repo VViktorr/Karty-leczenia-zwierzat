@@ -135,6 +135,50 @@ static class Program
                 CancellationToken.None).GetAwaiter().GetResult();
             Check(databaseQueries == 3,
                 "expired document lists must be refreshed, not silently reused");
+            var incrementalLists = new DocumentListCache(() => clock);
+            databaseQueries = 0;
+            int latestId = 1;
+            int probes = 0;
+            bool timedOut = false;
+            Task<int> ReadLatestId(CancellationToken ct)
+            {
+                ct.ThrowIfCancellationRequested();
+                probes++;
+                return timedOut ? Task.FromException<int>(new OperationCanceledException())
+                    : Task.FromResult(latestId);
+            }
+            DocumentListCache.Result ReadIncremental(bool force = false) =>
+                incrementalLists.GetAsync("invoices", force, FetchList, CancellationToken.None, ReadLatestId)
+                    .GetAwaiter().GetResult();
+
+            var baseline = ReadIncremental();
+            clock += DocumentListCache.Lifetime;
+            var unchanged = ReadIncremental();
+            Check(probes == 2 && databaseQueries == 1 && unchanged.Cached &&
+                unchanged.LoadedAt == baseline.LoadedAt && unchanged.CheckedAt > baseline.CheckedAt,
+                "an unchanged newest document ID must skip the full list query");
+            latestId++;
+            clock += DocumentListCache.Lifetime;
+            var changed = ReadIncremental();
+            Check(databaseQueries == 2 && !changed.Cached,
+                "a changed newest document ID must trigger a full read");
+            clock += DocumentListCache.FullReadInterval;
+            Check(!ReadIncremental().Cached && databaseQueries == 3,
+                "periodic full reads must catch edits that do not affect the newest ID");
+            Check(!ReadIncremental(force: true).Cached && databaseQueries == 4,
+                "F5 must run a full read even when the newest ID is unchanged");
+            timedOut = true;
+            clock += DocumentListCache.Lifetime;
+            var stale = ReadIncremental();
+            int probesBeforeRetry = probes;
+            Check(stale.Cached && stale.Warning is not null && stale.Items.Count == 1 &&
+                ReadIncremental().Warning is not null && probes == probesBeforeRetry,
+                "temporary SQL timeouts must retain the last list and throttle repeated checks");
+            timedOut = false;
+            clock += TimeSpan.FromSeconds(30);
+            Check(ReadIncremental().Warning is null,
+                "a successful retry must clear the stale-list warning");
+
             var gate = new TaskCompletionSource<IReadOnlyList<KartyLeczenia.DocumentSuggestion>>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             int concurrentQueries = 0;

@@ -1010,7 +1010,8 @@ internal sealed class ReactWindow : Form
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var result = await documentLists.GetAsync(cacheKey, refresh,
                 async queryToken => await documents.SearchAsync(options, query, queryToken,
-                    kind, from, to, limit: 501, allowEmpty: true), token);
+                    kind, from, to, limit: 501, allowEmpty: true), token,
+                queryToken => documents.ReadLatestDocumentIdAsync(options, queryToken));
             CrashLog.Write($"ReactKL.Documents.List kind={kind} count={result.Items.Count} cached={result.Cached} elapsedMs={watch.ElapsedMilliseconds}");
             return new
             {
@@ -1019,7 +1020,7 @@ internal sealed class ReactWindow : Form
                     x.Id, x.Number, x.Date, x.ShortPayer, x.Payer, x.Gross,
                     x.Net, x.Currency, x.RelatedText
                 }).ToArray(),
-                result.Truncated, result.Cached, result.LoadedAt
+                result.Truncated, result.Cached, result.LoadedAt, result.CheckedAt, result.Warning
             };
         }
         if (action == "readDocument")

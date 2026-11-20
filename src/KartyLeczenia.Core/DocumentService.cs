@@ -54,7 +54,8 @@ public sealed class DocumentService
         }
         var result = (Gross: gross, Currency: currency, Net: net); AmountColumns[key] = result; return result;
     }
-    static async Task<List<DocumentSuggestion>> AttachRelations(SqlConnection con, List<DocumentSuggestion> documents, int? warehouseId, CancellationToken token)
+    static async Task<List<DocumentSuggestion>> AttachRelations(SqlConnection con, List<DocumentSuggestion> documents, int? warehouseId, DocumentSearchKinds kinds,
+        CancellationToken token)
     {
         if (documents.Count == 0) return documents;
         using var cmd = con.CreateCommand(); cmd.CommandTimeout = 10;
@@ -63,8 +64,9 @@ public sealed class DocumentService
         for (int i = 0; i < ids.Count; i++) cmd.Parameters.Add("@doc" + i, SqlDbType.Int).Value = ids[i];
         cmd.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)warehouseId ?? DBNull.Value;
         // These are actual trade/warehouse references on document positions, never date/customer guesses.
-        cmd.CommandText = $"""
-            WITH CandidateLinks AS (
+        var candidates = new List<string>(2);
+        if ((kinds & (DocumentSearchKinds.Invoices | DocumentSearchKinds.Receipts)) != 0)
+            candidates.Add($"""
                 SELECT p.ob_DokHanId AS TradeId, p.ob_DokMagId AS WarehouseId
                 FROM dbo.dok_Pozycja p WHERE p.ob_DokHanId IN ({parameters})
                 UNION
@@ -72,14 +74,20 @@ public sealed class DocumentService
                 FROM dbo.dok_Pozycja p
                 JOIN dbo.dok_Pozycja source ON source.ob_Id=p.ob_DoId AND source.ob_TowId=p.ob_TowId
                 WHERE p.ob_DokHanId IN ({parameters})
-                UNION
-                SELECT p.ob_DokHanId, p.ob_DokMagId
+                """);
+        if (kinds.HasFlag(DocumentSearchKinds.WarehouseReleases))
+            candidates.Add($"""
+                SELECT p.ob_DokHanId AS TradeId, p.ob_DokMagId AS WarehouseId
                 FROM dbo.dok_Pozycja p WHERE p.ob_DokMagId IN ({parameters})
                 UNION
                 SELECT p.ob_DokHanId, source.ob_DokMagId
                 FROM dbo.dok_Pozycja source
                 JOIN dbo.dok_Pozycja p ON p.ob_DoId=source.ob_Id AND p.ob_TowId=source.ob_TowId
                 WHERE source.ob_DokMagId IN ({parameters})
+                """);
+        cmd.CommandText = $"""
+            WITH CandidateLinks AS (
+                {string.Join(" UNION ", candidates)}
             )
             SELECT h.dok_Id, h.dok_NrPelny, m.dok_Id, m.dok_NrPelny
             FROM CandidateLinks links
@@ -128,6 +136,15 @@ public sealed class DocumentService
         DateColumns[key] = value;
         return value;
     }
+    public async Task<int> ReadLatestDocumentIdAsync(ConnectionOptions options, CancellationToken token)
+    {
+        await using var connection = new SqlConnection(options.BuildConnectionString());
+        await connection.OpenAsync(token).ConfigureAwait(false);
+        using var command = new SqlCommand(
+            "SELECT ISNULL(MAX(dok_Id), 0) FROM dbo.dok__Dokument;", connection) { CommandTimeout = 5 };
+        return Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false));
+    }
+
     public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token, DocumentSearchKinds kinds = DocumentSearchKinds.All, DateTime? dateFrom = null, DateTime? dateUntil = null, int limit = 21, bool allowEmpty = false)
     {
         string fragment = input.Trim();
@@ -186,7 +203,7 @@ public sealed class DocumentService
             ShortPayer = reader.GetString(7),
             Net = reader.IsDBNull(8) ? null : Convert.ToDecimal(reader.GetValue(8))
         });
-        return await AttachRelations(con, found, options.WarehouseId, token).ConfigureAwait(false);
+        return await AttachRelations(con, found, options.WarehouseId, kinds, token).ConfigureAwait(false);
     }
     public async Task<string?> ReadPayerEmailAsync(ConnectionOptions options, int payerId, CancellationToken token)
     {

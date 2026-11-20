@@ -6,7 +6,7 @@ export interface DocumentRow {
   shortPayer: string; payer: string; gross: number | null;
   net: number | null; currency: string; relatedText: string;
 }
-export interface DocumentsResult { items: DocumentRow[]; truncated: boolean; cached: boolean; loadedAt: string; }
+export interface DocumentsResult { items: DocumentRow[]; truncated: boolean; cached: boolean; loadedAt: string; checkedAt?: string; warning?: string | null; }
 export interface DocumentDetail {
   number: string; payer: string; recipient: string;
   rows: Array<{product: string; quantity: string; batch: string; species: string; route: string;}>;
