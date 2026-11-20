@@ -36,7 +36,7 @@ internal static class ChplPdfAssistant
         ("domięśniowa", @"\b(domięśniow\w*|intramuscular|i\.m\.)\b"),
         ("podskórna", @"\b(podskórn\w*|subcutaneous|s\.c\.)\b"),
         ("doustna", @"\b(doustn\w*|oralnie|per os)\b"),
-        ("dosutkowa", @"\b(dosutkow\w*|intramammary)\b"),
+        ("dowymieniowa", @"\b(dowymieniow\w*|dosutkow\w*|intramammary)\b"),
         ("na skórę", @"\b(naskórn\w*|na skórę|spot.on|pour.on)\b")
     ];
 
@@ -107,11 +107,17 @@ internal static class ChplPdfAssistant
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
         // Do not mistake other species' withdrawal times for this species.
-        string pattern = milk
-            ? @"(?im)^\s*Mleko\s*[:\-–]\s*([^\r\n]+)"
-            : @"(?im)^\s*(?:Tkanki jadalne|Tkanki|Mięso i podroby|Mięso)\s*[:\-–]\s*([^\r\n]+)";
-        var found = Regex.Match(text, pattern);
-        return found.Success ? Clean(found.Groups[1].Value) : "";
+        string label = milk ? "Mleko" : "(?:Tkanki jadalne|Tkanki|Mięso i podroby|Mięso)";
+        var found = Regex.Match(text, @"(?im)^[ \t]*" + label + @"[ \t]*[:\-–][ \t]*([^\r\n]*)");
+        if (!found.Success) return "";
+        string inline = Clean(found.Groups[1].Value);
+        if (inline.Length > 0) return inline;
+
+        // A heading on its own line can introduce several mutually exclusive
+        // conditions. Keep the whole contiguous bullet block or leave it empty.
+        var bullets = Regex.Match(text[(found.Index + found.Length)..],
+            @"^(?:\r?\n[ \t]*[●•▪][ \t]+[^\r\n]+)+");
+        return bullets.Success ? Clean(bullets.Value) : "";
     }
 
     internal static Proposal Read(string pdfFile)
@@ -190,6 +196,9 @@ internal static class ChplPdfAssistant
             }
             if (string.IsNullOrWhiteSpace(doseForAnimal))
                 warnings.Add($"{animal}: brak jednoznacznego dawkowania dla tego gatunku.");
+            string milk = ExtractWithdrawal(withdrawalForAnimal, true);
+            if (milk.Length == 0 && Has(withdrawalForAnimal, @"(?m)^[ \t]*Mleko[ \t]*:"))
+                warnings.Add($"{animal}: sprawdź pełny zapis karencji dla mleka w rozpoznanym fragmencie.");
             foreach (string route in routes)
                 result.Add(new CatalogueVariantModel(
                     Species: animal,
@@ -197,7 +206,7 @@ internal static class ChplPdfAssistant
                     Route: route,
                     Dose: doseForAnimal,
                     Tissues: ExtractWithdrawal(withdrawalForAnimal, false),
-                    Milk: ExtractWithdrawal(withdrawalForAnimal, true),
+                    Milk: milk,
                     Source: leaflet ? "Propozycja z ulotki – wymaga weryfikacji z ChPL"
                         : "Propozycja automatyczna z ChPL – wymaga weryfikacji"));
         }
