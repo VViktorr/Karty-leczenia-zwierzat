@@ -144,7 +144,11 @@ export function SubiektDatabaseSettings(){
     try{
       await invoke("saveSettings",{...values});
       setChecked(true);
-      setNotice("Połączenie z Subiektem GT sprawdzone i zapisane tylko na tym stanowisku.");
+      setNotice(values.windowsAuthentication || values.rememberPassword
+        ? "Połączenie z Subiektem GT sprawdzone i zapisane na tym stanowisku."
+        : "Połączenie z Subiektem GT sprawdzone. Hasło SQL działa do zamknięcia programu, " +
+          "ale nie zostało zapamiętane. Aby dokumenty działały także po ponownym uruchomieniu, " +
+          "zaznacz „Zapamiętaj hasło” i zapisz ustawienia jeszcze raz.");
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(null);}
   }
