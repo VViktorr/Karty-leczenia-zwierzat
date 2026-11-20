@@ -30,7 +30,13 @@ try
     store.Save(options, false);
     Check(!File.ReadAllText(path).Contains(options.Password), "Plaintext password persisted.");
     var loaded = store.Load();
-    Check(loaded.Options?.Password == "" && !loaded.Remembered, "Opt-out must not restore a password.");
+    Check(loaded.Options?.Password == options.Password && !loaded.Remembered,
+        "An unremembered password must survive in the current app session only.");
+    var newlyStartedProcess = new ConnectionSettingsStore(path);
+    var afterRestart = newlyStartedProcess.Load();
+    Check(afterRestart.Options?.Password == "" && !afterRestart.Remembered &&
+        afterRestart.Warning?.Contains("hasła", StringComparison.OrdinalIgnoreCase) == true,
+        "An unremembered password must not survive restart and must prompt for credentials.");
     Check(loaded.Options?.Database == "Firma" && loaded.Options.DrugGroup == "Leki", "Database/group not restored.");
     store.Save(options, true);
     string persisted = File.ReadAllText(path);
@@ -38,7 +44,10 @@ try
     Check(!string.IsNullOrWhiteSpace(encrypted.ProtectedPassword) && !persisted.Contains(options.Password), "DPAPI password not protected.");
     Check(store.Load().Options == options && store.Load().Remembered, "Encrypted credentials did not round-trip.");
     store.Save(options, false);
-    Check(JsonSerializer.Deserialize<SavedConnection>(File.ReadAllText(path))!.ProtectedPassword is null, "Unchecking remember must remove the stored secret.");
+    Check(JsonSerializer.Deserialize<SavedConnection>(File.ReadAllText(path))!.ProtectedPassword is null,
+        "Unchecking remember must remove the stored secret.");
+    Check(store.Load().Options?.Password == options.Password,
+        "Unremembered credentials must remain available in the current process.");
     store.Save(options with { WindowsAuthentication = true }, true);
     Check(JsonSerializer.Deserialize<SavedConnection>(File.ReadAllText(path))!.ProtectedPassword is null, "SQL password persisted with Windows authentication.");
     File.WriteAllText(path, "corrupted");

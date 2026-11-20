@@ -184,10 +184,10 @@ public sealed class ConnectionSettingsStore(string? filePath = null)
             // made outside this process must not inherit unrelated credentials.
             if (!options.WindowsAuthentication && !remembered &&
                 sessionOptions is { } active &&
-                active with { Password = "" } == options with { Password = "" })
+                (active with { Password = "" }) == (options with { Password = "" }))
                 options = options with { Password = active.Password };
             else if (sessionOptions is not null &&
-                     sessionOptions with { Password = "" } != options with { Password = "" })
+                     (sessionOptions with { Password = "" }) != (options with { Password = "" }))
                 sessionOptions = null;
             if (!options.WindowsAuthentication && string.IsNullOrEmpty(options.Password) && warning is null)
                 warning = "Połączenie SQL wymaga hasła. Wpisz je w Ustawieniach i sprawdź połączenie. " +
