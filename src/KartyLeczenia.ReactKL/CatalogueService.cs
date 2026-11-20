@@ -5,6 +5,7 @@ using KartyLeczenia;
 
 namespace KartyLeczenia.ReactKL;
 
+internal sealed record CatalogueReference(string Symbol, string Name);
 internal sealed record CatalogueListing(string Symbol, string Name, string Status, int Variants);
 internal sealed record CatalogueVariantModel(
     int? Id = null, string Species = "", string Indication = "", string Route = "",
@@ -65,6 +66,22 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         while (reader.Read())
             result.Add(new(reader.GetString(0), reader.GetString(1),
                 reader.GetString(2), reader.GetInt32(3)));
+        return result;
+    }
+
+    internal List<CatalogueReference> ReferenceProducts()
+    {
+        using var db = Open();
+        CheckImported(db);
+        using var command = Command(db, """
+            SELECT symbol, name FROM dbo.catalog_products
+            WHERE COALESCE(decision, N'') <> N'NOT_MEDICINE'
+            ORDER BY name, symbol;
+            """);
+        var result = new List<CatalogueReference>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            result.Add(new(reader.GetString(0), reader.GetString(1)));
         return result;
     }
 

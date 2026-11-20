@@ -1042,6 +1042,9 @@ internal sealed class ReactWindow : Form
                 hasPayerId = document.PayerId.HasValue,
                 rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),
                     replacement = r.Get("Zamiennik produktu"),
+                    referenceSymbol = r.Get("Symbol zamiennika produktu"),
+                    descriptionGroup = r.Get(CardSchema.AnimalDescriptionGroup),
+                    countGroup = r.Get(CardSchema.AnimalCountGroup),
                     symbol = r.Get("Symbol Subiekta"), indication = r.Get("Wskazanie ChPL"),
                     quantity = r.Get("Ilość wydana"), batch = r.Get("Seria"),
                     species = r.Get("Gatunek"), route = r.Get("Droga podania"),
@@ -1061,10 +1064,10 @@ internal sealed class ReactWindow : Form
                     "Dokument ma zbyt wiele pozycji do zbiorczych propozycji.");
             var variants = await Task.Run(() =>
                 catalogue.VariantsForSymbols(draft.Rows.Select(row =>
-                    row.Get("Symbol Subiekta"))), token);
+                    TreatmentAutofillPlanner.CatalogueSymbol(row))), token);
             var proposals = draft.Rows.Select((row, index) =>
             {
-                variants.TryGetValue(row.Get("Symbol Subiekta").Trim(), out var entries);
+                variants.TryGetValue(TreatmentAutofillPlanner.CatalogueSymbol(row), out var entries);
                 return TreatmentAutofillPlanner.Propose(index, row,
                     entries ?? []);
             }).ToArray();
@@ -1074,7 +1077,7 @@ internal sealed class ReactWindow : Form
                     items = proposals,
                     compatibility = draft.Rows.Select((row, index) =>
                     {
-                        variants.TryGetValue(row.Get("Symbol Subiekta").Trim(), out var entries);
+                        variants.TryGetValue(TreatmentAutofillPlanner.CatalogueSymbol(row), out var entries);
                         return new
                         {
                             index,
@@ -1192,6 +1195,34 @@ internal sealed class ReactWindow : Form
                 draft.Rows[index].Set("Drukuj", Flag(inputs[index], "selected").ToString());
             return new { updated = inputs.Length };
         }
+        if (action == "treatmentReferences")
+            return new { items = await Task.Run(catalogue.ReferenceProducts, token) };
+        if (action == "setTreatmentReference")
+        {
+            string id = ReadTextField(root, "draftId", 30);
+            int index = Int(root, "index") ?? -1;
+            if (!drafts.TryGetValue(id, out var draft) || index < 0 || index >= draft.Rows.Count)
+                throw new InvalidOperationException("Ponownie otwórz dokument.");
+            var row = draft.Rows[index];
+            string symbol = ReadTextField(root, "referenceSymbol", 128);
+            if (string.Equals(symbol, row.Get("Symbol Subiekta").Trim(), StringComparison.OrdinalIgnoreCase))
+                symbol = "";
+            var reference = symbol.Length > 0 ? await Task.Run(() => catalogue.Read(symbol), token) : null;
+            var original = row.Get("Symbol Subiekta").Trim();
+            string effective = reference?.Symbol ?? original;
+            var variants = await Task.Run(() => catalogue.VariantsForSymbols([effective]), token);
+            variants.TryGetValue(effective, out var entries);
+            row.Set("Symbol zamiennika produktu", reference?.Symbol ?? "");
+            row.Set("Zamiennik produktu", reference?.Name ?? "");
+            foreach (var field in new[] { "Gatunek", "Droga podania", "Dawkowanie i okres stosowania",
+                "Karencja", "Wskazanie ChPL", "Automatyczna karencja", "Automatyczne dawkowanie",
+                "Źródło karencji", "Status karencji", "Domyślny gatunek", "Dokument kontekstu JSON",
+                "Produkt kontekstu", "Pełna sekcja karencji źródła", "Pełna sekcja dawkowania źródła",
+                "Pełna sekcja gatunków źródła", "SHA256 źródła" })
+                row.Set(field, "", false);
+            return new { replacement = reference?.Name ?? "", referenceSymbol = reference?.Symbol ?? "",
+                groups = TreatmentSpeciesGroup.CompatibleGroups((entries ?? []).Select(v => v.Species)) };
+        }
         if (action == "treatmentVariants" || action == "applyTreatmentVariant")
         {
             string draftId = ReadTextField(root,"draftId",30);
@@ -1200,7 +1231,7 @@ internal sealed class ReactWindow : Form
                 index<0 || index>=draft.Rows.Count)
                 throw new InvalidOperationException("Ponownie otwórz dokument przed wyborem wariantu ChPL.");
             var row = draft.Rows[index];
-            string symbol = row.Get("Symbol Subiekta").Trim();
+            string symbol = TreatmentAutofillPlanner.CatalogueSymbol(row);
             if (string.IsNullOrWhiteSpace(symbol))
                 throw new InvalidOperationException(
                     "Pozycja dokumentu nie zawiera symbolu Subiekta. Wariant wybierz ręcznie w katalogu.");
@@ -1220,7 +1251,7 @@ internal sealed class ReactWindow : Form
                     "Wybrany wariant jest niekompletny lub nie istnieje. Nie zmieniono karty.");
             // Save only after an explicit variant choice and opt-in; the
             // remembered species/route never changes clinical values itself.
-            if (Flag(root, "remember"))
+            if (Flag(root, "remember") && row.Get("Symbol zamiennika produktu").Length == 0)
                 await treatmentChoices.SaveAsync(draft.Scope, symbol,
                     choice.Species, choice.Route, token);
             return TreatmentVariantApplier.Apply(row, choice);
@@ -1308,6 +1339,8 @@ internal sealed class ReactWindow : Form
                 treatment.Printed = Flag(item, "selected");
                 foreach (var (key, field) in new[] {
                     ("batch", "Seria"), ("replacement", "Zamiennik produktu"),
+                    ("descriptionGroup", CardSchema.AnimalDescriptionGroup),
+                    ("countGroup", CardSchema.AnimalCountGroup),
                     ("species", "Gatunek"),
                     ("route", "Droga podania"), ("dosing", "Dawkowanie i okres stosowania"),
                     ("withdrawal", "Karencja"),

@@ -14,6 +14,12 @@ internal sealed record TreatmentSuggestion(
 /// </summary>
 internal static class TreatmentAutofillPlanner
 {
+    internal static string CatalogueSymbol(TreatmentRow row)
+    {
+        string reference = row.Get("Symbol zamiennika produktu").Trim();
+        return reference.Length > 0 ? reference : row.Get("Symbol Subiekta").Trim();
+    }
+
     private static readonly string[] ReviewWords =
     [
         "do weryfikacji", "weryfikacji", "wg chpl", "zgodnie z ulotką",
@@ -55,7 +61,7 @@ internal static class TreatmentAutofillPlanner
     internal static TreatmentSuggestion Propose(
         int index, TreatmentRow row, IReadOnlyList<CatalogueVariantModel> variants)
     {
-        string symbol = row.Get("Symbol Subiekta").Trim();
+        string symbol = CatalogueSymbol(row);
         if (!row.Printed)
             return new(index, symbol, "unselected", "Pozycja jest odznaczona na karcie.");
         if (symbol.Length == 0)

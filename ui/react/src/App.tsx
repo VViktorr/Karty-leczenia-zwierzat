@@ -24,7 +24,7 @@ type LayoutName = "classic" | "modern" | "fluent" | "compact-tabs" | "compact-si
 type PaletteName = "light" | "dark" | "sea";
 type Section = "documents" | "prices" | "catalogue" | "treatment" | "saved" | "expiry" | "settings";
 interface DraftRow {
-  index: number; product: string; replacement: string; symbol: string; indication: string; quantity: string; batch: string;
+  index: number; product: string; replacement: string; referenceSymbol?: string; descriptionGroup?: string; countGroup?: string; symbol: string; indication: string; quantity: string; batch: string;
   species: string; route: string; dosing: string; withdrawal: string;
   description: string; animals: string; diagnosis: string; section: string; selected: boolean;
 }
@@ -449,6 +449,14 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [duplicateId,setDuplicateId]=useState<string|null>(null);
   const [reported, setReported] = useState("");
   const [performed, setPerformed] = useState(() => localDateTime());
+  const [dateStep,setDateStep]=useState<{reported:string;performed:string}|null>(null);
+  const [animalEdit,setAnimalEdit]=useState<{
+    candidates:DraftRow[]; checked:number[]; description:string; count:string;
+  }|null>(null);
+  const [referenceEdit,setReferenceEdit]=useState<{
+    index:number; value:string; items:{symbol:string;name:string}[];
+  }|null>(null);
+  const [referenceBusy,setReferenceBusy]=useState(false);
   const [findings, setFindings] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
   const [previewSavedId,setPreviewSavedId]=useState<string|null>(null);
@@ -491,7 +499,8 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const selectionVersion=useRef(0);
   useEffect(() => {
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
-    setDuplicateId(null);
+    setDuplicateId(null);setDateStep(null);setAnimalEdit(null);setReferenceEdit(null);
+    setReported("");setPerformed(localDateTime());
     desiredChecks.current=new Map((draft?.rows??[]).map(row=>[row.index,row.selected]));
     setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});
     setSavedChoices({});setAnimalDescriptions([]);setAnimalError("");
@@ -579,6 +588,62 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       ? {...row,...(description?{description}:{}),...(count?{animals:count}:{})}:row));
     setSavedNumber("");setAnimalError("");
   }
+  function openAnimalEdit(row:DraftRow){
+    if(!row.selected){
+      setError("Zaznacz pozycję do wydruku, aby wpisać wspólne dane zwierząt.");
+      return;
+    }
+    const candidates=rows.filter(item=>item.selected &&
+      (item.section==="III")===(row.section==="III") &&
+      item.species.trim().toLocaleLowerCase("pl")===row.species.trim().toLocaleLowerCase("pl"));
+    setError("");
+    setAnimalEdit({candidates,checked:candidates.filter(item=>
+      (item.descriptionGroup??"")===(row.descriptionGroup??"")).map(item=>item.index),
+      description:row.description,count:row.animals});
+  }
+  async function applyAnimalEdit(){
+    if(!animalEdit||!draft||!animalEdit.checked.length)return;
+    const description=animalEdit.description.trim(), animals=animalEdit.count.trim();
+    const group=window.crypto.randomUUID();
+    setRows(current=>current.map(row=>animalEdit.checked.includes(row.index)
+      ? {...row,description,animals,descriptionGroup:group,countGroup:group}:row));
+    setAnimalEdit(null);setSavedNumber("");setAnimalError("");
+    if(!draft.hasPayerId||!description)return;
+    try{
+      await invoke("saveAnimalDescription",{draftId:draft.draftId,description});
+      setAnimalDescriptions(current=>[description,...current.filter(value=>value!==description)].slice(0,100));
+    }catch(error){setAnimalError(error instanceof Error?error.message:String(error));}
+  }
+  async function openReference(row:DraftRow){
+    if(referenceBusy)return;
+    setReferenceBusy(true);setError("");
+    try{
+      const {items}=await invoke<{items:{symbol:string;name:string}[]}>("treatmentReferences",{});
+      setReferenceEdit({index:row.index,value:row.referenceSymbol??"",
+        items:items.filter(item=>item.symbol.toUpperCase()!==row.symbol.trim().toUpperCase())});
+    }catch(error){setError(error instanceof Error?error.message:String(error));}
+    finally{setReferenceBusy(false);}
+  }
+  async function applyReference(){
+    if(!draft||!referenceEdit||referenceBusy)return;
+    const {index,value}=referenceEdit;
+    const row=rows.find(item=>item.index===index);
+    if(row && (row.referenceSymbol??"")===value && (value||!row.replacement)){
+      setReferenceEdit(null);return;
+    }
+    setReferenceBusy(true);setError("");
+    try{
+      const {groups,...reference}=await invoke<{
+        referenceSymbol:string;replacement:string;groups:SpeciesGroup[];
+      }>("setTreatmentReference",{draftId:draft.draftId,index,referenceSymbol:value});
+      setRows(current=>current.map(item=>item.index===index
+        ? {...item,...reference,species:"",route:"",dosing:"",withdrawal:"",indication:""}:item));
+      setCompatibility(current=>({...current,[index]:groups}));
+      setSuggestTick(tick=>tick+1);
+      setReferenceEdit(null);setSavedNumber("");
+    }catch(error){setReferenceEdit(null);setError(error instanceof Error?error.message:String(error));}
+    finally{setReferenceBusy(false);}
+  }
   async function rememberAnimalDescription(){
     if(!draft?.hasPayerId||!groupDescription.trim()||animalBusy)return;
     setAnimalBusy(true);setAnimalError("");
@@ -598,13 +663,13 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   useEffect(()=>()=>{if(variantPdfUrl)URL.revokeObjectURL(variantPdfUrl);},[variantPdfUrl]);
   // Do not silently print an incomplete treatment card. The warning review
   // covers both SQL save and draft preview, without changing clinician entries.
-  async function reviewBefore(action:"save"|"preview"):Promise<boolean> {
+  async function reviewBefore(action:"save"|"preview", execution=performed):Promise<boolean> {
     const selected=rows.filter(row=>row.selected);
     if(!selected.length) {
       setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk. Jeśli filtr gatunku ukrywa dostępne pozycje, wybierz Wszystkie.");
       return false;
     }
-    if(!performed){
+    if(!execution){
       setError("Podaj datę i godzinę wykonania czynności weterynaryjnych.");
       return false;
     }
@@ -655,13 +720,13 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       });
     });
   }
-  async function saveCard(confirmDuplicate = false) {
+  async function saveCard(dates:{reported:string;performed:string},confirmDuplicate = false) {
     if (!draft || busy || applyBusy || selectionBusy) return;
     setBusy(true); setError("");
     try {
-      if (!await reviewBefore("save")) return;
+      if (!confirmDuplicate && !await reviewBefore("save",dates.performed)) return;
       const result = await invoke<SaveResult>("saveDraft", {
-        draftId:draft.draftId, reported, performed, findings, confirmDuplicate, rows
+        draftId:draft.draftId, ...dates, findings, confirmDuplicate, rows
       });
       if (result.duplicate) {
         if(result.duplicateId)setDuplicateId(result.duplicateId);
@@ -774,7 +839,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       const result=await invoke<Pick<DraftRow,"species"|"route"|"dosing"|"withdrawal"|"indication"|"description">>(
         "applyTreatmentVariant",{draftId:draft.draftId,
           index:variantModal.index,variantId:id,remember});
-      if(remember){
+      if(remember && !rows.find(row=>row.index===variantModal.index)?.referenceSymbol){
         const chosen=variantModal.variants.find(item=>item.id===id);
         if(chosen){
           const symbol=variantModal.symbol.trim().toUpperCase();
@@ -784,7 +849,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         }
       }
       setRows(current=>current.map(row=>row.index===variantModal.index
-        ? {...row,...result} : row));
+        ? {...row,...result,description:row.descriptionGroup?row.description:result.description} : row));
       setVariantModal(null);
       setSuggestions(current=>current.map(s=>s.index===variantModal.index
         ? {...s,status:"existingData",message:"Wariant wybrany ręcznie."} : s));
@@ -848,7 +913,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       }},
     {title:"Wariant ChPL",key:"variant",width:150,
       render:(_value:unknown,row:DraftRow)=><Button size="small"
-        disabled={!row.symbol || variantBusy || applyBusy}
+        disabled={!(row.referenceSymbol||row.symbol) || variantBusy || applyBusy || referenceBusy}
         onClick={()=>{void openVariants(row);}}>
         Wybierz wariant
       </Button>},
@@ -857,13 +922,21 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       render:(value:string)=><span title={value}>{value||"—"}</span>},
     ...editable.map(({key,title}) => ({
       title, dataIndex:key, width:key==="section" ? 125 : key==="dosing" || key==="withdrawal" ? 245 : 170,
-      render:(value:string,row:DraftRow) => key==="section"
+      render:(value:string,row:DraftRow) => key==="replacement"
+        ? <Button size="small" disabled={applyBusy||busy||referenceBusy} title={value}
+            onClick={()=>{void openReference(row);}}>{value||"Wybierz…"}</Button>
+        : key==="section"
         ? <Select aria-label={"Sekcja karty leczenia — "+row.product}
             value={value==="III"?"III":"II"} disabled={applyBusy} style={{width:"100%"}}
             options={[{label:"II",value:"II"},{label:"III",value:"III"}]}
             onChange={next=>{void update(row.index,"section",next);}}/>
         : <Input.TextArea autoSize={{minRows:1,maxRows:3}}
-        aria-label={title} data-treatment-field={key} value={value} disabled={applyBusy||busy}
+        aria-label={title} data-treatment-field={key} value={value}
+        title={key==="description"?"Dwuklik otwiera dane zwierząt":undefined}
+        onDoubleClick={key==="description"?()=>openAnimalEdit(row):undefined}
+        onKeyDown={key==="description"?event=>{
+          if(event.key==="F4"){event.preventDefault();openAnimalEdit(row);}
+        }:undefined} disabled={applyBusy||busy}
         onChange={e => {
           const next=e.target.value;
           setRows(current => current.map(item => item.index===row.index ? {...item,[key]:next} : item));
@@ -880,7 +953,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       <Button onClick={onDocuments}>Dokumenty</Button>
       <Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={()=>{void printPreview();}} loading={busy} disabled={applyBusy||selectionBusy}>Podgląd wydruku</Button>
-      <Button type="primary" onClick={()=>{void saveCard();}} loading={busy} disabled={applyBusy||selectionBusy}>Zapisz kartę do SQL</Button>
+      <Button type="primary" onClick={()=>setDateStep({reported,performed})} loading={busy} disabled={applyBusy||selectionBusy||referenceBusy}>Zapisz kartę do SQL</Button>
     </Space></div>
     <div className="treatment-tools">
     <TreatmentOptions compact={compact} label={"Podpowiedzi ChPL ("+readySuggestions.length+")"}>
@@ -959,8 +1032,6 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     </div>
     <Card className="treatment-meta">
       <Space wrap>
-        <label>Data zgłoszenia (opcjonalnie) <Input type="datetime-local" value={reported} onChange={e=>setReported(e.target.value)}/></label>
-        <label>Data wykonania <Input type="datetime-local" value={performed} onChange={e=>setPerformed(e.target.value)}/></label>
         <label>Wyniki badań <Input value={findings} onChange={e=>setFindings(e.target.value)} style={{width:340}}/></label>
       </Space>
     </Card>
@@ -981,6 +1052,54 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>
+    <Modal className="kl-dialog-treatment-reference" open={referenceEdit!==null}
+      title="Zamiennik produktu" okText="Wybierz" cancelText="Anuluj"
+      confirmLoading={referenceBusy} onOk={()=>{void applyReference();}}
+      onCancel={()=>{if(!referenceBusy)setReferenceEdit(null);}}>
+      {referenceEdit&&<Select showSearch aria-label="Zamiennik produktu"
+        style={{width:"100%"}} value={referenceEdit.value}
+        onChange={value=>setReferenceEdit({...referenceEdit,value})}
+        filterOption={(input,option)=>input.toLocaleLowerCase("pl").split(/[\s-]+/).every(word=>
+          String(option?.label??"").toLocaleLowerCase("pl").includes(word))}
+        options={[{value:"",label:"Preparat z dokumentu"},...referenceEdit.items.map(item=>({
+          value:item.symbol,label:item.name+" · "+item.symbol
+        }))]}/>}
+    </Modal>
+    <Modal className="kl-dialog-treatment-animals" open={animalEdit!==null}
+      title="Numery i liczba leczonych zwierząt" okText="Zastosuj" cancelText="Anuluj"
+      okButtonProps={{disabled:!animalEdit?.checked.length}} onOk={()=>{void applyAnimalEdit();}}
+      onCancel={()=>setAnimalEdit(null)}>
+      {animalEdit&&<Space direction="vertical" style={{width:"100%"}}>
+        {animalEdit.candidates.length>1&&<Checkbox.Group value={animalEdit.checked}
+          onChange={checked=>setAnimalEdit({...animalEdit,checked})}>
+          <Space direction="vertical">{animalEdit.candidates.map(item=>
+            <Checkbox key={item.index} value={item.index}>
+              {item.index+1}. {item.product}{item.batch&&" · "+item.batch}
+            </Checkbox>)}</Space>
+        </Checkbox.Group>}
+        <label>Numery zwierząt <Input.TextArea rows={4} value={animalEdit.description}
+          onChange={e=>setAnimalEdit({...animalEdit,description:e.target.value})}/></label>
+        <label>Liczba leczonych zwierząt <Input value={animalEdit.count}
+          onChange={e=>setAnimalEdit({...animalEdit,count:e.target.value})}/></label>
+      </Space>}
+    </Modal>
+    <Modal className="kl-dialog-treatment-dates" open={dateStep!==null}
+      title="Daty i godziny karty leczenia" okText="Dalej" cancelText="Anuluj"
+      okButtonProps={{disabled:!dateStep?.performed}} onCancel={()=>setDateStep(null)}
+      onOk={()=>{
+        if(!dateStep?.performed)return;
+        setReported(dateStep.reported);setPerformed(dateStep.performed);setDateStep(null);
+        void saveCard(dateStep);
+      }}>
+      {dateStep&&<Space direction="vertical" style={{width:"100%"}}>
+        <label>Data i godzina zgłoszenia (opcjonalnie)
+          <Input type="datetime-local" value={dateStep.reported}
+            onChange={e=>setDateStep({...dateStep,reported:e.target.value})}/></label>
+        <label>Data i godzina wykonania czynności weterynaryjnych
+          <Input type="datetime-local" value={dateStep.performed}
+            onChange={e=>setDateStep({...dateStep,performed:e.target.value})}/></label>
+      </Space>}
+    </Modal>
     <Modal className="kl-dialog-treatment-duplicate" open={duplicateId!==null}
       title="Karta z tego dokumentu już istnieje" onCancel={()=>setDuplicateId(null)}
       footer={<Space wrap>
@@ -989,7 +1108,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
           const id=duplicateId;setDuplicateId(null);
           if(id)onOpenSaved(id);
         }}>Otwórz / zaktualizuj istniejącą</Button>
-        <Button type="primary" onClick={()=>{setDuplicateId(null);void saveCard(true);}}>
+        <Button type="primary" onClick={()=>{setDuplicateId(null);void saveCard({reported,performed},true);}}>
           Zapisz kolejną kartę
         </Button>
       </Space>}>
