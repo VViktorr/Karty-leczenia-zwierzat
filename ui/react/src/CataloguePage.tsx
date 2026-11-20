@@ -452,6 +452,7 @@ export default function CataloguePage({
     {savedNotice && <Alert className="notice" type="success" showIcon message={savedNotice} />}
     <div className="catalogue-layout">
       <Card className="catalogue-list">
+        <Button size="small" onClick={productsLayout.openColumns}>Kolumny kartotek</Button>
         <Input.Search allowClear value={input}
           placeholder="Nazwa lub symbol leku..."
           onSearch={value=>{
@@ -517,6 +518,7 @@ export default function CataloguePage({
           </div>
           <div className="catalogue-variant-toolbar">
             <Space wrap>
+              <Button onClick={variantsLayout.openColumns}>Kolumny wariantów</Button>
               <Button onClick={addVariant}>Dodaj wariant</Button>
               <Button disabled={!selected.length || working}
                 onClick={() => { void choosePdf(); }}>
@@ -544,6 +546,8 @@ export default function CataloguePage({
         </>}
       </Card>
     </div>
+    {productsLayout.dialog}
+    {variantsLayout.dialog}
     <Modal className="kl-dialog-catalogue-picker" open={pickerOpen} title="Wybierz kartotekę Subiekta" width={680}
       onCancel={working ? undefined : closePicker} closable={!working} maskClosable={false}
       keyboard={!working} cancelButtonProps={{ disabled: working }} cancelText="Anuluj"

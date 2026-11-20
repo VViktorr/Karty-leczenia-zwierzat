@@ -64,6 +64,7 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
     });
   }
 
+  const view = modal.ownerDocument?.defaultView;
   let gesture: {target: HTMLElement; pointer: number; edge?: Edge;
     x: number; y: number; origin: Bounds; zoom: number} | undefined;
   const start = (event: PointerEvent) => {
@@ -73,7 +74,11 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
     const target = event.currentTarget;
     gesture = {target, pointer: event.pointerId, edge: target.dataset.edge as Edge | undefined,
       x: event.clientX, y: event.clientY, origin: bounds, zoom: scale()};
-    target.setPointerCapture(event.pointerId);
+    try { target.setPointerCapture(event.pointerId); }
+    catch { /* Continue through the top-level pointer listeners. */ }
+    view?.addEventListener("pointermove", move, true);
+    view?.addEventListener("pointerup", finish, true);
+    view?.addEventListener("pointercancel", finish, true);
     modal.classList.add("kl-modal-adjusting");
     event.preventDefault();
     event.stopPropagation();
@@ -110,6 +115,7 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
     if (!gesture || event.pointerId !== gesture.pointer) return;
     const {origin} = gesture;
     gesture = undefined;
+    removeWindowListeners();
     modal.classList.remove("kl-modal-adjusting");
     if (event.type !== "pointerup") {
       place(fit(preferred, wrapper));
@@ -121,6 +127,12 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
     try { localStorage.setItem(key, JSON.stringify(preferred)); }
     catch { /* Keep the active geometry. */ }
   };
+
+  function removeWindowListeners() {
+    view?.removeEventListener("pointermove", move, true);
+    view?.removeEventListener("pointerup", finish, true);
+    view?.removeEventListener("pointercancel", finish, true);
+  }
 
   const handles = edges.map(edge => {
     const handle = document.createElement("span");
@@ -176,6 +188,7 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
   refit.observe(wrapper);
   return () => {
     refit.disconnect();
+    removeWindowListeners();
     targets.forEach(target => events.forEach(([name, listener]) =>
       target.removeEventListener(name, listener)));
     keyboardTargets.forEach(target => target.removeEventListener("keydown", adjustByKey));

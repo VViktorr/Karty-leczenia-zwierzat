@@ -85,6 +85,16 @@
 .kl-movable-modal .ant-modal-header,
 .kl-movable-modal .ant-modal-confirm-title { cursor: move; touch-action: none; user-select: none; pointer-events: auto; }
 .kl-movable-modal .ant-modal-title { user-select: none; }
+.kl-movable-modal .ant-modal-header > .ant-modal-title::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 12px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  background: radial-gradient(circle, currentColor 1px, transparent 1.4px) 0 0 / 5px 4px;
+  opacity: .55;
+}
 .kl-movable-modal > .ant-modal-content { position: relative; }
 .kl-modal-adjusting iframe { pointer-events: none; }
 .kl-movable-modal > .ant-modal-content > .kl-modal-resize {
@@ -100,7 +110,7 @@
   top: 10px; bottom: 10px; width: 7px; cursor: ew-resize;
 }
 .kl-modal-resize:is([data-edge="nw"], [data-edge="ne"], [data-edge="se"], [data-edge="sw"]) {
-  width: 13px; height: 13px;
+  width: 17px; height: 17px;
 }
 .kl-modal-resize:is([data-edge="n"], [data-edge="nw"], [data-edge="ne"]) { top: 0; }
 .kl-modal-resize:is([data-edge="s"], [data-edge="sw"], [data-edge="se"]) { bottom: 0; }
@@ -208,3 +218,11 @@
 .layout-compact .treatment-meta label { display: flex; align-items: center; gap: 5px; }
 .layout-compact .treatment-meta input[type="datetime-local"] { width: 180px; }
 .layout-compact .treatment-meta input:not([type="datetime-local"]) { width: min(210px, 34vw) !important; }
+
+.kl-formatted-cell :is(textarea.ant-input, input.ant-input, .ant-select-selection-item) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: inherit;
+  color: inherit;
+}

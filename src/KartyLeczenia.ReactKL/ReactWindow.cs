@@ -438,6 +438,13 @@ internal sealed class ReactWindow : Form
                 ? pending : await Task.Run(() => catalogue.ReadPdf(path), token);
             return new { base64 = Convert.ToBase64String(data), name = Path.GetFileName(path) };
         }
+        if (action == "systemFontFamilies")
+        {
+            using var fonts = new System.Drawing.Text.InstalledFontCollection();
+            return fonts.Families.Select(font => font.Name)
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        }
         if (action == "getProgramVersion")
             return new { version = ReactUpdateService.CurrentVersion };
         if (action == "getUpdateStatus")

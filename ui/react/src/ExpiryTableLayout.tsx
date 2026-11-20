@@ -1,6 +1,7 @@
+import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
 import {useEffect,useState} from "react";
-import {Button,Checkbox,InputNumber,Modal,Typography} from "antd";
+import {Button,Checkbox,InputNumber,Modal,Tabs,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
 
 const specs=[
@@ -81,6 +82,7 @@ export function useExpiryTableLayout<T extends object>(columns:ColumnsType<T>){
       ...column,width:widths[String(column.key)]??column.width
     }));
 
+  const formatting=useListFormatting("expiry");
   const mouse = useTableMouseLayout("expiry");
   const mouseColumns = mouse.decorate(arranged, column=>String(column.key??""),
     (key,width)=>setWidths(previous=>({...previous,[key]:width})),
@@ -90,6 +92,8 @@ export function useExpiryTableLayout<T extends object>(columns:ColumnsType<T>){
     title="Parametry listy — terminy ważności"
     onCancel={()=>setOpen(false)} onOk={()=>setOpen(false)}
     okText="Gotowe" cancelButtonProps={{style:{display:"none"}}}>
+    <Tabs items={[
+      {key:"columns",label:"Kolumny",children:<>
     <Typography.Paragraph type="secondary">
       Widoczność, kolejność i szerokość kolumn są zapamiętywane wyłącznie na tym stanowisku.
       Zgodnie z WinForms musi pozostać widoczna przynajmniej jedna kolumna.
@@ -127,6 +131,9 @@ export function useExpiryTableLayout<T extends object>(columns:ColumnsType<T>){
       onClick={()=>{
         setVisible([...keys]);setOrder([...keys]);setWidths({});mouse.resetHeight();
       }}>Przywróć domyślne kolumny</Button>
+      </>},
+      {key:"format",label:"Formatowanie",children:<ListFormattingPanel formatting={formatting} columns={specs.map(item=>({...item}))}/>}
+    ]}/>
   </Modal>;
-  return {columns:mouseColumns,tableProps:mouse.tableProps,dialog,openColumns:()=>setOpen(true)};
+  return {columns:formatting.apply(mouseColumns,column=>String(column.key??"")),tableProps:mouse.tableProps,dialog,openColumns:()=>setOpen(true)};
 }

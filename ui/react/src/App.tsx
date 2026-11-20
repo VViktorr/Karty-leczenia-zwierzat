@@ -1,3 +1,4 @@
+import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {useListPagination} from "./ListPagination";
 import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayout";
 import { useEffect, useMemo, useState, useRef } from "react";
@@ -400,6 +401,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   },[compact,draft]);
   const [showColumns,setShowColumns]=useState(false);
   const treatmentMouse = useTableMouseLayout("treatment");
+  const treatmentFormatting = useListFormatting("treatment");
   const [columnOrder,setColumnOrder]=useState<string[]>(restoreColumnOrder);
   const [columnWidths,setColumnWidths]=useState<Record<string,number>>(restoreColumnWidths);
   useEffect(()=>{
@@ -966,14 +968,14 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     <ErrorNotice error={error}/>
     </div>
     <Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
-      columns={treatmentMouse.decorate(
+      columns={treatmentFormatting.apply(treatmentMouse.decorate(
         columns.filter(column=>visibleColumns.includes(treatmentColumnKey(column)))
         .sort((a,b)=>columnOrder.indexOf(treatmentColumnKey(a))-
           columnOrder.indexOf(treatmentColumnKey(b)))
         .map(column=>({...column,width:columnWidths[treatmentColumnKey(column)]??column.width})), treatmentColumnKey,
         (key,width)=>setColumnWidths(previous=>({...previous,[key]:width})),
         (source,target)=>setColumnOrder(previous=>reorderColumn(previous,source,target)),
-        60, 800, ["selected","product"])} size="small"
+        60, 800, ["selected","product"]), treatmentColumnKey)} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
       scroll={{x:1900,y:compact?tableHeight:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
@@ -999,6 +1001,8 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     <Modal className="kl-dialog-treatment-columns" open={showColumns} title="Parametry listy — karta leczenia"
       onCancel={()=>setShowColumns(false)} onOk={()=>setShowColumns(false)}
       okText="Gotowe" cancelButtonProps={{style:{display:"none"}}}>
+      <Tabs items={[
+        {key:"columns",label:"Kolumny",children:<>
       <Typography.Paragraph type="secondary">
         Wybierz widoczne kolumny. Produkt i zaznaczenie do wydruku pozostają zawsze dostępne.
         Ustawienie jest zapamiętywane na tym stanowisku.
@@ -1040,6 +1044,10 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
           setColumnWidths({});
           treatmentMouse.resetHeight();
         }}>Przywróć domyślne kolumny</Button>
+        </>},
+        {key:"format",label:"Formatowanie",children:<ListFormattingPanel formatting={treatmentFormatting}
+          columns={treatmentColumns.map(({value,label})=>({key:value,label}))}/>}
+      ]}/>
     </Modal>
     <Modal className="kl-dialog-treatment-review" width="90vw" open={suggestReviewOpen}
       title="Potwierdź uzupełnienie jednoznacznych wariantów ChPL"

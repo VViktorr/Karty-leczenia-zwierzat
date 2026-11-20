@@ -1,6 +1,7 @@
+import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
 import {useEffect,useState} from "react";
-import {Button,Checkbox,InputNumber,Modal,Typography} from "antd";
+import {Button,Checkbox,InputNumber,Modal,Tabs,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
 
 /** Workstation-local, WinForms-style column visibility, order and widths. */
@@ -77,6 +78,7 @@ export function useListColumnLayout<T extends object>(
     });
   }
 
+  const formatting=useListFormatting(listId);
   const mouse = useTableMouseLayout(listId);
   const mouseColumns = mouse.decorate(arranged, identity,
     (key,width)=>setWidths(previous=>({...previous,[key]:width})),
@@ -86,6 +88,8 @@ export function useListColumnLayout<T extends object>(
       title="Parametry listy — kolumny" onCancel={()=>setOpen(false)}
       onOk={()=>setOpen(false)} okText="Gotowe"
       cancelButtonProps={{style:{display:"none"}}}>
+    <Tabs items={[
+      {key:"columns",label:"Kolumny",children:<>
     <Typography.Paragraph type="secondary">
       Widoczność, kolejność i szerokość kolumn obowiązują wyłącznie na tym stanowisku.
       Przynajmniej jedna kolumna musi pozostać widoczna.
@@ -121,6 +125,9 @@ export function useListColumnLayout<T extends object>(
     <Button size="small" onClick={()=>{
       setVisible([...keys]);setOrder([...keys]);setWidths({});mouse.resetHeight();
     }}>Przywróć domyślne kolumny</Button>
+      </>},
+      {key:"format",label:"Formatowanie",children:<ListFormattingPanel formatting={formatting} columns={definitions}/>}
+    ]}/>
   </Modal>;
-  return {columns:mouseColumns,tableProps:mouse.tableProps,openColumns:()=>setOpen(true),dialog};
+  return {columns:formatting.apply(mouseColumns,identity),tableProps:mouse.tableProps,openColumns:()=>setOpen(true),dialog};
 }
