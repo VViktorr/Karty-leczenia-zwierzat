@@ -21,6 +21,8 @@ class ElementFixture extends EventTarget {
   offsetHeight = 600;
   closest() { return null; }
   setAttribute() {}
+  getAttribute() { return null; }
+  removeAttribute() {}
   setPointerCapture() {}
   append(child) { this.children.push(child); child.parent = this; }
   remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); }
@@ -68,5 +70,10 @@ test("dialog and PDF handles resize at zoom, persist per dialog, and clean up on
   const closeAgain = attachDialog(modal, wrapper);
   assert.equal(modal.style.width, "700px");
   assert.equal(modal.style.left, "150px");
+  const keyboardCorner = content.children.find(handle => handle.dataset.edge === "se");
+  keyboardCorner.dispatchEvent(Object.assign(new Event("keydown", {cancelable: true}),
+    {key: "ArrowLeft", shiftKey: false}));
+  assert.equal(modal.style.width, "688px");
+  assert.equal(JSON.parse(saved.get(key)).width, 688);
   closeAgain();
 });

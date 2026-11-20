@@ -83,7 +83,7 @@
   overflow: auto;
 }
 .kl-movable-modal .ant-modal-header,
-.kl-movable-modal .ant-modal-confirm-title { cursor: move; touch-action: none; user-select: none; }
+.kl-movable-modal .ant-modal-confirm-title { cursor: move; touch-action: none; user-select: none; pointer-events: auto; }
 .kl-movable-modal .ant-modal-title { user-select: none; }
 .kl-movable-modal > .ant-modal-content { position: relative; }
 .kl-modal-adjusting iframe { pointer-events: none; }
@@ -120,6 +120,7 @@
   opacity: .45;
   pointer-events: none;
 }
+.kl-modal-resize:focus-visible { outline: 2px solid #1768d8; outline-offset: -2px; }
 .kl-modal-resize:hover { background: #5297da66; }
 .kl-movable-modal:is(.kl-dialog-treatment-pdf, .kl-dialog-treatment-preview,
   .kl-dialog-saved-preview, .kl-dialog-catalogue-pdf, .kl-dialog-price-preview)

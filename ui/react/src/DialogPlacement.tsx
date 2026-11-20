@@ -68,7 +68,7 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
     x: number; y: number; origin: Bounds; zoom: number} | undefined;
   const start = (event: PointerEvent) => {
     if (gesture || event.button !== 0 || !(event.currentTarget instanceof HTMLElement) ||
-      (event.target instanceof Element &&
+      (event.target !== event.currentTarget && event.target instanceof Element &&
         event.target.closest("button,input,select,textarea,a,[role=button]"))) return;
     const target = event.currentTarget;
     gesture = {target, pointer: event.pointerId, edge: target.dataset.edge as Edge | undefined,
@@ -130,6 +130,36 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
     content.append(handle);
     return handle;
   });
+  const corner = handles[3];
+  const keyboardTargets = header ? [header, corner] : [corner];
+  const originalHeaderTabIndex = header?.getAttribute("tabindex");
+  const originalHeaderTitle = header?.getAttribute("title");
+  if (header) {
+    header.tabIndex = 0;
+    header.title = "Przeciągnij lub użyj strzałek, aby przesunąć okno";
+  }
+  corner.tabIndex = 0;
+  corner.removeAttribute("aria-hidden");
+  corner.setAttribute("role", "button");
+  corner.setAttribute("aria-label", "Zmień rozmiar okna strzałkami");
+  corner.title = "Przeciągnij lub użyj strzałek, aby zmienić rozmiar";
+  const adjustByKey = (event: KeyboardEvent) => {
+    if (event.target !== event.currentTarget || gesture) return;
+    const step = event.shiftKey ? 40 : 12;
+    const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+    const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+    if (!dx && !dy) return;
+    event.preventDefault();
+    const next = event.currentTarget === corner
+      ? {...bounds, width: Math.min(bounds.width + dx, wrapper.clientWidth - bounds.left - edgeMargin),
+          height: Math.min(bounds.height + dy, wrapper.clientHeight - bounds.top - edgeMargin)}
+      : {...bounds, left: bounds.left + dx, top: bounds.top + dy};
+    preferred = fit(next, wrapper);
+    place(preferred);
+    try { localStorage.setItem(key, JSON.stringify(preferred)); }
+    catch { /* Keep the active geometry. */ }
+  };
+  keyboardTargets.forEach(target => target.addEventListener("keydown", adjustByKey));
   const targets = header ? [header, ...handles] : handles;
   const events = [
     ["pointerdown", start], ["pointermove", move], ["pointerup", finish],
@@ -148,6 +178,13 @@ export function attachDialog(modal: HTMLElement, wrapper: HTMLElement) {
     refit.disconnect();
     targets.forEach(target => events.forEach(([name, listener]) =>
       target.removeEventListener(name, listener)));
+    keyboardTargets.forEach(target => target.removeEventListener("keydown", adjustByKey));
+    if (header) {
+      if (originalHeaderTabIndex == null) header.removeAttribute("tabindex");
+      else header.setAttribute("tabindex", originalHeaderTabIndex);
+      if (originalHeaderTitle == null) header.removeAttribute("title");
+      else header.setAttribute("title", originalHeaderTitle);
+    }
     handles.forEach(handle => handle.remove());
     modal.classList.remove("kl-movable-modal", "kl-modal-adjusting");
     for (const property of ["left", "top", "height"]) modal.style.removeProperty(property);

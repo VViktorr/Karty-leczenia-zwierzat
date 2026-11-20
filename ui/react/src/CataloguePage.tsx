@@ -284,6 +284,13 @@ export default function CataloguePage({
     } finally {setWorking(false);}
   }
 
+  function editProposal(index: number, field: "species" | "route" | "dose", value: string) {
+    setProposal(current => current && ({
+      ...current, variants: current.variants.map((row, i) =>
+        i === index ? {...row, [field]: value} : row)
+    }));
+  }
+
   function acceptProposal() {
     if (!proposal) return;
     let added=0, filled=0, skipped=0;
@@ -291,6 +298,7 @@ export default function CataloguePage({
     for (const suggestion of proposal.variants) {
       const species = suggestion.species.trim();
       const route = suggestion.route.trim();
+      if (!species || !route || !suggestion.dose.trim()) { skipped++; continue; }
       const match = next.find(row =>
         row.species.trim().toLocaleLowerCase("pl")===species.toLocaleLowerCase("pl") &&
         row.route.trim().toLocaleLowerCase("pl")===route.toLocaleLowerCase("pl"));
@@ -303,14 +311,18 @@ export default function CataloguePage({
         }
         if (!update.pdf && proposal.path) {update.pdf=proposal.path;filled++;}
         next[next.indexOf(match)] = update;
-      } else if (species && route && suggestion.dose.trim()) {
+      } else {
         next.push({...emptyVariant(),...suggestion,id:null,key:"new-"+crypto.randomUUID(),
           pdf:proposal.path});
         added++;
-      } else skipped++;
+      }
+    }
+    if (!added && !filled) {
+      void msgApi.info("Brak nowych danych do przeniesienia. Sprawdź, czy pola są już uzupełnione.");
+      return;
     }
     setVariants(next);
-    if (added || filled) setDirty(true);
+    setDirty(true);
     void msgApi.info(
       "Propozycje w edytorze: dodano "+added+
       " wariantów, uzupełniono "+filled+" pustych pól, pominięto "+skipped+
@@ -592,7 +604,7 @@ export default function CataloguePage({
       onCancel={() => setProposal(null)}
       footer={<Space>
         <Button onClick={() => setProposal(null)}>Anuluj</Button>
-        <Button type="primary" disabled={!proposal?.variants.length}
+        <Button type="primary" disabled={!proposal?.variants.some(row=>row.species.trim()&&row.route.trim()&&row.dose.trim())}
           onClick={acceptProposal}>
           Przenieś propozycje do edytora (bez zapisu SQL)
         </Button>
@@ -603,14 +615,26 @@ export default function CataloguePage({
           description="Dane z dokumentów wielogatunkowych lub niejednoznacznych mogą pozostać puste."/>
         {proposal.warnings.map((warning,index) =>
           <Alert key={index} type="info" className="notice" showIcon message={warning}/>)}
+        {proposal.variants.some(row=>!row.species.trim()||!row.route.trim()||!row.dose.trim()) &&
+          <Alert className="notice" type="info" showIcon
+            message="Uzupełnij w tabeli gatunek, drogę podania i dawkowanie według ChPL, aby przenieść daną pozycję."/>}
         <Table<CatalogueVariant> rowKey={(_,index)=>String(index)}
           dataSource={proposal.variants} pagination={false} size="small"
           scroll={{x:1100,y:230}}
           columns={[
-            {title:"Gatunek",dataIndex:"species",width:120},
-            {title:"Droga podania",dataIndex:"route",width:135},
+            {title:"Gatunek",dataIndex:"species",width:120,
+              render:(value:string,_row,index)=><Input.TextArea aria-label={"Gatunek — pozycja "+(index+1)}
+                size="small" autoSize={{minRows:1,maxRows:3}} value={value}
+                onChange={event=>editProposal(index,"species",event.target.value)}/>} ,
+            {title:"Droga podania",dataIndex:"route",width:135,
+              render:(value:string,_row,index)=><Input.TextArea aria-label={"Droga podania — pozycja "+(index+1)}
+                size="small" autoSize={{minRows:1,maxRows:3}} value={value}
+                onChange={event=>editProposal(index,"route",event.target.value)}/>} ,
             {title:"Wskazanie",dataIndex:"indication",width:245,ellipsis:true},
-            {title:"Dawkowanie",dataIndex:"dose",width:255,ellipsis:true},
+            {title:"Dawkowanie",dataIndex:"dose",width:255,
+              render:(value:string,_row,index)=><Input.TextArea aria-label={"Dawkowanie — pozycja "+(index+1)}
+                size="small" autoSize={{minRows:1,maxRows:3}} value={value}
+                onChange={event=>editProposal(index,"dose",event.target.value)}/>} ,
             {title:"Tkanki",dataIndex:"tissues",width:180,ellipsis:true},
             {title:"Mleko",dataIndex:"milk",width:160,ellipsis:true}
           ]}/>
