@@ -160,6 +160,9 @@ public sealed record SavedConnection(string Server, string Database, bool Window
 public sealed class ConnectionSettingsStore(string? filePath = null)
 {
     readonly string path = filePath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KartyLeczenia", "connection.json");
+    // A deliberately unremembered SQL password may still be used by this
+    // running process. Never persist it unless the operator opted into DPAPI.
+    private ConnectionOptions? sessionOptions;
     public (ConnectionOptions? Options, bool Remembered, string? Warning) Load()
     {
         if (!File.Exists(path)) return (null, false, null);
@@ -172,7 +175,24 @@ public sealed class ConnectionSettingsStore(string? filePath = null)
                 try { password = Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(saved.ProtectedPassword), null, DataProtectionScope.CurrentUser)); }
                 catch (Exception ex) when (ex is CryptographicException or FormatException) { warning = "Nie można odczytać zapamiętanego hasła. Wpisz je ponownie i zapisz ustawienia."; }
             }
-            return (new(saved.Server, saved.Database, saved.WindowsAuthentication, saved.UserName, password, saved.TrustCertificate, saved.DrugGroup ?? "Leki", saved.WarehouseId), !string.IsNullOrWhiteSpace(saved.ProtectedPassword), warning);
+            bool remembered = !string.IsNullOrWhiteSpace(saved.ProtectedPassword);
+            var options = new ConnectionOptions(saved.Server, saved.Database, saved.WindowsAuthentication,
+                saved.UserName, password, saved.TrustCertificate, saved.DrugGroup ?? "Leki",
+                saved.WarehouseId);
+            // Reuse a password from a successfully tested/save operation ONLY
+            // if all non-secret settings still match the saved file. A change
+            // made outside this process must not inherit unrelated credentials.
+            if (!options.WindowsAuthentication && !remembered &&
+                sessionOptions is { } active &&
+                active with { Password = "" } == options with { Password = "" })
+                options = options with { Password = active.Password };
+            else if (sessionOptions is not null &&
+                     sessionOptions with { Password = "" } != options with { Password = "" })
+                sessionOptions = null;
+            if (!options.WindowsAuthentication && string.IsNullOrEmpty(options.Password) && warning is null)
+                warning = "Połączenie SQL wymaga hasła. Wpisz je w Ustawieniach i sprawdź połączenie. " +
+                    "Bez zaznaczenia „Zapamiętaj hasło” jest ono dostępne tylko do zamknięcia programu.";
+            return (options, remembered, warning);
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or InvalidDataException)
         { return (null, false, "Nie udało się odczytać ustawień. Skonfiguruj połączenie ponownie i zapisz je."); }
@@ -185,7 +205,12 @@ public sealed class ConnectionSettingsStore(string? filePath = null)
         string? directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
         string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try { File.WriteAllText(temp, JsonSerializer.Serialize(saved, new JsonSerializerOptions { WriteIndented = true })); File.Move(temp, path, true); }
+        try
+        {
+            File.WriteAllText(temp, JsonSerializer.Serialize(saved, new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(temp, path, true);
+            sessionOptions = options;
+        }
         finally { if (File.Exists(temp)) File.Delete(temp); }
     }
 }
