@@ -1,3 +1,4 @@
+import {useListPagination} from "./ListPagination";
 import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayout";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
@@ -762,6 +763,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
     }catch(e){setVariantError(e instanceof Error?e.message:String(e));}
     finally{setVariantBusy(false);}
   }
+  const variantsPagination=useListPagination("treatment-variants",variantModal?.variants.length??0,12);
   if (!draft) return <Card>
     <Empty description="Wybierz dokument w zakładce Dokumenty">
       <Button type="primary" onClick={onDocuments}>Przejdź do dokumentów</Button>
@@ -1052,7 +1054,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
       <ErrorNotice error={variantError}/>
       <Table<TreatmentVariantChoice> rowKey="id" loading={variantBusy}
         dataSource={variantModal?.variants??[]} size="small"
-        pagination={{pageSize:12}} scroll={{x:1190,y:340}}
+        pagination={variantsPagination} scroll={{x:1190,y:340}}
         columns={[
           {title:"Gatunek",dataIndex:"species",width:130},
           {title:"Droga podania",dataIndex:"route",width:140},
@@ -1102,7 +1104,7 @@ function Treatment({draft, onDocuments, onOpenSaved}: {
   </>;
 }
 
-function Prices({onCatalogue}: {onCatalogue: (symbol: string) => void}) {
+function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) => void}) {
   const [activePriceSymbol,setActivePriceSymbol]=useState("");
   const levels=useRemote<PriceLevel[]>("priceLevels",{},[]);
   const [level,setLevel]=useState<number|null>(null);
@@ -1173,10 +1175,11 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string) => void}) {
       }},
     {title:"Katalog",key:"status",width:135,
       render:(_value,row)=>row.needsCompletion
-        ? <Tag color="orange">Do uzupełnienia</Tag>
+        ? <Button size="small" onClick={()=>onCatalogue(row.symbol,true)}>Uzupełnij</Button>
         : <Tag color="green">Warianty SQL</Tag>}
   ];
   const listLayout=useListColumnLayout("prices",columns);
+  const pagination=useListPagination("prices",rows.length,40);
   return <>
     <div className="page-heading"><div>
       <Typography.Title level={3}>Cennik leków</Typography.Title>
@@ -1230,7 +1233,7 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string) => void}) {
       <Table {...listLayout.tableProps} rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
         onRow={row=>({onClick:()=>setActivePriceSymbol(row.symbol)})}
         dataSource={rows} columns={listLayout.columns}
-        pagination={{pageSize:40,showSizeChanger:true}}
+        pagination={pagination}
         size="middle" scroll={{x:1180,y:"calc(100vh - 425px)"}}/>
       <Typography.Text type="secondary">
         {selected.length} z {rows.length} widocznych pozycji do wydruku.
@@ -1290,6 +1293,7 @@ function Expiry() {
               days(row)!<=30 ? <Tag color="orange">Do 30 dni</Tag> : <Tag color="green">Aktualne</Tag>}
   ];
   const expiryLayout=useExpiryTableLayout(expiryColumns);
+  const pagination=useListPagination("expiry",rows.length,40);
   return <>
     <div className="page-heading"><div>
       <Typography.Title level={3}>Terminy ważności leków</Typography.Title>
@@ -1312,7 +1316,7 @@ function Expiry() {
       <ErrorNotice error={remote.error}/>
       <Table {...expiryLayout.tableProps} rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
         loading={remote.busy} dataSource={rows}
-        pagination={{pageSize:40,showSizeChanger:true}} scroll={{x:1040,y:"calc(100vh - 400px)"}}
+        pagination={pagination} scroll={{x:1040,y:"calc(100vh - 400px)"}}
         columns={expiryLayout.columns}/>
       <Typography.Text type="secondary">
         Wyświetlono {rows.length} pozycji. Dane magazynowe są buforowane maksymalnie 30 sekund. „Odśwież z SQL” pomija bufor.
@@ -1537,6 +1541,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
 
   ];
   const savedLayout=useListColumnLayout("saved-cards",savedColumns);
+  const pagination=useListPagination("saved-cards",remote.data?.length??0,35);
   return <>
     <div className="page-heading"><Typography.Title level={3}>Zapisane karty leczenia</Typography.Title>
       <Space><Segmented value={trash?"trash":"active"} onChange={v=>setTrash(v==="trash")}
@@ -1560,7 +1565,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       <ErrorNotice error={error || remote.error}/>
       {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
       <Table {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
-        scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={{pageSize:35}}
+        scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={pagination}
         onRow={row=>({onDoubleClick:()=>{void open(row);}})}
         columns={savedLayout.columns}/>
     </Card>
@@ -2137,7 +2142,7 @@ export default function App() {
   const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
   const [draft,setDraft]=useState<Draft|null>(null);
   const [catalogueDirty,setCatalogueDirty]=useState(false);
-  const [cataloguePickerSymbol,setCataloguePickerSymbol]=useState<string|null>(null);
+  const [catalogueEntry,setCatalogueEntry]=useState<{symbol:string;direct:boolean}|null>(null);
   const navigate=(next:Section)=>{
     if(next===section)return;
     if(section==="catalogue"&&catalogueDirty){
@@ -2186,9 +2191,9 @@ export default function App() {
   const content=section==="documents"?null:
     section==="treatment"?<Treatment draft={draft} onDocuments={()=>setSection("documents")}
       onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>:
-    section==="prices"?<Prices onCatalogue={symbol=>{setCataloguePickerSymbol(symbol);setSection("catalogue");}}/>:
+    section==="prices"?<Prices onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
     section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}
-      initialPickerSymbol={cataloguePickerSymbol} onPickerOpened={()=>setCataloguePickerSymbol(null)}/>:
+      initialEntry={catalogueEntry} onPickerOpened={()=>setCatalogueEntry(null)}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards initialCardId={savedCardToOpen}
       onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;

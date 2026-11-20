@@ -303,6 +303,8 @@ static class Program
                 ("LEK-A", new PriceVariant("Świnie","doustnie","Wskazanie",
                     "2 ml","3 dni","","T: 3 dni")),
                 ("LEK-B", new PriceVariant("Koty","doustnie","Wskazanie",
+                    "1 ml","","",null)),
+                ("LEK-C", new PriceVariant("Psy","doustnie","Wskazanie",
                     "1 ml","","",""))
             ]);
             var formatted = cataloguePrices.Format(
@@ -333,6 +335,8 @@ static class Program
                 new KartyLeczenia.MedicinePrice("Wariant bez karencji", null)
                 { Symbol = "LEK-B" }).NeedsCompletion,
                 "incomplete catalogue withdrawal must require completion");
+            Check(!cataloguePrices.NeedsCompletion("LEK-C"),
+                "an intentionally empty price withdrawal entry must not flag a complete variant");
             var printDefault = new PricePrintOptions();
             Check(printDefault.Landscape && printDefault.Legend == "start" &&
                   printDefault.WithdrawalFormat == 1 && printDefault.RouteCodes,

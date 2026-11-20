@@ -1,3 +1,4 @@
+import {useListPagination} from "./ListPagination";
 import {useListColumnLayout} from "./ListColumnLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -8,7 +9,7 @@ import type { ColumnsType } from "antd/es/table";
 import { invoke } from "./bridge";
 
 interface CatalogueListing { symbol: string; name: string; status: string; variants: number; }
-interface SubiektProduct { symbol:string; name:string; }
+interface SubiektProduct { symbol:string; name:string; reason?:string; }
 interface CatalogueVariant {
   id: number | null;
   species: string; indication: string; route: string; dose: string;
@@ -56,10 +57,10 @@ function emptyVariant(): UiVariant {
 }
 
 export default function CataloguePage({
-  onDirtyChange, initialPickerSymbol, onPickerOpened
+  onDirtyChange, initialEntry, onPickerOpened
 }: {
   onDirtyChange?: (value: boolean) => void;
-  initialPickerSymbol: string | null;
+  initialEntry: {symbol:string;direct:boolean} | null;
   onPickerOpened: () => void;
 }) {
   const [input, setInput] = useState("");
@@ -156,13 +157,19 @@ export default function CataloguePage({
     }
   }, []);
 
+  const handledEntry = useRef<typeof initialEntry>(null);
   useEffect(() => {
-    if (initialPickerSymbol === null) return;
-    setPickerQuery(initialPickerSymbol);
-    setPickerOpen(true);
-    void searchSubiekt(initialPickerSymbol);
+    if (!initialEntry || handledEntry.current === initialEntry) return;
+    handledEntry.current = initialEntry;
     onPickerOpened();
-  }, [initialPickerSymbol, onPickerOpened, searchSubiekt]);
+    if (initialEntry.direct) {
+      void openSubiektProduct(initialEntry.symbol);
+    } else {
+      setPickerQuery(initialEntry.symbol);
+      setPickerOpen(true);
+      void searchSubiekt(initialEntry.symbol);
+    }
+  }, [initialEntry, onPickerOpened, searchSubiekt]);
 
   function openPicker() {
     const symbol = editing?.symbol ?? "";
@@ -404,6 +411,10 @@ export default function CataloguePage({
   ], false);
   const variantsLayout = useListColumnLayout("catalogue-variants", columns, false);
 
+  const productsPagination=useListPagination("catalogue",list.length,20);
+  const missingPagination=useListPagination("catalogue-missing",missingRows?.length??0,20);
+  const pickerPagination=useListPagination("catalogue-picker",pickerRows.length);
+
   return <>
     {contextHolder}
     <div className="page-heading">
@@ -439,7 +450,7 @@ export default function CataloguePage({
           onChange={event => setInput(event.target.value)} />
         <Table<CatalogueListing> {...productsLayout.tableProps} rowKey="symbol" size="small"
           loading={listBusy} dataSource={list}
-          pagination={{ pageSize: 20, showSizeChanger: false }}
+          pagination={productsPagination}
           scroll={{ y: "calc(100vh - 370px)" }}
           onRow={row => ({
             onClick: () => { void openProduct(row); }
@@ -541,7 +552,7 @@ export default function CataloguePage({
         Pokazano pierwsze 100 kartotek. Zawęź wyszukiwanie.
       </Typography.Text>}
       <Table<SubiektProduct> rowKey="symbol" size="small" dataSource={pickerRows}
-        loading={pickerBusy} pagination={false} scroll={{ y: 300 }}
+        loading={pickerBusy} pagination={pickerPagination} scroll={{ y: 300 }}
         locale={{ emptyText: pickerBusy ? "Wczytywanie kartotek…" : "Brak pasujących kartotek." }}
         rowSelection={{ type: "radio", selectedRowKeys: pickerSelection ? [pickerSelection] : [],
           onChange: keys => setPickerSelection(keys[0] == null ? null : String(keys[0])) }}
@@ -565,12 +576,13 @@ export default function CataloguePage({
         Bez Twojego zatwierdzenia nic nie zapisuje się w SQL.
       </Typography.Paragraph>
       <Table<SubiektProduct> rowKey="symbol" size="small"
-        dataSource={missingRows??[]} pagination={{pageSize:20}}
+        dataSource={missingRows??[]} pagination={missingPagination}
         scroll={{y:420}} columns={[
           {title:"Symbol Subiekta",dataIndex:"symbol",width:210},
           {title:"Nazwa leku",dataIndex:"name"},
+          {title:"Powód",dataIndex:"reason",width:260},
           {title:"Otwórz",key:"open",width:105,
-            render:(_value,row)=><Button size="small" disabled={working}
+            render:(_value,row)=><Button size="small" loading={working}
               onClick={()=>{void openSubiektProduct(row.symbol);}}>Uzupełnij</Button>}
         ]}/>
     </Modal>

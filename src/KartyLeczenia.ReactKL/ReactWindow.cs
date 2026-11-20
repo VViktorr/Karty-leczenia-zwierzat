@@ -342,8 +342,9 @@ internal sealed class ReactWindow : Form
                 "price-catalogue",refresh,
                 ct => priceCatalogueService.ReadAsync(ct),token);
             var missing = products.Value
-                .Where(item => snapshot.Value.NeedsCompletion(item.Symbol))
-                .Select(item => new {symbol=item.Symbol,name=item.Name}).ToArray();
+                .Select(item => new { symbol = item.Symbol, name = item.Name,
+                    reason = snapshot.Value.CompletionReason(item.Symbol) })
+                .Where(item => item.reason is not null).ToArray();
             return new {items=missing,count=missing.Length,total=products.Value.Length};
         }
         if (action == "searchCatalogue")

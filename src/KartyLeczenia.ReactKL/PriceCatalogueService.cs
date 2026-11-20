@@ -6,7 +6,7 @@ namespace KartyLeczenia.ReactKL;
 
 internal sealed record PriceVariant(
     string Species, string Route, string Indication, string Dose,
-    string Tissues, string Milk, string CompactText)
+    string Tissues, string Milk, string? CompactText)
 {
     internal string Withdrawal => string.Join(", ", new[]
     {
@@ -19,7 +19,7 @@ internal sealed record PriceVariant(
         string.IsNullOrWhiteSpace(Route) ||
         string.IsNullOrWhiteSpace(Indication) ||
         string.IsNullOrWhiteSpace(Dose) ||
-        string.IsNullOrWhiteSpace(CompactText);
+        CompactText is null;
 }
 
 internal sealed record PricePresentation(
@@ -63,13 +63,17 @@ internal sealed class PriceCatalogueSnapshot(
         return new(dictionary, nonMedicines);
     }
 
-    internal bool NeedsCompletion(string symbol)
+    internal bool NeedsCompletion(string symbol) => CompletionReason(symbol) is not null;
+
+    internal string? CompletionReason(string symbol)
     {
-        if (nonMedicines.Contains(symbol.Trim())) return false;
-        if (!variants.TryGetValue(symbol.Trim(), out var all) || all.Count == 0)
-            return true;
-        return all.Any(variant=>variant.Incomplete) ||
-            !all.Any(variant=>variant.Withdrawal.Length>0);
+        string key = symbol.Trim();
+        if (nonMedicines.Contains(key)) return null;
+        if (!variants.TryGetValue(key, out var all) || all.Count == 0)
+            return "Brak aktywnych wariantów dla tego symbolu w katalogu SQL.";
+        if (all.Any(variant => variant.Incomplete))
+            return "Co najmniej jeden wariant nie ma gatunku, drogi podania, wskazania, dawkowania lub wpisu karencji w cenniku.";
+        return null;
     }
 
     internal PricePresentation Format(MedicinePrice price)
@@ -82,14 +86,16 @@ internal sealed class PriceCatalogueSnapshot(
                 ? AdministrationRouteLegend.Abbreviate(route)
                 : AdministrationRouteLegend.Expand(route);
 
-            var withWithdrawal = all.Where(v => v.Withdrawal.Length > 0).ToArray();
+            var withWithdrawal = all.Where(v => v.Withdrawal.Length > 0 &&
+                v.CompactText is not null && !string.IsNullOrWhiteSpace(v.Route) &&
+                !string.IsNullOrWhiteSpace(v.Dose)).ToArray();
             if (format == 0)
                 return string.Join(" | ", withWithdrawal.Select(v =>
                     $"{v.Species} {Route(v.Route)} · {v.Withdrawal}").Distinct());
 
             var compact = withWithdrawal
                 .Select(v => (v.Species, Route: Route(v.Route),
-                    Text: v.CompactText.ReplaceLineEndings(" ").Trim()))
+                    Text: (v.CompactText ?? "").ReplaceLineEndings(" ").Trim()))
                 .Where(v => v.Text.Length > 0).Distinct().ToArray();
             return format == 2
                 ? string.Join("; ", compact.GroupBy(v => v.Species).Select(group =>
@@ -125,7 +131,7 @@ internal sealed class PriceCatalogueService(ConnectionSettingsStore archive)
         await db.OpenAsync(token).ConfigureAwait(false);
         using var cmd = new SqlCommand("""
             SELECT p.symbol, v.species, v.route, v.indication, v.dose,
-                   v.edible_tissues, v.milk, COALESCE(w.compact_text, N'')
+                   v.edible_tissues, v.milk, w.compact_text
             FROM dbo.catalog_products p
             JOIN dbo.catalog_variants v ON v.symbol = p.symbol
             LEFT JOIN dbo.catalog_price_withdrawal w ON w.id = v.id
@@ -143,7 +149,7 @@ internal sealed class PriceCatalogueService(ConnectionSettingsStore archive)
         {
             string Value(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i);
             rows.Add((Value(0), new PriceVariant(Value(1), Value(2), Value(3),
-                Value(4), Value(5), Value(6), Value(7))));
+                Value(4), Value(5), Value(6), reader.IsDBNull(7) ? null : Value(7))));
         }
         var classifications = new List<(string Symbol, string Decision, string Status)>();
         if (await reader.NextResultAsync(token).ConfigureAwait(false))
