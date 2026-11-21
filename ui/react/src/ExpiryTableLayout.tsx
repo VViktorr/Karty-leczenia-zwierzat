@@ -1,7 +1,8 @@
+import Modal from "./AppModal";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
 import {useEffect,useState} from "react";
-import {Button,Checkbox,InputNumber,Modal,Tabs,Typography} from "antd";
+import {Button,Checkbox,InputNumber,Tabs,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
 
 const specs=[

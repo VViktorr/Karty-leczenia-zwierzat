@@ -1,11 +1,11 @@
-import ResizableDialogFrame from "./ResizableDialogFrame";
+import Modal from "./AppModal";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {useListPagination} from "./ListPagination";
 import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayout";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Empty,
-  Form, Input, InputNumber, Modal, Segmented, Select, Space, Spin, Switch, Table,
+  Form, Input, InputNumber, Segmented, Select, Space, Spin, Switch, Table,
   Tag, Tabs, Typography, Progress, theme
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -13,7 +13,6 @@ import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
 import {useExpiryTableLayout} from "./ExpiryTableLayout";
 import {useListColumnLayout} from "./ListColumnLayout";
-import DialogPlacement from "./DialogPlacement";
 import {SubiektDatabaseSettings,ProgramDatabaseSettings} from "./DatabaseSettings";
 import { defaultPricePrint, normalizePriceSettings, withdrawalText,
   PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
@@ -1226,9 +1225,6 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         ]}/>
     </Modal>
     <Modal className="kl-dialog-treatment-variant" width="90vw" open={variantModal!==null}
-      destroyOnHidden modalRender={content=><ResizableDialogFrame storageKey="treatment-variant">
-        {content}
-      </ResizableDialogFrame>}
       title={"Dobór wariantu leku — "+(variantModal?.product||"")}
       onCancel={()=>{if(!variantBusy)setVariantModal(null);}}
       footer={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>
@@ -2360,7 +2356,6 @@ export default function App() {
     section==="saved"?<SavedCards initialCardId={savedCardToOpen}
       onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
   return <ConfigProvider theme={appearance}>
-    <DialogPlacement/>
     <div className={"app-shell layout-"+layout+" palette-"+palette+(compact?" layout-compact":"")}>
       {!topTabs&&<aside className="sidebar">
         <div className="sidebar-brand"><div className="brand-mark">KL</div>

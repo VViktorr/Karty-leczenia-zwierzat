@@ -1,5 +1,6 @@
+import Modal from "./AppModal";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Checkbox, Divider, InputNumber, Modal, Select, Space, Switch, Typography } from "antd";
+import { Alert, Button, Card, Checkbox, Divider, InputNumber, Select, Space, Switch, Typography } from "antd";
 import { invoke } from "./bridge";
 
 export interface PricePrintRow {

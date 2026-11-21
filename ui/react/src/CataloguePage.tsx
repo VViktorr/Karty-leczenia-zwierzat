@@ -1,9 +1,10 @@
+import Modal from "./AppModal";
 import {compactWithdrawal,rplEntryFromPdfName} from "./cataloguePdfMetadata";
 import {useListPagination} from "./ListPagination";
 import {useListColumnLayout} from "./ListColumnLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Button, Card, Checkbox, Empty, Input, Modal, Space, Table,
+  Alert, Button, Card, Checkbox, Empty, Input, Space, Table,
   Tag, Typography, Tooltip, message
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
