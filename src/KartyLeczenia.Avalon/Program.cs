@@ -38,29 +38,33 @@ public sealed class AvalonApp : Application
 
     private Window CreateMainWindow()
     {
+        var preferences = DesktopPreferences.Load();
         var themeSelector = new ComboBox
         {
             ItemsSource = new[] { "Systemowy", "Jasny", "Ciemny" },
-            SelectedIndex = 0,
+            SelectedIndex = Math.Clamp(preferences.Theme, 0, 2),
             MinWidth = 135
         };
-        themeSelector.SelectionChanged += (_, _) =>
-            RequestedThemeVariant = themeSelector.SelectedIndex switch
+        void ApplyTheme() => RequestedThemeVariant = themeSelector.SelectedIndex switch
             {
                 1 => ThemeVariant.Light,
                 2 => ThemeVariant.Dark,
                 _ => ThemeVariant.Default
             };
 
-        return new Window
+        themeSelector.SelectionChanged += (_, _) => ApplyTheme();
+        ApplyTheme();
+        var catalogue = CreateCatalogueLookup(preferences, out var readTablePreferences);
+        var window = new Window
         {
             Title = "Karty leczenia zwierząt — Avalon",
-            Width = 1000,
-            Height = 680,
+            Width = Math.Clamp(preferences.WindowWidth, 520, 2400),
+            Height = Math.Clamp(preferences.WindowHeight, 360, 1600),
+            WindowState = preferences.Maximized ? WindowState.Maximized : WindowState.Normal,
             MinWidth = 520,
             MinHeight = 360,
             WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            Content = new StackPanel
+            Content = new ScrollViewer { Content = new StackPanel
             {
                 Margin = new Thickness(24),
                 Spacing = 16,
@@ -77,13 +81,33 @@ public sealed class AvalonApp : Application
                             themeSelector
                         }
                     },
-                    CreateCatalogueLookup()
+                    catalogue
                 }
+            } }
+        };
+        window.Closing += (_, _) =>
+        {
+            try
+            {
+                var table = readTablePreferences();
+                (table with
+                {
+                    Theme = themeSelector.SelectedIndex,
+                    WindowWidth = window.WindowState == WindowState.Normal ? window.Bounds.Width : window.Width,
+                    WindowHeight = window.WindowState == WindowState.Normal ? window.Bounds.Height : window.Height,
+                    Maximized = window.WindowState == WindowState.Maximized
+                }).Save();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine("Nie można zapisać ustawień wyglądu: " + ex.Message);
             }
         };
+        return window;
     }
 
-    private static Control CreateCatalogueLookup()
+    private static Control CreateCatalogueLookup(DesktopPreferences preferences,
+        out Func<DesktopPreferences> readPreferences)
     {
         var server = new TextBox { Watermark = "Adres serwera lub nazwa instancji" };
         var symbol = new TextBox { Watermark = "Symbol kartoteki leku", MaxLength = 128 };
@@ -97,27 +121,53 @@ public sealed class AvalonApp : Application
             CanUserReorderColumns = true,
             AutoGenerateColumns = false
         };
-        foreach (var (header, property) in new[]
+        var columnDefinitions = new[]
         {
             ("Gatunek", nameof(CatalogueVariant.Species)), ("Droga podania", nameof(CatalogueVariant.Route)),
             ("Dawkowanie", nameof(CatalogueVariant.Dose)), ("Tkanki jadalne", nameof(CatalogueVariant.Tissues)),
             ("Mleko", nameof(CatalogueVariant.Milk)), ("Jaja", nameof(CatalogueVariant.Eggs))
-        })
+        };
+        var saved = preferences.Columns ?? [];
+        var columns = new Dictionary<string, DataGridTextColumn>();
+        foreach (var (header, property) in columnDefinitions.OrderBy(column =>
+            saved.FirstOrDefault(item => item.Key == column.Item2)?.Order ?? int.MaxValue))
         {
-            variants.Columns.Add(new DataGridTextColumn { Header = header, Binding = new Binding(property) });
+            var column = new DataGridTextColumn { Header = header, Binding = new Binding(property) };
+            if (saved.FirstOrDefault(item => item.Key == property)?.Width is >= 20 and <= 4000 and var width)
+                column.Width = new DataGridLength(width);
+            columns.Add(property, column);
+            variants.Columns.Add(column);
         }
 
         var fonts = FontManager.Current.SystemFonts.Select(font => font.Name).Order().ToArray();
-        var font = new ComboBox { ItemsSource = fonts, PlaceholderText = "Czcionka tabeli", MinWidth = 165 };
+        var font = new ComboBox { ItemsSource = fonts, PlaceholderText = "Czcionka tabeli", MinWidth = 165,
+            SelectedItem = fonts.FirstOrDefault(name => name == preferences.Font) };
+        if (font.SelectedItem is string savedFont) variants.FontFamily = new FontFamily(savedFont);
         font.SelectionChanged += (_, _) =>
         {
             if (font.SelectedItem is string family)
                 variants.FontFamily = new FontFamily(family);
         };
-        var fontSize = new NumericUpDown { Minimum = 8, Maximum = 32, Value = 14, Width = 85 };
+        var fontSize = new NumericUpDown { Minimum = 8, Maximum = 32, Value = Math.Clamp(preferences.FontSize, 8, 32), Width = 85 };
         fontSize.ValueChanged += (_, change) =>
         {
             if (change.NewValue is decimal value) variants.FontSize = (double)value;
+        };
+        var rowHeight = new NumericUpDown { Minimum = 18, Maximum = 120,
+            Value = Math.Clamp(preferences.RowHeight, 18, 120), Width = 85 };
+        variants.FontSize = (double)fontSize.Value!.Value;
+        variants.RowHeight = (double)rowHeight.Value!.Value;
+        rowHeight.ValueChanged += (_, change) =>
+        {
+            if (change.NewValue is decimal value) variants.RowHeight = (double)value;
+        };
+        readPreferences = () => preferences with
+        {
+            Font = font.SelectedItem as string,
+            FontSize = fontSize.Value ?? 14,
+            RowHeight = rowHeight.Value ?? 30,
+            Columns = columns.Select(item => new ColumnPreference(item.Key, item.Value.DisplayIndex,
+                item.Value.Width.IsAbsolute ? item.Value.Width.Value : null)).ToArray()
         };
         load.Click += async (_, _) =>
         {
@@ -161,7 +211,8 @@ public sealed class AvalonApp : Application
                 new StackPanel
                 {
                     Orientation = Orientation.Horizontal, Spacing = 8,
-                    Children = { font, new TextBlock { Text = "Rozmiar", VerticalAlignment = VerticalAlignment.Center }, fontSize }
+                    Children = { font, new TextBlock { Text = "Rozmiar", VerticalAlignment = VerticalAlignment.Center }, fontSize,
+                        new TextBlock { Text = "Wysokość wiersza", VerticalAlignment = VerticalAlignment.Center }, rowHeight }
                 },
                 variants }
         };
