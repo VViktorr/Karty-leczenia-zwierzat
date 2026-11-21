@@ -494,6 +494,11 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [reported, setReported] = useState("");
   const [performed, setPerformed] = useState(() => localDateTime());
   const [dateStep,setDateStep]=useState<{reported:string;performed:string}|null>(null);
+  const [saveReview,setSaveReview]=useState<{
+    dates:{reported:string;performed:string};
+    warnings:{row:DraftRow;issues:{message:string;field?:keyof DraftRow}[]}[];
+  }|null>(null);
+  const [savingSql,setSavingSql]=useState(false);
   const pendingSaveDates=useRef<{reported:string;performed:string}|null>(null);
   const [animalEdit,setAnimalEdit]=useState<{
     candidates:DraftRow[]; checked:number[]; description:string; count:string; beforeSave?:boolean;
@@ -546,7 +551,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   useEffect(() => {
     autoApplied.current.clear();
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
-    pendingSaveDates.current=null;
+    pendingSaveDates.current=null;setSaveReview(null);
     setDuplicateId(null);setDateStep(null);setAnimalEdit(null);setReferenceEdit(null);
     setReported("");setPerformed(localDateTime());
     desiredChecks.current=new Map((draft?.rows??[]).map(row=>[row.index,row.selected]));
@@ -733,15 +738,15 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     catch{/* Current session still works without storage. */}
   }
   useEffect(()=>()=>{if(variantPdfUrl)URL.revokeObjectURL(variantPdfUrl);},[variantPdfUrl]);
-  async function reviewBeforeSave(execution:string):Promise<boolean> {
+  function requestSave(dates:{reported:string;performed:string}) {
     const selected=rows.filter(row=>row.selected);
     if(!selected.length) {
       setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk. Jeśli filtr gatunku ukrywa dostępne pozycje, wybierz Wszystkie.");
-      return false;
+      return;
     }
-    if(!execution){
+    if(!dates.performed){
       setError("Podaj datę i godzinę wykonania czynności weterynaryjnych.");
-      return false;
+      return;
     }
     const warnings=selected.map(row=>{
       const issues:{message:string; field?:keyof DraftRow}[]=[];
@@ -753,48 +758,13 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         issues.push({message:"Sprawdź wariant ChPL"});
       return {row,issues};
     }).filter(item=>item.issues.length);
-    if(!warnings.length)return true;
-    return new Promise<boolean>(resolve=>{
-      let resolved=false;
-      const done=(accepted:boolean)=>{if(!resolved){resolved=true;resolve(accepted);}};
-      let dialog:ReturnType<typeof Modal.confirm>|null=null;
-      dialog=Modal.confirm({
-        className:"kl-dialog-treatment-warnings", title:"Sprawdź dane przed zapisem",
-        width:700,
-        content:<div>
-          <Alert className="notice" type="warning" showIcon
-            message="Sprawdź wymienione pozycje przed kontynuowaniem."/>
-          <div style={{maxHeight:350,overflowY:"auto",marginTop:12}}>
-            {warnings.map(item=><div key={item.row.index} style={{padding:"9px 0",borderBottom:"1px solid var(--ant-color-border-secondary, #ddd)"}}>
-              <Typography.Text strong>{item.row.index+1}. {item.row.product||"Bez nazwy produktu"}</Typography.Text>
-              <ul style={{margin:"5px 0",paddingLeft:20}}>
-                {item.issues.map(issue=><li key={issue.message}>{issue.message}</li>)}
-              </ul>
-              <Button type="link" size="small" onClick={()=>{
-                dialog?.destroy();done(false);
-                const field=item.issues.find(issue=>issue.field)?.field;
-                if(field)setVisibleColumns(current=>current.includes(field)?current:[...current,field]);
-                window.setTimeout(()=>{
-                  const row=document.querySelector('.treatment-rows tr[data-row-key="'+item.row.index+'"]');
-                  const input=field?row?.querySelector<HTMLElement>('[data-treatment-field="'+field+'"]'):null;
-                  (input??row)?.scrollIntoView({behavior:"smooth",block:"center",inline:"nearest"});
-                  input?.focus({preventScroll:true});
-                },250);
-              }}>Przejdź do pozycji</Button>
-            </div>)}
-          </div>
-        </div>,
-        okText:"Potwierdzam — zapisz kartę",
-        cancelText:"Anuluj",
-        onOk:()=>done(true),onCancel:()=>done(false),afterClose:()=>done(false)
-      });
-    });
+    if(warnings.length)setSaveReview({dates,warnings});
+    else void saveCard(dates);
   }
   async function saveCard(dates:{reported:string;performed:string},confirmDuplicate = false) {
     if (!draft || busy || applyBusy || selectionBusy) return;
-    setBusy(true); setError("");
+    setBusy(true);setSavingSql(true);setError("");
     try {
-      if (!confirmDuplicate && !await reviewBeforeSave(dates.performed)) return;
       const result = await invoke<SaveResult>("saveDraft", {
         draftId:draft.draftId, ...dates, findings, confirmDuplicate, rows
       });
@@ -810,7 +780,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         }
       }
     } catch (e) {setError(e instanceof Error ? e.message : String(e));}
-    finally {setBusy(false);}
+    finally {setSavingSql(false);setBusy(false);}
   }
   async function pdfFromPreview(mail:boolean) {
     if(!draft||pdfBusy)return;
@@ -877,7 +847,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
 
   useEffect(()=>{
     if(!draft||compatibilityDraftId!==draft.draftId||suggestBusy||selectionBusy||
-      applyBusy||busy||variantBusy||referenceBusy||suggestReviewOpen||dateStep||pendingSaveDates.current||animalEdit?.beforeSave)return;
+      applyBusy||busy||variantBusy||referenceBusy||suggestReviewOpen||saveReview||dateStep||pendingSaveDates.current||animalEdit?.beforeSave)return;
     const candidates=readySuggestions.filter(item=>{
       const key=JSON.stringify([item.index,item.symbol,item.variantId]);
       return !autoApplied.current.has(key) &&
@@ -1068,8 +1038,8 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     </div><Space>
       <Button onClick={onDocuments}>Dokumenty</Button>
       <Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>
-      <Button onClick={()=>{void printPreview();}} loading={busy} disabled={applyBusy||selectionBusy}>Podgląd wydruku</Button>
-      <Button type="primary" onClick={()=>startSave()} loading={busy} disabled={applyBusy||selectionBusy||referenceBusy}>Zapisz kartę do SQL</Button>
+      <Button onClick={()=>{void printPreview();}} loading={busy&&!savingSql} disabled={busy||applyBusy||selectionBusy}>Podgląd wydruku</Button>
+      <Button type="primary" onClick={()=>startSave()} loading={savingSql} disabled={busy||applyBusy||selectionBusy||referenceBusy}>Zapisz kartę do SQL</Button>
     </Space></div>
     <div className="treatment-tools">
     <TreatmentOptions compact={compact} label={"Podpowiedzi ChPL ("+readySuggestions.length+")"}>
@@ -1205,7 +1175,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       afterClose={()=>{
         const dates=pendingSaveDates.current;
         pendingSaveDates.current=null;
-        if(dates)void saveCard(dates);
+        if(dates)requestSave(dates);
       }}
       footer={<Space wrap>
         <Button onClick={()=>setDateStep(null)}>Anuluj</Button>
@@ -1234,6 +1204,38 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
               ...current,performed:value?.format("YYYY-MM-DDTHH:mm")??""
             })}/></label>
       </Space>}
+    </Modal>
+    <Modal className="kl-dialog-treatment-warnings" open={saveReview!==null}
+      title="Sprawdź dane przed zapisem" width={700}
+      okText="Potwierdzam — zapisz kartę" cancelText="Anuluj"
+      onCancel={()=>setSaveReview(null)} onOk={()=>{
+        if(!saveReview)return;
+        const {dates}=saveReview;
+        setSaveReview(null);
+        void saveCard(dates);
+      }}>
+      <Alert className="notice" type="warning" showIcon
+        message="Sprawdź wymienione pozycje przed kontynuowaniem."/>
+      <div style={{maxHeight:350,overflowY:"auto",marginTop:12}}>
+        {saveReview?.warnings.map(item=><div key={item.row.index}
+          style={{padding:"9px 0",borderBottom:"1px solid var(--ant-color-border-secondary, #ddd)"}}>
+          <Typography.Text strong>{item.row.index+1}. {item.row.product||"Bez nazwy produktu"}</Typography.Text>
+          <ul style={{margin:"5px 0",paddingLeft:20}}>
+            {item.issues.map(issue=><li key={issue.message}>{issue.message}</li>)}
+          </ul>
+          <Button type="link" size="small" onClick={()=>{
+            setSaveReview(null);
+            const field=item.issues.find(issue=>issue.field)?.field;
+            if(field)setVisibleColumns(current=>current.includes(field)?current:[...current,field]);
+            window.setTimeout(()=>{
+              const row=document.querySelector('.treatment-rows tr[data-row-key="'+item.row.index+'"]');
+              const input=field?row?.querySelector<HTMLElement>('[data-treatment-field="'+field+'"]'):null;
+              (input??row)?.scrollIntoView({behavior:"smooth",block:"center",inline:"nearest"});
+              input?.focus({preventScroll:true});
+            },250);
+          }}>Przejdź do pozycji</Button>
+        </div>)}
+      </div>
     </Modal>
     <Modal className="kl-dialog-treatment-duplicate" open={duplicateId!==null}
       title="Karta z tego dokumentu już istnieje" onCancel={()=>setDuplicateId(null)}
