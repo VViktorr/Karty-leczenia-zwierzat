@@ -5,7 +5,7 @@ import {useListPagination} from "./ListPagination";
 import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayout";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
-  Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Empty,
+  Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Dropdown, Empty,
   Form, Input, InputNumber, Segmented, Select, Space, Spin, Switch, Table,
   Tag, Tabs, Typography, Progress, theme
 } from "antd";
@@ -162,7 +162,10 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   }};
 }
 
-function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) => void}) {
+function Documents({active, compact, onOpen}: {active: boolean; compact: boolean; onOpen: (draft: Draft) => void}) {
+  const tableRef=useRef<HTMLDivElement>(null);
+  const [contextMenu,setContextMenu]=useState<DocumentRow|"header"|null>(null);
+  useEffect(()=>{if(!active||!compact)setContextMenu(null);},[active,compact]);
   const [kind, setKind] = useState<DocumentKind>("invoices");
   const [period, setPeriod] = useState<DatePeriod>("all");
   const [pageSize,setPageSize] = useState<25|50|100|"all">(()=>{
@@ -249,6 +252,22 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
     {title:"Powiązania",dataIndex:"relatedText",ellipsis:true,width:230}
   ];
   const listLayout=useListColumnLayout("documents",columns,active);
+  const columnMenu=[
+    {key:"columns",label:"Ustaw kolumny",onClick:listLayout.openColumns},
+    {key:"fit",label:"Dopasuj szerokości",onClick:()=>{if(tableRef.current)listLayout.fitColumns(tableRef.current);}},
+    {key:"reset",label:"Przywróć domyślne kolumny",onClick:listLayout.resetColumns}
+  ];
+  async function copyDocumentText(value:string){
+    try{await navigator.clipboard.writeText(value);setReadError("");}
+    catch{setReadError("Nie udało się skopiować tekstu do schowka.");}
+  }
+  const rowMenu=contextMenu&&contextMenu!=="header"?[
+    {key:"open",label:"Otwórz dokument",onClick:()=>{void open(contextMenu);}},
+    {key:"number",label:"Kopiuj numer",onClick:()=>{void copyDocumentText(contextMenu.number);}},
+    {key:"payer",label:"Kopiuj nazwę kontrahenta",onClick:()=>{
+      void copyDocumentText(contextMenu.payer||contextMenu.shortPayer);
+    }}
+  ]:columnMenu;
   const periods: Array<{label:string;value:DatePeriod}> = [
     {label:"(nieokreślony)",value:"all"},
     {label:"Bieżący dzień",value:"today"},
@@ -262,27 +281,35 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
     {label:"Dowolny okres",value:"custom"}
   ];
   return <>
-    <div className="page-heading"><div>
+    {!compact&&<div className="page-heading"><div>
       <Typography.Title level={3}>Dokumenty Subiekta GT</Typography.Title>
       <Typography.Text type="secondary">Lista z jednego magazynu. F5 pobiera świeże dane SQL.</Typography.Text>
     </div><Space wrap>
       <Button onClick={listLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={reload} loading={busy}>Odśwież · F5</Button>
-    </Space></div>
-    <Card>
-      <div className="document-filters">
-        <Segmented block size="large" value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
-          options={[{label:"Faktury · Alt+1",value:"invoices"},
-            {label:"Paragony · Alt+2",value:"receipts"},
-            {label:"WZ · Alt+4",value:"warehouse"},
+    </Space></div>}
+    <Card className={compact?"compact-documents":undefined}>
+      <div className={"document-filters"+(compact?" compact-document-toolbar":"")}>
+        <Segmented block size={compact?"middle":"large"} value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
+          options={[{label:compact?"Faktury":"Faktury · Alt+1",value:"invoices"},
+            {label:compact?"Paragony":"Paragony · Alt+2",value:"receipts"},
+            {label:compact?"WZ":"WZ · Alt+4",value:"warehouse"},
             {label:"Wszystkie",value:"all"}]}/>
-        <Input.Search allowClear size="large" value={query}
+        <Input.Search allowClear size={compact?"middle":"large"} value={query}
           onChange={e=>setQuery(e.target.value)}
           onSearch={text=>{setSearch(text.trim());}}
           onPressEnter={()=>{setSearch(query.trim());reload();}}
           placeholder="Numer lub kontrahent"/>
-        <Select value={period} size="large" onChange={next=>{setPeriod(next);setSelectedId(null);}}
+        <Select value={period} size={compact?"middle":"large"} onChange={next=>{setPeriod(next);setSelectedId(null);}}
           options={periods}/>
+        {compact&&<Space size={6} className="compact-document-actions">
+          {data?.truncated&&<Tag title="Pokazano 500 dokumentów. Zawęź wyszukiwanie."
+            color="blue">Limit: 500</Tag>}
+          <Button onClick={reload} loading={busy} title="Odśwież · F5">Odśwież ↻</Button>
+          <Dropdown menu={{items:columnMenu}} trigger={["click"]}>
+            <Button aria-label="Ustawienia tabeli dokumentów">⋯</Button>
+          </Dropdown>
+        </Space>}
         {period==="customMonth"&&<Input type="month" aria-label="Wybrany miesiąc"
           value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)}/>}
         {period==="custom"&&<>
@@ -294,11 +321,22 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
       {data&&(data.warning||error)&&<Alert className="notice" type="warning" showIcon
         message="Nie udało się odświeżyć dokumentów. Pokazuję ostatnią wczytaną listę."
         description={data.warning||error}/>}
-      {data?.truncated&&<Alert className="notice" type="info" showIcon
+      {!compact&&data?.truncated&&<Alert className="notice" type="info" showIcon
         message="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
+      <Dropdown trigger={compact?["contextMenu"]:[]} open={compact&&contextMenu!==null}
+        onOpenChange={visible=>{if(!visible)setContextMenu(null);}}
+        menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
+        <div ref={tableRef} onContextMenuCapture={event=>{
+          if(!compact||!(event.target instanceof Element))return;
+          const header=event.target.closest(".ant-table-thead th");
+          const id=event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key");
+          const row=data?.items.find(item=>String(item.id)===id);
+          if(header||row){event.preventDefault();setContextMenu(header?"header":row!);if(row)setSelectedId(row.id);}
+          else event.stopPropagation();
+        }}>
       <Table {...listLayout.tableProps} rowKey="id" loading={(busy&&!data)||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
-        size="middle" scroll={{x:900,y:"calc(100vh - 390px)"}} pagination={{
+        size={compact?"small":"middle"} scroll={{x:900,y:compact?"calc(100vh - 250px)":"calc(100vh - 390px)"}} pagination={{
           current:page,pageSize:effectivePageSize,position:["bottomRight"],
           pageSizeOptions:[25,50,100,allPageSize],
           showSizeChanger:{
@@ -316,6 +354,8 @@ function Documents({active, onOpen}: {active: boolean; onOpen: (draft: Draft) =>
         onRow={row=>({tabIndex:0,onClick:()=>setSelectedId(row.id),
           onDoubleClick:()=>{void open(row);}})}
         locale={{emptyText:<Empty description="Brak dokumentów"/>}}/>
+        </div>
+      </Dropdown>
       <Typography.Text type="secondary">
         {data?.loadedAt?"Ostatni odczyt "+new Date(data.loadedAt).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})+
           (data.cached?" · lista z pamięci":" · odświeżono z SQL")+" · ":""}
@@ -2373,7 +2413,7 @@ export default function App() {
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             message="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           <div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
-            <Documents key={subiektRevision} active={section==="documents"}
+            <Documents key={subiektRevision} compact={compact} active={section==="documents"}
               onOpen={next=>{setDraft(next);setSection("treatment");}}/>
           </div>
           {content}

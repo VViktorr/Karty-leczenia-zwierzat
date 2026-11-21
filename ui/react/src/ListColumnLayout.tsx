@@ -85,6 +85,30 @@ export function useListColumnLayout<T extends object>(
     (key,width)=>setWidths(previous=>({...previous,[key]:width})),
     (source,target)=>setOrder(previous=>moveColumn(previous,source,target)));
 
+  function resetColumns(){
+    setVisible([...keys]);setOrder([...keys]);setWidths({});mouse.resetHeight();
+  }
+
+  function fitColumns(table:HTMLElement){
+    const context=document.createElement("canvas").getContext("2d");
+    if(!context)return;
+    const rows=Array.from(table.querySelectorAll<HTMLTableRowElement>("tr[data-row-key]"));
+    const sizes=Object.fromEntries(arranged.map((column,index)=>{
+      const header=table.querySelectorAll<HTMLElement>(".ant-table-thead th")[index];
+      const label=definitions.find(item=>item.key===identity(column))?.label??"";
+      function measure(element:HTMLElement|undefined,text:string){
+        if(!element)return 0;
+        const style=getComputedStyle(element.firstElementChild??element);
+        context!.font=[style.fontWeight,style.fontSize,style.fontFamily].join(" ");
+        return context!.measureText(text.trim()).width;
+      }
+      const content=rows.map(row=>measure(row.cells[index],row.cells[index]?.textContent??""));
+      return [identity(column),Math.max(60,Math.min(1000,Math.ceil(Math.max(
+        measure(header,label)+40,...content.map(width=>width+26)))))];
+    }));
+    setWidths(previous=>({...previous,...sizes}));
+  }
+
   const dialog=<Modal className={"kl-dialog-columns-"+listId} open={open}
       title="Parametry listy — kolumny" onCancel={()=>setOpen(false)}
       onOk={()=>setOpen(false)} okText="Gotowe"
@@ -123,12 +147,10 @@ export function useListColumnLayout<T extends object>(
         </div>;
       })}
     </div>
-    <Button size="small" onClick={()=>{
-      setVisible([...keys]);setOrder([...keys]);setWidths({});mouse.resetHeight();
-    }}>Przywróć domyślne kolumny</Button>
+    <Button size="small" onClick={resetColumns}>Przywróć domyślne kolumny</Button>
       </>},
       {key:"format",label:"Formatowanie",children:<ListFormattingPanel formatting={formatting} columns={definitions}/>}
     ]}/>
   </Modal>;
-  return {columns:formatting.apply(mouseColumns,identity),tableProps:mouse.tableProps,openColumns:()=>setOpen(true),dialog};
+  return {columns:formatting.apply(mouseColumns,identity),tableProps:mouse.tableProps,openColumns:()=>setOpen(true),resetColumns,fitColumns,dialog};
 }

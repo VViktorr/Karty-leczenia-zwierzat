@@ -197,3 +197,17 @@
   min-height: 0;
   overflow: auto;
 }
+
+.compact-documents > .ant-card-body { padding: 7px 8px; }
+.document-filters.compact-document-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.compact-document-toolbar > .ant-segmented { flex: 1 1 300px; }
+.compact-document-toolbar > .ant-input-search { flex: 2 1 200px; width: auto; }
+.compact-document-toolbar > .ant-select { min-width: 155px; }
+.compact-document-toolbar > input { width: auto; }
+.compact-document-actions { margin-left: auto; }
+.compact-document-actions .ant-tag { margin-inline-end: 0; }
