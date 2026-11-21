@@ -98,7 +98,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         }
         string number = $"K/{sequence}/{year:D4}";
         fields["Nr karty"] = number;
-        string html = CardHtmlRenderer.Render(card);
+        string html = CardPrintSettings.Render(card);
         string json = JsonSerializer.Serialize(card);
         using (var save = Cmd(db, tx, """
             INSERT INTO dbo.treatment_cards
@@ -151,7 +151,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
     {
         var card = JsonSerializer.Deserialize<Card>(ReadSavedJson(id,trash)) ??
             throw new InvalidDataException("Nie można odczytać zapisanej karty.");
-        return CardHtmlRenderer.Render(card);
+        return CardPrintSettings.Render(card);
     }
 
     internal string RenderDraft(DocumentData source, DateTime? reported, DateTime performed, string findings)
@@ -169,7 +169,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Dokument źródłowy"] = source.Number,
             ["Zakres mapowania towarów"] = source.Scope
         };
-        return CardHtmlRenderer.Render(new Card(fields,
+        return CardPrintSettings.Render(new Card(fields,
             CaptureRows(source))
         {
             ClinicStampPng = clinic.UseClinicStamp ? clinic.ClinicStampPng : null,

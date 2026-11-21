@@ -3,7 +3,7 @@ using System.Text;
 namespace KartyLeczenia;
 public static class CardHtmlRenderer
 {
-    public static string Render(Card card)
+    public static string Render(Card card, decimal? doctorStampHeightMm = null)
     {
         var selected = card.Rows.Where(r => string.Equals(r.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)).ToList();
         if (selected.Count == 0) throw new InvalidOperationException("Zaznacz co najmniej jedną pozycję do wydruku.");
@@ -115,7 +115,12 @@ public static class CardHtmlRenderer
         html.Append($"<div class='signatures'><div class='signature'>{doctor}<br>........................................................<small>(podpis i pieczęć lekarza weterynarii)</small></div><div class='signature'><br>........................................................<small>(podpis posiadacza zwierzęcia)</small></div></div>");
         html.Append($"<div class='results'>IV. Wyniki badań uzupełniających: {Fill("Wyniki badań")}</div><div class='footnote'>*) W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych.</div>");
         if (showStamp)
-            html.Append($"<img class='doctor-stamp' alt='Pieczątka lekarza' src='data:image/png;base64,{Convert.ToBase64String(stamp!)}'>");
+        {
+            string heightStyle = doctorStampHeightMm is >= 1 and <= 150
+                ? " style='height:" + doctorStampHeightMm.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "mm'"
+                : "";
+            html.Append($"<img class='doctor-stamp'{heightStyle} alt='Pieczątka lekarza' src='data:image/png;base64,{Convert.ToBase64String(stamp!)}'>");
+        }
         html.Append("</div>");
         html.Append("<details class='tools'><summary>Dokument źródłowy i źródła karencji (nie drukowane)</summary><p>" + F("Dokument źródłowy") + "</p>");
         foreach (var row in selected) html.Append("<p class='source'>" + E(row.GetValueOrDefault("Produkt")) + "<br>" + E(row.GetValueOrDefault("Źródło karencji")) + "<br>" + E(row.GetValueOrDefault("Status karencji")) + "</p>");

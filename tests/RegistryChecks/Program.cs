@@ -44,6 +44,11 @@ Check(restored.Rows[0]["SHA256 źródła"] == "hash" && restored.Rows[0]["Pełna
 string html = CardHtmlRenderer.Render(restored);
 Check(html.Contains("&lt;lek &amp; test&gt;") && !html.Contains("<lek & test>"), "HTML escaping failed.");
 Check(html.Contains("A4 landscape"), "Landscape A4 was lost.");
+var stampedCard = restored with { DoctorStampPng = [137, 80, 78, 71, 13, 10, 26, 10] };
+Check(CardHtmlRenderer.Render(stampedCard, 17.5m)
+    .Contains("class='doctor-stamp' style='height:17.5mm'"), "Configured stamp size was not rendered.");
+Check(CardHtmlRenderer.Render(stampedCard)
+    .Contains("class='doctor-stamp' alt="), "An unset stamp size must preserve its original dimensions.");
 restored.Rows[0]["Sekcja (II lub III)"] = "invalid";
 try { CardHtmlRenderer.Render(restored); throw new Exception("Invalid section accepted."); }
 catch (InvalidOperationException) { checks++; }

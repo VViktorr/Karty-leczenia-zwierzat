@@ -362,6 +362,17 @@ internal sealed class ReactWindow : Form
 
     private async Task<object> HandleRequest(string action, JsonElement root, CancellationToken token)
     {
+        if (action == "getCardPrintSettings")
+            return new { doctorStampHeightMm = CardPrintSettings.Load() };
+        if (action == "saveCardPrintSettings")
+        {
+            if (!root.TryGetProperty("doctorStampHeightMm", out var height) ||
+                (height.ValueKind != JsonValueKind.Null &&
+                 (height.ValueKind != JsonValueKind.Number || !height.TryGetDecimal(out _))))
+                throw new ArgumentException("Podaj wysokość pieczątki w milimetrach.");
+            CardPrintSettings.Save(height.ValueKind == JsonValueKind.Null ? null : height.GetDecimal());
+            return new { saved = true };
+        }
         if (action == "getPricePrintSettings")
             return PricePrintOptionsStore.Load();
         if (action == "savePricePrintSettings")
@@ -851,7 +862,7 @@ internal sealed class ReactWindow : Form
                     throw new ArgumentException("Nieprawidłowy identyfikator karty.");
                 var stored = JsonSerializer.Deserialize<Card>(cards.ReadSavedJson(id, trash))
                     ?? throw new InvalidDataException("Zapisana karta nie zawiera poprawnych danych.");
-                html = CardHtmlRenderer.Render(stored);
+                html = CardPrintSettings.Render(stored);
                 documentNumber = stored.Fields.GetValueOrDefault("Dokument źródłowy", "");
             }
             else

@@ -1925,6 +1925,42 @@ interface ClinicData {
   useClinicStamp:boolean;useDoctorStamp:boolean;
   hasClinicStamp:boolean;hasDoctorStamp:boolean;
 }
+function CardStampSizeSettings() {
+  const [height,setHeight]=useState<number|null>(null);
+  const [loaded,setLoaded]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [message,setMessage]=useState("");
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    let active=true;
+    void invoke<{doctorStampHeightMm:number|null}>("getCardPrintSettings")
+      .then(result=>{if(active){setHeight(result.doctorStampHeightMm);setLoaded(true);}})
+      .catch(error=>{if(active)setError(String(error instanceof Error?error.message:error));});
+    return()=>{active=false;};
+  },[]);
+  async function save(){
+    setSaving(true);setMessage("");setError("");
+    try{
+      await invoke("saveCardPrintSettings",{doctorStampHeightMm:height});
+      setMessage("Zapisano wysokość pieczątki na tym stanowisku.");
+    }catch(error){setError(String(error instanceof Error?error.message:error));}
+    finally{setSaving(false);}
+  }
+  return <div style={{marginBottom:16}}>
+    <Space wrap>
+      <label htmlFor="doctor-stamp-height">Wysokość pieczątki lekarza (mm)</label>
+      <InputNumber id="doctor-stamp-height" value={height} min={1} max={150} step={0.5}
+        placeholder="Oryginalna" style={{width:120}} disabled={!loaded||saving}
+        onChange={value=>{setHeight(value);setMessage("");}}/>
+      <Button htmlType="button" onClick={()=>{void save();}} loading={saving}
+        disabled={!loaded||(height!==null&&(height<1||height>150))}>Zapisz wysokość</Button>
+    </Space>
+    <div><Typography.Text type="secondary">Puste pole przywraca oryginalny rozmiar PNG.</Typography.Text></div>
+    {message&&<Typography.Text type="success">{message}</Typography.Text>}
+    <ErrorNotice error={error}/>
+  </div>;
+}
+
 function ClinicSettingsPanel() {
   const [form]=Form.useForm();
   const [busy,setBusy]=useState(false);
@@ -2031,6 +2067,7 @@ function ClinicSettingsPanel() {
         <Button danger disabled={busy||(!doctorStamp&&!selectedDoctor)||removeDoctor}
           onClick={()=>removeStamp("doctor")}>Usuń pieczątkę</Button>
       </Space>
+      <CardStampSizeSettings/>
       <Space wrap>
         <Button onClick={()=>{void refresh();}} disabled={busy}>Odśwież z SQL</Button>
         <Button type="primary" htmlType="submit" loading={busy} disabled={!revision}>
