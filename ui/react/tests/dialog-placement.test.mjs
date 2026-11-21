@@ -14,3 +14,8 @@ test("dialog restores saved geometry and fits smaller viewports", () => {
   assert.deepEqual(restoreGeometry(stored, 1200, 900), geometry);
   assert.deepEqual(restoreGeometry(stored, 540, 420), {x:0, y:0, width:516, height:296});
 });
+
+test("dialog keeps offsets beyond half the available height", () => {
+  const geometry = {x:0, y:430, width:500, height:210};
+  assert.deepEqual(restoreGeometry(JSON.stringify(geometry), 1200, 900), geometry);
+});

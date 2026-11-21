@@ -7,7 +7,7 @@ import type {ColumnsType} from "antd/es/table";
 
 /** Workstation-local, WinForms-style column visibility, order and widths. */
 export function useListColumnLayout<T extends object>(
-  listId:string,columns:ColumnsType<T>,shortcutEnabled=true
+  listId:string,columns:ColumnsType<T>,shortcutEnabled=true,requiredColumn?:string
 ) {
   const identity=(column:ColumnsType<T>[number]):string =>
     String(column.key ?? ("dataIndex" in column ? column.dataIndex : ""));
@@ -45,7 +45,7 @@ export function useListColumnLayout<T extends object>(
     return {visible:keys,order:keys,widths:{}};
   }
   const [initial]=useState(read);
-  const [visible,setVisible]=useState<string[]>(initial.visible);
+  const [visible,setVisible]=useState<string[]>(()=>[...new Set([...initial.visible,...(requiredColumn ? [requiredColumn] : [])])]);
   const [order,setOrder]=useState<string[]>(initial.order);
   const [widths,setWidths]=useState<Record<string,number>>(initial.widths);
   const [open,setOpen]=useState(false);
@@ -121,10 +121,10 @@ export function useListColumnLayout<T extends object>(
     </Typography.Paragraph>
     <Checkbox.Group value={visible} onChange={values=>{
         const next=values.map(String);
-        if(next.length)setVisible([...new Set(next)]);
+        if(next.length)setVisible([...new Set([...next,...(requiredColumn ? [requiredColumn] : [])])]);
       }}
       options={definitions.map(item=>({label:item.label,value:item.key,
-        disabled:visible.length===1&&visible.includes(item.key)}))}
+        disabled:item.key===requiredColumn||(visible.length===1&&visible.includes(item.key))}))}
       style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}/>
     <div style={{marginTop:16,maxHeight:300,overflowY:"auto"}}>
       {order.filter(key=>visible.includes(key)).map(key=>{

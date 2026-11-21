@@ -8,8 +8,8 @@ export function restoreGeometry(raw:string|null, viewportWidth:number, viewportH
     const limit = Math.max(1, viewportWidth - 24);
     const heightLimit = Math.max(1, viewportHeight - 124);
     return {
-      x: Number.isFinite(saved.x) && Math.abs(saved.x!) < limit / 2 ? saved.x! : 0,
-      y: Number.isFinite(saved.y) && saved.y! >= -88 && saved.y! < heightLimit / 2 ? saved.y! : 0,
+      x: Number.isFinite(saved.x) && Math.abs(saved.x!) < limit && !(typeof saved.width === "number" && saved.width > limit) ? saved.x! : 0,
+      y: Number.isFinite(saved.y) && saved.y! >= -124 && saved.y! < heightLimit && !(typeof saved.height === "number" && saved.height > heightLimit) ? saved.y! : 0,
       width: typeof saved.width === "number" && saved.width >= 320 ? Math.min(saved.width, limit) : "100%",
       height: typeof saved.height === "number" && saved.height >= 190 ? Math.min(saved.height, heightLimit) : "auto"
     };

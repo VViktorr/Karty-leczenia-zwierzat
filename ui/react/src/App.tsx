@@ -917,6 +917,33 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     }catch(e){setVariantError(e instanceof Error?e.message:String(e));}
     finally{setVariantBusy(false);}
   }
+  const variantColumns:ColumnsType<TreatmentVariantChoice> = [
+          {title:"Gatunek",dataIndex:"species",width:170,
+            render:(species:string,row:TreatmentVariantChoice)=>
+              <Space direction="vertical" size={2}>
+                <Button type="primary" size="small" disabled={variantBusy ||
+                  !species?.trim() || !row.route?.trim() || !row.dose?.trim()}
+                  style={{whiteSpace:"normal",height:"auto",textAlign:"left"}}
+                  onClick={()=>{void applyVariant(row.id);}}>{species?.trim() || "Brak gatunku"}</Button>
+                {remember && variantModal?.symbol &&
+                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.species===species &&
+                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.route===row.route &&
+                  <Tag color="blue">Ostatni wybór</Tag>}
+              </Space>},
+          {title:"Droga podania",dataIndex:"route",width:140},
+          {title:"Dawkowanie",dataIndex:"dose",width:230,ellipsis:true},
+          {title:"Karencja — tkanki",dataIndex:"tissues",width:180,ellipsis:true},
+          {title:"Karencja — mleko",dataIndex:"milk",width:145,ellipsis:true,
+            render:(value:string,row)=>isPoultry(row.species) ? "—" : value},
+          {title:"Karencja — jaja",dataIndex:"eggs",width:145,ellipsis:true},
+          {title:"Wskazanie",dataIndex:"indication",width:225,ellipsis:true},
+          {title:"PDF ChPL",dataIndex:"pdf",width:130,
+            render:(value:string)=>value
+              ? <Button size="small" disabled={variantBusy}
+                  onClick={()=>{void viewVariantPdf(value);}}>Otwórz ChPL</Button>
+              : "Brak"}
+        ];
+  const variantLayout=useListColumnLayout("treatment-variant",variantColumns,false,"species");
   const variantsPagination=useListPagination("treatment-variants",variantModal?.variants.length??0,12);
   if (!draft) return <Card>
     <Empty description="Wybierz dokument w zakładce Dokumenty">
@@ -1278,36 +1305,13 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
             savedChoices[variantModal.symbol.trim().toUpperCase()].route}
           description="Zapamiętany wybór to wskazówka. Potwierdź konkretny aktualny wariant ChPL, aby wypełnić kartę."/>}
       <ErrorNotice error={variantError}/>
-      <Table<TreatmentVariantChoice> rowKey="id" loading={variantBusy}
+      <Button size="small" onClick={variantLayout.openColumns}>Kolumny wariantów</Button>
+      <Table<TreatmentVariantChoice> {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantModal?.variants??[]} size="small"
-        pagination={variantsPagination} scroll={{x:1190,y:340}}
-        columns={[
-          {title:"Gatunek",dataIndex:"species",width:170,
-            render:(species:string,row:TreatmentVariantChoice)=>
-              <Space direction="vertical" size={2}>
-                <Button type="primary" size="small" disabled={variantBusy ||
-                  !species?.trim() || !row.route?.trim() || !row.dose?.trim()}
-                  style={{whiteSpace:"normal",height:"auto",textAlign:"left"}}
-                  onClick={()=>{void applyVariant(row.id);}}>{species?.trim() || "Brak gatunku"}</Button>
-                {remember && variantModal?.symbol &&
-                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.species===species &&
-                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.route===row.route &&
-                  <Tag color="blue">Ostatni wybór</Tag>}
-              </Space>},
-          {title:"Droga podania",dataIndex:"route",width:140},
-          {title:"Dawkowanie",dataIndex:"dose",width:230,ellipsis:true},
-          {title:"Karencja — tkanki",dataIndex:"tissues",width:180,ellipsis:true},
-          {title:"Karencja — mleko",dataIndex:"milk",width:145,ellipsis:true,
-            render:(value:string,row)=>isPoultry(row.species) ? "—" : value},
-          {title:"Karencja — jaja",dataIndex:"eggs",width:145,ellipsis:true},
-          {title:"Wskazanie",dataIndex:"indication",width:225,ellipsis:true},
-          {title:"PDF ChPL",dataIndex:"pdf",width:130,
-            render:(value:string)=>value
-              ? <Button size="small" disabled={variantBusy}
-                  onClick={()=>{void viewVariantPdf(value);}}>Otwórz ChPL</Button>
-              : "Brak"}
-        ]}/>
+        pagination={variantsPagination} scroll={{x:"max-content",y:340}}
+        columns={variantLayout.columns}/>
     </Modal>
+    {variantLayout.dialog}
     <Modal className="kl-dialog-treatment-pdf" width="94vw" open={variantPdfUrl!==null}
       title={"Dokument ChPL — "+variantPdfName}
       onCancel={()=>setVariantPdfUrl(null)}
