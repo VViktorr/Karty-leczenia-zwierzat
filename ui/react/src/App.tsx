@@ -1244,7 +1244,18 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         dataSource={variantModal?.variants??[]} size="small"
         pagination={variantsPagination} scroll={{x:1190,y:340}}
         columns={[
-          {title:"Gatunek",dataIndex:"species",width:130},
+          {title:"Gatunek",dataIndex:"species",width:170,
+            render:(species:string,row:TreatmentVariantChoice)=>
+              <Space direction="vertical" size={2}>
+                <Button type="primary" size="small" disabled={variantBusy ||
+                  !species?.trim() || !row.route?.trim() || !row.dose?.trim()}
+                  style={{whiteSpace:"normal",height:"auto",textAlign:"left"}}
+                  onClick={()=>{void applyVariant(row.id);}}>{species?.trim() || "Brak gatunku"}</Button>
+                {remember && variantModal?.symbol &&
+                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.species===species &&
+                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.route===row.route &&
+                  <Tag color="blue">Ostatni wybór</Tag>}
+              </Space>},
           {title:"Droga podania",dataIndex:"route",width:140},
           {title:"Dawkowanie",dataIndex:"dose",width:230,ellipsis:true},
           {title:"Karencja — tkanki",dataIndex:"tissues",width:180,ellipsis:true},
@@ -1254,18 +1265,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
             render:(value:string)=>value
               ? <Button size="small" disabled={variantBusy}
                   onClick={()=>{void viewVariantPdf(value);}}>Otwórz ChPL</Button>
-              : "Brak"},
-          {title:"Wybór",width:190,
-            render:(_value:unknown,row:TreatmentVariantChoice)=>
-              <Space>
-                {remember && variantModal?.symbol &&
-                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.species===row.species &&
-                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.route===row.route &&
-                  <Tag color="blue">Ostatni wybór</Tag>}
-                <Button type="primary" size="small" disabled={variantBusy ||
-                !row.species?.trim() || !row.route?.trim() || !row.dose?.trim()}
-                onClick={()=>{void applyVariant(row.id);}}>Wybierz</Button>
-              </Space>}
+              : "Brak"}
         ]}/>
     </Modal>
     <Modal className="kl-dialog-treatment-pdf" width="94vw" open={variantPdfUrl!==null}
