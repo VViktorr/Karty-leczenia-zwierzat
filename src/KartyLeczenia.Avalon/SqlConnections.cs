@@ -34,13 +34,16 @@ internal sealed class SqlConnections
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { profiles = new(); }
     }
 
-    public SqlConnection OpenArchiveConnection()
+    public SqlConnection OpenArchiveConnection() => OpenConfigured("archive", "KartyLeczenia");
+    public SqlConnection OpenSubiektConnection() => OpenConfigured("subiekt", "Subiekt GT");
+
+    private SqlConnection OpenConfigured(string key, string name)
     {
-        if (!profiles.TryGetValue("archive", out var profile))
-            throw new InvalidOperationException("Skonfiguruj i przetestuj bazę KartyLeczenia w zakładce Ustawienia.");
-        if (!profile.Windows && !passwords.ContainsKey("archive"))
+        if (!profiles.TryGetValue(key, out var profile))
+            throw new InvalidOperationException($"Skonfiguruj i przetestuj połączenie {name} w zakładce Ustawienia.");
+        if (!profile.Windows && !passwords.ContainsKey(key))
             throw new InvalidOperationException("Wpisz hasło SQL w Ustawieniach i kliknij „Połącz i zapisz”.");
-        return profile.Connect(passwords.GetValueOrDefault("archive", ""));
+        return profile.Connect(passwords.GetValueOrDefault(key, ""));
     }
 
     public Control CreateEditor(string key, string title, string? fixedDatabase = null)

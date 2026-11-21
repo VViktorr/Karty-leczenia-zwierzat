@@ -1,3 +1,4 @@
+using Avalonia.Controls.Presenters;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -24,6 +25,11 @@ public sealed class AvalonApp : Application
     public override void Initialize()
     {
         Styles.Add(new FluentTheme());
+        Styles.Add(new Style(selector => selector.OfType<TabControl>().Class("sidebar-layout")
+            .Template().OfType<ItemsPresenter>().Name("PART_ItemsPresenter"))
+        {
+            Setters = { new Setter(Visual.IsVisibleProperty, false) }
+        });
         var location = new Uri("avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml");
         Styles.Add(new StyleInclude(location) { Source = location });
     }
@@ -60,7 +66,7 @@ public sealed class AvalonApp : Application
         {
             ItemsSource = new[]
             {
-                PendingTab("Dokumenty"),
+                Tab("Dokumenty", DocumentsPage.Create(connections)),
                 PendingTab("Cennik leków"),
                 Tab("Katalog leków / ChPL", catalogue),
                 PendingTab("Karta leczenia"),
@@ -78,6 +84,51 @@ public sealed class AvalonApp : Application
             },
             SelectedIndex = 6
         };
+        var layout = new ComboBox
+        {
+            ItemsSource = new[] { "Zakładki kompaktowe", "Menu boczne" },
+            SelectedIndex = Math.Clamp(preferences.Layout, 0, 1)
+        };
+        var sidebar = new ListBox { Width = 170, SelectedIndex = tabs.SelectedIndex,
+            ItemsSource = ((TabItem[])tabs.ItemsSource!).Select(item => item.Header).ToArray() };
+        var navigation = new DockPanel { Children = { sidebar, tabs } };
+        DockPanel.SetDock(sidebar, Dock.Left);
+        sidebar.SelectionChanged += (_, _) =>
+        {
+            if (sidebar.SelectedIndex >= 0) tabs.SelectedIndex = sidebar.SelectedIndex;
+        };
+        tabs.SelectionChanged += (_, _) =>
+        {
+            if (tabs.SelectedIndex >= 0) sidebar.SelectedIndex = tabs.SelectedIndex;
+        };
+        var themeButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        for (int index = 0; index < 3; index++)
+        {
+            int choice = index;
+            var button = new RadioButton
+            {
+                GroupName = "AppearanceTheme",
+                Content = new[] { "Systemowy", "Jasny", "Ciemny" }[choice],
+                IsChecked = themeSelector.SelectedIndex == choice
+            };
+            button.Click += (_, _) => themeSelector.SelectedIndex = choice;
+            themeButtons.Children.Add(button);
+        }
+        themeSelector.SelectionChanged += (_, _) =>
+        {
+            if (themeSelector.SelectedIndex is >= 0 and < 3)
+                ((RadioButton)themeButtons.Children[themeSelector.SelectedIndex]).IsChecked = true;
+        };
+        void ApplyLayout()
+        {
+            bool side = layout.SelectedIndex == 1;
+            sidebar.IsVisible = side;
+            themeButtons.IsVisible = side;
+            themeSelector.IsVisible = !side;
+            tabs.Classes.Set("sidebar-layout", side);
+        }
+        layout.SelectionChanged += (_, _) => ApplyLayout();
+        ApplyLayout();
         var window = new Window
         {
             Title = "Karty leczenia zwierząt — Avalon",
@@ -94,17 +145,17 @@ public sealed class AvalonApp : Application
                 Children =
                 {
                     new TextBlock { Text = "Karty leczenia zwierząt", FontSize = 24 },
-                    new StackPanel
+                    new WrapPanel
                     {
-                        Orientation = Orientation.Horizontal,
-                        Spacing = 12,
                         Children =
                         {
                             new TextBlock { Text = "Motyw", VerticalAlignment = VerticalAlignment.Center },
-                            themeSelector
+                            themeSelector, themeButtons,
+                            new TextBlock { Text = "Skórka", VerticalAlignment = VerticalAlignment.Center },
+                            layout
                         }
                     },
-                    tabs
+                    navigation
                 }
             } }
         };
@@ -116,6 +167,7 @@ public sealed class AvalonApp : Application
                 (table with
                 {
                     Theme = themeSelector.SelectedIndex,
+                    Layout = layout.SelectedIndex,
                     WindowWidth = window.WindowState == WindowState.Normal ? window.Bounds.Width : window.Width,
                     WindowHeight = window.WindowState == WindowState.Normal ? window.Bounds.Height : window.Height,
                     Maximized = window.WindowState == WindowState.Maximized

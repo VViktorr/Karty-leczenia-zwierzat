@@ -5,7 +5,7 @@ namespace KartyLeczenia.Avalon;
 internal sealed record ColumnPreference(string Key, int Order, double? Width);
 internal sealed record DesktopPreferences(int Theme = 0, string? Font = null,
     decimal FontSize = 14, decimal RowHeight = 30, ColumnPreference[]? Columns = null,
-    double WindowWidth = 1000, double WindowHeight = 680, bool Maximized = false)
+    double WindowWidth = 1000, double WindowHeight = 680, bool Maximized = false, int Layout = 0)
 {
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
