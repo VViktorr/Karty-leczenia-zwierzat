@@ -45,14 +45,16 @@ string html = CardHtmlRenderer.Render(restored);
 Check(html.Contains("&lt;lek &amp; test&gt;") && !html.Contains("<lek & test>"), "HTML escaping failed.");
 Check(html.Contains("A4 landscape"), "Landscape A4 was lost.");
 const string acquisitionHeading = "III. Potwierdzenie nabycia produktu";
-const string productCell = "&lt;lek &amp; test&gt;";
+const string productCell = "<td>&lt;lek &amp; test&gt;</td>";
 int acquisitionStart = html.IndexOf(acquisitionHeading, StringComparison.Ordinal);
-Check(acquisitionStart > html.IndexOf(productCell, StringComparison.Ordinal),
+int treatmentCell = html.IndexOf(productCell, StringComparison.Ordinal);
+Check(treatmentCell >= 0 && acquisitionStart > treatmentCell,
     "The treatment item must appear in section II by default.");
 restored.Rows[0]["Sekcja (II lub III)"] = "III";
 string acquiredHtml = CardHtmlRenderer.Render(restored);
 int acquiredCell = acquiredHtml.IndexOf(productCell, StringComparison.Ordinal);
-Check(acquiredCell > acquiredHtml.IndexOf(acquisitionHeading, StringComparison.Ordinal) &&
+int acquiredSectionStart = acquiredHtml.IndexOf(acquisitionHeading, StringComparison.Ordinal);
+Check(acquiredSectionStart >= 0 && acquiredCell > acquiredSectionStart &&
     acquiredCell == acquiredHtml.LastIndexOf(productCell, StringComparison.Ordinal),
     "The acquired item must appear only in section III.");
 restored.Rows[0]["Sekcja (II lub III)"] = "II";
