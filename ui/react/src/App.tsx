@@ -492,7 +492,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [performed, setPerformed] = useState(() => localDateTime());
   const [dateStep,setDateStep]=useState<{reported:string;performed:string}|null>(null);
   const [animalEdit,setAnimalEdit]=useState<{
-    candidates:DraftRow[]; checked:number[]; description:string; count:string;
+    candidates:DraftRow[]; checked:number[]; description:string; count:string; beforeSave?:boolean;
   }|null>(null);
   const [referenceEdit,setReferenceEdit]=useState<{
     index:number; value:string; items:{symbol:string;name:string}[];
@@ -644,14 +644,36 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       (item.descriptionGroup??"")===(row.descriptionGroup??"")).map(item=>item.index),
       description:row.description,count:row.animals});
   }
+  function startSave(currentRows=rows){
+    const selected=currentRows.filter(row=>row.selected);
+    if(!selected.length){
+      setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk.");
+      return;
+    }
+    const description=(row:DraftRow)=>!row.descriptionGroup && row.description.trim().toLocaleLowerCase("pl")===
+      row.species.trim().toLocaleLowerCase("pl") ? "" : row.description.trim();
+    const missing=selected.find(row=>!description(row)||!row.animals.trim());
+    setError("");
+    if(!missing){
+      setDateStep({reported,performed});
+      return;
+    }
+    const candidates=selected.filter(row=>row.species===missing.species && row.section===missing.section &&
+      description(row)===description(missing) && row.animals.trim()===missing.animals.trim() &&
+      row.descriptionGroup===missing.descriptionGroup && row.countGroup===missing.countGroup);
+    setAnimalEdit({candidates,checked:candidates.map(row=>row.index),
+      description:description(missing),count:missing.animals,beforeSave:true});
+  }
   async function applyAnimalEdit(){
     if(!animalEdit||!draft||!animalEdit.checked.length)return;
     const description=animalEdit.description.trim(), animals=animalEdit.count.trim();
-    if(!animals)return;
+    if(!animals||(animalEdit.beforeSave&&!description))return;
     const group=window.crypto.randomUUID();
-    setRows(current=>current.map(row=>animalEdit.checked.includes(row.index)
-      ? {...row,description,animals,descriptionGroup:group,countGroup:group}:row));
+    const updated=rows.map(row=>animalEdit.checked.includes(row.index)
+      ? {...row,description,animals,descriptionGroup:group,countGroup:group}:row);
+    setRows(updated);
     setAnimalEdit(null);setSavedNumber("");setAnimalError("");
+    if(animalEdit.beforeSave){startSave(updated);return;}
     if(!draft.hasPayerId||!description)return;
     try{
       await invoke("saveAnimalDescription",{draftId:draft.draftId,description});
@@ -758,7 +780,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         </div>,
         okText:"Potwierdzam — zapisz kartę",
         cancelText:"Anuluj",
-        onOk:()=>done(true),onCancel:()=>done(false)
+        onOk:()=>done(true),onCancel:()=>done(false),afterClose:()=>done(false)
       });
     });
   }
@@ -849,7 +871,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
 
   useEffect(()=>{
     if(!draft||compatibilityDraftId!==draft.draftId||suggestBusy||selectionBusy||
-      applyBusy||busy||variantBusy||referenceBusy||suggestReviewOpen||dateStep)return;
+      applyBusy||busy||variantBusy||referenceBusy||suggestReviewOpen||dateStep||animalEdit?.beforeSave)return;
     const candidates=readySuggestions.filter(item=>{
       const key=JSON.stringify([item.index,item.symbol,item.variantId]);
       return !autoApplied.current.has(key) &&
@@ -1041,7 +1063,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       <Button onClick={onDocuments}>Dokumenty</Button>
       <Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={()=>{void printPreview();}} loading={busy} disabled={applyBusy||selectionBusy}>Podgląd wydruku</Button>
-      <Button type="primary" onClick={()=>setDateStep({reported,performed})} loading={busy} disabled={applyBusy||selectionBusy||referenceBusy}>Zapisz kartę do SQL</Button>
+      <Button type="primary" onClick={()=>startSave()} loading={busy} disabled={applyBusy||selectionBusy||referenceBusy}>Zapisz kartę do SQL</Button>
     </Space></div>
     <div className="treatment-tools">
     <TreatmentOptions compact={compact} label={"Podpowiedzi ChPL ("+readySuggestions.length+")"}>
@@ -1155,7 +1177,8 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     </Modal>
     <Modal className="kl-dialog-treatment-animals" open={animalEdit!==null}
       title="Numery i liczba leczonych zwierząt" okText="Zastosuj" cancelText="Anuluj"
-      okButtonProps={{disabled:!animalEdit?.checked.length||!animalEdit.count.trim()}} onOk={()=>{void applyAnimalEdit();}}
+      okButtonProps={{disabled:!animalEdit?.checked.length||!animalEdit.count.trim()||
+        (animalEdit.beforeSave&&!animalEdit.description.trim())}} onOk={()=>{void applyAnimalEdit();}}
       onCancel={()=>setAnimalEdit(null)}>
       {animalEdit&&<Space direction="vertical" style={{width:"100%"}}>
         {animalEdit.candidates.length>1&&<Checkbox.Group value={animalEdit.checked}
@@ -1165,7 +1188,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
               {item.index+1}. {item.product}{item.batch&&" · "+item.batch}
             </Checkbox>)}</Space>
         </Checkbox.Group>}
-        <label>Numery zwierząt <Input.TextArea rows={4} value={animalEdit.description}
+        <label>Numery zwierząt / opis grupy <Input.TextArea required={animalEdit.beforeSave} rows={4} value={animalEdit.description}
           onChange={e=>setAnimalEdit({...animalEdit,description:e.target.value})}/></label>
         <label>Liczba leczonych zwierząt (wymagane) <Input required value={animalEdit.count}
           onChange={e=>setAnimalEdit({...animalEdit,count:e.target.value})}/></label>
