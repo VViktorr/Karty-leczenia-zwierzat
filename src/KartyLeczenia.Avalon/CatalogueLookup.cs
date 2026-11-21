@@ -9,17 +9,8 @@ internal sealed record CatalogueVariant(string Species, string Route, string Dos
 internal static class CatalogueLookup
 {
     public static async Task<List<CatalogueVariant>> Read(
-        string server, string symbol, CancellationToken cancellationToken)
+        SqlConnection connection, string symbol, CancellationToken cancellationToken)
     {
-        var settings = new SqlConnectionStringBuilder
-        {
-            DataSource = server,
-            InitialCatalog = "KartyLeczenia",
-            IntegratedSecurity = true,
-            ConnectTimeout = 10,
-            ApplicationName = "Karty leczenia Avalon"
-        };
-        await using var connection = new SqlConnection(settings.ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
         await using var command = connection.CreateCommand();

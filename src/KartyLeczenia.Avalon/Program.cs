@@ -54,7 +54,30 @@ public sealed class AvalonApp : Application
 
         themeSelector.SelectionChanged += (_, _) => ApplyTheme();
         ApplyTheme();
-        var catalogue = CreateCatalogueLookup(preferences, out var readTablePreferences);
+        var connections = new SqlConnections();
+        var catalogue = CreateCatalogueLookup(preferences, connections, out var readTablePreferences);
+        var tabs = new TabControl
+        {
+            ItemsSource = new[]
+            {
+                PendingTab("Dokumenty"),
+                PendingTab("Cennik leków"),
+                Tab("Katalog leków / ChPL", catalogue),
+                PendingTab("Karta leczenia"),
+                PendingTab("Zapisane karty"),
+                PendingTab("Terminy ważności"),
+                Tab("Ustawienia", new StackPanel
+                {
+                    Spacing = 24,
+                    Children =
+                    {
+                        connections.CreateEditor("archive", "Archiwum kart i katalog leków", "KartyLeczenia"),
+                        connections.CreateEditor("subiekt", "Subiekt GT")
+                    }
+                })
+            },
+            SelectedIndex = 6
+        };
         var window = new Window
         {
             Title = "Karty leczenia zwierząt — Avalon",
@@ -81,7 +104,7 @@ public sealed class AvalonApp : Application
                             themeSelector
                         }
                     },
-                    catalogue
+                    tabs
                 }
             } }
         };
@@ -106,10 +129,15 @@ public sealed class AvalonApp : Application
         return window;
     }
 
-    private static Control CreateCatalogueLookup(DesktopPreferences preferences,
+    private static TabItem Tab(string title, Control content) =>
+        new() { Header = title, Content = new Border { Padding = new Thickness(8, 16), Child = content } };
+
+    private static TabItem PendingTab(string title) =>
+        Tab(title, new TextBlock { Text = "Ten ekran jest w przygotowaniu." });
+
+    private static Control CreateCatalogueLookup(DesktopPreferences preferences, SqlConnections connections,
         out Func<DesktopPreferences> readPreferences)
     {
-        var server = new TextBox { Watermark = "Adres serwera lub nazwa instancji" };
         var symbol = new TextBox { Watermark = "Symbol kartoteki leku", MaxLength = 128 };
         var load = new Button { Content = "Pokaż warianty" };
         var status = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
@@ -171,11 +199,10 @@ public sealed class AvalonApp : Application
         };
         load.Click += async (_, _) =>
         {
-            string address = server.Text?.Trim() ?? "";
             string code = symbol.Text?.Trim() ?? "";
-            if (address.Length == 0 || code.Length == 0)
+            if (code.Length == 0)
             {
-                status.Text = "Podaj adres SQL Servera i symbol leku.";
+                status.Text = "Podaj symbol leku.";
                 return;
             }
 
@@ -185,13 +212,18 @@ public sealed class AvalonApp : Application
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try
             {
-                var result = await CatalogueLookup.Read(address, code, timeout.Token);
+                await using var connection = connections.OpenArchiveConnection();
+                var result = await CatalogueLookup.Read(connection, code, timeout.Token);
                 variants.ItemsSource = result;
                 status.Text = result.Count == 0 ? "Brak wariantów dla tego symbolu." : $"Warianty ({result.Count})";
             }
             catch (Microsoft.Data.SqlClient.SqlException ex)
             {
                 status.Text = $"Odczyt SQL nie powiódł się (kod {ex.Number}). Sprawdź serwer, certyfikat i uprawnienia konta Windows.";
+            }
+            catch (InvalidOperationException ex)
+            {
+                status.Text = ex.Message;
             }
             catch (OperationCanceledException)
             {
@@ -206,8 +238,8 @@ public sealed class AvalonApp : Application
         return new StackPanel
         {
             Spacing = 8,
-            Children = { new TextBlock { Text = "Katalog leków — odczyt z SQL kontem Windows" },
-                server, symbol, load, status,
+            Children = { new TextBlock { Text = "Katalog leków — odczyt z bazy KartyLeczenia" },
+                symbol, load, status,
                 new StackPanel
                 {
                     Orientation = Orientation.Horizontal, Spacing = 8,
