@@ -559,6 +559,20 @@ static class Program
             Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine,cattle])
                   .Status == "ambiguous",
                 "multiple species are ambiguous when cattle is merely a default");
+            var cattleWithWithdrawal = cattle with { Milk = "2 dni", Route = "IM/IV" };
+            var cattleSuggestion = TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                [swine, cattleWithWithdrawal], "cattle");
+            Check(cattleSuggestion.Status == "ready" && cattleSuggestion.VariantId == 51 &&
+                  cattleSuggestion.Route == "IM/IV",
+                "the cattle filter selects the sole cattle variant and keeps its catalogue route");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                  [swine, cattleWithWithdrawal, cattleWithWithdrawal with
+                      { Id = 54, Species = "Bydło (cielęta)", Route = "im." }], "cattle")
+                  .Status == "ambiguous",
+                "multiple variants in the cattle group require manual selection");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine], "cattle")
+                  .Status == "noMatch",
+                "the cattle filter must never propose a swine variant");
             suggestedRow.Set("Gatunek", "Świnie");
             Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine,cattle])
                   .VariantId == 50,

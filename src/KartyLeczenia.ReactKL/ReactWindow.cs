@@ -1117,11 +1117,14 @@ internal sealed class ReactWindow : Form
             var (variants, nonMedicines) = await Task.Run(() =>
                 catalogue.VariantsForSymbols(draft.Rows.Select(row =>
                     TreatmentAutofillPlanner.CatalogueSymbol(row))), token);
+            string speciesGroup = ReadTextField(root, "speciesGroup", 10);
+            if (!TreatmentSpeciesGroup.Values.Contains(speciesGroup))
+                speciesGroup = "all";
             var proposals = draft.Rows.Select((row, index) =>
             {
                 variants.TryGetValue(TreatmentAutofillPlanner.CatalogueSymbol(row), out var entries);
                 return TreatmentAutofillPlanner.Propose(index, row,
-                    entries ?? []);
+                    entries ?? [], speciesGroup);
             }).ToArray();
             if (action == "treatmentSuggestions")
                 return new
@@ -1132,7 +1135,10 @@ internal sealed class ReactWindow : Form
                         proposal.VariantId, proposal.Species, proposal.Route, proposal.Dosing,
                         proposal.Withdrawal, proposal.Source, proposal.HasPdf, proposal.PdfPath,
                         groups = TreatmentSpeciesGroup.CompatibleGroups([proposal.Species]),
-                        variantCount = variants.TryGetValue(proposal.Symbol, out var matched) ? matched.Count : 0,
+                        variantCount = variants.TryGetValue(proposal.Symbol, out var matched)
+                            ? TreatmentAutofillPlanner.ForSpeciesGroup(matched, speciesGroup).Count : 0,
+                        hasCatalogueVariants = variants.TryGetValue(proposal.Symbol, out var allMatches)
+                            && allMatches.Count > 0,
                         nonMedicine = nonMedicines.Contains(proposal.Symbol)
                     }),
                     compatibility = draft.Rows.Select((row, index) =>

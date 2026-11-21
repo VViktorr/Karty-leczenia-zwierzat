@@ -9,8 +9,7 @@ internal sealed record TreatmentSuggestion(
     bool HasPdf = false, string PdfPath = "");
 
 /// <summary>
-/// Conservative, read-only matching. No clinical value changes until the user
-/// explicitly approves a proposed variant. Never guess by product name.
+/// Conservative, read-only matching against the catalogue. Never guess by product name.
 /// </summary>
 internal static class TreatmentAutofillPlanner
 {
@@ -54,12 +53,18 @@ internal static class TreatmentAutofillPlanner
         !string.IsNullOrWhiteSpace(variant.Route) &&
         !string.IsNullOrWhiteSpace(variant.Dose);
 
+    internal static IReadOnlyList<CatalogueVariantModel> ForSpeciesGroup(
+        IReadOnlyList<CatalogueVariantModel> variants, string group) =>
+        group == "all" ? variants :
+        variants.Where(variant => TreatmentSpeciesGroup.Matches(group, [variant.Species])).ToArray();
+
     /// <summary>
     /// Return a suggestion and explain why it cannot be applied in bulk.
     /// The default Bydło value is NOT a deliberate species constraint.
     /// </summary>
     internal static TreatmentSuggestion Propose(
-        int index, TreatmentRow row, IReadOnlyList<CatalogueVariantModel> variants)
+        int index, TreatmentRow row, IReadOnlyList<CatalogueVariantModel> variants,
+        string speciesGroup = "all")
     {
         string symbol = CatalogueSymbol(row);
         if (!row.Printed)
@@ -72,6 +77,11 @@ internal static class TreatmentAutofillPlanner
                 "Istniejące dawkowanie lub karencja nie są nadpisywane automatycznie.");
         if (variants.Count == 0)
             return new(index, symbol, "notFound", "Nie znaleziono wariantów w katalogu SQL.");
+
+        variants = ForSpeciesGroup(variants, speciesGroup);
+        if (speciesGroup != "all" && variants.Count > 1)
+            return new(index, symbol, "ambiguous",
+                $"{variants.Count} warianty dla wybranego gatunku. Wybierz właściwy ręcznie.");
 
         string species = row.Get("Domyślny gatunek") == "True"
             ? "" : row.Get("Gatunek").Trim();

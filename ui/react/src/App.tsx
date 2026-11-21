@@ -46,7 +46,7 @@ interface TreatmentVariantList {
 interface TreatmentSuggestion {
   index:number;symbol:string;status:string;message:string;
   variantId:number|null;species:string;route:string;dosing:string;
-  withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;groups:SpeciesGroup[];variantCount:number;nonMedicine:boolean;
+  withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;groups:SpeciesGroup[];variantCount:number;hasCatalogueVariants:boolean;nonMedicine:boolean;
 }
 interface TreatmentSuggestionList {
   items:TreatmentSuggestion[];
@@ -527,6 +527,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [applyBusy,setApplyBusy]=useState(false);
   const [autofillMessage,setAutofillMessage]=useState("");
   const [suggestTick,setSuggestTick]=useState(0);
+  const [suggestionGroup,setSuggestionGroup]=useState<SpeciesGroup>();
   const [speciesGroup,setSpeciesGroup]=useState<SpeciesGroup>("cattle");
   const [compatibility,setCompatibility]=useState<Record<number,SpeciesGroup[]>>({});
   const [compatibilityDraftId,setCompatibilityDraftId]=useState("");
@@ -563,9 +564,14 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     if(!draft){setSuggestions([]);return;}
     let cancelled=false;
     setSuggestBusy(true);setSuggestError("");setSuggestions([]);
-    invoke<TreatmentSuggestionList>("treatmentSuggestions",{draftId:draft.draftId})
+    // The selection effect queues the new group on the host in this render.
+    void Promise.resolve().then(()=>selectionQueue.current)
+      .then(()=>cancelled?undefined:invoke<TreatmentSuggestionList>("treatmentSuggestions",{
+        draftId:draft.draftId,speciesGroup
+      }))
       .then(result=>{
-        if(cancelled)return;
+        if(cancelled||!result)return;
+        setSuggestionGroup(speciesGroup);
         setSuggestions(result.items);
         const groups:Record<number,SpeciesGroup[]>={};
         for(const item of result.compatibility??[])groups[item.index]=item.groups;
@@ -576,7 +582,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         e instanceof Error?e.message:String(e));}})
       .finally(()=>{if(!cancelled)setSuggestBusy(false);});
     return()=>{cancelled=true;};
-  },[draft,suggestTick]);
+  },[draft,suggestTick,speciesGroup]);
   useEffect(()=>{
     if(!draft||!remember){setSavedChoices({});setChoiceError("");return;}
     let active=true;
@@ -812,7 +818,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     finally {setBusy(false);}
   }
   const readySuggestions=suggestions.filter(s=>{
-    if(s.status!=="ready" || s.variantId==null)return false;
+    if(suggestionGroup!==speciesGroup || s.status!=="ready" || s.variantId==null)return false;
     const row=rows.find(x=>x.index===s.index);
     return !!row && row.selected && (row.referenceSymbol||row.symbol).trim().toUpperCase()===s.symbol.toUpperCase() &&
       !row.dosing?.trim() && !row.withdrawal?.trim();
@@ -822,7 +828,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     setApplyBusy(true);setAutofillMessage("");setError("");
     try{
       const result=await invoke<TreatmentBulkResult>("applyTreatmentSuggestions",{
-        draftId:draft.draftId, rows, autoGroup,
+        draftId:draft.draftId, rows, speciesGroup, autoGroup,
         candidates:candidates.slice(0,300).map(s=>({index:s.index,variantId:s.variantId,
           species:s.species,route:s.route,dosing:s.dosing,withdrawal:s.withdrawal,
           source:s.source,hasPdf:s.hasPdf,pdfPath:s.pdfPath}))
@@ -967,7 +973,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   };
   const isCompatible=(row:DraftRow)=>speciesGroup==="all" ||
     (compatibility[row.index]??[]).includes(speciesGroup);
-  const rowSuggestions=new Map(suggestions.map(item=>[item.index,item]));
+  const rowSuggestions=new Map((suggestionGroup===speciesGroup?suggestions:[]).map(item=>[item.index,item]));
   const isUnambiguous=(row:DraftRow)=>{
     const item=rowSuggestions.get(row.index);
     return !!item && !item.nonMedicine && item.status!=="review" &&
@@ -997,7 +1003,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
           isUnambiguous(row)?"Jednoznaczny":"Kilka wariantów";
         const color=label==="Jednoznaczny"?"green":
           item.variantCount>0?"gold":"default";
-        if(item.nonMedicine||item.variantCount===0)
+        if(item.nonMedicine||!item.hasCatalogueVariants)
           return <Tag title={item.nonMedicine?"Produkt oznaczony w katalogu jako nieleczniczy":item.message}>{label}</Tag>;
         return <Button size="small" variant="outlined" color={color}
           title={item.message} disabled={variantBusy||applyBusy||referenceBusy}
