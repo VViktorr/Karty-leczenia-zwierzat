@@ -1,3 +1,6 @@
+import dayjs from "dayjs";
+import "dayjs/locale/pl";
+import datePickerPl from "antd/es/date-picker/locale/pl_PL";
 import {isPoultry} from "./cataloguePdfMetadata";
 import Modal from "./AppModal";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
@@ -1215,11 +1218,21 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       </Space>}>
       {dateStep&&<Space direction="vertical" style={{width:"100%"}}>
         <label>Data i godzina zgłoszenia (opcjonalnie)
-          <Input type="datetime-local" value={dateStep.reported}
-            onChange={e=>setDateStep({...dateStep,reported:e.target.value})}/></label>
+          <DatePicker value={dateStep.reported?dayjs(dateStep.reported).locale("pl"):null}
+            showTime={{format:"HH:mm"}} needConfirm format="DD.MM.YYYY HH:mm"
+            locale={{...datePickerPl,lang:{...datePickerPl.lang,ok:"Zatwierdź"}}}
+            style={{width:"100%"}}
+            onChange={value=>setDateStep(current=>current&&{
+              ...current,reported:value?.format("YYYY-MM-DDTHH:mm")??""
+            })}/></label>
         <label>Data i godzina wykonania czynności weterynaryjnych
-          <Input type="datetime-local" value={dateStep.performed}
-            onChange={e=>setDateStep({...dateStep,performed:e.target.value})}/></label>
+          <DatePicker value={dateStep.performed?dayjs(dateStep.performed).locale("pl"):null}
+            showTime={{format:"HH:mm"}} needConfirm allowClear={false} format="DD.MM.YYYY HH:mm"
+            locale={{...datePickerPl,lang:{...datePickerPl.lang,ok:"Zatwierdź"}}}
+            style={{width:"100%"}}
+            onChange={value=>setDateStep(current=>current&&{
+              ...current,performed:value?.format("YYYY-MM-DDTHH:mm")??""
+            })}/></label>
       </Space>}
     </Modal>
     <Modal className="kl-dialog-treatment-duplicate" open={duplicateId!==null}
