@@ -1,3 +1,4 @@
+import ResizableDialogFrame from "./ResizableDialogFrame";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {useListPagination} from "./ListPagination";
 import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayout";
@@ -1225,6 +1226,9 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         ]}/>
     </Modal>
     <Modal className="kl-dialog-treatment-variant" width="90vw" open={variantModal!==null}
+      destroyOnHidden modalRender={content=><ResizableDialogFrame storageKey="treatment-variant">
+        {content}
+      </ResizableDialogFrame>}
       title={"Dobór wariantu leku — "+(variantModal?.product||"")}
       onCancel={()=>{if(!variantBusy)setVariantModal(null);}}
       footer={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>

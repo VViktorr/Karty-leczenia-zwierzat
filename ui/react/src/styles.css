@@ -226,3 +226,18 @@
   text-align: inherit;
   color: inherit;
 }
+
+.kl-rnd-dialog-frame { pointer-events: auto; }
+.kl-rnd-dialog-frame > .ant-modal-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.kl-rnd-dialog-frame .ant-modal-header {
+  cursor: move;
+  user-select: none;
+}
+.kl-rnd-dialog-frame .ant-modal-body {
+  min-height: 0;
+  overflow: auto;
+}

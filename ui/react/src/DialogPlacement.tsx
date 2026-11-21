@@ -243,7 +243,7 @@ export default function DialogPlacement() {
         }
       }
       document.querySelectorAll<HTMLElement>(".ant-modal-wrap .ant-modal").forEach(modal => {
-        if (live.has(modal)) return;
+        if (live.has(modal) || modal.querySelector(".kl-rnd-dialog-frame")) return;
         const wrapper = modal.closest<HTMLElement>(".ant-modal-wrap");
         if (!wrapper?.clientWidth || !wrapper.clientHeight || !modal.offsetWidth) return;
         const cleanup = attachDialog(modal, wrapper);
