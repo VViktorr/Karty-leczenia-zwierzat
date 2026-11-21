@@ -491,6 +491,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [reported, setReported] = useState("");
   const [performed, setPerformed] = useState(() => localDateTime());
   const [dateStep,setDateStep]=useState<{reported:string;performed:string}|null>(null);
+  const pendingSaveDates=useRef<{reported:string;performed:string}|null>(null);
   const [animalEdit,setAnimalEdit]=useState<{
     candidates:DraftRow[]; checked:number[]; description:string; count:string; beforeSave?:boolean;
   }|null>(null);
@@ -542,6 +543,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   useEffect(() => {
     autoApplied.current.clear();
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
+    pendingSaveDates.current=null;
     setDuplicateId(null);setDateStep(null);setAnimalEdit(null);setReferenceEdit(null);
     setReported("");setPerformed(localDateTime());
     desiredChecks.current=new Map((draft?.rows??[]).map(row=>[row.index,row.selected]));
@@ -645,6 +647,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       description:row.description,count:row.animals});
   }
   function startSave(currentRows=rows){
+    if(pendingSaveDates.current)return;
     const selected=currentRows.filter(row=>row.selected);
     if(!selected.length){
       setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk.");
@@ -871,7 +874,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
 
   useEffect(()=>{
     if(!draft||compatibilityDraftId!==draft.draftId||suggestBusy||selectionBusy||
-      applyBusy||busy||variantBusy||referenceBusy||suggestReviewOpen||dateStep||animalEdit?.beforeSave)return;
+      applyBusy||busy||variantBusy||referenceBusy||suggestReviewOpen||dateStep||pendingSaveDates.current||animalEdit?.beforeSave)return;
     const candidates=readySuggestions.filter(item=>{
       const key=JSON.stringify([item.index,item.symbol,item.variantId]);
       return !autoApplied.current.has(key) &&
@@ -1195,13 +1198,21 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       </Space>}
     </Modal>
     <Modal className="kl-dialog-treatment-dates" open={dateStep!==null}
-      title="Daty i godziny karty leczenia" okText="Dalej" cancelText="Anuluj"
-      okButtonProps={{disabled:!dateStep?.performed}} onCancel={()=>setDateStep(null)}
-      onOk={()=>{
-        if(!dateStep?.performed)return;
-        setReported(dateStep.reported);setPerformed(dateStep.performed);setDateStep(null);
-        void saveCard(dateStep);
-      }}>
+      title="Daty i godziny karty leczenia" onCancel={()=>setDateStep(null)}
+      afterClose={()=>{
+        const dates=pendingSaveDates.current;
+        pendingSaveDates.current=null;
+        if(dates)void saveCard(dates);
+      }}
+      footer={<Space wrap>
+        <Button onClick={()=>setDateStep(null)}>Anuluj</Button>
+        <Button type="primary" disabled={!dateStep?.performed} onClick={()=>{
+          if(!dateStep?.performed||pendingSaveDates.current)return;
+          pendingSaveDates.current=dateStep;
+          setReported(dateStep.reported);setPerformed(dateStep.performed);
+          setDateStep(null);
+        }}>Zatwierdź daty i kontynuuj</Button>
+      </Space>}>
       {dateStep&&<Space direction="vertical" style={{width:"100%"}}>
         <label>Data i godzina zgłoszenia (opcjonalnie)
           <Input type="datetime-local" value={dateStep.reported}
