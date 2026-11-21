@@ -11,6 +11,8 @@ public static class CardHtmlRenderer
         static string E(string? value) => WebUtility.HtmlEncode(value ?? "").Replace("\r\n", "\n").Replace("\n", "<br>");
         string F(string key) => E(card.Fields.GetValueOrDefault(key));
         string Fill(string key) => string.IsNullOrWhiteSpace(card.Fields.GetValueOrDefault(key)) ? "................................" : F(key);
+        var stamp = card.DoctorStampPng;
+        bool showStamp = stamp is not null && CardSchema.HasPngHeader(stamp);
         var html = new StringBuilder("""
             <!doctype html><html lang="pl"><head><meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1"><title>Karta leczenia zwierząt</title>
@@ -27,12 +29,15 @@ public static class CardHtmlRenderer
             th {font-weight:normal;text-align:center;vertical-align:middle;font-size:8.3pt} thead {display:table-header-group} tr {break-inside:avoid;page-break-inside:avoid}
             tbody td {height:8mm;font-size:8pt} .group {height:12mm;font-size:8.6pt} .columns {height:29mm} .lp {text-align:center} .empty td {height:7.5mm}
             .statement {width:37%;margin:1mm 0 0 auto;font-size:8pt;line-height:1.1;break-inside:avoid}.signatures {display:grid;grid-template-columns:58% 42%;padding-top:4.5mm;text-align:center;break-inside:avoid}
-            .signatures.stamped {align-items:end}.doctor-stamp {display:inline-block;max-width:47mm;max-height:16mm;width:auto;height:auto;vertical-align:bottom}
+            .sheet.has-doctor-stamp {position:relative}.doctor-stamp {position:absolute;left:29%;bottom:0;transform:translateX(-50%);z-index:1;width:auto;height:auto;max-width:none;max-height:none;pointer-events:none}
             .signature {padding:0 8mm;min-height:10mm}.signature small {display:block;font-size:8pt}.results {border-top:.3mm solid #222;margin-top:2mm;padding-top:1mm;font-size:9pt}.footnote {font-size:7.5pt;margin-top:1mm}
             .tools {font-size:12px;background:#eef2f6;border:1px solid #cbd5e1;padding:10px;margin-bottom:12px} .source {font-size:12px;overflow-wrap:anywhere}
             @media screen {body {background:#e2e8f0;padding:20px}.sheet {width:297mm;min-height:210mm;background:white;padding:7mm;box-shadow:0 2px 15px #0002}.tools{max-width:283mm;margin:0 auto 12px}}
-            @media print {.tools {display:none!important}.sheet {width:100%;padding:0;box-shadow:none}}
-            </style></head><body><div class="sheet">
+            @media print {.tools {display:none!important}.sheet {width:100%;padding:0;box-shadow:none}.sheet.has-doctor-stamp {min-height:195.9mm}}
+            </style></head><body>
+            """);
+        html.Append(showStamp ? "<div class='sheet has-doctor-stamp'>" : "<div class='sheet'>");
+        html.Append("""
             <h1>KSIĄŻKA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT,<br>
             Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h1>
             <div class="section">I.</div>
@@ -106,13 +111,12 @@ public static class CardHtmlRenderer
         Rows("III", 3); html.Append("</tbody></table>");
         html.Append(AdministrationRouteLegend.Html);
         html.Append("<div class='statement'>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii</div>");
-        var stamp = card.DoctorStampPng;
-        bool showStamp = stamp is not null && CardSchema.HasPngHeader(stamp);
-        string doctor = showStamp
-            ? $"<img class='doctor-stamp' alt='Pieczątka lekarza' src='data:image/png;base64,{Convert.ToBase64String(stamp!)}'>"
-            : F("Lekarz i nr prawa wykonywania zawodu");
-        html.Append($"<div class='signatures{(showStamp ? " stamped" : "")}'><div class='signature'>{doctor}<br>........................................................<small>(podpis i pieczęć lekarza weterynarii)</small></div><div class='signature'><br>........................................................<small>(podpis posiadacza zwierzęcia)</small></div></div>");
-        html.Append($"<div class='results'>IV. Wyniki badań uzupełniających: {Fill("Wyniki badań")}</div><div class='footnote'>*) W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych.</div></div>");
+        string doctor = showStamp ? "" : F("Lekarz i nr prawa wykonywania zawodu");
+        html.Append($"<div class='signatures'><div class='signature'>{doctor}<br>........................................................<small>(podpis i pieczęć lekarza weterynarii)</small></div><div class='signature'><br>........................................................<small>(podpis posiadacza zwierzęcia)</small></div></div>");
+        html.Append($"<div class='results'>IV. Wyniki badań uzupełniających: {Fill("Wyniki badań")}</div><div class='footnote'>*) W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych.</div>");
+        if (showStamp)
+            html.Append($"<img class='doctor-stamp' alt='Pieczątka lekarza' src='data:image/png;base64,{Convert.ToBase64String(stamp!)}'>");
+        html.Append("</div>");
         html.Append("<details class='tools'><summary>Dokument źródłowy i źródła karencji (nie drukowane)</summary><p>" + F("Dokument źródłowy") + "</p>");
         foreach (var row in selected) html.Append("<p class='source'>" + E(row.GetValueOrDefault("Produkt")) + "<br>" + E(row.GetValueOrDefault("Źródło karencji")) + "<br>" + E(row.GetValueOrDefault("Status karencji")) + "</p>");
         html.Append("</details></body></html>");
