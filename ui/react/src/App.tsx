@@ -664,9 +664,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     catch{/* Current session still works without storage. */}
   }
   useEffect(()=>()=>{if(variantPdfUrl)URL.revokeObjectURL(variantPdfUrl);},[variantPdfUrl]);
-  // Do not silently print an incomplete treatment card. The warning review
-  // covers both SQL save and draft preview, without changing clinician entries.
-  async function reviewBefore(action:"save"|"preview", execution=performed):Promise<boolean> {
+  async function reviewBeforeSave(execution:string):Promise<boolean> {
     const selected=rows.filter(row=>row.selected);
     if(!selected.length) {
       setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk. Jeśli filtr gatunku ukrywa dostępne pozycje, wybierz Wszystkie.");
@@ -692,7 +690,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       const done=(accepted:boolean)=>{if(!resolved){resolved=true;resolve(accepted);}};
       let dialog:ReturnType<typeof Modal.confirm>|null=null;
       dialog=Modal.confirm({
-        className:"kl-dialog-treatment-warnings", title:"Sprawdź dane przed "+(action==="save"?"zapisem":"podglądem wydruku"),
+        className:"kl-dialog-treatment-warnings", title:"Sprawdź dane przed zapisem",
         width:700,
         content:<div>
           <Alert className="notice" type="warning" showIcon
@@ -717,7 +715,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
             </div>)}
           </div>
         </div>,
-        okText:"Potwierdzam — "+(action==="save"?"zapisz kartę":"otwórz podgląd"),
+        okText:"Potwierdzam — zapisz kartę",
         cancelText:"Anuluj",
         onOk:()=>done(true),onCancel:()=>done(false)
       });
@@ -727,7 +725,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     if (!draft || busy || applyBusy || selectionBusy) return;
     setBusy(true); setError("");
     try {
-      if (!confirmDuplicate && !await reviewBefore("save",dates.performed)) return;
+      if (!confirmDuplicate && !await reviewBeforeSave(dates.performed)) return;
       const result = await invoke<SaveResult>("saveDraft", {
         draftId:draft.draftId, ...dates, findings, confirmDuplicate, rows
       });
@@ -766,7 +764,6 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     if (!draft || busy || applyBusy || selectionBusy) return;
     setBusy(true);setError("");
     try {
-      if (!await reviewBefore("preview")) return;
       const data = await invoke<{html:string}>("previewDraft", {
         draftId:draft.draftId, reported, performed, findings, rows
       });
