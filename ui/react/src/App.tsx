@@ -93,7 +93,7 @@ const archivedEditableColumns=[
   {key:"Opis zwierząt / numer siedziby stada",title:"Opis zwierząt",width:230},
   {key:"Rozpoznanie",title:"Rozpoznanie",width:210},
   {key:"Zamiennik produktu",title:"Zamiennik",width:180},
-  {key:"Sekcja (II lub III)",title:"Sekcja",width:105},
+  {key:"Sekcja (II lub III)",title:"Nabycie produktu",width:150},
   {key:"Zalecenia / uwagi",title:"Uwagi",width:230}
 ] as const;
 const archivedEditableFields=new Set(["Wyniki badań",
@@ -381,12 +381,12 @@ const editable: Array<{key: keyof DraftRow; field: string; title: string}> = [
   {key:"animals",field:"Liczba zwierząt",title:"Liczba zwierząt"},
   {key:"description",field:"Opis zwierząt / numer siedziby stada",title:"Opis zwierząt"},
   {key:"diagnosis",field:"Rozpoznanie",title:"Rozpoznanie"},
-  {key:"section",field:"Sekcja (II lub III)",title:"Sekcja"}
+  {key:"section",field:"Sekcja (II lub III)",title:"Nabycie produktu"}
 ];
 const treatmentColumns=[{value:"selected",label:"Druk"},{value:"product",label:"Produkt"},
-  {value:"variant",label:"Wariant ChPL"},
+  {value:"section",label:"Nabycie produktu"},{value:"variant",label:"Wariant ChPL"},
   {value:"quantity",label:"Ilość"},{value:"indication",label:"Wskazanie z ChPL"},
-  ...editable.map(({key,title})=>({value:key,label:title}))];
+  ...editable.filter(({key})=>key!=="section").map(({key,title})=>({value:key,label:title}))];
 const treatmentColumnKeys=treatmentColumns.map(column=>column.value);
 function treatmentColumnKey(column:ColumnsType<DraftRow>[number]):string {
   return String(column.key??("dataIndex" in column?column.dataIndex:""));
@@ -1013,15 +1013,15 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     {title:"Wskazanie z ChPL",dataIndex:"indication",width:220,ellipsis:true,
       render:(value:string)=><span title={value}>{value||"—"}</span>},
     ...editable.map(({key,title}) => ({
-      title, dataIndex:key, width:key==="section" ? 125 : key==="dosing" || key==="withdrawal" ? 245 : 170,
+      title, dataIndex:key, width:key==="section" ? 150 : key==="dosing" || key==="withdrawal" ? 245 : 170,
       render:(value:string,row:DraftRow) => key==="replacement"
         ? <Button size="small" disabled={applyBusy||busy||referenceBusy} title={value}
             onClick={()=>{void openReference(row);}}>{value||"Wybierz…"}</Button>
         : key==="section"
-        ? <Select aria-label={"Sekcja karty leczenia — "+row.product}
-            value={value==="III"?"III":"II"} disabled={applyBusy} style={{width:"100%"}}
-            options={[{label:"II",value:"II"},{label:"III",value:"III"}]}
-            onChange={next=>{void update(row.index,"section",next);}}/>
+        ? <Checkbox aria-label={"Nabycie produktu — "+row.product}
+            title="Potwierdzenie nabycia produktu (sekcja III)"
+            checked={value==="III"} disabled={applyBusy||busy}
+            onChange={event=>{void update(row.index,"section",event.target.checked?"III":"II");}}/>
         : <Input.TextArea autoSize={{minRows:1,maxRows:3}}
         aria-label={title} data-treatment-field={key} value={value}
         title={key==="description"?"Dwuklik otwiera dane zwierząt":undefined}
@@ -1938,14 +1938,14 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
               render:(value:string,_row:Record<string,string>,index:number)=>
                 editing
                   ? key==="Sekcja (II lub III)"
-                    ? <Select value={value==="III"?"III":"II"} style={{width:80}}
-                        aria-label={"Sekcja pozycji "+(index+1)}
-                        options={[{value:"II",label:"II"},{value:"III",label:"III"}]}
-                        onChange={next=>editRow(index,key,next)}/>
+                    ? <Checkbox checked={value==="III"}
+                        aria-label={"Nabycie produktu — pozycja "+(index+1)}
+                        title="Potwierdzenie nabycia produktu (sekcja III)"
+                        onChange={event=>editRow(index,key,event.target.checked?"III":"II")}/>
                     : <Input.TextArea aria-label={title+" pozycji "+(index+1)}
                         autoSize={{minRows:1,maxRows:3}} value={value??""}
                         onChange={event=>editRow(index,key,event.target.value)}/>
-                  : <span>{value||"—"}</span>
+                  : <span>{key==="Sekcja (II lub III)"?(value==="III"?"Tak":"Nie"):value||"—"}</span>
             }))
           ]}/>
       </>}

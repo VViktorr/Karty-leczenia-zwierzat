@@ -44,6 +44,18 @@ Check(restored.Rows[0]["SHA256 źródła"] == "hash" && restored.Rows[0]["Pełna
 string html = CardHtmlRenderer.Render(restored);
 Check(html.Contains("&lt;lek &amp; test&gt;") && !html.Contains("<lek & test>"), "HTML escaping failed.");
 Check(html.Contains("A4 landscape"), "Landscape A4 was lost.");
+const string acquisitionHeading = "III. Potwierdzenie nabycia produktu";
+const string productCell = "&lt;lek &amp; test&gt;";
+int acquisitionStart = html.IndexOf(acquisitionHeading, StringComparison.Ordinal);
+Check(acquisitionStart > html.IndexOf(productCell, StringComparison.Ordinal),
+    "The treatment item must appear in section II by default.");
+restored.Rows[0]["Sekcja (II lub III)"] = "III";
+string acquiredHtml = CardHtmlRenderer.Render(restored);
+int acquiredCell = acquiredHtml.IndexOf(productCell, StringComparison.Ordinal);
+Check(acquiredCell > acquiredHtml.IndexOf(acquisitionHeading, StringComparison.Ordinal) &&
+    acquiredCell == acquiredHtml.LastIndexOf(productCell, StringComparison.Ordinal),
+    "The acquired item must appear only in section III.");
+restored.Rows[0]["Sekcja (II lub III)"] = "II";
 var stampedCard = restored with { DoctorStampPng = [137, 80, 78, 71, 13, 10, 26, 10] };
 Check(CardHtmlRenderer.Render(stampedCard, 17.5m)
     .Contains("class='doctor-stamp' style='height:17.5mm'"), "Configured stamp size was not rendered.");
