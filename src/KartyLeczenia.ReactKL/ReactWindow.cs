@@ -1292,7 +1292,7 @@ internal sealed class ReactWindow : Form
                     product = product.Name,symbol = product.Symbol,
                     variants = product.Variants.Where(v=>v.Id.HasValue)
                         .Select(v => new {v.Id,v.Species,v.Indication,v.Route,v.Dose,
-                            v.Tissues,v.Milk,v.Remarks,v.Source,v.Pdf}).ToArray()
+                            v.Tissues,v.Milk,v.Eggs,v.Remarks,v.Source,v.Pdf}).ToArray()
                 };
             int variantId = Int(root,"variantId") ?? -1;
             var choice = product.Variants.SingleOrDefault(v=>v.Id == variantId);

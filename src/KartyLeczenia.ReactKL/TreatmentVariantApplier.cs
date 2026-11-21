@@ -13,6 +13,20 @@ internal sealed record AppliedTreatmentVariant(
 /// </summary>
 internal static class TreatmentVariantApplier
 {
+    internal static string FormatWithdrawal(CatalogueVariantModel choice)
+    {
+        bool poultry = TreatmentSpeciesGroup.CompatibleGroups([choice.Species]).Contains("poultry");
+        return string.Join(Environment.NewLine, new[]
+        {
+            Line("Tkanki jadalne", choice.Tissues),
+            poultry ? "" : Line("Mleko", choice.Milk),
+            Line("Jaja", choice.Eggs)
+        }.Where(part => part.Length > 0));
+
+        static string Line(string label, string value) =>
+            string.IsNullOrWhiteSpace(value) ? "" : label + ": " + value.Trim();
+    }
+
     internal static AppliedTreatmentVariant Apply(TreatmentRow row, CatalogueVariantModel choice)
     {
         if (choice.Id is null || string.IsNullOrWhiteSpace(choice.Species) ||
@@ -20,13 +34,7 @@ internal static class TreatmentVariantApplier
             throw new InvalidOperationException(
                 "Wybrany wariant katalogu nie ma gatunku, drogi lub dawkowania.");
 
-        string withdrawal = string.Join(Environment.NewLine, new[]
-        {
-            string.IsNullOrWhiteSpace(choice.Tissues) ? "" :
-                "Tkanki jadalne: " + choice.Tissues.Trim(),
-            string.IsNullOrWhiteSpace(choice.Milk) ? "" :
-                "Mleko: " + choice.Milk.Trim()
-        }.Where(part => part.Length > 0));
+        string withdrawal = FormatWithdrawal(choice);
 
         // Old registry context belongs to the previously selected variant;
         // keeping it can recalculate an unrelated dosing/withdrawal later.

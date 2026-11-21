@@ -1,3 +1,4 @@
+import {isPoultry} from "./cataloguePdfMetadata";
 import Modal from "./AppModal";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {useListPagination} from "./ListPagination";
@@ -34,7 +35,7 @@ interface Draft {
 }
 interface TreatmentVariantChoice {
   id:number;species:string;indication:string;route:string;dose:string;
-  tissues:string;milk:string;remarks:string;source:string;pdf:string;
+  tissues:string;milk:string;eggs:string;remarks:string;source:string;pdf:string;
 }
 interface TreatmentVariantList {
   product:string;symbol:string;variants:TreatmentVariantChoice[];
@@ -1256,7 +1257,9 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
           {title:"Droga podania",dataIndex:"route",width:140},
           {title:"Dawkowanie",dataIndex:"dose",width:230,ellipsis:true},
           {title:"Karencja — tkanki",dataIndex:"tissues",width:180,ellipsis:true},
-          {title:"Karencja — mleko",dataIndex:"milk",width:145,ellipsis:true},
+          {title:"Karencja — mleko",dataIndex:"milk",width:145,ellipsis:true,
+            render:(value:string,row)=>isPoultry(row.species) ? "—" : value},
+          {title:"Karencja — jaja",dataIndex:"eggs",width:145,ellipsis:true},
           {title:"Wskazanie",dataIndex:"indication",width:225,ellipsis:true},
           {title:"PDF ChPL",dataIndex:"pdf",width:130,
             render:(value:string)=>value

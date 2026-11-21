@@ -532,6 +532,12 @@ static class Program
                 "new animal withdrawal must include tissues and milk");
             Check(previous.Get("Karencja")==updated.Withdrawal,
                 "printed withdrawal must match the selected SQL catalogue variant");
+            var poultryChoice = second with { Species = "Kury", Milk = "Nie dotyczy", Eggs = "0 dni" };
+            var poultryApplied = TreatmentVariantApplier.Apply(previous, poultryChoice);
+            Check(poultryApplied.Withdrawal.Contains("Jaja: 0 dni") && !poultryApplied.Withdrawal.Contains("Mleko:"),
+                "poultry withdrawal includes explicitly stored zero and omits milk");
+            Check(!TreatmentVariantApplier.FormatWithdrawal(poultryChoice with { Eggs = "" }).Contains("Jaja:"),
+                "missing egg withdrawal stays missing");
             bool incompleteRejected = false;
             try { TreatmentVariantApplier.Apply(previous, choice with { Route = "" }); }
             catch (InvalidOperationException) { incompleteRejected = true; }

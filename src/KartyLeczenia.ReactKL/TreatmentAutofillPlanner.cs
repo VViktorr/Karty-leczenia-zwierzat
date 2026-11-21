@@ -88,19 +88,10 @@ internal static class TreatmentAutofillPlanner
                 $"{valid.Length} pasujące warianty. Wybierz właściwy ręcznie.");
 
         var candidate = valid[0];
-        string withdrawal = string.Join(Environment.NewLine, new[]
-        {
-            string.IsNullOrWhiteSpace(candidate.Tissues) ? "" :
-                "Tkanki jadalne: " + candidate.Tissues.Trim(),
-            string.IsNullOrWhiteSpace(candidate.Milk) ? "" :
-                "Mleko: " + candidate.Milk.Trim()
-        }.Where(s => s.Length > 0));
+        string withdrawal = TreatmentVariantApplier.FormatWithdrawal(candidate);
 
-        // The compact catalogue model does not carry every food-animal
-        // restriction (notably eggs). Such products still need manual review.
         string target = candidate.Species.Trim().ToLowerInvariant();
-        bool poultry = new[] {"kury","drób","indyki","gęsi","kaczki","kurczęta"}
-            .Any(name => target.Contains(name, StringComparison.Ordinal));
+        bool poultry = TreatmentSpeciesGroup.CompatibleGroups([candidate.Species]).Contains("poultry");
         bool dairy = new[] {"bydło","krowy","owce","kozy"}
             .Any(name => target.Contains(name, StringComparison.Ordinal));
         bool needsReview = poultry ||
@@ -110,7 +101,7 @@ internal static class TreatmentAutofillPlanner
             string.IsNullOrWhiteSpace(candidate.Source) ||
             string.IsNullOrWhiteSpace(candidate.Pdf) ||
             new[] { candidate.Dose, candidate.Indication, candidate.Tissues,
-                candidate.Milk, candidate.Source, candidate.Remarks }
+                candidate.Milk, candidate.Eggs, candidate.Source, candidate.Remarks }
                 .Any(HasReviewPlaceholder);
         return new(index, symbol, needsReview ? "review" : "ready",
             needsReview

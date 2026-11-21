@@ -10,7 +10,7 @@ internal sealed record CatalogueListing(string Symbol, string Name, string Statu
 internal sealed record CatalogueVariantModel(
     int? Id = null, string Species = "", string Indication = "", string Route = "",
     string Dose = "", string Tissues = "", string Milk = "", string Remarks = "",
-    string Source = "", string Short = "", string Price = "", string Pdf = "");
+    string Source = "", string Short = "", string Price = "", string Pdf = "", string Eggs = "");
 internal sealed record CatalogueProductModel(
     string Symbol, string Name, string RplId, string Description,
     string Revision, List<CatalogueVariantModel> Variants);
@@ -45,6 +45,12 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 THROW 50003, N''Brak zaimportowanego katalogu SQL.'', 1;');
             """);
         command.ExecuteNonQuery();
+    }
+
+    private static bool HasEggsColumn(SqlConnection db, SqlTransaction? tx = null)
+    {
+        using var probe = Command(db, "SELECT CASE WHEN COL_LENGTH(N'dbo.catalog_variants', N'eggs') IS NULL THEN 0 ELSE 1 END;", tx);
+        return (int)probe.ExecuteScalar()! == 1;
     }
 
     internal List<CatalogueListing> Search(string query)
@@ -122,10 +128,11 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         }
 
         var variants = new List<CatalogueVariantModel>();
-        using (var command = Command(db, """
+        string eggs = HasEggsColumn(db, tx) ? "v.eggs" : "NULL";
+        using (var command = Command(db, $"""
             SELECT v.id,v.species,v.indication,v.route,v.dose,v.edible_tissues,
                    v.milk,v.restrictions,v.source,v.withdrawal_short,
-                   COALESCE(w.compact_text,N''),v.pdf_path
+                   COALESCE(w.compact_text,N''),v.pdf_path,{eggs}
             FROM dbo.catalog_variants v
             LEFT JOIN dbo.catalog_price_withdrawal w ON w.id=v.id
             WHERE v.symbol=@symbol ORDER BY v.id;
@@ -138,7 +145,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 string Value(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i);
                 variants.Add(new(reader.GetInt32(0),Value(1),Value(2),Value(3),
                     Value(4),Value(5),Value(6),Value(7),Value(8),
-                    Value(9),Value(10),Value(11)));
+                    Value(9),Value(10),Value(11),Value(12)));
             }
         }
         tx.Commit();
@@ -164,13 +171,14 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
 
         using var db = Open();
         CheckImported(db);
+        string eggs = HasEggsColumn(db) ? "v.eggs" : "NULL";
         foreach (var batch in unique.Chunk(90))
         {
             var args = batch.Select((_, i) => "@symbol" + i).ToArray();
-            string query = """
+            string query = $"""
                 SELECT p.symbol,v.id,v.species,v.indication,v.route,v.dose,
                        v.edible_tissues,v.milk,v.restrictions,v.source,
-                       v.withdrawal_short,COALESCE(w.compact_text,N''),v.pdf_path,COALESCE(p.decision,N'')
+                       v.withdrawal_short,COALESCE(w.compact_text,N''),v.pdf_path,COALESCE(p.decision,N''),{eggs}
                 FROM dbo.catalog_products p
                 LEFT JOIN dbo.catalog_variants v ON v.symbol=p.symbol
                 LEFT JOIN dbo.catalog_price_withdrawal w ON w.id=v.id
@@ -202,7 +210,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 }
                 variants.Add(new(reader.GetInt32(1),Value(2),Value(3),
                     Value(4),Value(5),Value(6),Value(7),Value(8),
-                    Value(9),Value(10),Value(11),Value(12)));
+                    Value(9),Value(10),Value(11),Value(12),Value(14)));
             }
         }
         return (result, nonMedicines);
@@ -240,7 +248,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 string.IsNullOrWhiteSpace(v.Route) || string.IsNullOrWhiteSpace(v.Dose)))
                 throw new ArgumentException("Nowy wariant wymaga gatunku, drogi i dawkowania.");
             foreach (string value in new[] { v.Species,v.Indication,v.Route,v.Dose,v.Tissues,
-                v.Milk,v.Remarks,v.Source,v.Short,v.Price,v.Pdf })
+                v.Milk,v.Eggs,v.Remarks,v.Source,v.Short,v.Price,v.Pdf })
                 if (value.Length > 10000)
                     throw new ArgumentException("Pole wariantu jest zbyt długie.");
             if (v.Pdf.Length > 450) throw new ArgumentException("Za długa ścieżka PDF.");
@@ -248,6 +256,13 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
 
         using var db = Open();
         CheckImported(db);
+        bool hasEggs = HasEggsColumn(db);
+        if (!hasEggs && product.Variants.Any(v => !string.IsNullOrWhiteSpace(v.Eggs)))
+            throw new InvalidOperationException("Przed zapisaniem karencji dla jaj uruchom na serwerze scripts/Upgrade-CatalogueEggWithdrawal.sql.");
+        string eggsField = hasEggs ? "v.eggs" : "NULL";
+        string eggColumn = hasEggs ? ",eggs" : "";
+        string eggValue = hasEggs ? ",@eggs" : "";
+        string eggUpdate = hasEggs ? ",eggs=@eggs" : "";
         using var tx = db.BeginTransaction(IsolationLevel.Serializable);
         using (var command = Command(db, creating ? """
             IF EXISTS(SELECT 1 FROM dbo.catalog_products WITH(UPDLOCK,HOLDLOCK)
@@ -289,9 +304,9 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             {
                 // Never retain a stale generated withdrawal abbreviation after
                 // an operator changes tissues or milk but leaves the old short text.
-                using var previous = Command(db, """
+                using var previous = Command(db, $"""
                     SELECT v.edible_tissues,v.milk,v.withdrawal_short,
-                           COALESCE(w.compact_text,N'')
+                           COALESCE(w.compact_text,N''),{eggsField}
                     FROM dbo.catalog_variants v WITH (UPDLOCK)
                     LEFT JOIN dbo.catalog_price_withdrawal w ON w.id=v.id
                     WHERE v.symbol=@symbol AND v.id=@id;
@@ -305,21 +320,22 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 string oldMilk=reader.IsDBNull(1)?"":reader.GetString(1);
                 string oldShort=reader.IsDBNull(2)?"":reader.GetString(2);
                 string oldPrice=reader.GetString(3);
-                bool changed=oldTissues!=variant.Tissues || oldMilk!=variant.Milk;
+                string oldEggs=reader.IsDBNull(4)?"":reader.GetString(4);
+                bool changed=oldTissues!=variant.Tissues || oldMilk!=variant.Milk || oldEggs!=variant.Eggs;
                 if (changed && shortText==oldShort) shortText="";
                 if (changed && priceText==oldPrice) priceText="";
             }
-            using var write=Command(db,variant.Id is null ? """
+            using var write=Command(db,variant.Id is null ? $"""
                 INSERT dbo.catalog_variants(symbol,name,rpl_id,species,indication,route,dose,
-                    edible_tissues,milk,restrictions,source,card_text,pdf_path,withdrawal_short)
+                    edible_tissues,milk,restrictions,source,card_text,pdf_path,withdrawal_short{eggColumn})
                 OUTPUT INSERTED.id
                 VALUES(@symbol,@name,@rpl,@species,@indication,@route,@dose,
-                    @tissues,@milk,@remarks,@source,@card,@pdf,@short);
-                """ : """
+                    @tissues,@milk,@remarks,@source,@card,@pdf,@short{eggValue});
+                """ : $"""
                 UPDATE dbo.catalog_variants SET species=@species,indication=@indication,
                     route=@route,dose=@dose,edible_tissues=@tissues,milk=@milk,
                     restrictions=@remarks,source=@source,card_text=@card,
-                    pdf_path=@pdf,withdrawal_short=@short
+                    pdf_path=@pdf,withdrawal_short=@short{eggUpdate}
                 OUTPUT INSERTED.id WHERE id=@id AND symbol=@symbol;
                 """,tx);
             write.Parameters.Add("@symbol",SqlDbType.NVarChar,128).Value=product.Symbol;
@@ -333,13 +349,14 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 write.Parameters.Add(name,SqlDbType.NVarChar,-1).Value=value;
             Add("@species",variant.Species);Add("@indication",variant.Indication);
             Add("@route",variant.Route);Add("@dose",variant.Dose);
-            Add("@tissues",variant.Tissues);Add("@milk",variant.Milk);
+            Add("@tissues",variant.Tissues);Add("@milk",variant.Milk);Add("@eggs",variant.Eggs);
             Add("@remarks",variant.Remarks);Add("@source",variant.Source);
             Add("@short",shortText);
             write.Parameters.Add("@pdf",SqlDbType.NVarChar,450).Value=NullIfEmpty(variant.Pdf);
             string full=string.Join(", ",new[]{
                 string.IsNullOrWhiteSpace(variant.Tissues)?"":"tk. "+variant.Tissues,
-                string.IsNullOrWhiteSpace(variant.Milk)?"":"ml. "+variant.Milk
+                string.IsNullOrWhiteSpace(variant.Milk)?"":"ml. "+variant.Milk,
+                string.IsNullOrWhiteSpace(variant.Eggs)?"":"jaja: "+variant.Eggs
             }.Where(x=>x.Length>0));
             Add("@card",string.Join(" · ",new[]{
                 variant.Species,variant.Indication,variant.Route,variant.Dose,full,variant.Remarks

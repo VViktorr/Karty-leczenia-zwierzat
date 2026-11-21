@@ -107,7 +107,7 @@ BEGIN
         symbol nvarchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES dbo.catalog_products(symbol),
         name nvarchar(max) NULL, rpl_id nvarchar(max) NULL, upd_id nvarchar(max) NULL,
         species nvarchar(max) NULL, indication nvarchar(max) NULL, route nvarchar(max) NULL, dose nvarchar(max) NULL,
-        edible_tissues nvarchar(max) NULL, milk nvarchar(max) NULL, restrictions nvarchar(max) NULL,
+        edible_tissues nvarchar(max) NULL, milk nvarchar(max) NULL, eggs nvarchar(max) NULL, restrictions nvarchar(max) NULL,
         source nvarchar(max) NULL, verified_at nvarchar(max) NULL, card_text nvarchar(max) NULL, scope nvarchar(max) NULL,
         pdf_path nvarchar(450) COLLATE Latin1_General_100_BIN2 NULL REFERENCES dbo.catalog_documents(path),
         withdrawal_short nvarchar(max) NULL
@@ -122,6 +122,9 @@ BEGIN
     );
     CREATE TABLE dbo.catalog_import (id tinyint NOT NULL PRIMARY KEY CHECK (id = 1));
 END;
+IF COL_LENGTH(N'dbo.catalog_variants', N'eggs') IS NULL
+    ALTER TABLE dbo.catalog_variants ADD eggs nvarchar(max) NULL;
+
 
 IF OBJECT_ID(N'dbo.treatment_choices', N'U') IS NULL
 BEGIN

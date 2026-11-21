@@ -1,5 +1,5 @@
 import Modal from "./AppModal";
-import {compactWithdrawal,rplEntryFromPdfName} from "./cataloguePdfMetadata";
+import {compactWithdrawal, isPoultry,rplEntryFromPdfName} from "./cataloguePdfMetadata";
 import {useListPagination} from "./ListPagination";
 import {useListColumnLayout} from "./ListColumnLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,7 +15,7 @@ interface SubiektProduct { symbol:string; name:string; reason?:string; }
 interface CatalogueVariant {
   id: number | null;
   species: string; indication: string; route: string; dose: string;
-  tissues: string; milk: string; remarks: string; source: string;
+  tissues: string; milk: string; eggs: string; remarks: string; source: string;
   short: string; price: string; pdf: string;
 }
 interface CatalogueProduct {
@@ -40,6 +40,7 @@ const textFields = [
   { key: "dose", title: "Dawkowanie", width: 230 },
   { key: "tissues", title: "Tkanki jadalne", width: 160 },
   { key: "milk", title: "Mleko", width: 145 },
+  { key: "eggs", title: "Jaja", width: 145 },
   { key: "remarks", title: "Uwagi", width: 190 },
   { key: "source", title: "Źródło danych", width: 160 },
   { key: "short", title: "Skrót karencji", width: 160 },
@@ -53,7 +54,7 @@ function keyForVariant(variant: CatalogueVariant) {
 function emptyVariant(): UiVariant {
   return {
     id: null, key: "new-" + crypto.randomUUID(), species: "", indication: "",
-    route: "", dose: "", tissues: "", milk: "", remarks: "", source: "",
+    route: "", dose: "", tissues: "", milk: "", eggs: "", remarks: "", source: "",
     short: "", price: "", pdf: ""
   };
 }
@@ -256,7 +257,7 @@ export default function CataloguePage({
   }
 
   function fillWithdrawal(row: UiVariant): UiVariant {
-    const compact = compactWithdrawal(row.tissues,row.milk);
+    const compact = compactWithdrawal(row.tissues,isPoultry(row.species) ? "" : row.milk,row.eggs);
     if (!compact) return row;
     const short = row.short.trim() ? row.short : compact;
     return {...row,short,price:row.price.trim() ? row.price : short};
@@ -428,7 +429,7 @@ export default function CataloguePage({
     ...textFields.map(({ key, title, width }) => ({
       title, key, width,
       render: (_: unknown, row: UiVariant) =>
-        <Input.TextArea
+        key === "milk" && isPoultry(row.species) ? "—" : <Input.TextArea
           aria-label={title + " " + row.key}
           value={row[key]}
           autoSize={{ minRows: 1, maxRows: 4 }}
