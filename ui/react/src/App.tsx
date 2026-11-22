@@ -186,11 +186,11 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
       refresh ? {...payload,refresh:true}:payload,undefined,
       signal?AbortSignal.any([controller.signal,signal]):controller.signal);
     const pending=cacheScope!==undefined&&!refresh
-      // A superseded filter must cancel the native WebView2/SQL request too.
-      // React Query's signal alone does not track this component's lifecycle
-      // for an imperative fetchQuery call.
-      ? readCache.fetchQuery({queryKey,queryFn:({signal})=>invoke<T>(
-          action,payload,undefined,AbortSignal.any([controller.signal,signal]))})
+      // Keep this shared QueryClient fetch independent of a single component's
+      // effect lifetime. React.StrictMode mounts, cleans up and mounts again;
+      // cancelling the shared query on cleanup can discard the initial list.
+      // Uncached requests use the component's AbortController via load().
+      ? readCache.fetchQuery({queryKey,queryFn:({signal})=>invoke<T>(action,payload,undefined,signal)})
       : load();
     pending.then(result=>{
       if(expired)return;

@@ -4,7 +4,7 @@ Zakres: dotychczasowy ReactKL (React/Ant Design/AG Grid, WebView2, .NET, Subiekt
 
 ## Zmiany
 1. `DocumentService.ReadLatestDocumentIdAsync`: sprawdza najnowszy dokument **wyłącznie wybranego magazynu**. Nowe dokumenty z innych magazynów nie wymuszają pełnego odczytu listy po wygaśnięciu cache. Wciąż działa okresowy pełny odczyt (15 minut) i wymuszenie F5; brak dokumentów zwraca 0.
-2. `useRemote` w React: gdy użytkownik zmienia filtr albo opuszcza ekran, anulowany jest także odczyt rozpoczęty przez `fetchQuery` TanStack Query. Zapobiega to pozostawianiu zbędnych zapytań WebView2/SQL po szybkim wpisywaniu wyszukiwanego tekstu.
+2. `useRemote` w React: współdzielony odczyt TanStack Query pozostaje niezależny od pojedynczego montowania komponentu (React StrictMode), a odczyty bez tego cache nadal są anulowane po zmianie filtra. Nie wolno anulować współdzielonego `fetchQuery` przez `AbortController` jednego widoku, bo lista może pozostać pusta.
 3. Reużycie instancji `Intl.NumberFormat` i `Intl.DateTimeFormat` dla wszystkich wierszy.
 4. AG Grid: brak kopiowania tablicy wierszy i zastąpienie wielokrotnych `indexOf` mapą indeksów (dla funkcyjnego `rowKey`).
 5. `reactkl-checks.yml` uruchamia komplet testów także w pull requestach do `ReactKL`.
@@ -12,7 +12,7 @@ Zakres: dotychczasowy ReactKL (React/Ant Design/AG Grid, WebView2, .NET, Subiekt
 ## Testy przed scaleniem
 - GitHub Actions: `npm ci`, `npm run test:bridge`, `npm run build`, Playwright, `dotnet build`, `tests/ReactKLChecks`, publikacja win-x64 oraz test kompilacji Inno Setup.
 - Test ręczny z Subiektem GT: porównać listy FS/PA/WZ/Wszystkie (również po wyborze okresu i magazynu), kolejność, kontrahenta, wartości i powiązane WZ.
-- Szybko zmieniać wyszukiwaną frazę i zakładki: nie mogą pojawiać się wyniki nieaktualnej frazy; potwierdzić anulowanie zapytań po stronie hosta.
+- Szybko zmieniać wyszukiwaną frazę i zakładki: nie mogą pojawiać się wyniki nieaktualnej frazy. Zweryfikować oba tryby cache i inicjalizację React StrictMode; współdzielonego zapytania nie wolno anulować po sprzątaniu jednego widoku.
 - Sprawdzić F5, listę z pamięci i powrót po 5 minutach. Zmiana dokumentu w bieżącym magazynie ma odświeżyć listę. Edycje istniejących dokumentów wychwytywane są przy okresowym pełnym odczycie albo F5.
 - Sprawdzić oba widoki tabel (Ant Design i AG Grid), sortowanie, rozmiary kolumn, zmianę liczby pozycji i otwieranie Enter/dwuklikiem.
 - W środowisku wielostanowiskowym zmierzyć medianę i p95 z co najmniej 20 powtórzeń: zimny odczyt listy, ciepły cache, F5 i zmiana filtrów. Diagnostyka: `ReactKL.Documents.List` i `Subiekt.Documents.Timing`.
