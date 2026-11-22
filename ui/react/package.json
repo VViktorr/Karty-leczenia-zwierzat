@@ -10,10 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/pro-table": "3.21.0",
+    "ag-grid-community": "36.3.0",
+    "ag-grid-react": "36.3.0",
     "antd": "^5.27.0",
     "dayjs": "^1.11.0",
+    "pdfjs-dist": "6.5.438",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-pdf": "11.1.0",
     "react-rnd": "10.5.3"
   },
   "devDependencies": {

@@ -136,5 +136,14 @@ export function useExpiryTableLayout<T extends object>(columns:ColumnsType<T>){
       {key:"format",label:"Formatowanie",children:<ListFormattingPanel formatting={formatting} columns={specs.map(item=>({...item}))}/>}
     ]}/>
   </Modal>;
-  return {columns:formatting.apply(mouseColumns,column=>String(column.key??"")),tableProps:mouse.tableProps,dialog,openColumns:()=>setOpen(true)};
+  const grid = {
+    id:"expiry",
+    resize:(key:string,width:number)=>setWidths(previous=>({...previous,[key]:Math.max(80,Math.min(650,width))})),
+    move:(visibleOrder:string[])=>setOrder(previous=>{
+      const moved=new Set(visibleOrder);
+      let next=0;
+      return previous.map(key=>moved.has(key)?visibleOrder[next++]:key);
+    })
+  };
+  return {grid,columns:formatting.apply(mouseColumns,column=>String(column.key??"")),tableProps:mouse.tableProps,dialog,openColumns:()=>setOpen(true)};
 }

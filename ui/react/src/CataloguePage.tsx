@@ -1,14 +1,18 @@
 import Modal from "./AppModal";
+import Table from "./AppTable";
+import {Suspense, lazy} from "react";
 import {compactWithdrawal, isPoultry,rplEntryFromPdfName} from "./cataloguePdfMetadata";
 import {useListPagination} from "./ListPagination";
 import {useListColumnLayout} from "./ListColumnLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Button, Card, Checkbox, Empty, Input, Space, Table,
+  Alert, Button, Card, Checkbox, Empty, Input, Space, Spin,
   Tag, Typography, Tooltip, message
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { invoke } from "./bridge";
+
+const ChplPdfViewer = lazy(() => import("./ChplPdfViewer"));
 
 interface CatalogueListing { symbol: string; name: string; status: string; variants: number; }
 interface SubiektProduct { symbol:string; name:string; reason?:string; }
@@ -503,7 +507,7 @@ export default function CataloguePage({
             else setQuery(trimmed);
           }}
           onChange={event => setInput(event.target.value)} />
-        <Table<CatalogueListing> {...productsLayout.tableProps} rowKey="symbol" size="small"
+        <Table<CatalogueListing> grid={productsLayout.grid} {...productsLayout.tableProps} rowKey="symbol" size="small"
           loading={listBusy} dataSource={list}
           pagination={productsPagination}
           scroll={{ y: "calc(100vh - 370px)" }}
@@ -700,8 +704,9 @@ export default function CataloguePage({
       width="94vw" destroyOnClose
       onCancel={closePdf}
       footer={<Button onClick={closePdf}>Zamknij podgląd</Button>}>
-      {pdfUrl && <iframe src={pdfUrl} title="Dokument ChPL" referrerPolicy="no-referrer"
-        style={{ width: "100%", height: "76vh", border: 0, background: "#fff" }} />}
+      {pdfUrl && <Suspense fallback={<Spin aria-label="Ładowanie podglądu ChPL"/>}>
+        <ChplPdfViewer key={pdfUrl} url={pdfUrl} name={pdfName}/>
+      </Suspense>}
     </Modal>
   </>;
 }

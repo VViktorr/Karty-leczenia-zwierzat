@@ -90,6 +90,8 @@ export function useListColumnLayout<T extends object>(
   }
 
   function fitColumns(table:HTMLElement){
+    const grid=table.querySelector(".kl-ag-grid");
+    if(grid){grid.dispatchEvent(new Event("kl-fit-columns"));return;}
     const context=document.createElement("canvas").getContext("2d");
     if(!context)return;
     const rows=Array.from(table.querySelectorAll<HTMLTableRowElement>("tr[data-row-key]"));
@@ -152,5 +154,14 @@ export function useListColumnLayout<T extends object>(
       {key:"format",label:"Formatowanie",children:<ListFormattingPanel formatting={formatting} columns={definitions}/>}
     ]}/>
   </Modal>;
-  return {columns:formatting.apply(mouseColumns,identity),tableProps:mouse.tableProps,openColumns:()=>setOpen(true),resetColumns,fitColumns,dialog};
+  const grid = {
+    id:listId,
+    resize:(key:string,width:number)=>setWidths(previous=>({...previous,[key]:width})),
+    move:(visibleOrder:string[])=>setOrder(previous=>{
+      const moved=new Set(visibleOrder);
+      let next=0;
+      return previous.map(key=>moved.has(key)?visibleOrder[next++]:key);
+    })
+  };
+  return {grid,columns:formatting.apply(mouseColumns,identity),tableProps:mouse.tableProps,openColumns:()=>setOpen(true),resetColumns,fitColumns,dialog};
 }

@@ -3,13 +3,15 @@ import "dayjs/locale/pl";
 import datePickerPl from "antd/es/date-picker/locale/pl_PL";
 import {isPoultry} from "./cataloguePdfMetadata";
 import Modal from "./AppModal";
+import Table from "./AppTable";
+import {Suspense, lazy} from "react";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {useListPagination} from "./ListPagination";
 import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayout";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Dropdown, Empty,
-  Form, Input, InputNumber, Segmented, Select, Space, Spin, Switch, Table,
+  Form, Input, InputNumber, Segmented, Select, Space, Spin, Switch,
   Tag, Tabs, Typography, Progress, theme
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -23,6 +25,8 @@ import { defaultPricePrint, normalizePriceSettings, withdrawalText,
 import type { PricePrintOptions, PricePrintRow } from "./PricePrint";
 import type { BackupProgress } from "./bridge";
 import type { DocumentKind, DocumentRow, DocumentsResult, DatePeriod } from "./bridge";
+
+const ChplPdfViewer = lazy(() => import("./ChplPdfViewer"));
 
 type LayoutName = "classic" | "modern" | "fluent" | "compact-tabs" | "compact-sidebar";
 type PaletteName = "light" | "dark" | "sea";
@@ -331,13 +335,14 @@ function Documents({active, compact, onOpen}: {active: boolean; compact: boolean
         menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
         <div ref={tableRef} onContextMenuCapture={event=>{
           if(!compact||!(event.target instanceof Element))return;
-          const header=event.target.closest(".ant-table-thead th");
-          const id=event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key");
+          const header=event.target.closest(".ant-table-thead th, .ag-header-cell");
+          const id=event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key") ??
+            event.target.closest(".ag-row[row-id]")?.getAttribute("row-id");
           const row=data?.items.find(item=>String(item.id)===id);
           if(header||row){event.preventDefault();setContextMenu(header?"header":row!);if(row)setSelectedId(row.id);}
           else event.stopPropagation();
         }}>
-      <Table {...listLayout.tableProps} rowKey="id" loading={(busy&&!data)||reading} dataSource={data?.items??[]} columns={listLayout.columns}
+      <Table grid={listLayout.grid} {...listLayout.tableProps} rowKey="id" loading={(busy&&!data)||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
         size={compact?"small":"middle"} scroll={{x:900,y:compact?"calc(100vh - 250px)":"calc(100vh - 390px)"}} pagination={{
           current:page,pageSize:effectivePageSize,position:["bottomRight"],
@@ -1371,9 +1376,9 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       title={"Dokument ChPL — "+variantPdfName}
       onCancel={()=>setVariantPdfUrl(null)}
       footer={<Button onClick={()=>setVariantPdfUrl(null)}>Zamknij dokument</Button>}>
-      {variantPdfUrl&&<iframe src={variantPdfUrl} title="ChPL wybranego wariantu"
-        referrerPolicy="no-referrer"
-        style={{width:"100%",height:"76vh",border:0,background:"#fff"}}/>}
+      {variantPdfUrl&&<Suspense fallback={<Spin aria-label="Ładowanie podglądu ChPL"/>}>
+        <ChplPdfViewer key={variantPdfUrl} url={variantPdfUrl} name={variantPdfName}/>
+      </Suspense>}
     </Modal>
     <Modal className="kl-dialog-treatment-preview" width="92vw" open={preview!==null} title="Podgląd karty leczenia" onCancel={()=>setPreview(null)}
       footer={<Space wrap>
@@ -1517,7 +1522,7 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) 
           const next=new Set(current);rows.forEach(row=>next.add(row.symbol));return next;
         })}>Odznacz widoczne</Button>
       </Space>
-      <Table {...listLayout.tableProps} rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
+      <Table grid={listLayout.grid} {...listLayout.tableProps} rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
         onRow={row=>({onClick:()=>setActivePriceSymbol(row.symbol)})}
         dataSource={rows} columns={listLayout.columns}
         pagination={pagination}
@@ -1601,7 +1606,7 @@ function Expiry() {
         </Button>
       </Space>
       <ErrorNotice error={remote.error}/>
-      <Table {...expiryLayout.tableProps} rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
+      <Table grid={expiryLayout.grid} {...expiryLayout.tableProps} rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
         loading={remote.busy} dataSource={rows}
         pagination={pagination} scroll={{x:1040,y:"calc(100vh - 400px)"}}
         columns={expiryLayout.columns}/>
@@ -1851,7 +1856,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       </Space>
       <ErrorNotice error={error || remote.error}/>
       {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
-      <Table {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
+      <Table grid={savedLayout.grid} {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
         scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={pagination}
         onRow={row=>({onDoubleClick:()=>{void open(row);}})}
         columns={savedLayout.columns}/>

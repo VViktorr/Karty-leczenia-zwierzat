@@ -211,3 +211,10 @@
 .compact-document-toolbar > input { width: auto; }
 .compact-document-actions { margin-left: auto; }
 .compact-document-actions .ant-tag { margin-inline-end: 0; }
+
+.kl-grid-toggle { margin-block-end: 6px; }
+.kl-ag-grid .ant-table-row-selected .ag-cell { background: var(--ant-color-primary-bg, #1677ff26); }
+.kl-ag-pagination { justify-content: flex-end; margin-block: 12px; }
+.kl-chpl-pdf { height: min(72vh, 800px); overflow: auto; margin-top: 8px; }
+.kl-chpl-pdf .react-pdf__Page { width: max-content; margin-inline: auto; }
+.kl-chpl-pdf iframe { width: 100%; height: 100%; border: 0; }
