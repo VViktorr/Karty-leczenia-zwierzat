@@ -14,6 +14,7 @@ import {
   Form, Input, InputNumber, Segmented, Select, Space, Spin, Switch,
   Tag, Tabs, Typography, Progress, theme
 } from "antd";
+import type {ThemeConfig} from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
@@ -27,8 +28,8 @@ import type { BackupProgress } from "./bridge";
 import type { DocumentKind, DocumentRow, DocumentsResult, DatePeriod } from "./bridge";
 
 const ChplPdfViewer = lazy(() => import("./ChplPdfViewer"));
+const FluentNavigation = lazy(() => import("./FluentNavigation")) as typeof import("./FluentNavigation").default;
 
-type LayoutName = "classic" | "modern" | "fluent" | "compact-tabs" | "compact-sidebar";
 type PaletteName = "light" | "dark" | "sea";
 type Section = "documents" | "prices" | "catalogue" | "treatment" | "saved" | "expiry" | "settings";
 interface DraftRow {
@@ -118,9 +119,11 @@ function saved<T extends string>(key: string, values: readonly T[], fallback: T)
   try { const value = localStorage.getItem(key); return values.find(item => item === value) ?? fallback; }
   catch { return fallback; }
 }
-const layouts = ["modern", "classic", "fluent", "compact-tabs", "compact-sidebar"] as const;
+const layouts = ["modern", "classic", "windows", "fluent", "compact-tabs", "compact-sidebar"] as const;
+type LayoutName = (typeof layouts)[number];
 const layoutLabels: Record<LayoutName,string> = {
-  modern:"Modern — menu boczne", classic:"Classic — zakładki", fluent:"Fluent — Windows 11",
+  modern:"Modern — menu boczne", classic:"Classic — zakładki",
+  windows:"Windows — pasek poleceń", fluent:"Fluent UI React — menu boczne",
   "compact-tabs":"Zakładki kompaktowe", "compact-sidebar":"Menu boczne kompaktowe"
 };
 const palettes = ["light", "dark", "sea"] as const;
@@ -2431,8 +2434,10 @@ export default function App() {
     return()=>{active=false;};
   },[]);
   const [layout,setLayout]=useState<LayoutName>(()=>saved("kl.layout",layouts,"modern"));
-  const compact=layout==="compact-tabs"||layout==="compact-sidebar";
-  const topTabs=layout==="classic"||layout==="compact-tabs";
+  const windows=layout==="windows";
+  const fluent=layout==="fluent";
+  const compact=windows||layout==="compact-tabs"||layout==="compact-sidebar";
+  const topTabs=windows||layout==="classic"||layout==="compact-tabs";
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
   const [uiScale,setUiScale]=useState<number>(()=>{
     try{const value=Number(localStorage.getItem("kl.uiScale"));return Number.isFinite(value)&&value>=80&&value<=200?value:100;}
@@ -2467,19 +2472,68 @@ export default function App() {
     try{localStorage.setItem("kl.uiScale",String(uiScale));}catch{/* no storage */}
     return()=>{document.documentElement.style.zoom=previous;};
   },[uiScale]);
-  const primary=palette==="sea"?"#15836f":palette==="dark"?"#78a5fa":"#1768d8";
-  const appearance=useMemo(()=>({
-    algorithm:palette==="dark"?theme.darkAlgorithm:theme.defaultAlgorithm,
-    token:{colorPrimary:primary,borderRadius:topTabs?4:layout==="modern"?12:8, controlHeight:compact?26:32,
-      fontFamily:"Segoe UI,system-ui,sans-serif",fontSize:compact?13:14},
-    components:{Segmented:{itemSelectedBg:primary,itemSelectedColor:"#fff"},
-      Table:{headerBg:palette==="dark"?"#273447":"#f3f6fa"}}
-  }),[palette,layout,primary,topTabs,compact]);
-  const nav=<nav aria-label="Nawigacja Karty Leczenia" className="main-nav">
+  const dark=palette==="dark";
+  const primary=palette==="sea"?"#15836f":windows?(dark?"#2367a7":"#005fb8"):
+    fluent?(dark?"#276bb0":"#0f6cbd"):dark?"#78a5fa":"#1768d8";
+  const appearance=useMemo<ThemeConfig>(()=>{
+    const desktop=windows||fluent;
+    const panel=dark?"#242424":"#fff";
+    const line=dark?"#454545":"#d8d8d8";
+    const surface=windows?(dark?"#303030":"#ededed"):(dark?"#292929":"#f7f7f7");
+    const selection=palette==="sea"?(dark?"#183e35":"#e1f3ec"):
+      dark?(windows?"#253d56":"#263b50"):(windows?"#e2effb":"#ebf3fc");
+    return {
+      algorithm:dark?theme.darkAlgorithm:theme.defaultAlgorithm,
+      token:{colorPrimary:primary,borderRadius:windows?3:fluent?6:topTabs?4:layout==="modern"?12:8,
+        controlHeight:windows?28:compact?26:32,
+        fontFamily:"Segoe UI,system-ui,sans-serif",fontSize:compact?13:14,
+        ...(desktop?{colorBgContainer:panel,colorBorder:line,colorBorderSecondary:line,
+          colorText:dark?"#f5f5f5":"#242424",colorBgElevated:panel,
+          colorFillAlter:surface,colorPrimaryBg:selection}:{})},
+      components:{
+        Segmented:{itemSelectedBg:primary,itemSelectedColor:"#fff"},
+        Table:{
+          headerBg:desktop?surface:(dark?"#273447":"#f3f6fa"),
+          ...(desktop?{borderColor:line,headerBorderRadius:windows?0:6,
+            rowHoverBg:surface,rowSelectedBg:selection,rowSelectedHoverBg:selection}:{})
+        },
+        ...(desktop?{
+          Button:{defaultShadow:"none",primaryShadow:"none",dangerShadow:"none",
+            defaultBorderColor:windows?line:"transparent",defaultBg:windows?panel:surface,
+            defaultHoverBg:selection},
+          Card:{bodyPadding:windows?10:16,headerBg:windows?surface:panel},
+          Modal:{titleFontSize:windows?15:17,headerBg:windows?surface:panel,contentBg:panel},
+          Input:{activeShadow:windows?"none":`0 2px 0 ${primary}`},
+          InputNumber:{handleWidth:windows?20:26,handleVisible:windows?true:"auto",
+            handleBg:surface,handleBorderColor:line},
+          Select:{optionSelectedBg:selection,optionSelectedFontWeight:600},
+          Switch:{trackHeight:windows?18:22,trackMinWidth:windows?38:44,
+            handleSize:windows?14:16,trackPadding:windows?2:3,handleShadow:"none"},
+          Slider:{railSize:windows?3:4,handleSize:windows?10:14,
+            handleSizeHover:windows?10:14,trackBg:primary,handleColor:primary},
+          Dropdown:{paddingBlock:windows?3:6}
+        }:{})
+      }
+    };
+  },[dark,layout,primary,topTabs,compact,windows,fluent,palette]);
+  useEffect(()=>{
+    if(windows||fluent)document.documentElement.dataset.klSkin=layout;
+    else delete document.documentElement.dataset.klSkin;
+    ConfigProvider.config({holderRender:children=><ConfigProvider theme={appearance}>{children}</ConfigProvider>});
+    return ()=>{
+      delete document.documentElement.dataset.klSkin;
+      ConfigProvider.config({holderRender:children=>children});
+    };
+  },[layout,windows,fluent,appearance]);
+  const standardNav=<nav aria-label="Nawigacja Karty Leczenia" className="main-nav">
     {sections.map(x=><button key={x.id} type="button"
+      aria-current={section===x.id?"page":undefined}
       className={"nav-item "+(section===x.id?"is-active":"")}
       onClick={()=>navigate(x.id)}>{x.name}</button>)}
   </nav>;
+  const nav=fluent?<Suspense fallback={standardNav}>
+    <FluentNavigation items={sections} current={section} palette={palette} onNavigate={navigate}/>
+  </Suspense>:standardNav;
   const controls=<div className="appearance-controls">
     <Select aria-label="Układ" value={layout} onChange={setLayout} options={layouts.map(value=>({value,label:layoutLabels[value]}))}/>
     <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
@@ -2500,9 +2554,9 @@ export default function App() {
     <div className={"app-shell layout-"+layout+" palette-"+palette+(compact?" layout-compact":"")}>
       {!topTabs&&<aside className="sidebar">
         <div className="sidebar-brand"><div className="brand-mark">KL</div>
-          <div><strong>Karty Leczenia</strong><small>ReactKL · SQL</small></div></div>
+          <div><strong>Karty Leczenia</strong>{!fluent&&<small>ReactKL · SQL</small>}</div></div>
         {nav}
-        <div className="sidebar-footer">Interfejs React + WebView2<br/>Dane pozostają w SQL Server</div>
+        {!fluent&&<div className="sidebar-footer">Interfejs React + WebView2<br/>Dane pozostają w SQL Server</div>}
       </aside>}
       <div className="workspace">
         <header className="topbar">

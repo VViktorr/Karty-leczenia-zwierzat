@@ -33,11 +33,6 @@
 .top-navigation{padding:8px 22px 0;background:var(--panel);border-bottom:1px solid var(--line)}
 .top-navigation .main-nav{flex-direction:row;gap:4px}.top-navigation .nav-item{border-radius:7px 7px 0 0;padding:10px 17px}
 .layout-classic .main-content{padding:20px 24px}.layout-classic .document-card{box-shadow:none}
-.layout-fluent .sidebar{width:206px;flex-basis:206px;padding:18px 10px}
-.layout-fluent .nav-item{border-radius:5px;border-left:3px solid transparent;padding:11px 15px}
-.layout-fluent .nav-item.is-active{background:color-mix(in srgb,var(--nav-active) 16%,var(--panel));color:var(--text);border-left-color:var(--nav-active)}
-.layout-fluent .main-content{background:var(--panel)}.layout-fluent .document-card{box-shadow:none}
-.layout-fluent .topbar{background:var(--shell-bg)}
 @media(max-width:1200px){.document-filters{grid-template-columns:1fr 1fr}.document-filters .ant-segmented{grid-column:1/-1}}
 @media(max-width:900px){.sidebar{width:182px;flex-basis:182px}.sidebar-brand strong{font-size:13px}.topbar{padding:0 14px}.main-content{padding:18px 14px}.document-filters{grid-template-columns:1fr}.document-filters .ant-segmented{grid-column:auto}.appearance-controls .ant-select:first-child{width:175px}}
 
@@ -218,3 +213,76 @@
 .kl-chpl-pdf { height: min(72vh, 800px); overflow: auto; margin-top: 8px; }
 .kl-chpl-pdf .react-pdf__Page { width: max-content; margin-inline: auto; }
 .kl-chpl-pdf iframe { width: 100%; height: 100%; border: 0; }
+
+/* Desktop skins share the selected palette with dialogs and data grids. */
+:is(.layout-windows,.layout-fluent).palette-light {
+  --shell-bg: #f3f3f3; --panel: #fff; --line: #dadada;
+  --text: #242424; --subtle: #616161; --nav-bg: #f8f8f8;
+  --nav-text: #242424; --nav-active: #0f6cbd;
+}
+:is(.layout-windows,.layout-fluent).palette-dark {
+  --shell-bg: #202020; --panel: #242424; --line: #454545;
+  --text: #f5f5f5; --subtle: #cacaca; --nav-bg: #292929;
+  --nav-text: #f5f5f5; --nav-active: #479ef5;
+}
+.layout-windows.palette-light { --nav-active: #005fb8; }
+.layout-windows .topbar {
+  height: auto; min-height: 38px; flex: 0 0 auto;
+  padding: 4px 10px; flex-wrap: wrap; background: var(--shell-bg);
+}
+.layout-windows .top-navigation {
+  padding: 4px 8px; overflow-x: auto; background: var(--panel);
+}
+.layout-windows .top-navigation .nav-item {
+  white-space: nowrap; border-radius: 4px; padding: 5px 9px;
+}
+.layout-windows .nav-item.is-active {
+  background: color-mix(in srgb,var(--nav-active) 13%,var(--panel));
+  color: var(--text);
+  border-color: color-mix(in srgb,var(--nav-active) 55%,var(--line));
+}
+.layout-windows .page-heading {
+  padding: 6px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+}
+.layout-fluent .sidebar { width: 208px; flex-basis: 208px; padding: 12px 8px; }
+.layout-fluent .sidebar-brand { margin: 0 6px 20px; }
+.layout-fluent .brand-mark { width: 32px; height: 32px; border-radius: 6px; background: var(--nav-active); }
+.layout-fluent .topbar {
+  height: auto; min-height: 52px; flex: 0 0 auto; flex-wrap: wrap;
+  padding: 8px 16px; background: var(--panel);
+}
+.layout-fluent .main-content { padding: 14px 16px; }
+.layout-fluent .main-nav { gap: 3px; }
+.layout-fluent .fluent-nav-provider { background: transparent; }
+.layout-fluent .fluent-nav-button {
+  position: relative; justify-content: flex-start; text-align: left;
+  padding-inline: 12px 8px; color: var(--nav-text);
+}
+.layout-fluent .fluent-nav-button[aria-current="page"] {
+  background: color-mix(in srgb,var(--nav-active) 13%,var(--panel));
+  color: var(--text); font-weight: 650;
+}
+.layout-fluent .fluent-nav-button[aria-current="page"]::before {
+  content: ""; position: absolute; inset-block: 6px; inset-inline-start: 0;
+  width: 3px; border-radius: 3px; background: var(--nav-active);
+}
+
+/* The root selector also reaches Ant Design controls mounted in portals. */
+html[data-kl-skin="windows"] .ant-table :is(th,td):not(:last-child) {
+  border-inline-end: 1px solid var(--line, #8883);
+}
+html[data-kl-skin="windows"] .ant-table-thead th { padding-block: 6px; }
+html[data-kl-skin="windows"] .ant-switch { border-radius: 4px; }
+html[data-kl-skin="windows"] .ant-switch .ant-switch-handle::before { border-radius: 2px; }
+html[data-kl-skin="windows"] .ant-modal .ant-modal-header {
+  padding: 7px 10px; border-radius: 3px; padding-inline-end: 60px;
+}
+html[data-kl-skin="fluent"] .ant-table-thead th { font-weight: 650; }
+html[data-kl-skin="fluent"] .ant-table-thead th::before { opacity: .45; }
+html[data-kl-skin="fluent"] .ant-modal .ant-modal-footer { padding-block-start: 8px; }
+html[data-kl-skin="windows"] .ag-root-wrapper {
+  --ag-wrapper-border-radius: 2px;
+  --ag-header-column-border: 1px solid var(--line);
+  --ag-cell-horizontal-border: 1px solid var(--line);
+}
+html[data-kl-skin="fluent"] .ag-root-wrapper { --ag-wrapper-border-radius: 6px; }
