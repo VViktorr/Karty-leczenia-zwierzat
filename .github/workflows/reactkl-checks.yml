@@ -124,6 +124,6 @@ jobs:
             throw 'Inno Setup did not produce the expected smoke-test file.'
           }
           $meta = [Diagnostics.FileVersionInfo]::GetVersionInfo($installer)
-          if ($meta.FileDescription -ne 'Karty Leczenia 0.0.0-rc.1') {
+          if ($meta.FileDescription.Trim() -ne 'Karty Leczenia 0.0.0-rc.1') {
             throw "Nieprawidłowy opis wersji RC instalatora: $($meta.FileDescription)"
           }

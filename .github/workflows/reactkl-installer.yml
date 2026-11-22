@@ -44,7 +44,7 @@ jobs:
           $path = "Instalatory/KartyLeczenia-Setup-win-x64-v$env:RELEASE_VERSION.exe"
           if (!(Test-Path -LiteralPath $path)) { throw "Nie znaleziono $path" }
           $meta = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $path).Path)
-          if ($meta.FileDescription -ne "Karty Leczenia $env:RELEASE_VERSION") {
+          if ($meta.FileDescription.Trim() -ne "Karty Leczenia $env:RELEASE_VERSION") {
             throw "Opis pliku nie odpowiada wydaniu: $($meta.FileDescription)"
           }
           $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
