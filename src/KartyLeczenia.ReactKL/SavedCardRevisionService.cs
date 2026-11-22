@@ -112,6 +112,7 @@ internal sealed class SavedCardRevisionService(ConnectionSettingsStore settings)
             }
             updatedRows.Add(newValues);
         }
+        CardArchiveService.ValidateAnimalCounts(updatedRows);
         var updated = original with { Fields = updatedFields, Rows = updatedRows };
         // Validate the same print payload before touching the SQL record.
         _ = CardHtmlRenderer.Render(updated);

@@ -51,6 +51,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Zakres mapowania towarów"] = source.Scope
         };
         var rows = CaptureRows(source);
+        ValidateAnimalCounts(rows);
         var card = new Card(fields, rows)
         {
             ClinicStampPng = clinic.UseClinicStamp ? clinic.ClinicStampPng : null,
@@ -175,6 +176,20 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ClinicStampPng = clinic.UseClinicStamp ? clinic.ClinicStampPng : null,
             DoctorStampPng = clinic.UseDoctorStamp ? clinic.DoctorStampPng : null
         });
+    }
+
+    internal static void ValidateAnimalCounts(IReadOnlyList<Dictionary<string, string>> rows)
+    {
+        for (int index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            if (!string.Equals(row.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase))
+                continue;
+            string value = (row.GetValueOrDefault("Liczba zwierząt") ?? "").Trim();
+            if (!int.TryParse(value, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out int count) || count <= 0)
+                throw new ArgumentException($"Pozycja {index + 1}: podaj dodatnią całkowitą liczbę zwierząt.");
+        }
     }
 
     private static List<Dictionary<string, string>> CaptureRows(DocumentData source)

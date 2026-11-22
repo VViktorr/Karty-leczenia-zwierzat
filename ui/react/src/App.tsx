@@ -13,7 +13,7 @@ import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayou
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Dropdown, Empty,
-  Form, Input, InputNumber, Segmented, Select, Space, Spin, Switch,
+  Form, Input, InputNumber, Segmented, Select, Space, Spin, Steps, Switch,
   Tag, Tabs, Typography, Progress, theme
 } from "antd";
 import type {ThemeConfig} from "antd";
@@ -56,11 +56,12 @@ interface TreatmentSuggestion {
   withdrawal:string;source:string;hasPdf:boolean;pdfPath:string;groups:SpeciesGroup[];variantCount:number;hasCatalogueVariants:boolean;nonMedicine:boolean;
 }
 interface TreatmentSuggestionList {
+  preferenceWarning?:string;
   items:TreatmentSuggestion[];
-  compatibility:Array<{index:number;groups:SpeciesGroup[]}>;
+  compatibility:Array<{index:number;groups:SpeciesGroup[];currentSpecies?:string;currentGroups?:SpeciesGroup[]}>;
 }
 type SpeciesGroup="all"|"cattle"|"swine"|"poultry"|"dog"|"cat";
-interface SavedChoice {symbol:string;species:string;route:string;}
+interface SavedChoice {symbol:string;species:string;route:string;variantId?:number|null;}
 interface SavedChoiceList {items:SavedChoice[];}
 const speciesGroups:Array<{value:SpeciesGroup;label:string}>=[
   {value:"all",label:"Wszystkie gatunki"},
@@ -72,7 +73,7 @@ const speciesGroups:Array<{value:SpeciesGroup;label:string}>=[
 ];
 interface TreatmentBulkResult {
   applied:Array<{index:number;species:string;route:string;dosing:string;
-    withdrawal:string;indication:string;description:string}>;
+    withdrawal:string;indication:string;description:string;remembered?:boolean;requiresReview?:boolean}>;
   skipped:string[];
 }
 interface PriceLevel { number: number; name: string; }
@@ -181,7 +182,10 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   }};
 }
 
-function Documents({active, compact, onOpen}: {active: boolean; compact: boolean; onOpen: (draft: Draft) => void}) {
+function Documents({active, compact, beforeOpen, onOpen}: {
+  active:boolean;compact:boolean;beforeOpen:(row:DocumentRow)=>Promise<boolean>;
+  onOpen:(draft:Draft)=>void;
+}) {
   const tableRef=useRef<HTMLDivElement>(null);
   const [contextMenu,setContextMenu]=useState<DocumentRow|"header"|null>(null);
   useEffect(()=>{if(!active||!compact)setContextMenu(null);},[active,compact]);
@@ -229,6 +233,7 @@ function Documents({active, compact, onOpen}: {active: boolean; compact: boolean
     openedDocument.current = request;
     setReading(true); setReadError("");
     try {
+      if(!await beforeOpen(row)||request.signal.aborted)return;
       const draft = await invoke<Draft>("readDocument",
         {documentId: row.id, number: row.number}, undefined, request.signal);
       if (!request.signal.aborted) onOpen(draft);
@@ -438,16 +443,45 @@ function TreatmentOptions({compact, label, children}: {
     : <>{children}</>;
 }
 
-function Treatment({draft, compact, onDocuments, onOpenSaved}: {
-  draft: Draft | null; compact: boolean; onDocuments: () => void; onOpenSaved: (id:string)=>void;
+function TreatmentDateFields({reported,performed,onChange}: {
+  reported:string;performed:string;onChange:(dates:{reported:string;performed:string})=>void;
+}) {
+return <Space direction="vertical" style={{width:"100%"}}>
+        <label>Data i godzina zgłoszenia (opcjonalnie)
+          <DatePicker value={reported?dayjs(reported).locale("pl"):null}
+            showTime={{format:"HH:mm"}} needConfirm format="DD.MM.YYYY HH:mm"
+            locale={{...datePickerPl,lang:{...datePickerPl.lang,ok:"Zatwierdź"}}}
+            style={{width:"100%"}}
+            onChange={value=>onChange({reported:value?.format("YYYY-MM-DDTHH:mm")??"",performed})}/></label>
+        <label>Data i godzina wykonania czynności weterynaryjnych
+          <DatePicker value={performed?dayjs(performed).locale("pl"):null}
+            showTime={{format:"HH:mm"}} needConfirm allowClear={false} format="DD.MM.YYYY HH:mm"
+            locale={{...datePickerPl,lang:{...datePickerPl.lang,ok:"Zatwierdź"}}}
+            style={{width:"100%"}}
+            onChange={value=>onChange({performed:value?.format("YYYY-MM-DDTHH:mm")??"",reported})}/></label>
+      </Space>;
+}
+
+const treatmentSteps=["Gatunek i leki","Zwierzęta i leczenie","Daty","Podsumowanie"];
+const validAnimalCount=(value:string)=>/^\d+$/.test(value.trim()) &&
+  Number(value)>0 && Number(value)<=2147483647;
+
+function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onSavedChange}: {
+  draft: Draft | null; compact: boolean; active:boolean; wizard:boolean; onDocuments: () => void; onOpenSaved: (id:string)=>void;
+  onSavedChange:(saved:boolean)=>void;
 }) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
+  const [step,setStep]=useState(0);
+  const [summaryHtml,setSummaryHtml]=useState("");
+  const drugStep=!wizard||step===0;
+  const animalStep=!wizard||step===1;
+  const editingRows=drugStep||animalStep;
   const treatmentControls = useRef<HTMLDivElement>(null);
   const [tableHeight, setTableHeight] = useState(180);
   useEffect(()=>{
     const controls=treatmentControls.current;
     const main=controls?.closest<HTMLElement>("main");
-    if(!compact||!controls||!main)return;
+    if(!active||!compact||!controls||!main)return;
     const measure=()=>{
       const padding=getComputedStyle(main);
       const available=main.clientHeight-controls.offsetHeight
@@ -459,7 +493,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     observer.observe(main);
     measure();
     return()=>observer.disconnect();
-  },[compact,draft]);
+  },[active,compact,draft]);
   const [showColumns,setShowColumns]=useState(false);
   const treatmentMouse = useTableMouseLayout("treatment");
   const treatmentFormatting = useListFormatting("treatment");
@@ -496,6 +530,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     catch{/* Current choice remains active for this session. */}
   },[visibleColumns]);
   useEffect(()=>{
+    if(!active||!editingRows)return;
     const key=(event:KeyboardEvent)=>{
       if(event.ctrlKey&&event.shiftKey&&event.code==="KeyL"){
         event.preventDefault();setShowColumns(current=>!current);
@@ -503,10 +538,11 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     };
     window.addEventListener("keydown",key);
     return()=>window.removeEventListener("keydown",key);
-  },[]);
+  },[active,editingRows]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedNumber, setSavedNumber] = useState("");
+  useEffect(()=>onSavedChange(!!savedNumber),[savedNumber,onSavedChange]);
   const [duplicateId,setDuplicateId]=useState<string|null>(null);
   const [reported, setReported] = useState("");
   const [performed, setPerformed] = useState(() => localDateTime());
@@ -533,6 +569,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [variantModal,setVariantModal]=useState<{
     index:number;product:string;symbol:string;variants:TreatmentVariantChoice[];
   }|null>(null);
+  const [rememberVariant,setRememberVariant]=useState<boolean>();
   const [variantBusy,setVariantBusy]=useState(false);
   const [variantError,setVariantError]=useState("");
   const [variantPdfUrl,setVariantPdfUrl]=useState<string|null>(null);
@@ -547,15 +584,15 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [suggestionGroup,setSuggestionGroup]=useState<SpeciesGroup>();
   const [speciesGroup,setSpeciesGroup]=useState<SpeciesGroup>("cattle");
   const [compatibility,setCompatibility]=useState<Record<number,SpeciesGroup[]>>({});
+  const [restoredVariants,setRestoredVariants]=useState<Record<number,boolean>>({});
+  const [rowSpeciesGroups,setRowSpeciesGroups]=useState<Record<number,{species:string;groups:SpeciesGroup[]}>>({});
   const [compatibilityDraftId,setCompatibilityDraftId]=useState("");
-  const desiredChecks=useRef<Map<number,boolean>>(new Map());
   const [remember,setRemember]=useState(()=>{
     try{return localStorage.getItem("ReactKL.rememberTreatmentChoices")==="true";}
     catch{return false;}
   });
   const [savedChoices,setSavedChoices]=useState<Record<string,SavedChoice>>({});
   const [choiceError,setChoiceError]=useState("");
-  const [selectionBusy,setSelectionBusy]=useState(false);
   const [animalDescriptions,setAnimalDescriptions]=useState<string[]>([]);
   const [animalError,setAnimalError]=useState("");
   const [animalBusy,setAnimalBusy]=useState(false);
@@ -563,17 +600,15 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const [groupCount,setGroupCount]=useState("");
   const [groupSpecies,setGroupSpecies]=useState("");
   const [groupSection,setGroupSection]=useState("II");
-  const selectionQueue=useRef<Promise<void>>(Promise.resolve());
-  const selectionVersion=useRef(0);
   const autoApplied=useRef(new Set<string>());
   useEffect(() => {
     autoApplied.current.clear();
+    setStep(0);setSummaryHtml("");setFindings("");setPreview(null);setError("");
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
     pendingSaveDates.current=null;setSaveReview(null);
     setDuplicateId(null);setDateStep(null);setAnimalEdit(null);setReferenceEdit(null);
     setReported("");setPerformed(localDateTime());
-    desiredChecks.current=new Map((draft?.rows??[]).map(row=>[row.index,row.selected]));
-    setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});
+    setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});setRowSpeciesGroups({});setRestoredVariants({});
     setSavedChoices({});setAnimalDescriptions([]);setAnimalError("");
     setGroupDescription("");setGroupCount("");setGroupSpecies("");setGroupSection("II");
   }, [draft]);
@@ -581,27 +616,31 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     if(!draft){setSuggestions([]);return;}
     let cancelled=false;
     setSuggestBusy(true);setSuggestError("");setSuggestions([]);
-    // The selection effect queues the new group on the host in this render.
-    void Promise.resolve().then(()=>selectionQueue.current)
-      .then(()=>cancelled?undefined:invoke<TreatmentSuggestionList>("treatmentSuggestions",{
-        draftId:draft.draftId,speciesGroup
-      }))
+    void invoke<TreatmentSuggestionList>("treatmentSuggestions",{draftId:draft.draftId,speciesGroup,useRemembered:wizard||remember})
       .then(result=>{
         if(cancelled||!result)return;
+        setSuggestError(result.preferenceWarning??"");
         setSuggestionGroup(speciesGroup);
         setSuggestions(result.items);
         const groups:Record<number,SpeciesGroup[]>={};
-        for(const item of result.compatibility??[])groups[item.index]=item.groups;
+        const applied:typeof rowSpeciesGroups={};
+        for(const item of result.compatibility??[]){
+          groups[item.index]=item.groups;
+          if(item.currentSpecies&&item.currentGroups?.length)
+            applied[item.index]={species:item.currentSpecies,groups:item.currentGroups};
+        }
         setCompatibility(groups);
+        setRowSpeciesGroups(applied);
         setCompatibilityDraftId(draft.draftId);
       })
       .catch(e=>{if(!cancelled){setSuggestions([]);setSuggestError(
         e instanceof Error?e.message:String(e));}})
       .finally(()=>{if(!cancelled)setSuggestBusy(false);});
     return()=>{cancelled=true;};
-  },[draft,suggestTick,speciesGroup]);
+  },[draft,suggestTick,speciesGroup,wizard,remember]);
+  const loadChoices=active&&(remember||variantModal!==null);
   useEffect(()=>{
-    if(!draft||!remember){setSavedChoices({});setChoiceError("");return;}
+    if(!draft||!loadChoices)return;
     let active=true;
     void invoke<SavedChoiceList>("readTreatmentChoices",{draftId:draft.draftId})
       .then(data=>{
@@ -612,35 +651,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       })
       .catch(error=>{if(active)setChoiceError(error instanceof Error?error.message:String(error));});
     return()=>{active=false;};
-  },[draft?.draftId,remember]);
-
-  useEffect(()=>{
-    if(!draft||compatibilityDraftId!==draft.draftId)return;
-    const belongs=(index:number)=>speciesGroup==="all"||
-      (compatibility[index]??[]).includes(speciesGroup);
-    const planned=rows.map(row=>({...row,selected:belongs(row.index)&&
-      (desiredChecks.current.get(row.index)??row.selected)}));
-    setRows(planned);setSavedNumber("");setSelectionBusy(true);
-    // Serialize snapshots: a slower SQL/host response must not overwrite a
-    // newer species filter selection when the user switches groups quickly.
-    const version=++selectionVersion.current;
-    const payload={draftId:draft.draftId,
-      selections:planned.map(row=>({index:row.index,symbol:row.symbol,selected:row.selected}))};
-    selectionQueue.current=selectionQueue.current
-      .catch(()=>{/* An earlier failed snapshot must not block the next one. */})
-      .then(async()=>{
-        await invoke("setDraftSelections",payload);
-      })
-      .catch(error=>{
-        if(version===selectionVersion.current)
-          setError(error instanceof Error?error.message:String(error));
-      })
-      .finally(()=>{
-        if(version===selectionVersion.current)setSelectionBusy(false);
-      });
-    // Changing the filter uses catalogue compatibility already loaded once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[speciesGroup,compatibility,compatibilityDraftId,draft]);
+  },[draft?.draftId,loadChoices]);
 
   useEffect(()=>{
     if(!draft?.hasPayerId){setAnimalDescriptions([]);return;}
@@ -659,9 +670,13 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       (row.section==="III"?"III":"II")===groupSection);
     if(!target.length){setAnimalError("Nie ma zaznaczonych pozycji tego gatunku i sekcji.");return;}
     const description=groupDescription.trim(),count=groupCount.trim();
+    if(count&&!validAnimalCount(count)){setAnimalError("Podaj dodatnią liczbę całkowitą zwierząt.");return;}
     if(!description&&!count){setAnimalError("Wprowadź opis zwierząt lub liczbę leczonych.");return;}
-    setRows(current=>current.map(row=>target.some(item=>item.index===row.index)
-      ? {...row,...(description?{description}:{}),...(count?{animals:count}:{})}:row));
+    const group=window.crypto.randomUUID();
+    const selectedIndexes=new Set(target.map(row=>row.index));
+    setRows(current=>current.map(row=>selectedIndexes.has(row.index)
+      ? {...row,...(description?{description,descriptionGroup:group}:{}),
+          ...(count?{animals:count,countGroup:group}:{})}:row));
     setSavedNumber("");setAnimalError("");
   }
   function openAnimalEdit(row:DraftRow){
@@ -686,28 +701,30 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     }
     const description=(row:DraftRow)=>!row.descriptionGroup && row.description.trim().toLocaleLowerCase("pl")===
       row.species.trim().toLocaleLowerCase("pl") ? "" : row.description.trim();
-    const missing=selected.find(row=>!description(row)||!row.animals.trim());
+    const missing=selected.find(row=>!description(row)||!validAnimalCount(row.animals));
     setError("");
     if(!missing){
-      setDateStep({reported,performed});
+      if(wizard)requestSave({reported,performed});
+      else setDateStep({reported,performed});
       return;
     }
     const candidates=selected.filter(row=>row.species===missing.species && row.section===missing.section &&
       description(row)===description(missing) && row.animals.trim()===missing.animals.trim() &&
       row.descriptionGroup===missing.descriptionGroup && row.countGroup===missing.countGroup);
+    if(wizard)setStep(1);
     setAnimalEdit({candidates,checked:candidates.map(row=>row.index),
       description:description(missing),count:missing.animals,beforeSave:true});
   }
   async function applyAnimalEdit(){
     if(!animalEdit||!draft||!animalEdit.checked.length)return;
     const description=animalEdit.description.trim(), animals=animalEdit.count.trim();
-    if(!animals||(animalEdit.beforeSave&&!description))return;
+    if(!validAnimalCount(animals)||(animalEdit.beforeSave&&!description))return;
     const group=window.crypto.randomUUID();
     const updated=rows.map(row=>animalEdit.checked.includes(row.index)
       ? {...row,description,animals,descriptionGroup:group,countGroup:group}:row);
     setRows(updated);
     setAnimalEdit(null);setSavedNumber("");setAnimalError("");
-    if(animalEdit.beforeSave){startSave(updated);return;}
+    if(animalEdit.beforeSave){if(!wizard)startSave(updated);return;}
     if(!draft.hasPayerId||!description)return;
     try{
       await invoke("saveAnimalDescription",{draftId:draft.draftId,description});
@@ -764,28 +781,35 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   function requestSave(dates:{reported:string;performed:string}) {
     const selected=rows.filter(row=>row.selected);
     if(!selected.length) {
-      setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk. Jeśli filtr gatunku ukrywa dostępne pozycje, wybierz Wszystkie.");
+      setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk.");
       return;
     }
     if(!dates.performed){
       setError("Podaj datę i godzinę wykonania czynności weterynaryjnych.");
       return;
     }
-    const warnings=selected.map(row=>{
-      const issues:{message:string; field?:keyof DraftRow}[]=[];
-      if(!row.batch.trim()) issues.push({message:"Nie wpisano serii",field:"batch"});
-      if(!row.animals.trim()) issues.push({message:"Nie wpisano liczby zwierząt",field:"animals"});
-      if(!row.withdrawal.trim()) issues.push({message:"Brak danych o karencji",field:"withdrawal"});
-      const candidate=suggestions.find(item=>item.index===row.index);
-      if(!candidate || ["review","ambiguous","notFound","noMatch","missingSymbol"].includes(candidate.status))
-        issues.push({message:"Sprawdź wariant ChPL"});
-      return {row,issues};
-    }).filter(item=>item.issues.length);
+    const warnings=collectWarnings();
     if(warnings.length)setSaveReview({dates,warnings});
     else void saveCard(dates);
   }
+  function collectWarnings(){
+    return rows.filter(row=>row.selected).map(row=>{
+      const issues:{message:string; field?:keyof DraftRow}[]=[];
+      if(!row.batch.trim()) issues.push({message:"Nie wpisano serii",field:"batch"});
+      if(!validAnimalCount(row.animals)) issues.push({message:"Podaj dodatnią całkowitą liczbę zwierząt",field:"animals"});
+      if(!row.description.trim()||(!row.descriptionGroup&&row.description.trim().toLocaleLowerCase("pl")===row.species.trim().toLocaleLowerCase("pl")))
+        issues.push({message:"Brak opisu lub numerów zwierząt",field:"description"});
+      if(!isCompatible(row))issues.push({message:"Sprawdź zgodność pozycji z wybranym gatunkiem",field:"species"});
+      if(restoredVariants[row.index])issues.push({message:"Zweryfikuj dane zapamiętanego wariantu ChPL",field:"species"});
+      if(!row.withdrawal.trim()) issues.push({message:"Brak danych o karencji",field:"withdrawal"});
+      const candidate=suggestions.find(item=>item.index===row.index);
+      if(!candidate || ["review","ambiguous","notFound","noMatch","missingSymbol"].includes(candidate.status))
+        issues.push({message:"Sprawdź wariant ChPL",field:"species"});
+      return {row,issues};
+    }).filter(item=>item.issues.length);
+  }
   async function saveCard(dates:{reported:string;performed:string},confirmDuplicate = false) {
-    if (!draft || busy || applyBusy || selectionBusy) return;
+    if (!draft || busy || applyBusy) return;
     setBusy(true);setSavingSql(true);setError("");
     try {
       const result = await invoke<SaveResult>("saveDraft", {
@@ -799,7 +823,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         if (result.id) {
           setPreviewSavedId(result.id);
           setPdfMessage("");
-          if(result.html)setPreview(result.html);
+          if(result.html){setSummaryHtml(result.html);setPreview(result.html);}
         }
       }
     } catch (e) {setError(e instanceof Error ? e.message : String(e));}
@@ -822,15 +846,21 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     }catch(e){setPdfMessage(e instanceof Error?e.message:String(e));}
     finally{setPdfBusy(null);}
   }
-  async function printPreview() {
-    if (!draft || busy || applyBusy || selectionBusy) return;
+  async function printPreview(inSummary=false) {
+    if (!draft || busy || applyBusy) return;
+    if(savedNumber&&previewSavedId&&summaryHtml){
+      if(!inSummary){setPdfMessage("");setPreview(summaryHtml);}
+      return;
+    }
     setBusy(true);setError("");
     try {
       const data = await invoke<{html:string}>("previewDraft", {
         draftId:draft.draftId, reported, performed, findings, rows
       });
       setPreviewSavedId(null);setPdfMessage("");
-      setPreview(data.html); setError("");
+      if(inSummary)setSummaryHtml(data.html);
+      else setPreview(data.html);
+      setError("");
     } catch(e) {setError(e instanceof Error ? e.message : String(e));}
     finally {setBusy(false);}
   }
@@ -845,7 +875,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     setApplyBusy(true);setAutofillMessage("");setError("");
     try{
       const result=await invoke<TreatmentBulkResult>("applyTreatmentSuggestions",{
-        draftId:draft.draftId, rows, speciesGroup, autoGroup,
+        draftId:draft.draftId, rows, speciesGroup, autoGroup, useRemembered:wizard||remember,
         candidates:candidates.slice(0,300).map(s=>({index:s.index,variantId:s.variantId,
           species:s.species,route:s.route,dosing:s.dosing,withdrawal:s.withdrawal,
           source:s.source,hasPdf:s.hasPdf,pdfPath:s.pdfPath}))
@@ -857,19 +887,33 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         return item ? {...row,...item,description:row.description===original?.description &&
           !row.descriptionGroup?item.description:row.description} : row;
       }));
+      setRestoredVariants(current=>{
+        const next={...current};
+        for(const item of result.applied)if(item.remembered)next[item.index]=!!item.requiresReview;
+        return next;
+      });
+      setRowSpeciesGroups(current=>{
+        const next={...current};
+        for(const item of result.applied){
+          const candidate=candidates.find(value=>value.index===item.index);
+          if(candidate)next[item.index]={species:item.species,groups:candidate.groups};
+        }
+        return next;
+      });
+      setSuggestions(current=>current.map(item=>applied.has(item.index)
+        ? {...item,status:"existingData"}:item));
       setSuggestReviewOpen(false);
       setAutofillMessage(result.applied.length+
         (autoGroup?" jednoznacznych wariantów uzupełniono automatycznie. ":" jednoznacznych wariantów wstawiono do edytora. ")+
         "Sprawdź dawkowanie i karencję przed zapisem karty."+
         (result.skipped.length?" Pominięto: "+result.skipped.join(" "):""));
-      setSuggestTick(value=>value+1);
       setSavedNumber("");
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setApplyBusy(false);}
   }
 
   useEffect(()=>{
-    if(!draft||compatibilityDraftId!==draft.draftId||suggestBusy||selectionBusy||
+    if(!active||!drugStep||!draft||compatibilityDraftId!==draft.draftId||suggestBusy||
       applyBusy||busy||variantBusy||referenceBusy||suggestReviewOpen||saveReview||dateStep||pendingSaveDates.current||animalEdit?.beforeSave)return;
     const candidates=readySuggestions.filter(item=>{
       const key=JSON.stringify([item.index,item.symbol,item.variantId]);
@@ -887,10 +931,11 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     setVariantBusy(true);setVariantError("");setError("");
     try{
       const found=await invoke<TreatmentVariantList>("treatmentVariants",{
-        draftId:draft.draftId,index:row.index
+        draftId:draft.draftId,index:row.index,speciesGroup
       });
       if(!found.variants.length)throw new Error(
         "W katalogu SQL brak wariantów dla tego produktu. Sprawdź jego kartotekę.");
+      setRememberVariant(undefined);
       setVariantModal({index:row.index,product:found.product,
         symbol:found.symbol,variants:found.variants});
     }catch(e){setError(e instanceof Error?e.message:String(e));}
@@ -910,27 +955,38 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     }catch(e){setVariantError(e instanceof Error?e.message:String(e));}
     finally{setVariantBusy(false);}
   }
+  const variantRow=variantModal&&rows.find(row=>row.index===variantModal.index);
+  const canRememberVariant=!!variantRow&&!variantRow.referenceSymbol;
+  const previousChoice=canRememberVariant&&variantModal
+    ? savedChoices[variantModal.symbol.trim().toUpperCase()]:undefined;
+  const rememberForVariant=canRememberVariant&&(rememberVariant??(wizard||remember||!!previousChoice));
+  const sameChoice=(variant:TreatmentVariantChoice)=>
+    previousChoice?.species===variant.species&&previousChoice?.route===variant.route&&
+    (previousChoice.variantId==null||previousChoice.variantId===variant.id);
+  const preferredVariants=variantModal?.variants.filter(sameChoice)??[];
+  const variantRows=variantModal?[...preferredVariants,...variantModal.variants.filter(row=>!sameChoice(row))]:[];
+
   async function applyVariant(id:number){
     if(!draft || !variantModal || variantBusy)return;
     setVariantBusy(true);setVariantError("");
     try{
       const result=await invoke<Pick<DraftRow,"species"|"route"|"dosing"|"withdrawal"|"indication"|"description">>(
         "applyTreatmentVariant",{draftId:draft.draftId,
-          index:variantModal.index,variantId:id,remember});
-      if(remember && !rows.find(row=>row.index===variantModal.index)?.referenceSymbol){
+          index:variantModal.index,variantId:id,remember:rememberForVariant});
+      if(rememberForVariant){
         const chosen=variantModal.variants.find(item=>item.id===id);
         if(chosen){
           const symbol=variantModal.symbol.trim().toUpperCase();
           setSavedChoices(current=>({...current,[symbol]:{
-            symbol,species:chosen.species,route:chosen.route
+            symbol,species:chosen.species,route:chosen.route,variantId:id
           }}));
         }
       }
       setRows(current=>current.map(row=>row.index===variantModal.index
         ? {...row,...result,description:row.descriptionGroup?row.description:result.description} : row));
+      setRestoredVariants(current=>Object.fromEntries(Object.entries(current).filter(([key])=>Number(key)!==variantModal.index)));
       setVariantModal(null);
-      setSuggestions(current=>current.map(s=>s.index===variantModal.index
-        ? {...s,status:"existingData",message:"Wariant wybrany ręcznie."} : s));
+      setSuggestTick(tick=>tick+1);
       setSavedNumber("");
       setError(!result.withdrawal?.trim()
         ? "Wybrany wariant nie zawiera pełnej karencji w katalogu SQL. Zweryfikuj ChPL i uzupełnij karencję ręcznie przed zapisem karty, jeżeli jest wymagana."
@@ -946,9 +1002,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
                   !species?.trim() || !row.route?.trim() || !row.dose?.trim()}
                   style={{whiteSpace:"normal",height:"auto",textAlign:"left"}}
                   onClick={()=>{void applyVariant(row.id);}}>{species?.trim() || "Brak gatunku"}</Button>
-                {remember && variantModal?.symbol &&
-                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.species===species &&
-                  savedChoices[variantModal.symbol.trim().toUpperCase()]?.route===row.route &&
+                {sameChoice(row)&&
                   <Tag color="blue">Ostatni wybór</Tag>}
               </Space>},
           {title:"Droga podania",dataIndex:"route",width:140},
@@ -972,8 +1026,6 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     </Empty></Card>;
   const update = async (index: number, key: keyof DraftRow, value: string | boolean) => {
     const field = key === "selected" ? "Drukuj" : editable.find(x => x.key === key)?.field;
-    if(key==="selected" && typeof value==="boolean")
-      desiredChecks.current.set(index,value);
     if (!field || applyBusy) return;
     setRows(current => current.map(row => row.index === index ? {...row,[key]:value} : row));
     if(["species","route","dosing","withdrawal"].includes(String(key))){
@@ -982,14 +1034,41 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     }
     setSavedNumber("");
     try { await invoke("updateDraft", {draftId:draft.draftId,index,field,
-      ...(key === "selected" ? {checked:value} : {value})}); }
+      ...(key === "selected" ? {checked:value} : {value})});
+      if(key==="selected"||key==="species")setSuggestTick(tick=>tick+1);
+    }
     catch (e) {
       setError("Nie udało się zsynchronizować pola. Wpis zachowano w edytorze: "+
         (e instanceof Error ? e.message : String(e)));
     }
   };
-  const isCompatible=(row:DraftRow)=>speciesGroup==="all" ||
-    (compatibility[row.index]??[]).includes(speciesGroup);
+  const isCompatible=(row:DraftRow)=>{
+    if(speciesGroup==="all"||compatibilityDraftId!==draft.draftId)return true;
+    const applied=rowSpeciesGroups[row.index];
+    if((row.dosing.trim()||row.withdrawal.trim())&&applied?.species===row.species)
+      return applied.groups.includes(speciesGroup);
+    return (compatibility[row.index]??[]).includes(speciesGroup);
+  };
+  const changingStepBlocked=busy||applyBusy||referenceBusy||variantBusy||(wizard&&step===0&&suggestBusy);
+  function goToStep(next:number){
+    if(changingStepBlocked)return;
+    setError("");
+    setStep(next);
+    if(next===3&&!savedNumber){
+      setSummaryHtml("");
+      if(rows.some(row=>row.selected)&&performed)void printPreview(true);
+    }
+  }
+  function goToIssue(index:number,field?:keyof DraftRow){
+    if(wizard)setStep(field==="species"?0:1);
+    if(field)setVisibleColumns(current=>current.includes(field)?current:[...current,field]);
+    window.setTimeout(()=>{
+      const row=document.querySelector('.treatment-rows tr[data-row-key="'+index+'"]');
+      const input=field?row?.querySelector<HTMLElement>('[data-treatment-field="'+field+'"]'):null;
+      (input??row)?.scrollIntoView({behavior:"smooth",block:"center",inline:"nearest"});
+      input?.focus({preventScroll:true});
+    },250);
+  }
   const rowSuggestions=new Map((suggestionGroup===speciesGroup?suggestions:[]).map(item=>[item.index,item]));
   const isUnambiguous=(row:DraftRow)=>{
     const item=rowSuggestions.get(row.index);
@@ -1002,12 +1081,12 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
   const columns: ColumnsType<DraftRow> = [
     {title:"Druk",dataIndex:"selected",width:63,render:(value:boolean,row) =>
       <Checkbox checked={value}
-        disabled={applyBusy||selectionBusy||!isCompatible(row)}
+        disabled={applyBusy||busy}
         title={!isCompatible(row)?"Brak wariantu ChPL dla wybranego gatunku":undefined}
         onChange={e => {void update(row.index,"selected",e.target.checked);}}/>},
     {title:"Produkt",dataIndex:"product",width:240,ellipsis:true,fixed:"left",
       render:(value:string,row:DraftRow)=><span title={value}>
-        {value}{row.replacement?.trim()&&<><br/><Typography.Text type="secondary">
+        {value}{!isCompatible(row)&&<><br/><Tag color="gold">Sprawdź gatunek</Tag></>}{row.replacement?.trim()&&<><br/><Typography.Text type="secondary">
           Zamiennik: {row.replacement}</Typography.Text></>}
       </span>},
     {title:"Wariant ChPL",key:"variant",width:150,
@@ -1060,11 +1139,21 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       <Typography.Text type="secondary">{draft.payer.split("\n")[0]}</Typography.Text>
     </div><Space>
       <Button onClick={onDocuments}>Dokumenty</Button>
-      <Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>
-      <Button onClick={()=>{void printPreview();}} loading={busy&&!savingSql} disabled={busy||applyBusy||selectionBusy}>Podgląd wydruku</Button>
-      <Button type="primary" onClick={()=>startSave()} loading={savingSql} disabled={busy||applyBusy||selectionBusy||referenceBusy}>Zapisz kartę do SQL</Button>
+      {editingRows&&<Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>}
+      {(!wizard||step===3)&&<><Button onClick={()=>{void printPreview();}} loading={busy&&!savingSql} disabled={busy||applyBusy}>Podgląd wydruku</Button>
+      <Button type="primary" onClick={()=>startSave()} loading={savingSql} disabled={!!savedNumber||busy||applyBusy||referenceBusy}>Zapisz kartę do SQL</Button></>}
     </Space></div>
+    {wizard&&<div className="treatment-stepper">
+      <Steps size="small" current={step} items={treatmentSteps.map(title=>({title}))}/>
+      <Space wrap>
+        <Button disabled={step===0||changingStepBlocked} onClick={()=>goToStep(step-1)}>Wstecz</Button>
+        {step<3&&<Button type="primary" disabled={changingStepBlocked||(step===2&&!performed)}
+          onClick={()=>goToStep(step+1)}>Dalej</Button>}
+        {step<2&&<Button disabled={changingStepBlocked} onClick={()=>goToStep(3)}>Przejdź do podsumowania</Button>}
+      </Space>
+    </div>}
     <div className="treatment-tools">
+    {drugStep&&<>
     <TreatmentOptions compact={compact} label={"Podpowiedzi ChPL ("+readySuggestions.length+")"}>
     <Card className="treatment-autofill">
       <Space wrap>
@@ -1094,18 +1183,18 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       <Space wrap>
         <Typography.Text strong>Filtr gatunku</Typography.Text>
         <Select value={speciesGroup} style={{minWidth:210}}
-          disabled={suggestBusy||selectionBusy||applyBusy}
+          disabled={suggestBusy||applyBusy}
           options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/>
         <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
-          Zapamiętuj gatunki i drogi podania w SQL
+          Domyślnie zapamiętuj wybór dla leku w SQL
         </Checkbox>
         <Typography.Text type="secondary">
-          Niezgodne leki są odznaczane i przenoszone na koniec. Poprzedni wybór wraca po zmianie filtra.
+          Gatunek zawęża propozycje ChPL. O pozycjach na wydruku decyduje kolumna Druk.
         </Typography.Text>
       </Space>
       {choiceError&&<Alert type="warning" className="notice" showIcon message={choiceError}/>}
-    </Card>
-    <TreatmentOptions compact={compact} label="Wspólny opis i liczba zwierząt">
+    </Card></>}
+    {animalStep&&<TreatmentOptions compact={compact} label="Wspólny opis i liczba zwierząt">
     <Card className="treatment-animals">
       <Typography.Text strong>Wspólny opis i liczba zwierząt</Typography.Text>
       <Typography.Paragraph type="secondary">
@@ -1126,7 +1215,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
           placeholder="Nowy opis" onChange={e=>setGroupDescription(e.target.value)}/>
         <Input style={{width:145}} value={groupCount}
           placeholder="Liczba zwierząt" onChange={e=>setGroupCount(e.target.value)}/>
-        <Button onClick={applyGroupAnimals} disabled={!groupSpecies||applyBusy||selectionBusy}>
+        <Button onClick={applyGroupAnimals} disabled={!groupSpecies||applyBusy}>
           Zastosuj do grupy
         </Button>
         <Button loading={animalBusy} disabled={!draft.hasPayerId||!groupDescription.trim()}
@@ -1137,19 +1226,24 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
         Zapamiętywanie wymaga płatnika z identyfikatorem Subiekta.
       </Typography.Text>}
     </Card>
-    </TreatmentOptions>
+    </TreatmentOptions>}
     </div>
-    <Card className="treatment-meta">
+    {animalStep&&<Card className="treatment-meta">
       <Space wrap>
-        <label>Wyniki badań <Input value={findings} onChange={e=>setFindings(e.target.value)} style={{width:340}}/></label>
+        <label>Wyniki badań <Input value={findings} onChange={e=>{setFindings(e.target.value);setSavedNumber("");}} style={{width:340}}/></label>
       </Space>
-    </Card>
+    </Card>}
     {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
     </div>
-    <Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
+    {editingRows&&<Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
       columns={treatmentFormatting.apply(treatmentMouse.decorate(
-        columns.filter(column=>visibleColumns.includes(treatmentColumnKey(column)))
+        columns.filter(column=>{
+          const key=treatmentColumnKey(column);
+          return visibleColumns.includes(key)&&(!wizard||(drugStep
+            ? !["description","animals","diagnosis"].includes(key)
+            : !["variant","replacement","quantity","indication"].includes(key)));
+        })
         .sort((a,b)=>columnOrder.indexOf(treatmentColumnKey(a))-
           columnOrder.indexOf(treatmentColumnKey(b)))
         .map(column=>({...column,width:columnWidths[treatmentColumnKey(column)]??column.width})), treatmentColumnKey,
@@ -1160,7 +1254,25 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       scroll={{x:1900,y:compact?tableHeight:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
-    </Card>
+    </Card>}
+    {wizard&&step===2&&<Card title="Daty i godziny karty leczenia">
+      <TreatmentDateFields reported={reported} performed={performed}
+        onChange={dates=>{setReported(dates.reported);setPerformed(dates.performed);setSavedNumber("");}}/>
+    </Card>}
+    {wizard&&step===3&&<Card title="Podsumowanie karty">
+      {!rows.some(row=>row.selected)&&<Alert type="warning" showIcon message="Zaznacz pozycje do druku na etapie Gatunek i leki."/>}
+      {rows.some(row=>row.selected&&Object.hasOwn(restoredVariants,row.index))&&
+        <Space wrap>{rows.filter(row=>row.selected&&Object.hasOwn(restoredVariants,row.index)).map(row=>
+          <Tag color="blue" key={row.index}>{row.product} · zapamiętany wariant</Tag>)}</Space>}
+      {collectWarnings().map(({row,issues})=><div key={row.index} className="treatment-summary-row">
+        <strong>{row.product}</strong>
+        {issues.map(issue=><Button key={issue.message} type="link" size="small"
+          onClick={()=>goToIssue(row.index,issue.field)}>{issue.message}</Button>)}
+      </div>)}
+      {busy&&!savingSql&&<Spin aria-label="Tworzenie podglądu"/>}
+      {summaryHtml&&<iframe className="treatment-summary-preview" title="Podsumowanie wydruku karty leczenia" srcDoc={summaryHtml}/>}
+    </Card>}
+    {active&&<>
     <Modal className="kl-dialog-treatment-reference" open={referenceEdit!==null}
       title="Zamiennik produktu" okText="Wybierz" cancelText="Anuluj"
       confirmLoading={referenceBusy} onOk={()=>{void applyReference();}}
@@ -1176,7 +1288,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
     </Modal>
     <Modal className="kl-dialog-treatment-animals" open={animalEdit!==null}
       title="Numery i liczba leczonych zwierząt" okText="Zastosuj" cancelText="Anuluj"
-      okButtonProps={{disabled:!animalEdit?.checked.length||!animalEdit.count.trim()||
+      okButtonProps={{disabled:!animalEdit?.checked.length||!validAnimalCount(animalEdit.count)||
         (animalEdit.beforeSave&&!animalEdit.description.trim())}} onOk={()=>{void applyAnimalEdit();}}
       onCancel={()=>setAnimalEdit(null)}>
       {animalEdit&&<Space direction="vertical" style={{width:"100%"}}>
@@ -1209,24 +1321,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
           setDateStep(null);
         }}>Zatwierdź daty i kontynuuj</Button>
       </Space>}>
-      {dateStep&&<Space direction="vertical" style={{width:"100%"}}>
-        <label>Data i godzina zgłoszenia (opcjonalnie)
-          <DatePicker value={dateStep.reported?dayjs(dateStep.reported).locale("pl"):null}
-            showTime={{format:"HH:mm"}} needConfirm format="DD.MM.YYYY HH:mm"
-            locale={{...datePickerPl,lang:{...datePickerPl.lang,ok:"Zatwierdź"}}}
-            style={{width:"100%"}}
-            onChange={value=>setDateStep(current=>current&&{
-              ...current,reported:value?.format("YYYY-MM-DDTHH:mm")??""
-            })}/></label>
-        <label>Data i godzina wykonania czynności weterynaryjnych
-          <DatePicker value={dateStep.performed?dayjs(dateStep.performed).locale("pl"):null}
-            showTime={{format:"HH:mm"}} needConfirm allowClear={false} format="DD.MM.YYYY HH:mm"
-            locale={{...datePickerPl,lang:{...datePickerPl.lang,ok:"Zatwierdź"}}}
-            style={{width:"100%"}}
-            onChange={value=>setDateStep(current=>current&&{
-              ...current,performed:value?.format("YYYY-MM-DDTHH:mm")??""
-            })}/></label>
-      </Space>}
+      {dateStep&&<TreatmentDateFields {...dateStep} onChange={setDateStep}/>}
     </Modal>
     <Modal className="kl-dialog-treatment-warnings" open={saveReview!==null}
       title="Sprawdź dane przed zapisem" width={700}
@@ -1249,13 +1344,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
           <Button type="link" size="small" onClick={()=>{
             setSaveReview(null);
             const field=item.issues.find(issue=>issue.field)?.field;
-            if(field)setVisibleColumns(current=>current.includes(field)?current:[...current,field]);
-            window.setTimeout(()=>{
-              const row=document.querySelector('.treatment-rows tr[data-row-key="'+item.row.index+'"]');
-              const input=field?row?.querySelector<HTMLElement>('[data-treatment-field="'+field+'"]'):null;
-              (input??row)?.scrollIntoView({behavior:"smooth",block:"center",inline:"nearest"});
-              input?.focus({preventScroll:true});
-            },250);
+            goToIssue(item.row.index,field);
           }}>Przejdź do pozycji</Button>
         </div>)}
       </div>
@@ -1370,16 +1459,21 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       <Alert className="notice" type="warning" showIcon
         message="Zweryfikuj gatunek, dawkowanie i karencję z aktualną urzędową ChPL."
         description="Wybór zastąpi dotychczasowy gatunek, drogę podania i dawkowanie; pełną karencję zmieni tylko, gdy katalog zawiera jej dane. Nic nie jest automatycznie zapisywane do archiwum kart."/>
-      {remember&&variantModal?.symbol&&savedChoices[variantModal.symbol.trim().toUpperCase()]&&
-        <Alert className="notice" type="info" showIcon
-          message={"Ostatnio wybrano: "+
-            savedChoices[variantModal.symbol.trim().toUpperCase()].species+" / "+
-            savedChoices[variantModal.symbol.trim().toUpperCase()].route}
-          description="Zapamiętany wybór to wskazówka. Potwierdź konkretny aktualny wariant ChPL, aby wypełnić kartę."/>}
+      {canRememberVariant&&<Checkbox checked={rememberForVariant} disabled={variantBusy}
+        onChange={event=>setRememberVariant(event.target.checked)}>Zapamiętaj wybór dla tego leku</Checkbox>}
+      {previousChoice&&<Alert className="notice" type="info" showIcon
+        message={"Ostatni wybór: "+previousChoice.species+" / "+previousChoice.route}
+        description={preferredVariants.length>1
+          ?"Kilka aktualnych wariantów pasuje do zapamiętanego wyboru. Wybierz właściwy w tabeli."
+          :"Potwierdź aktualny wariant w tabeli."}
+        action={preferredVariants.length===1&&preferredVariants[0].dose?.trim()&&
+          <Button size="small" disabled={variantBusy}
+            onClick={()=>{void applyVariant(preferredVariants[0].id);}}>Użyj ostatniego wyboru</Button>}/>}
+      <ErrorNotice error={choiceError}/>
       <ErrorNotice error={variantError}/>
       <Button size="small" onClick={variantLayout.openColumns}>Kolumny wariantów</Button>
       <Table<TreatmentVariantChoice> {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
-        dataSource={variantModal?.variants??[]} size="small"
+        dataSource={variantRows} size="small"
         pagination={variantsPagination} scroll={{x:"max-content",y:340}}
         columns={variantLayout.columns}/>
     </Modal>
@@ -1405,6 +1499,7 @@ function Treatment({draft, compact, onDocuments, onOpenSaved}: {
       {preview && <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
         style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
     </Modal>
+    </>}
   </>;
 }
 
@@ -2400,7 +2495,7 @@ function UpdatePanel(){
   </Card>;
 }
 
-function SettingsPage({onSubiektSaved}: {onSubiektSaved: () => void}) {
+function SettingsPage({onSubiektSaved,wizard,onWizardChange}: {onSubiektSaved: () => void;wizard:boolean;onWizardChange:(enabled:boolean)=>void}) {
   const [active,setActive]=useState(()=>{
     try{return localStorage.getItem("kl.settings.activeTab")||"subiekt";}
     catch{return "subiekt";}
@@ -2415,6 +2510,10 @@ function SettingsPage({onSubiektSaved}: {onSubiektSaved: () => void}) {
       <Typography.Title level={3}>Ustawienia — Karty Leczenia</Typography.Title>
     </div>
     <Tabs activeKey={active} onChange={choose} items={[
+      {key:"treatment",label:"Karty leczenia",children:<Card>
+        <Space wrap><Switch checked={wizard} onChange={onWizardChange} aria-label="Kreator kart leczenia"/>
+          <Typography.Text>Kreator kart leczenia</Typography.Text></Space>
+      </Card>},
       {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings onSaved={onSubiektSaved}/>},
       {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
       {key:"administrator",label:"Konto administratora SQL",children:<ProgramDatabaseSettings administrator/>},
@@ -2457,6 +2556,31 @@ export default function App() {
   const [subiektRevision,setSubiektRevision]=useState(0);
   const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
   const [draft,setDraft]=useState<Draft|null>(null);
+  const [draftSaved,setDraftSaved]=useState(false);
+  async function beforeOpenDocument(row:DocumentRow){
+    if(!draft)return true;
+    if(draft.draftId===String(row.id)&&draft.number===row.number){
+      setSection("treatment");
+      return false;
+    }
+    if(draftSaved)return true;
+    return new Promise<boolean>(resolve=>{
+      Modal.confirm({
+        className:"kl-dialog-replace-treatment-draft",
+        title:"Otworzyć inny dokument?",
+        content:"Otworzenie innego dokumentu zastąpi obecną niezapisaną kartę.",
+        okText:"Otwórz dokument",cancelText:"Zachowaj kartę",
+        onOk:()=>resolve(true),onCancel:()=>resolve(false)
+      });
+    });
+  }
+  const [wizard,setWizard]=useState(()=>{
+    try{return localStorage.getItem("kl.treatmentWizard")!=="false";}catch{return true;}
+  });
+  function changeWizard(enabled:boolean){
+    setWizard(enabled);
+    try{localStorage.setItem("kl.treatmentWizard",String(enabled));}catch{/* Session only. */}
+  }
   const [catalogueDirty,setCatalogueDirty]=useState(false);
   const [catalogueEntry,setCatalogueEntry]=useState<{symbol:string;direct:boolean}|null>(null);
   const navigate=(next:Section)=>{
@@ -2553,15 +2677,13 @@ export default function App() {
     <Select aria-label="Skalowanie interfejsu" value={uiScale} style={{minWidth:100}}
       onChange={setUiScale} options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
   </div>;
-  const content=section==="documents"?null:
-    section==="treatment"?<Treatment draft={draft} compact={compact} onDocuments={()=>setSection("documents")}
-      onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>:
+  const content=section==="documents"||section==="treatment"?null:
     section==="prices"?<Prices onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
     section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}
       initialEntry={catalogueEntry} onPickerOpened={()=>setCatalogueEntry(null)}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards initialCardId={savedCardToOpen}
-      onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
+      onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage wizard={wizard} onWizardChange={changeWizard} onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
   const skinStyle=preset&&colors&&{
     "--shell-bg":colors.background, "--panel":colors.panel, "--skin-toolbar":colors.toolbar,
     "--line":colors.line, "--text":colors.text, "--subtle":colors.muted,
@@ -2587,8 +2709,13 @@ export default function App() {
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             message="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           <div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
-            <Documents key={subiektRevision} compact={compact} active={section==="documents"}
+            <Documents key={subiektRevision} compact={compact} active={section==="documents"} beforeOpen={beforeOpenDocument}
               onOpen={next=>{setDraft(next);setSection("treatment");}}/>
+          </div>
+          <div hidden={section!=="treatment"} style={section==="treatment"?{display:"contents"}:undefined}>
+            <Treatment draft={draft} compact={compact} active={section==="treatment"} wizard={wizard} onSavedChange={setDraftSaved}
+              onDocuments={()=>setSection("documents")}
+              onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>
           </div>
           {content}
         </main>

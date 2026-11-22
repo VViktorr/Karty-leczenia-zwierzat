@@ -7,13 +7,13 @@ using Microsoft.Data.SqlClient;
 
 namespace KartyLeczenia.ReactKL;
 
-internal sealed record SavedTreatmentChoice(string Symbol, string Species, string Route);
+internal sealed record SavedTreatmentChoice(string Symbol, string Species, string Route, int? VariantId = null);
 internal sealed record LegacyTreatmentChoice(string Symbol, string Product, string Species, string Route);
 
 /// <summary>
 /// Shared choices from final WinForms, keyed by Subiekt source scope and symbol.
-/// No dosing or withdrawal is stored: a remembered species/route is a hint,
-/// never permission to guess a ChPL clinical variant.
+/// Exact ReactKL variant IDs have their own scope in the existing table.
+/// The WinForms-compatible species and route remain available under the original key.
 /// </summary>
 internal sealed class TreatmentChoiceService(ConnectionSettingsStore archive)
 {
@@ -78,6 +78,8 @@ internal sealed class TreatmentChoiceService(ConnectionSettingsStore archive)
         return ResolveLegacy(rows, rows.Select(row => row.Symbol));
     }
 
+    private static string VariantScope(string scope) => scope + "\u001fReactKL.Variant";
+
     internal static string NormalizeSymbol(string symbol) => symbol.Trim().ToUpperInvariant();
 
     internal static byte[] ChoiceKey(string scope, string symbol)
@@ -115,22 +117,33 @@ internal sealed class TreatmentChoiceService(ConnectionSettingsStore archive)
         await using var db = Connect();
         await db.OpenAsync(token).ConfigureAwait(false);
         var result = new List<SavedTreatmentChoice>();
+        var exact = new Dictionary<string,SavedTreatmentChoice>(StringComparer.Ordinal);
+        string variantScope = VariantScope(scope);
         // Indexed choice_key reads; never scan the full choices table on each
         // card and never load unrelated patients or SQL identities.
         foreach (var batch in unique.Chunk(90))
         {
             using var command = db.CreateCommand();
             command.CommandTimeout = 10;
-            var keys = batch.Select((_, i) => "@key" + i).ToArray();
-            command.CommandText = "SELECT symbol,species,route FROM dbo.treatment_choices " +
-                "WHERE choice_key IN (" + string.Join(",", keys) + ") AND source_scope=@scope;";
+            var keys = batch.SelectMany((_, i) => new[] { "@key" + i, "@variant" + i }).ToArray();
+            command.CommandText = "SELECT symbol,species,route,source_scope,product FROM dbo.treatment_choices " +
+                "WHERE choice_key IN (" + string.Join(",", keys) + ") AND source_scope IN (@scope,@variantScope);";
             command.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = scope;
+            command.Parameters.Add("@variantScope", SqlDbType.NVarChar, -1).Value = variantScope;
             for (int i = 0; i < batch.Length; i++)
-                command.Parameters.Add(keys[i], SqlDbType.Binary, 32).Value =
-                    ChoiceKey(scope, batch[i]);
+            {
+                command.Parameters.Add("@key" + i, SqlDbType.Binary, 32).Value = ChoiceKey(scope, batch[i]);
+                command.Parameters.Add("@variant" + i, SqlDbType.Binary, 32).Value = ChoiceKey(variantScope, batch[i]);
+            }
             await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
             while (await reader.ReadAsync(token).ConfigureAwait(false))
-                result.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            {
+                var item = new SavedTreatmentChoice(reader.GetString(0), reader.GetString(1), reader.GetString(2));
+                if (reader.GetString(3) == scope)
+                    result.Add(item);
+                else if (int.TryParse(reader.GetString(4), out int id) && id > 0)
+                    exact[NormalizeSymbol(item.Symbol)] = item with { VariantId = id };
+            }
         }
         if (result.Count < unique.Length)
         {
@@ -146,11 +159,14 @@ internal sealed class TreatmentChoiceService(ConnectionSettingsStore archive)
                     unique.Contains(NormalizeSymbol(item.Symbol), StringComparer.Ordinal))
                     result.Add(item);
         }
-        return result.ToArray();
+        return result.Select(item =>
+            exact.TryGetValue(NormalizeSymbol(item.Symbol), out var saved) &&
+            saved.Species == item.Species && saved.Route == item.Route
+                ? item with { VariantId = saved.VariantId } : item).ToArray();
     }
 
     internal async Task SaveAsync(string scope, string symbol,
-        string species, string route, CancellationToken token)
+        string species, string route, int variantId, CancellationToken token)
     {
         symbol = NormalizeSymbol(symbol);
         species = species.Trim();
@@ -169,8 +185,19 @@ internal sealed class TreatmentChoiceService(ConnectionSettingsStore archive)
             ELSE
                 INSERT dbo.treatment_choices(choice_key,source_scope,symbol,product,species,route)
                 VALUES (@key,@scope,@symbol,N'',@species,@route);
+
+            IF EXISTS (SELECT 1 FROM dbo.treatment_choices WITH (UPDLOCK,HOLDLOCK) WHERE choice_key=@variantKey)
+                UPDATE dbo.treatment_choices SET product=@variant,species=@species,route=@route WHERE choice_key=@variantKey;
+            ELSE
+                INSERT dbo.treatment_choices(choice_key,source_scope,symbol,product,species,route)
+                VALUES (@variantKey,@variantScope,@symbol,@variant,@species,@route);
             """, db, transaction) { CommandTimeout = 10 };
+        string variantScope = VariantScope(scope);
         command.Parameters.Add("@key", SqlDbType.Binary, 32).Value = ChoiceKey(scope, symbol);
+        command.Parameters.Add("@variantKey", SqlDbType.Binary, 32).Value = ChoiceKey(variantScope, symbol);
+        command.Parameters.Add("@variantScope", SqlDbType.NVarChar, -1).Value = variantScope;
+        command.Parameters.Add("@variant", SqlDbType.NVarChar, 12).Value =
+            variantId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         command.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = scope;
         command.Parameters.Add("@symbol", SqlDbType.NVarChar, -1).Value = symbol;
         command.Parameters.Add("@species", SqlDbType.NVarChar, -1).Value = species;

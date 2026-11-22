@@ -6,7 +6,7 @@ internal sealed record TreatmentSuggestion(
     int Index, string Symbol, string Status, string Message,
     int? VariantId = null, string Species = "", string Route = "",
     string Dosing = "", string Withdrawal = "", string Source = "",
-    bool HasPdf = false, string PdfPath = "");
+    bool HasPdf = false, string PdfPath = "", bool Remembered = false, bool RequiresReview = false);
 
 /// <summary>
 /// Conservative, read-only matching against the catalogue. Never guess by product name.
@@ -64,7 +64,7 @@ internal static class TreatmentAutofillPlanner
     /// </summary>
     internal static TreatmentSuggestion Propose(
         int index, TreatmentRow row, IReadOnlyList<CatalogueVariantModel> variants,
-        string speciesGroup = "all")
+        string speciesGroup = "all", SavedTreatmentChoice? preference = null)
     {
         string symbol = CatalogueSymbol(row);
         if (!row.Printed)
@@ -79,16 +79,22 @@ internal static class TreatmentAutofillPlanner
             return new(index, symbol, "notFound", "Nie znaleziono wariantów w katalogu SQL.");
 
         variants = ForSpeciesGroup(variants, speciesGroup);
-        if (speciesGroup != "all" && variants.Count > 1)
-            return new(index, symbol, "ambiguous",
-                $"{variants.Count} warianty dla wybranego gatunku. Wybierz właściwy ręcznie.");
-
         string species = row.Get("Domyślny gatunek") == "True"
             ? "" : row.Get("Gatunek").Trim();
         string route = row.Get("Droga podania").Trim();
-        var valid = variants.Where(IsComplete).Where(v =>
+        bool MatchesRow(CatalogueVariantModel v) =>
             (species.Length == 0 || Same(species, v.Species)) &&
-            (route.Length == 0 || Same(route, v.Route))).ToArray();
+            (route.Length == 0 || Same(route, v.Route));
+        var remembered = preference is null ? [] : variants.Where(v =>
+            Same(preference.Species, v.Species) && Same(preference.Route, v.Route) &&
+            (!preference.VariantId.HasValue || preference.VariantId == v.Id))
+            .ToArray();
+        bool useRemembered = remembered.Length == 1 && IsComplete(remembered[0]) && MatchesRow(remembered[0]);
+        if (!useRemembered && speciesGroup != "all" && variants.Count > 1)
+            return new(index, symbol, "ambiguous",
+                $"{variants.Count} warianty dla wybranego gatunku. Sprawdź pozycję w podsumowaniu.");
+
+        var valid = useRemembered ? remembered : variants.Where(IsComplete).Where(MatchesRow).ToArray();
 
         if (valid.Length == 0)
             return new(index, symbol, "noMatch",
@@ -113,11 +119,11 @@ internal static class TreatmentAutofillPlanner
             new[] { candidate.Dose, candidate.Indication, candidate.Tissues,
                 candidate.Milk, candidate.Eggs, candidate.Source, candidate.Remarks }
                 .Any(HasReviewPlaceholder);
-        return new(index, symbol, needsReview ? "review" : "ready",
+        return new(index, symbol, needsReview && !(useRemembered && preference?.VariantId is > 0) ? "review" : "ready",
             needsReview
                 ? "Jeden wariant, ale brakuje potwierdzonych danych, karencji lub PDF. Sprawdź ręcznie."
                 : "Jednoznaczny wariant z katalogu SQL — wymaga zatwierdzenia przed zapisem.",
             candidate.Id, candidate.Species, candidate.Route, candidate.Dose,
-            withdrawal, candidate.Source, candidate.Pdf.Length > 0, candidate.Pdf);
+            withdrawal, candidate.Source, candidate.Pdf.Length > 0, candidate.Pdf, useRemembered, needsReview);
     }
 }

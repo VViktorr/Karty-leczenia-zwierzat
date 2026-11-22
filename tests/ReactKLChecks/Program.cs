@@ -573,6 +573,20 @@ static class Program
             Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine], "cattle")
                   .Status == "noMatch",
                 "the cattle filter must never propose a swine variant");
+            var secondCattle = cattleWithWithdrawal with { Id = 54, Dose = "Inna instrukcja" };
+            var exactChoice = new SavedTreatmentChoice("VET-123", cattleWithWithdrawal.Species,
+                cattleWithWithdrawal.Route, secondCattle.Id);
+            var restoredChoice = TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                [swine, cattleWithWithdrawal, secondCattle], "cattle", exactChoice);
+            Check(restoredChoice.Status == "ready" && restoredChoice.Remembered &&
+                  restoredChoice.VariantId == secondCattle.Id,
+                "remembered variant id disambiguates variants with the same species and route");
+            Check(TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                [swine, cattleWithWithdrawal, secondCattle], "cattle", exactChoice with { VariantId = null })
+                .Status == "ambiguous", "a legacy pair cannot disambiguate two variants");
+            Check(!TreatmentAutofillPlanner.Propose(0, suggestedRow,
+                [swine, cattleWithWithdrawal, secondCattle], "swine", exactChoice).Remembered,
+                "a remembered cattle variant cannot be applied to the swine filter");
             suggestedRow.Set("Gatunek", "Świnie");
             Check(TreatmentAutofillPlanner.Propose(0, suggestedRow, [swine,cattle])
                   .VariantId == 50,
@@ -669,7 +683,7 @@ static class Program
                 ["Produkt"]="Produkt źródłowy",["Symbol Subiekta"]="SUB-123",
                 ["Gatunek"]="Bydło",["Droga podania"]="domięśniowo",
                 ["Dawkowanie i okres stosowania"]="1 ml",["Karencja"]="28 dni",
-                ["Rozpoznanie"]="Rozpoznanie",["Status karencji"]=CardSchema.RegistryVerified
+                ["Rozpoznanie"]="Rozpoznanie",["Liczba zwierząt"]="2",["Status karencji"]=CardSchema.RegistryVerified
             };
             var savedFields = new Dictionary<string,string> {
                 ["Nr karty"]="K/14/2026",["Dokument źródłowy"]="FS 123",
@@ -708,6 +722,21 @@ static class Program
                 "saved-card revision must change after edits");
             Check(CardHtmlRenderer.Render(editedSaved).Contains("Zamiennik A"),
                 "revised card print must include explicitly entered replacement");
+            foreach (string invalidCount in new[] { "", "0", "-1", "1,5", "dwa", "2147483648" })
+            {
+                var invalidRow = new Dictionary<string,string>(savedRow)
+                {
+                    ["Liczba zwierząt"] = invalidCount
+                };
+                bool blocked = false;
+                try
+                {
+                    _ = SavedCardRevisionService.ApplyChanges(
+                        originalSaved, changedFields, [invalidRow], 2026, 14);
+                }
+                catch (ArgumentException) { blocked = true; }
+                Check(blocked, "an archive edit must reject a non-positive or invalid animal count");
+            }
             bool changedYearBlocked=false;
             try {
                 var wrongYear = new Dictionary<string,string>(savedFields) {

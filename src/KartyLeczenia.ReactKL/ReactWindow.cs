@@ -1114,26 +1114,49 @@ internal sealed class ReactWindow : Form
             if (draft.Rows.Count > 500)
                 throw new InvalidOperationException(
                     "Dokument ma zbyt wiele pozycji do zbiorczych propozycji.");
-            var (variants, nonMedicines) = await Task.Run(() =>
+            var catalogueTask = Task.Run(() =>
                 catalogue.VariantsForSymbols(draft.Rows.Select(row =>
                     TreatmentAutofillPlanner.CatalogueSymbol(row))), token);
+            string? preferenceWarning = null;
+            async Task<SavedTreatmentChoice[]> ReadPreferences()
+            {
+                try
+                {
+                    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    deadline.CancelAfter(TimeSpan.FromSeconds(3));
+                    return await treatmentChoices.ReadAsync(draft.Scope,
+                        draft.Rows.Select(row => row.Get("Symbol Subiekta")), deadline.Token);
+                }
+                catch (Exception error) when (!token.IsCancellationRequested &&
+                    error is SqlException or OperationCanceledException or InvalidOperationException)
+                {
+                    preferenceWarning = "Nie udało się odczytać zapamiętanych wariantów.";
+                    return [];
+                }
+            }
+            var preferenceTask = Flag(root, "useRemembered") ? ReadPreferences() : Task.FromResult<SavedTreatmentChoice[]>([]);
+            var (variants, nonMedicines) = await catalogueTask;
+            var preferences = (await preferenceTask).ToDictionary(
+                item => TreatmentChoiceService.NormalizeSymbol(item.Symbol), StringComparer.Ordinal);
             string speciesGroup = ReadTextField(root, "speciesGroup", 10);
             if (!TreatmentSpeciesGroup.Values.Contains(speciesGroup))
                 speciesGroup = "all";
             var proposals = draft.Rows.Select((row, index) =>
             {
                 variants.TryGetValue(TreatmentAutofillPlanner.CatalogueSymbol(row), out var entries);
-                return TreatmentAutofillPlanner.Propose(index, row,
-                    entries ?? [], speciesGroup);
+                var key = TreatmentChoiceService.NormalizeSymbol(row.Get("Symbol Subiekta"));
+                return TreatmentAutofillPlanner.Propose(index, row, entries ?? [], speciesGroup,
+                    row.Get("Symbol zamiennika produktu").Length == 0 ? preferences.GetValueOrDefault(key) : null);
             }).ToArray();
             if (action == "treatmentSuggestions")
                 return new
                 {
+                    preferenceWarning,
                     items = proposals.Select(proposal => new
                     {
                         proposal.Index, proposal.Symbol, proposal.Status, proposal.Message,
                         proposal.VariantId, proposal.Species, proposal.Route, proposal.Dosing,
-                        proposal.Withdrawal, proposal.Source, proposal.HasPdf, proposal.PdfPath,
+                        proposal.Withdrawal, proposal.Source, proposal.HasPdf, proposal.PdfPath, proposal.Remembered,
                         groups = TreatmentSpeciesGroup.CompatibleGroups([proposal.Species]),
                         variantCount = variants.TryGetValue(proposal.Symbol, out var matched)
                             ? TreatmentAutofillPlanner.ForSpeciesGroup(matched, speciesGroup).Count : 0,
@@ -1147,6 +1170,8 @@ internal sealed class ReactWindow : Form
                         return new
                         {
                             index,
+                            currentSpecies = row.Get("Gatunek"),
+                            currentGroups = TreatmentSpeciesGroup.CompatibleGroups([row.Get("Gatunek")]),
                             groups = TreatmentSpeciesGroup.CompatibleGroups(
                                 (entries ?? []).Select(variant => variant.Species))
                         };
@@ -1214,7 +1239,7 @@ internal sealed class ReactWindow : Form
                 applied.Add(new
                 {
                     index, value.Species, value.Route, value.Dosing,
-                    value.Withdrawal, value.Indication, value.Description
+                    value.Withdrawal, value.Indication, value.Description, proposal.Remembered, proposal.RequiresReview
                 });
             }
             return new { applied, skipped };
@@ -1305,12 +1330,16 @@ internal sealed class ReactWindow : Form
                     "Pozycja dokumentu nie zawiera symbolu Subiekta. Wariant wybierz ręcznie w katalogu.");
             var product = await Task.Run(() => catalogue.Read(symbol),token);
             if (action == "treatmentVariants")
+            {
+                string group = ReadTextField(root, "speciesGroup", 10);
                 return new {
                     product = product.Name,symbol = product.Symbol,
                     variants = product.Variants.Where(v=>v.Id.HasValue)
+                        .OrderByDescending(v=>TreatmentSpeciesGroup.Matches(group,[v.Species]))
                         .Select(v => new {v.Id,v.Species,v.Indication,v.Route,v.Dose,
                             v.Tissues,v.Milk,v.Eggs,v.Remarks,v.Source,v.Pdf}).ToArray()
                 };
+            }
             int variantId = Int(root,"variantId") ?? -1;
             var choice = product.Variants.SingleOrDefault(v=>v.Id == variantId);
             if (choice is null || string.IsNullOrWhiteSpace(choice.Species) ||
@@ -1321,7 +1350,7 @@ internal sealed class ReactWindow : Form
             // remembered species/route never changes clinical values itself.
             if (Flag(root, "remember") && row.Get("Symbol zamiennika produktu").Length == 0)
                 await treatmentChoices.SaveAsync(draft.Scope, symbol,
-                    choice.Species, choice.Route, token);
+                    choice.Species, choice.Route, variantId, token);
             return TreatmentVariantApplier.Apply(row, choice);
         }
         if (action == "updateDraft")

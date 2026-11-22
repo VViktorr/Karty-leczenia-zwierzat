@@ -345,3 +345,12 @@ html[data-kl-skin="carbon"] .ant-switch .ant-switch-handle::before { border-radi
 html[data-kl-skin="carbon"] .ant-table-thead th { font-weight: 700; }
 html[data-kl-skin="material"] .ant-modal .ant-modal-content { border-radius: 22px; }
 html[data-kl-skin="orchard"] .ant-modal .ant-modal-content { border-radius: 12px; }
+
+.treatment-stepper {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-block-end: 12px; padding: 8px 10px;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.treatment-stepper .ant-steps { flex: 1 1 610px; }
+.treatment-summary-row { padding-block: 4px; border-bottom: 1px solid var(--line); }
+.treatment-summary-preview { display: block; width: 100%; min-height: 60vh; border: 0; }
