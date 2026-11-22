@@ -354,3 +354,10 @@ html[data-kl-skin="orchard"] .ant-modal .ant-modal-content { border-radius: 12px
 .treatment-stepper .ant-steps { flex: 1 1 610px; }
 .treatment-summary-row { padding-block: 4px; border-bottom: 1px solid var(--line); }
 .treatment-summary-preview { display: block; width: 100%; min-height: 60vh; border: 0; }
+
+.settings-appearance { align-items: flex-start; gap: 16px; }
+.settings-appearance label { display: grid; gap: 6px; }
+.settings-appearance label .ant-select { min-width: 150px; }
+.settings-appearance label:first-child .ant-select { width: min(300px, 70vw); }
+.workflow-option { display: flex; align-items: center; gap: 8px; }
+.treatment-warning-scroll { max-height: 300px; overflow: auto; }

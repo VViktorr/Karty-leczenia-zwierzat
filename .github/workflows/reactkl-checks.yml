@@ -23,6 +23,11 @@ jobs:
       - name: Build React frontend
         working-directory: ui/react
         run: npm run build
+      - name: Verify treatment workflow and settings accessibility
+        working-directory: ui/react
+        env:
+          REACTKL_TEST_BROWSER: chrome
+        run: npm run test:e2e
       - uses: actions/setup-dotnet@v6.1.0
         with:
           dotnet-version: '11.0.100'

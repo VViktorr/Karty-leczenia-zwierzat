@@ -1,3 +1,7 @@
+import {QueryClient} from "@tanstack/react-query";
+import TreatmentShortcuts from "./TreatmentShortcuts";
+import TreatmentWarningList from "./TreatmentWarningList";
+import type {ReactNode} from "react";
 import {skinPresets, presetNames, type PresetName} from "./skinPresets";
 import type {CSSProperties} from "react";
 import dayjs from "dayjs";
@@ -150,8 +154,12 @@ const date = (value: string | null) => value
 function ErrorNotice({error}: {error: string}) {
   return error ? <Alert className="notice" type="error" showIcon title={error}/> : null;
 }
+const readCache = new QueryClient({
+  defaultOptions: {queries: {retry:false,staleTime:15_000,gcTime:60_000}},
+});
+
 function useRemote<T>(action: string, payload: Record<string, unknown>, deps: unknown[],
-  enabled = true, sameKeyOnly = false): {
+  enabled = true, sameKeyOnly = false, cacheScope?: number): {
   data: T | null; busy: boolean; error: string; reload: () => void;
 } {
   const [response, setResponse] = useState<{key:string;data:T} | null>(null);
@@ -168,13 +176,23 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
     const refresh = forceRefresh.current;
     forceRefresh.current = false;
     setBusy(true); setError("");
-    invoke<T>(action, refresh ? {...payload, refresh:true} : payload, undefined, controller.signal)
-      .then(result => { if (!expired) setResponse({key,data:result}); })
+    const queryKey=[action,cacheScope,key];
+    const load=(signal?:AbortSignal)=>invoke<T>(action,
+      refresh ? {...payload,refresh:true}:payload,undefined,
+      signal?AbortSignal.any([controller.signal,signal]):controller.signal);
+    const pending=cacheScope!==undefined&&!refresh
+      ? readCache.fetchQuery({queryKey,queryFn:({signal})=>invoke<T>(action,payload,undefined,signal)})
+      : load();
+    pending.then(result=>{
+      if(expired)return;
+      if(refresh&&cacheScope!==undefined)readCache.setQueryData(queryKey,result);
+      setResponse({key,data:result});
+    })
       .catch(reason => { if (!expired) setError(reason instanceof Error ? reason.message : String(reason)); })
       .finally(() => { if (!expired) setBusy(false); });
     return () => { expired = true; controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action, key, tick, enabled]);
+  }, [action, key, tick, enabled, cacheScope]);
   const data = response && (!sameKeyOnly || response.key===key) ? response.data : null;
   return {data, busy, error, reload: () => {
     forceRefresh.current = true;
@@ -182,8 +200,8 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   }};
 }
 
-function Documents({active, compact, beforeOpen, onOpen}: {
-  active:boolean;compact:boolean;beforeOpen:(row:DocumentRow)=>Promise<boolean>;
+function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
+  active:boolean;compact:boolean;cacheScope?:number;beforeOpen:(row:DocumentRow)=>Promise<boolean>;
   onOpen:(draft:Draft)=>void;
 }) {
   const tableRef=useRef<HTMLDivElement>(null);
@@ -219,7 +237,7 @@ function Documents({active, compact, beforeOpen, onOpen}: {
   const until = period==="custom" ? endDate : "";
   const {data, busy, error, reload} = useRemote<DocumentsResult>(
     "searchDocuments", {kind, period, query: search, startDate:from, endDate:until},
-    [kind, period, search, from, until], true, true);
+    [kind, period, search, from, until], true, true, cacheScope);
   useEffect(()=>{setPage(1);},[kind,period,search,from,until]);
   const allPageSize=Math.max(500,data?.items.length??0);
   const effectivePageSize=pageSize==="all"?allPageSize:pageSize;
@@ -466,8 +484,8 @@ const treatmentSteps=["Gatunek i leki","Zwierzęta i leczenie","Daty","Podsumowa
 const validAnimalCount=(value:string)=>/^\d+$/.test(value.trim()) &&
   Number(value)>0 && Number(value)<=2147483647;
 
-function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onSavedChange}: {
-  draft: Draft | null; compact: boolean; active:boolean; wizard:boolean; onDocuments: () => void; onOpenSaved: (id:string)=>void;
+function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, onDocuments, onOpenSaved,onSavedChange}: {
+  draft: Draft | null; compact: boolean; active:boolean; wizard:boolean;shortcuts:boolean;virtualWarnings:boolean; onDocuments: () => void; onOpenSaved: (id:string)=>void;
   onSavedChange:(saved:boolean)=>void;
 }) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
@@ -1133,6 +1151,13 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
     }))
   ];
   return <>
+    {active&&shortcuts&&!changingStepBlocked&&!preview&&!variantModal&&!referenceEdit&&
+      !animalEdit&&!dateStep&&!saveReview&&!duplicateId&&!suggestReviewOpen&&!showColumns&&!variantPdfUrl&&
+      <TreatmentShortcuts
+        back={wizard&&step>0?()=>goToStep(step-1):undefined}
+        next={wizard&&step<3&&(step!==2||!!performed)?()=>goToStep(step+1):undefined}
+        summary={wizard&&step<3?()=>goToStep(3):undefined}
+        save={!savedNumber&&(!wizard||step===3)?()=>startSave():undefined}/>}
     <div ref={treatmentControls} className="treatment-controls">
     <div className="page-heading"><div>
       <Typography.Title level={3}>Karta leczenia — {draft.number}</Typography.Title>
@@ -1264,11 +1289,12 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
       {rows.some(row=>row.selected&&Object.hasOwn(restoredVariants,row.index))&&
         <Space wrap>{rows.filter(row=>row.selected&&Object.hasOwn(restoredVariants,row.index)).map(row=>
           <Tag color="blue" key={row.index}>{row.product} · zapamiętany wariant</Tag>)}</Space>}
-      {collectWarnings().map(({row,issues})=><div key={row.index} className="treatment-summary-row">
-        <strong>{row.product}</strong>
-        {issues.map(issue=><Button key={issue.message} type="link" size="small"
-          onClick={()=>goToIssue(row.index,issue.field)}>{issue.message}</Button>)}
-      </div>)}
+      <TreatmentWarningList items={collectWarnings()} virtual={virtualWarnings} render={({row,issues})=>
+        <div key={row.index} className="treatment-summary-row">
+          <strong>{row.product}</strong>
+          {issues.map(issue=><Button key={issue.message} type="link" size="small"
+            onClick={()=>goToIssue(row.index,issue.field)}>{issue.message}</Button>)}
+        </div>}/>
       {busy&&!savingSql&&<Spin aria-label="Tworzenie podglądu"/>}
       {summaryHtml&&<iframe className="treatment-summary-preview" title="Podsumowanie wydruku karty leczenia" srcDoc={summaryHtml}/>}
     </Card>}
@@ -2495,7 +2521,10 @@ function UpdatePanel(){
   </Card>;
 }
 
-function SettingsPage({onSubiektSaved,wizard,onWizardChange}: {onSubiektSaved: () => void;wizard:boolean;onWizardChange:(enabled:boolean)=>void}) {
+function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowPreferences}: {
+  onSubiektSaved:()=>void;wizard:boolean;onWizardChange:(enabled:boolean)=>void;
+  appearance:ReactNode;workflowPreferences:ReactNode;
+}) {
   const [active,setActive]=useState(()=>{
     try{return localStorage.getItem("kl.settings.activeTab")||"subiekt";}
     catch{return "subiekt";}
@@ -2510,9 +2539,13 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange}: {onSubiektSaved: (
       <Typography.Title level={3}>Ustawienia — Karty Leczenia</Typography.Title>
     </div>
     <Tabs activeKey={active} onChange={choose} items={[
+      {key:"appearance",label:"Wygląd",children:<Card>{appearance}</Card>},
       {key:"treatment",label:"Karty leczenia",children:<Card>
+        <Space orientation="vertical" size={12}>
         <Space wrap><Switch checked={wizard} onChange={onWizardChange} aria-label="Kreator kart leczenia"/>
           <Typography.Text>Kreator kart leczenia</Typography.Text></Space>
+          {workflowPreferences}
+        </Space>
       </Card>},
       {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings onSaved={onSubiektSaved}/>},
       {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
@@ -2529,6 +2562,16 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange}: {onSubiektSaved: (
       {key:"updates",label:"Aktualizacje",children:<UpdatePanel/>}
     ]}/>
   </>;
+}
+
+function useLocalToggle(key:string) {
+  const [enabled,setEnabled]=useState(()=>{
+    try { return localStorage.getItem(key)!=="false"; } catch { return true; }
+  });
+  return [enabled,(value:boolean)=>{
+    setEnabled(value);
+    try {localStorage.setItem(key,String(value));} catch { /* Session only. */ }
+  }] as const;
 }
 
 export default function App() {
@@ -2574,13 +2617,10 @@ export default function App() {
       });
     });
   }
-  const [wizard,setWizard]=useState(()=>{
-    try{return localStorage.getItem("kl.treatmentWizard")!=="false";}catch{return true;}
-  });
-  function changeWizard(enabled:boolean){
-    setWizard(enabled);
-    try{localStorage.setItem("kl.treatmentWizard",String(enabled));}catch{/* Session only. */}
-  }
+  const [wizard,changeWizard]=useLocalToggle("kl.treatmentWizard");
+  const [shortcuts,setShortcuts]=useLocalToggle("kl.treatmentShortcuts");
+  const [cacheDocuments,setCacheDocuments]=useLocalToggle("kl.cacheDocuments");
+  const [virtualWarnings,setVirtualWarnings]=useLocalToggle("kl.virtualWarnings");
   const [catalogueDirty,setCatalogueDirty]=useState(false);
   const [catalogueEntry,setCatalogueEntry]=useState<{symbol:string;direct:boolean}|null>(null);
   const navigate=(next:Section)=>{
@@ -2670,20 +2710,39 @@ export default function App() {
   const nav=fluent?<Suspense fallback={standardNav}>
     <FluentNavigation items={sections} current={section} palette={palette} onNavigate={navigate}/>
   </Suspense>:standardNav;
-  const controls=<div className="appearance-controls">
-    <Select aria-label="Układ" value={layout} onChange={setLayout} options={layouts.map(value=>({value,label:layoutLabel(value)}))}/>
-    <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
-      {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
-    <Select aria-label="Skalowanie interfejsu" value={uiScale} style={{minWidth:100}}
-      onChange={setUiScale} options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
+  const controls=<div className="appearance-controls settings-appearance">
+    <label>Skórka
+      <Select aria-label="Skórka" value={layout} onChange={setLayout}
+        options={layouts.map(value=>({value,label:layoutLabel(value)}))}/>
+    </label>
+    <label>Motyw
+      <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
+        {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
+    </label>
+    <label>Skalowanie interfejsu
+      <Select aria-label="Skalowanie interfejsu" value={uiScale} onChange={setUiScale}
+        options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
+    </label>
   </div>;
+  const workflowPreferences=<>
+    <label className="workflow-option"><Switch checked={shortcuts} onChange={setShortcuts}
+      aria-label="Skróty klawiaturowe karty"/> Skróty klawiaturowe karty</label>
+    {shortcuts&&<Typography.Text type="secondary">
+      Alt + ← / → zmienia etap. Alt + Enter otwiera podsumowanie. Ctrl + S zapisuje kartę.
+    </Typography.Text>}
+    <label className="workflow-option"><Switch checked={cacheDocuments} onChange={setCacheDocuments}
+      aria-label="Podręczna lista dokumentów"/> Podręczna lista dokumentów przez 15 sekund</label>
+    <label className="workflow-option"><Switch checked={virtualWarnings} onChange={setVirtualWarnings}
+      aria-label="Tryb długiej listy ostrzeżeń"/> Tryb długiej listy ostrzeżeń w podsumowaniu</label>
+  </>;
   const content=section==="documents"||section==="treatment"?null:
     section==="prices"?<Prices onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
     section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}
       initialEntry={catalogueEntry} onPickerOpened={()=>setCatalogueEntry(null)}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards initialCardId={savedCardToOpen}
-      onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage wizard={wizard} onWizardChange={changeWizard} onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
+      onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage wizard={wizard} onWizardChange={changeWizard} appearance={controls}
+        workflowPreferences={workflowPreferences} onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
   const skinStyle=preset&&colors&&{
     "--shell-bg":colors.background, "--panel":colors.panel, "--skin-toolbar":colors.toolbar,
     "--line":colors.line, "--text":colors.text, "--subtle":colors.muted,
@@ -2702,18 +2761,17 @@ export default function App() {
       <div className="workspace">
         <header className="topbar">
           <div className="topbar-title"><strong>{topTabs?"Karty Leczenia":sections.find(x=>x.id===section)?.name}</strong></div>
-          {controls}
         </header>
         {topTabs&&<div className="top-navigation">{nav}</div>}
         <main className="main-content">
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             title="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           <div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
-            <Documents key={subiektRevision} compact={compact} active={section==="documents"} beforeOpen={beforeOpenDocument}
+            <Documents key={subiektRevision} compact={compact} active={section==="documents"} cacheScope={cacheDocuments?subiektRevision:undefined} beforeOpen={beforeOpenDocument}
               onOpen={next=>{setDraft(next);setSection("treatment");}}/>
           </div>
           <div hidden={section!=="treatment"} style={section==="treatment"?{display:"contents"}:undefined}>
-            <Treatment draft={draft} compact={compact} active={section==="treatment"} wizard={wizard} onSavedChange={setDraftSaved}
+            <Treatment draft={draft} compact={compact} active={section==="treatment"} wizard={wizard} shortcuts={shortcuts} virtualWarnings={virtualWarnings} onSavedChange={setDraftSaved}
               onDocuments={()=>setSection("documents")}
               onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>
           </div>

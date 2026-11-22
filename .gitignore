@@ -11,3 +11,7 @@ cards/
 
 /ui/react/node_modules/
 /ui/react/dist/
+
+# Browser test output
+/ui/react/playwright-report/
+/ui/react/test-results/
