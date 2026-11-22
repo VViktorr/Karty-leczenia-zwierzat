@@ -140,9 +140,19 @@ public sealed class DocumentService
     {
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token).ConfigureAwait(false);
-        using var command = new SqlCommand(
-            "SELECT ISNULL(MAX(dok_Id), 0) FROM dbo.dok__Dokument;", connection) { CommandTimeout = 5 };
-        return Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false));
+        // Inspect only the configured warehouse. A new document in an unrelated
+        // warehouse must not invalidate this workstation's document-list cache.
+        // The descending key lookup stops at the newest matching document.
+        using var command = new SqlCommand("""
+            SELECT TOP (1) dok_Id
+            FROM dbo.dok__Dokument
+            WHERE dok_MagId = @warehouseId
+            ORDER BY dok_Id DESC
+            """, connection) { CommandTimeout = 5 };
+        command.Parameters.Add("@warehouseId", SqlDbType.Int).Value =
+            (object?)options.WarehouseId ?? DBNull.Value;
+        var latest = await command.ExecuteScalarAsync(token).ConfigureAwait(false);
+        return latest is null or DBNull ? 0 : Convert.ToInt32(latest);
     }
 
     public async Task<List<DocumentSuggestion>> SearchAsync(ConnectionOptions options, string input, CancellationToken token, DocumentSearchKinds kinds = DocumentSearchKinds.All, DateTime? dateFrom = null, DateTime? dateUntil = null, int limit = 21, bool allowEmpty = false)
