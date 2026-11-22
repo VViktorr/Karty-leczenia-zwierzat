@@ -114,8 +114,12 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
             var metadata = FileVersionInfo.GetVersionInfo(installer);
             var fileVersion = new Version(metadata.FileMajorPart, metadata.FileMinorPart,
                 metadata.FileBuildPart, metadata.FilePrivatePart);
-            bool candidateMatches = ReactReleaseVersion.TryParse(metadata.ProductVersion, out var actual)
-                ? actual.Candidate == advertised.Candidate : advertised.Candidate is null;
+            const string descriptionPrefix = "Karty Leczenia ";
+            string? description = metadata.FileDescription;
+            string? label = description?.StartsWith(descriptionPrefix, StringComparison.Ordinal) == true
+                ? description[descriptionPrefix.Length..] : metadata.ProductVersion;
+            bool candidateMatches = ReactReleaseVersion.TryParse(label, out var actual)
+                ? actual == advertised : advertised.Candidate is null;
             if (fileVersion != advertised.FileVersion || !candidateMatches)
                 throw new InvalidDataException("Pobrany plik ma inną wersję niż opublikowana. Nie uruchomiono aktualizacji.");
             using(var stream=File.OpenRead(installer))

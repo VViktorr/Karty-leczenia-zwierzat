@@ -21,6 +21,7 @@ VersionInfoVersion={#ReleaseFileVersion}
 VersionInfoProductVersion={#ReleaseFileVersion}
 VersionInfoTextVersion={#ReleaseVersion}
 VersionInfoProductTextVersion={#ReleaseVersion}
+VersionInfoDescription=Karty Leczenia {#ReleaseVersion}
 DefaultDirName={autopf}\KartyLeczenia
 DefaultGroupName=Karty Leczenia
 PrivilegesRequired=admin

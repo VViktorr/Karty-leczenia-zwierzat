@@ -3,6 +3,7 @@ on:
   push:
     branches: [ReactKL]
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -122,6 +123,7 @@ jobs:
           if (!(Test-Path -LiteralPath $installer)) {
             throw 'Inno Setup did not produce the expected smoke-test file.'
           }
-          if ([Diagnostics.FileVersionInfo]::GetVersionInfo($installer).ProductVersion -ne '0.0.0-rc.1') {
-            throw 'Inno Setup did not preserve the RC version in installer metadata.'
+          $meta = [Diagnostics.FileVersionInfo]::GetVersionInfo($installer)
+          if ($meta.FileDescription -ne 'Karty Leczenia 0.0.0-rc.1') {
+            throw "Nieprawidłowy opis wersji RC instalatora: $($meta.FileDescription)"
           }

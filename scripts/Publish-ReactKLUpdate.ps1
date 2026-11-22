@@ -45,7 +45,11 @@ try {
     $actualFile = '{0}.{1}.{2}.{3}' -f $meta.FileMajorPart,$meta.FileMinorPart,$meta.FileBuildPart,$meta.FilePrivatePart
     $actualProduct = '{0}.{1}.{2}.{3}' -f $meta.ProductMajorPart,$meta.ProductMinorPart,$meta.ProductBuildPart,$meta.ProductPrivatePart
     $expected = ParseRelease $Version
-    $textVersion = ParseRelease $meta.ProductVersion
+    $labelPrefix = 'Karty Leczenia '
+    $label = if ($meta.FileDescription -and $meta.FileDescription.StartsWith($labelPrefix, [StringComparison]::Ordinal)) {
+        $meta.FileDescription.Substring($labelPrefix.Length)
+    } else { $meta.ProductVersion }
+    $textVersion = ParseRelease $label
     if ([version]$actualFile -ne $expected.Numeric -or [version]$actualProduct -ne $expected.Numeric -or
         (CompareRelease $textVersion $expected) -ne 0) {
         throw "Wersja pliku $actualFile, produktu $actualProduct i wydania $Version nie zgadzają się."

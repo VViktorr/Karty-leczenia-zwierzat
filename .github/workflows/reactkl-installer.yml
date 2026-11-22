@@ -1,5 +1,7 @@
 name: ReactKL installer (manual version)
 on:
+  push:
+    branches: [release/4.0.0]
   workflow_dispatch:
     inputs:
       version:
@@ -9,7 +11,16 @@ on:
 permissions:
   contents: read
 jobs:
+  checks:
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/reactkl-checks.yml
   installer:
+    needs: checks
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.checks.result == 'success')
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version || '4.0.0' }}
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
@@ -25,21 +36,33 @@ jobs:
         run: ./installer/Install-ReactKLCompiler.ps1
       - name: Build manual-version in-place SQL KartyLeczenia setup
         shell: pwsh
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           ./installer/Build-ReactKL.ps1 -Version $env:RELEASE_VERSION -Iscc $env:REACTKL_ISCC
       - name: Verify installer
         shell: pwsh
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           $path = "Instalatory/KartyLeczenia-Setup-win-x64-v$env:RELEASE_VERSION.exe"
           if (!(Test-Path -LiteralPath $path)) { throw "Nie znaleziono $path" }
-          Get-FileHash -Path $path -Algorithm SHA256
+          $meta = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $path).Path)
+          if ($meta.FileDescription -ne "Karty Leczenia $env:RELEASE_VERSION") {
+            throw "Opis pliku nie odpowiada wydaniu: $($meta.FileDescription)"
+          }
+          $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash *$(Split-Path -Leaf $path)" | Set-Content -LiteralPath "$path.sha256" -Encoding ascii
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: KartyLeczenia-Setup-win-x64
-          path: Instalatory/KartyLeczenia-Setup-win-x64-v*.exe
+          path: |
+            Instalatory/KartyLeczenia-Setup-win-x64-v*.exe
+            Instalatory/KartyLeczenia-Setup-win-x64-v*.exe.sha256
           if-no-files-found: error
           retention-days: 14
+      - name: Publish GitHub release 4.0.0
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = 'Instalatory/KartyLeczenia-Setup-win-x64-v4.0.0.exe'
+          gh release create v4.0.0 $installer "$installer.sha256" --target $env:GITHUB_SHA --title 'Karty Leczenia 4.0.0' --notes-file docs/releases/4.0.0.md
+          if ($LASTEXITCODE -ne 0) { throw 'Publikacja wydania GitHub nie powiodła się.' }
