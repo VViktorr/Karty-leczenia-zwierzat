@@ -37,8 +37,9 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
     fontFamily: token.fontFamily,
     fontSize: token.fontSize,
   }), [token]);
-  // Keep the existing row array: copying it causes needless grid updates.
-  const rows = useMemo(() => dataSource ?? [], [dataSource]);
+  // AG Grid requires mutable rowData, while Ant Design's source can be readonly.
+  // Copy at most once per source array; row ID lookup below remains O(n).
+  const rows = useMemo(() => Array.from(dataSource ?? []), [dataSource]);
   // Function rowKey needs the original array position. AG Grid resolves IDs
   // once per row, so avoid an O(n) indexOf scan for every ID (O(n²) overall).
   const rowIndices = useMemo(() => {
