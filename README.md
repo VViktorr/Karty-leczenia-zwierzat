@@ -32,7 +32,7 @@ JavaScript komunikuje się z hostem przez WebView2. Połączenia z SQL wykonują
 
 ### Dostępność instalatora
 
-Gotowe instalatory — **jeśli zostały opublikowane** — są w [GitHub Releases](https://github.com/VViktorr/Karty-leczenia-zwierzat/releases). Na 22.11.2026 nie potwierdzono wydania oznaczonego `v4.0.0` w GitHub Releases; nie należy traktować samej [notatki wydania](docs/releases/4.0.0.md) jako działającego linku do instalatora.
+**Wydanie [v4.0.0](https://github.com/VViktorr/Karty-leczenia-zwierzat/releases/tag/v4.0.0) jest dostępne** w GitHub Releases. Pobierz [instalator Windows x64](https://github.com/VViktorr/Karty-leczenia-zwierzat/releases/download/v4.0.0/KartyLeczenia-Setup-win-x64-v4.0.0.exe) i jego [sumę SHA-256](https://github.com/VViktorr/Karty-leczenia-zwierzat/releases/download/v4.0.0/KartyLeczenia-Setup-win-x64-v4.0.0.exe.sha256). W innych wydaniach korzystaj z [listy Releases](https://github.com/VViktorr/Karty-leczenia-zwierzat/releases).
 
 Instalator można zbudować lokalnie (instrukcja niżej) albo uruchomić ręcznie [workflow instalatora](https://github.com/VViktorr/Karty-leczenia-zwierzat/actions/workflows/reactkl-installer.yml) z podaniem numeru wersji.
 
@@ -160,4 +160,4 @@ Instalator zachowuje zgodność aktualizacji na miejscu: `AppId=pl.kartyleczenia
 - [Migracja ReactKL i obszary do weryfikacji](docs/reactkl-migration.md)
 - [Skrypt pełnego instalatora](installer/Build-ReactKL.ps1)
 - [Skrypt Inno Setup](installer/KartyLeczenia.ReactKL.iss)
-- [Notatki planowanego wydania 4.0.0](docs/releases/4.0.0.md)
+- [Lista zmian wydania 4.0.0](docs/releases/4.0.0.md)
