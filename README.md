@@ -1,12 +1,12 @@
 # Karty Leczenia — ReactKL
 
-Windows 11, .NET 10, React + TypeScript oraz Microsoft Edge WebView2.
+Windows 11, .NET 11, React + TypeScript oraz Microsoft Edge WebView2.
 
 **Aktywna gałąź prac:** `ReactKL`. Stara wersja WinForms służy tylko jako wzorzec funkcjonalny, zabezpieczony w `winforms-backup-2026-11-19`. W ReactKL nie używamy dawnego interfejsu ani AntdUI.
 
 ## Budowanie lokalne w C:\React
 
-Wymagane: Git, Node.js 22, .NET 10 SDK, Inno Setup 7 (do instalatora; skrypt obsługuje również Inno Setup 6). Na Windows 11 wymagany jest też WebView2 Runtime.
+Wymagane: Git, Node.js 26.13.1, .NET 11 SDK, Inno Setup 7.1.1 (do instalatora; skrypt obsługuje również Inno Setup 6). Na Windows 11 wymagany jest też WebView2 Runtime.
 
 **Pierwsze pobranie do pustego folderu:**
 
@@ -25,11 +25,13 @@ git pull --ff-only origin ReactKL
 
 Jeśli repozytorium korzysta z Git LFS, wykonaj także `git lfs pull` (gdy Git LFS jest zainstalowany). Sprawdź, czy plik `src/KartyLeczenia/Resources/Raw/medicine-catalog.sqlite` zawiera rzeczywistą bazę, a nie wskaźnik LFS: skrypt budowania instalatora sam kontroluje ten warunek.
 
+Wersję instalatora podaje się ręcznie, np. `3.0.0` albo `3.0.0-rc.1`. Aktualizator porównuje kolejne RC numerycznie, a wydanie finalne następuje po wszystkich RC tej samej wersji. Kanał SQL jest wspólny, więc publikacja RC udostępnia go wszystkim klientom z aktualizatorem obsługującym RC. Starsze stanowiska najpierw zaktualizuj stabilnym instalatorem zawierającym ten aktualizator.
+
 **Podgląd programu bez instalacji:**
 
 ```powershell
 cd C:\React\ui\react
-npm install --no-audit --no-fund
+npm ci --no-audit --no-fund
 npm run test:bridge
 npm run build
 cd C:\React

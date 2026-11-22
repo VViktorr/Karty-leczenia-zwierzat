@@ -39,7 +39,7 @@ export default function ChplPdfViewer({url, name}: {url: string; name: string}) 
       {native ? <iframe src={url} title="Dokument ChPL" referrerPolicy="no-referrer"/> :
       <Document file={url} onLoadSuccess={({numPages}) => setPages(numPages)}
         loading={<Spin aria-label="Ładowanie ChPL"/>}
-        error={<Alert type="error" message="Nie udało się wyświetlić PDF. Użyj przycisku Pobierz PDF."/>}>
+        error={<Alert type="error" title="Nie udało się wyświetlić PDF. Użyj przycisku Pobierz PDF."/>}>
         {pages > 0 && <Page pageNumber={page} width={Math.round(width * zoom / 100)}
           loading={<Spin aria-label="Ładowanie strony"/>}/>}
       </Document>}

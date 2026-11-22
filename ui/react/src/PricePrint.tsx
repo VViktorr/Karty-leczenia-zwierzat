@@ -231,7 +231,7 @@ export function PricePrintSettingsPanel({
   const availableFonts=(current:string)=>current&&!fonts.includes(current)
     ? [...fontOpts,{label:current,value:current}] : fontOpts;
   return <Modal className="kl-dialog-price-settings" open width="min(1040px,96vw)" title="Ustawienia wydruku cennika"
-    onCancel={onClose} destroyOnClose
+    onCancel={onClose} destroyOnHidden
     footer={<Space wrap>
       <Button onClick={onClose}>Zamknij</Button>
       <Button onClick={()=>{void save();}} loading={busy}>Zapisz ustawienia</Button>
@@ -239,7 +239,7 @@ export function PricePrintSettingsPanel({
         Zapisz i otwórz podgląd
       </Button>
     </Space>}>
-    {error&&<Alert type="error" showIcon message={error} style={{marginBottom:12}}/>}
+    {error&&<Alert type="error" showIcon title={error} style={{marginBottom:12}}/>}
     <div style={{maxHeight:"67vh",overflowY:"auto",paddingRight:8}}>
       <Card size="small" title="Strona A4">
         <Space wrap size={12}>
@@ -260,7 +260,7 @@ export function PricePrintSettingsPanel({
             options={[400,500,600,700,800,900].map(v=>({label:String(v),value:v}))}
             style={{width:90}}/></label>
         </Space>
-        <Divider orientation="left">Napisy na stronie</Divider>
+        <Divider titlePlacement="start">Napisy na stronie</Divider>
         <Space wrap>
           <Select value={activePage} onChange={setActivePage} style={{width:190}}
             options={[{label:"Tytuł cennika",value:0},{label:"Data",value:1},
@@ -288,7 +288,7 @@ export function PricePrintSettingsPanel({
               {["Lp.","Seria","Cena","Karencja"][i]}
             </Checkbox>)}
         </Space>
-        <Divider orientation="left">Format nagłówka i każdej kolumny</Divider>
+        <Divider titlePlacement="start">Format nagłówka i każdej kolumny</Divider>
         <Space wrap size={12}>
           <Select value={activeCol} onChange={setActiveCol}
             options={[{label:"Nagłówki",value:0},...priceColumns.map((label,i)=>({
@@ -340,7 +340,7 @@ export function PricePrintPreview({
   const frame=useRef<HTMLIFrameElement>(null);
   const documentText=useMemo(()=>pricePrintHtml(rows,settings,heading),[rows,settings,heading]);
   return <Modal className="kl-dialog-price-preview" open width="96vw" title={"Podgląd wielostronicowy — "+rows.length+" leków"}
-    onCancel={onClose} destroyOnClose
+    onCancel={onClose} destroyOnHidden
     footer={<Space>
       <Typography.Text type="secondary">Każda kartka ma własny nagłówek tabeli i numer strony.</Typography.Text>
       <Button onClick={onClose}>Zamknij</Button>

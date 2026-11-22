@@ -60,6 +60,12 @@ static class Program
                 "downgrade must never be offered");
             Check(!ReactUpdateService.IsNewer("2.2", "2.2.0"),
                 "two/three segment versions must be equivalent");
+            Check(ReactUpdateService.IsNewer("2.3.0-rc.10", "2.3.0-rc.2"),
+                "RC numbers compare numerically");
+            Check(ReactUpdateService.IsNewer("2.3.0", "2.3.0-rc.10"),
+                "final release supersedes its release candidates");
+            Check(!ReactUpdateService.IsNewer("2.3.0-rc.10", "2.3.0"),
+                "the updater must not replace a final release with its RC");
             bool bad = false;
             try { _ = ReactUpdateService.IsNewer("not-a-version", "2.2.2"); }
             catch (InvalidDataException) { bad = true; }

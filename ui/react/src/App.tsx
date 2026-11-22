@@ -148,7 +148,7 @@ function localDateTime() {
 const date = (value: string | null) => value
   ? new Intl.DateTimeFormat("pl-PL").format(new Date(value)) : "—";
 function ErrorNotice({error}: {error: string}) {
-  return error ? <Alert className="notice" type="error" showIcon message={error}/> : null;
+  return error ? <Alert className="notice" type="error" showIcon title={error}/> : null;
 }
 function useRemote<T>(action: string, payload: Record<string, unknown>, deps: unknown[],
   enabled = true, sameKeyOnly = false): {
@@ -343,10 +343,10 @@ function Documents({active, compact, beforeOpen, onOpen}: {
       </div>
       <ErrorNotice error={readError || (!data ? error : "")}/>
       {data&&(data.warning||error)&&<Alert className="notice" type="warning" showIcon
-        message="Nie udało się odświeżyć dokumentów. Pokazuję ostatnią wczytaną listę."
+        title="Nie udało się odświeżyć dokumentów. Pokazuję ostatnią wczytaną listę."
         description={data.warning||error}/>}
       {!compact&&data?.truncated&&<Alert className="notice" type="info" showIcon
-        message="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
+        title="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
       <Dropdown trigger={compact?["contextMenu"]:[]} open={compact&&contextMenu!==null}
         onOpenChange={visible=>{if(!visible)setContextMenu(null);}}
         menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
@@ -362,7 +362,7 @@ function Documents({active, compact, beforeOpen, onOpen}: {
       <Table grid={listLayout.grid} {...listLayout.tableProps} rowKey="id" loading={(busy&&!data)||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
         size={compact?"small":"middle"} scroll={{x:900,y:compact?"calc(100vh - 250px)":"calc(100vh - 390px)"}} pagination={{
-          current:page,pageSize:effectivePageSize,position:["bottomRight"],
+          current:page,pageSize:effectivePageSize,placement:["bottomEnd"],
           pageSizeOptions:[25,50,100,allPageSize],
           showSizeChanger:{
             "aria-label":"Liczba wyświetlanych dokumentów",
@@ -446,7 +446,7 @@ function TreatmentOptions({compact, label, children}: {
 function TreatmentDateFields({reported,performed,onChange}: {
   reported:string;performed:string;onChange:(dates:{reported:string;performed:string})=>void;
 }) {
-return <Space direction="vertical" style={{width:"100%"}}>
+return <Space orientation="vertical" style={{width:"100%"}}>
         <label>Data i godzina zgłoszenia (opcjonalnie)
           <DatePicker value={reported?dayjs(reported).locale("pl"):null}
             showTime={{format:"HH:mm"}} needConfirm format="DD.MM.YYYY HH:mm"
@@ -997,7 +997,7 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
   const variantColumns:ColumnsType<TreatmentVariantChoice> = [
           {title:"Gatunek",dataIndex:"species",width:170,
             render:(species:string,row:TreatmentVariantChoice)=>
-              <Space direction="vertical" size={2}>
+              <Space orientation="vertical" size={2}>
                 <Button type="primary" size="small" disabled={variantBusy ||
                   !species?.trim() || !row.route?.trim() || !row.dose?.trim()}
                   style={{whiteSpace:"normal",height:"auto",textAlign:"left"}}
@@ -1174,9 +1174,9 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
         wymagają ręcznego wyboru. Nic nie jest automatycznie zapisywane do SQL.
       </Typography.Text>
       {suggestError&&<Alert type="warning" showIcon className="notice"
-        message={"Nie udało się pobrać propozycji: "+suggestError}/>}
+        title={"Nie udało się pobrać propozycji: "+suggestError}/>}
       {autofillMessage&&<Alert type="info" showIcon className="notice"
-        message={autofillMessage}/>}
+        title={autofillMessage}/>}
     </Card>
     </TreatmentOptions>
     <Card className="treatment-species">
@@ -1192,7 +1192,7 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
           Gatunek zawęża propozycje ChPL. O pozycjach na wydruku decyduje kolumna Druk.
         </Typography.Text>
       </Space>
-      {choiceError&&<Alert type="warning" className="notice" showIcon message={choiceError}/>}
+      {choiceError&&<Alert type="warning" className="notice" showIcon title={choiceError}/>}
     </Card></>}
     {animalStep&&<TreatmentOptions compact={compact} label="Wspólny opis i liczba zwierząt">
     <Card className="treatment-animals">
@@ -1221,7 +1221,7 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
         <Button loading={animalBusy} disabled={!draft.hasPayerId||!groupDescription.trim()}
           onClick={()=>{void rememberAnimalDescription();}}>Zapamiętaj opis w SQL</Button>
       </Space>
-      {animalError&&<Alert className="notice" type="warning" showIcon message={animalError}/>}
+      {animalError&&<Alert className="notice" type="warning" showIcon title={animalError}/>}
       {!draft.hasPayerId&&<Typography.Text type="secondary">
         Zapamiętywanie wymaga płatnika z identyfikatorem Subiekta.
       </Typography.Text>}
@@ -1233,7 +1233,7 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
         <label>Wyniki badań <Input value={findings} onChange={e=>{setFindings(e.target.value);setSavedNumber("");}} style={{width:340}}/></label>
       </Space>
     </Card>}
-    {savedNumber && <Alert className="notice" type="success" showIcon message={"Zapisano kartę "+savedNumber}/>}
+    {savedNumber && <Alert className="notice" type="success" showIcon title={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
     </div>
     {editingRows&&<Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
@@ -1260,7 +1260,7 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
         onChange={dates=>{setReported(dates.reported);setPerformed(dates.performed);setSavedNumber("");}}/>
     </Card>}
     {wizard&&step===3&&<Card title="Podsumowanie karty">
-      {!rows.some(row=>row.selected)&&<Alert type="warning" showIcon message="Zaznacz pozycje do druku na etapie Gatunek i leki."/>}
+      {!rows.some(row=>row.selected)&&<Alert type="warning" showIcon title="Zaznacz pozycje do druku na etapie Gatunek i leki."/>}
       {rows.some(row=>row.selected&&Object.hasOwn(restoredVariants,row.index))&&
         <Space wrap>{rows.filter(row=>row.selected&&Object.hasOwn(restoredVariants,row.index)).map(row=>
           <Tag color="blue" key={row.index}>{row.product} · zapamiętany wariant</Tag>)}</Space>}
@@ -1291,10 +1291,10 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
       okButtonProps={{disabled:!animalEdit?.checked.length||!validAnimalCount(animalEdit.count)||
         (animalEdit.beforeSave&&!animalEdit.description.trim())}} onOk={()=>{void applyAnimalEdit();}}
       onCancel={()=>setAnimalEdit(null)}>
-      {animalEdit&&<Space direction="vertical" style={{width:"100%"}}>
+      {animalEdit&&<Space orientation="vertical" style={{width:"100%"}}>
         {animalEdit.candidates.length>1&&<Checkbox.Group value={animalEdit.checked}
           onChange={checked=>setAnimalEdit({...animalEdit,checked})}>
-          <Space direction="vertical">{animalEdit.candidates.map(item=>
+          <Space orientation="vertical">{animalEdit.candidates.map(item=>
             <Checkbox key={item.index} value={item.index}>
               {item.index+1}. {item.product}{item.batch&&" · "+item.batch}
             </Checkbox>)}</Space>
@@ -1333,7 +1333,7 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
         void saveCard(dates);
       }}>
       <Alert className="notice" type="warning" showIcon
-        message="Sprawdź wymienione pozycje przed kontynuowaniem."/>
+        title="Sprawdź wymienione pozycje przed kontynuowaniem."/>
       <div style={{maxHeight:350,overflowY:"auto",marginTop:12}}>
         {saveReview?.warnings.map(item=><div key={item.row.index}
           style={{padding:"9px 0",borderBottom:"1px solid var(--ant-color-border-secondary, #ddd)"}}>
@@ -1430,7 +1430,7 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
       </Space>}>
       <ErrorNotice error={variantError}/>
       <Alert type="warning" className="notice" showIcon
-        message="Sprawdź każdą dawkę i karencję przed zatwierdzeniem"
+        title="Sprawdź każdą dawkę i karencję przed zatwierdzeniem"
         description="Dopasowanie następuje wyłącznie po symbolu Subiekta. Wpisy ręczne nie będą nadpisywane, a zapis karty w SQL pozostaje oddzielną czynnością."/>
       <Table<TreatmentSuggestion> rowKey="index" size="small"
         dataSource={readySuggestions} pagination={false}
@@ -1457,12 +1457,12 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
         Anuluj
       </Button>}>
       <Alert className="notice" type="warning" showIcon
-        message="Zweryfikuj gatunek, dawkowanie i karencję z aktualną urzędową ChPL."
+        title="Zweryfikuj gatunek, dawkowanie i karencję z aktualną urzędową ChPL."
         description="Wybór zastąpi dotychczasowy gatunek, drogę podania i dawkowanie; pełną karencję zmieni tylko, gdy katalog zawiera jej dane. Nic nie jest automatycznie zapisywane do archiwum kart."/>
       {canRememberVariant&&<Checkbox checked={rememberForVariant} disabled={variantBusy}
         onChange={event=>setRememberVariant(event.target.checked)}>Zapamiętaj wybór dla tego leku</Checkbox>}
       {previousChoice&&<Alert className="notice" type="info" showIcon
-        message={"Ostatni wybór: "+previousChoice.species+" / "+previousChoice.route}
+        title={"Ostatni wybór: "+previousChoice.species+" / "+previousChoice.route}
         description={preferredVariants.length>1
           ?"Kilka aktualnych wariantów pasuje do zapamiętanego wyboru. Wybierz właściwy w tabeli."
           :"Potwierdź aktualny wariant w tabeli."}
@@ -1495,7 +1495,7 @@ function Treatment({draft, compact, active, wizard, onDocuments, onOpenSaved,onS
           onClick={()=>{void pdfFromPreview(true);}}>Wyślij mailem</Button>
         <Button type="primary" onClick={()=>previewFrame.current?.contentWindow?.print()}>Drukuj</Button>
       </Space>}>
-      {pdfMessage&&<Alert className="notice" type="info" showIcon message={pdfMessage}/>}
+      {pdfMessage&&<Alert className="notice" type="info" showIcon title={pdfMessage}/>}
       {preview && <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
         style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
     </Modal>
@@ -1962,7 +1962,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
         {treatmentDate&&<Button onClick={()=>setTreatmentDate("")}>Wyczyść datę</Button>}
       </Space>
       <ErrorNotice error={error || remote.error}/>
-      {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
+      {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
       <Table grid={savedLayout.grid} {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
         scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={pagination}
         onRow={row=>({onDoubleClick:()=>{void open(row);}})}
@@ -1976,7 +1976,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       closable={!trashBusy} maskClosable={!trashBusy} keyboard={!trashBusy}
       onCancel={()=>{if(!trashBusy)setTrashTarget(null);}}
       onOk={()=>{void confirmTrash();}}>
-      {trashError&&<Alert className="notice" type="error" showIcon message={trashError}/>}
+      {trashError&&<Alert className="notice" type="error" showIcon title={trashError}/>}
       <Typography.Paragraph>{trashTarget?.row.number||trashTarget?.row.document}</Typography.Paragraph>
     </Modal>
     <Modal className="kl-dialog-permanent-delete" open={purgeTarget!==null} title="Trwale usunąć kartę leczenia?"
@@ -1988,9 +1988,9 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           disabled={!purgeTarget || purgeConfirmation!==(purgeTarget.number||purgeTarget.document)}
           onClick={()=>{void purgeCard();}}>Usuń trwale z SQL</Button>
       </Space>}>
-      {purgeError&&<Alert className="notice" type="error" showIcon message={purgeError}/>}
+      {purgeError&&<Alert className="notice" type="error" showIcon title={purgeError}/>}
       <Alert className="notice" type="warning" showIcon
-        message="Nieodwracalna operacja — wymaga Windows Hello i uprawnień administratora SQL"
+        title="Nieodwracalna operacja — wymaga Windows Hello i uprawnień administratora SQL"
         description="Usuwana jest tylko wskazana karta znajdująca się już w koszu. Po usunięciu nie będzie jej można przywrócić z kosza."/>
       <Typography.Paragraph>
         Karta: <strong>{purgeTarget?.number||purgeTarget?.document}</strong>
@@ -2023,10 +2023,10 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       onCancel={()=>{if(!editBusy)discardSaved();}}>
       {!card ? <Spin/> : <>
         {editing&&<Alert className="notice" type="warning" showIcon
-          message="Edycja istniejącej karty — bez zmiany numeru"
+          title="Edycja istniejącej karty — bez zmiany numeru"
           description="Zmiany pól klinicznych wymagają ponownej weryfikacji ChPL. Dane źródłowe Subiekta, numer karty i pieczątki pozostają zachowane."/>}
         {!editConfirm&&<ErrorNotice error={error}/>}
-        {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
+        {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
         <Descriptions bordered column={2} size="small"
           items={Object.entries(editing&&editDraft?editDraft.fields:card.fields)
             .map(([key,value])=>({key,label:key,children:
@@ -2084,7 +2084,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
         <Button type="primary" onClick={()=>printFrame.current?.contentWindow?.print()}>Drukuj</Button>
       </Space>}>
       <ErrorNotice error={error}/>
-      {notice&&<Alert className="notice" type="info" showIcon message={notice}/>}
+      {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
       {printHtml&&<iframe ref={printFrame} title="Wydruk zapisanej karty" srcDoc={printHtml}
         style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
     </Modal>
@@ -2204,7 +2204,7 @@ function ClinicSettingsPanel() {
       uzupełnić z wcześniejszych ustawień komputera.
     </Typography.Paragraph>
     <ErrorNotice error={error}/>
-    {notice&&<Alert type="success" showIcon className="notice" message={notice}/>}
+    {notice&&<Alert type="success" showIcon className="notice" title={notice}/>}
     <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
       <Form.Item label="Nazwa lecznicy" name="name" rules={[{required:true}]}>
         <Input/>
@@ -2294,7 +2294,7 @@ function BackupPanel() {
     </Typography.Paragraph>
     <ErrorNotice error={error}/>
     {result&&<Alert className="notice" type={verified?"success":"info"} showIcon
-      message={<span style={{whiteSpace:"pre-wrap"}}>{result}</span>}/>}
+      title={<span style={{whiteSpace:"pre-wrap"}}>{result}</span>}/>}
     <Form form={form} layout="vertical" initialValues={{naming:"daily",overwrite:true,compress:false,customName:"KartyLeczenia"}}>
       <Form.Item label="Folder archiwum — pendrive" name="destinationFolder" rules={[{required:true,message:"Wybierz folder"}]}>
         <Input placeholder="E:\archiwum" addonAfter={<Button type="link" size="small" onClick={()=>{void browse();}}>Przeglądaj</Button>}/>
@@ -2379,12 +2379,12 @@ function RestorePanel() {
   return <Card className="settings-card">
     <Typography.Title level={4}>Odtwarzanie archiwum SQL</Typography.Title>
     <Alert className="notice" type="warning" showIcon
-      message="Operacja administracyjna — zastępuje całą bazę programową KartyLeczenia"
+      title="Operacja administracyjna — zastępuje całą bazę programową KartyLeczenia"
       description="Wykonuj na komputerze z SQL po zakończeniu pracy pozostałych stanowisk. Nie odtwarza danych Subiekta. Plik .bak musi być pełną kopią właściwej bazy."/>
     <ErrorNotice error={error}/>
     {result&&<Alert className="notice" type="success" showIcon
-      message={<span style={{whiteSpace:"pre-wrap"}}>{result}</span>}/>}
-    <Space direction="vertical" style={{width:"100%"}} size={13}>
+      title={<span style={{whiteSpace:"pre-wrap"}}>{result}</span>}/>}
+    <Space orientation="vertical" style={{width:"100%"}} size={13}>
       <Space wrap>
         <Button disabled={busy} onClick={()=>{void browse();}}>Wybierz archiwum .bak</Button>
         <Typography.Text>{file?.fileName??"Nie wybrano pliku"}</Typography.Text>
@@ -2468,12 +2468,12 @@ function UpdatePanel(){
     </Typography.Paragraph>
     <ErrorNotice error={error}/>
     {status && !status.installed && <Alert className="notice" type="info" showIcon
-      message="Tryb testowy — aktualizacje SQL są dostępne po zainstalowaniu ReactKL."/>}
+      title="Tryb testowy — aktualizacje SQL są dostępne po zainstalowaniu ReactKL."/>}
     {status?.publicationError && <Alert className="notice" type="warning" showIcon
-      message={"Publikacja na serwerze: "+status.publicationError}/>}
+      title={"Publikacja na serwerze: "+status.publicationError}/>}
     {notice&&<Alert className="notice" showIcon
-      type={data?.release?.newer?"info":"success"} message={notice}/>}
-    <Space direction="vertical" size={12}>
+      type={data?.release?.newer?"info":"success"} title={notice}/>}
+    <Space orientation="vertical" size={12}>
       <Typography.Text>Obecna wersja: <strong>{data?.currentVersion??status?.installedVersion??"—"}</strong></Typography.Text>
       {data?.release&&<div>
         <Typography.Text>Opublikowana wersja: <strong>{data.release.version}</strong></Typography.Text>
@@ -2517,10 +2517,10 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange}: {onSubiektSaved: (
       {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings onSaved={onSubiektSaved}/>},
       {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
       {key:"administrator",label:"Konto administratora SQL",children:<ProgramDatabaseSettings administrator/>},
-      {key:"backup",label:"Archiwizacja",children:<Space direction="vertical" size={18}
+      {key:"backup",label:"Archiwizacja",children:<Space orientation="vertical" size={18}
         style={{width:"100%"}}>
         <Alert type="info" className="notice" showIcon
-          message="Archiwizacja dotyczy bazy KartyLeczenia — nie bazy Subiekta"
+          title="Archiwizacja dotyczy bazy KartyLeczenia — nie bazy Subiekta"
           description="Kopia korzysta z połączenia „Baza Karty Leczenia”. Do odtwarzania używane jest „Konto administratora SQL”."/>
         <BackupPanel/>
         <RestorePanel/>
@@ -2707,7 +2707,7 @@ export default function App() {
         {topTabs&&<div className="top-navigation">{nav}</div>}
         <main className="main-content">
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
-            message="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
+            title="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           <div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
             <Documents key={subiektRevision} compact={compact} active={section==="documents"} beforeOpen={beforeOpenDocument}
               onOpen={next=>{setDraft(next);setSection("treatment");}}/>

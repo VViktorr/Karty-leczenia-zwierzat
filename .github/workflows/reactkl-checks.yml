@@ -10,24 +10,22 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '22'
+          node-version: '26.13.1'
       - name: Install React dependencies
         working-directory: ui/react
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Verify React-to-WebView2 RPC correlation
         working-directory: ui/react
         run: npm run test:bridge
       - name: Build React frontend
         working-directory: ui/react
         run: npm run build
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6.1.0
         with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
+          dotnet-version: '11.0.100'
       - name: Build Windows WebView2 host
         run: dotnet build src/KartyLeczenia.ReactKL/KartyLeczenia.ReactKL.csproj -c Release
       - name: Check React assets copied
@@ -66,7 +64,7 @@ jobs:
           if (!(Test-Path ReactKL-preview/react-ui/index.html)) {
             throw 'Missing React assets in publish folder.'
           }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: ReactKL-win-x64-preview
           path: ReactKL-preview/
@@ -74,16 +72,7 @@ jobs:
           retention-days: 14
       - name: Install Inno Setup for compiler smoke test
         shell: pwsh
-        run: |
-          $known = @(
-            'C:\Program Files\Inno Setup 7\ISCC.exe',
-            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
-            'C:\Program Files\Inno Setup 6\ISCC.exe'
-          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-          if (!$known) {
-            choco install innosetup --yes --no-progress
-            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup install failed.' }
-          }
+        run: ./installer/Install-ReactKLCompiler.ps1
       - name: Validate SQL publication scripts in Windows PowerShell 5.1
         shell: powershell
         run: |
@@ -112,12 +101,8 @@ jobs:
       - name: Compile in-place Inno Setup script (smoke only; no release/version)
         shell: pwsh
         run: |
-          $iscc = @(
-            'C:\Program Files\Inno Setup 7\ISCC.exe',
-            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
-            'C:\Program Files\Inno Setup 6\ISCC.exe'
-          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-          if (!$iscc) { throw 'ISCC.exe not found.' }
+          $iscc = $env:REACTKL_ISCC
+          if (!(Test-Path -LiteralPath $iscc)) { throw 'ISCC.exe not found.' }
           $payload = (Resolve-Path ReactKL-preview).Path
           $output = Join-Path (Get-Location) 'ReactKL-InnoSmoke'
           # This synthetic ZIP is used ONLY for compilation. Production uses
@@ -126,8 +111,12 @@ jobs:
           $seed = Join-Path $env:RUNNER_TEMP 'catalog-seed-win-x64.zip'
           Set-Content -LiteralPath $placeholder -Value 'Compiler smoke only; NOT a server installation package.'
           Compress-Archive -LiteralPath $placeholder -DestinationPath $seed -Force
-          & $iscc '/DReleaseVersion=0.0.0' '/DReleaseFileVersion=0.0.0.0' "/DPayloadDir=$payload" "/DCatalogSeedFile=$seed" "/O$output" 'installer/KartyLeczenia.ReactKL.iss'
+          & $iscc '/DReleaseVersion=0.0.0-rc.1' '/DReleaseFileVersion=0.0.0.0' "/DPayloadDir=$payload" "/DCatalogSeedFile=$seed" "/O$output" 'installer/KartyLeczenia.ReactKL.iss'
           if ($LASTEXITCODE -ne 0) { throw 'In-place installer script compilation failed.' }
-          if (!(Test-Path (Join-Path $output 'KartyLeczenia-Setup-win-x64-v0.0.0.exe'))) {
+          $installer = Join-Path $output 'KartyLeczenia-Setup-win-x64-v0.0.0-rc.1.exe'
+          if (!(Test-Path -LiteralPath $installer)) {
             throw 'Inno Setup did not produce the expected smoke-test file.'
+          }
+          if ([Diagnostics.FileVersionInfo]::GetVersionInfo($installer).ProductVersion -ne '0.0.0-rc.1') {
+            throw 'Inno Setup did not preserve the RC version in installer metadata.'
           }

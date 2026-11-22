@@ -442,7 +442,7 @@ export default function CataloguePage({
     })),
     {
       title: "ChPL (PDF)", key: "pdf", width: 235,
-      render: (_: unknown, row) => <Space direction="vertical" size={3}>
+      render: (_: unknown, row) => <Space orientation="vertical" size={3}>
         <Tooltip title={row.pdf || "Brak powiązanego dokumentu PDF"}>
           <Typography.Text ellipsis style={{ width: 205, maxWidth: 205 }}>
             {row.pdf ? (pdfNames[row.pdf] ?? (/^ChPL\/[a-f0-9]{64}\.pdf$/i.test(row.pdf)
@@ -492,10 +492,10 @@ export default function CataloguePage({
       </Space>
     </div>
     <Alert className="notice" showIcon type="info"
-      message="Zmiana danych klinicznych wymaga ręcznej weryfikacji z aktualną ChPL."
+      title="Zmiana danych klinicznych wymaga ręcznej weryfikacji z aktualną ChPL."
       description="Dołączenie PDF nie zmienia automatycznie gatunku, dawkowania ani karencji. Zapis jest zatwierdzany osobno." />
-    {error && <Alert className="notice" type="error" showIcon message={error} />}
-    {savedNotice && <Alert className="notice" type="success" showIcon message={savedNotice} />}
+    {error && <Alert className="notice" type="error" showIcon title={error} />}
+    {savedNotice && <Alert className="notice" type="success" showIcon title={savedNotice} />}
     <div className="catalogue-layout">
       <Card className="catalogue-list">
         <Button size="small" onClick={productsLayout.openColumns}>Kolumny kartotek</Button>
@@ -612,7 +612,7 @@ export default function CataloguePage({
           Szukaj
         </Button>
       </Space.Compact>
-      {pickerError && <Alert type="error" showIcon message={pickerError} />}
+      {pickerError && <Alert type="error" showIcon title={pickerError} />}
       {pickerRows.length === 100 && <Typography.Text type="secondary">
         Pokazano pierwsze 100 kartotek. Zawęź wyszukiwanie.
       </Typography.Text>}
@@ -634,7 +634,7 @@ export default function CataloguePage({
       title={"Leki do uzupełnienia ("+(missingRows?.length??0)+" / "+missingTotal+")"}
       width={900} onCancel={()=>setMissingOpen(false)}
       footer={<Button onClick={()=>setMissingOpen(false)}>Zamknij</Button>}>
-      {pickerError&&<Alert className="notice" type="error" showIcon message={pickerError}/>}
+      {pickerError&&<Alert className="notice" type="error" showIcon title={pickerError}/>}
       <Typography.Paragraph type="secondary">
         Lista obejmuje grupę leków z Subiekta, również produkty bez stanu w magazynie.
         Otwórz produkt, aby uzupełnić istniejącą kartotekę lub przygotować nową.
@@ -664,13 +664,13 @@ export default function CataloguePage({
       </Space>}>
       {proposal && <>
         <Alert className="notice" type="warning" showIcon
-          message="To tylko automatyczna propozycja. Sprawdź zgodność każdej wartości z aktualną urzędową polską ChPL."
+          title="To tylko automatyczna propozycja. Sprawdź zgodność każdej wartości z aktualną urzędową polską ChPL."
           description="Dane z dokumentów wielogatunkowych lub niejednoznacznych mogą pozostać puste."/>
         {proposal.warnings.map((warning,index) =>
-          <Alert key={index} type="info" className="notice" showIcon message={warning}/>)}
+          <Alert key={index} type="info" className="notice" showIcon title={warning}/>)}
         {proposal.variants.some(row=>!row.species.trim()||!row.route.trim()||!row.dose.trim()) &&
           <Alert className="notice" type="info" showIcon
-            message="Uzupełnij w tabeli gatunek, drogę podania i dawkowanie według ChPL, aby przenieść daną pozycję."/>}
+            title="Uzupełnij w tabeli gatunek, drogę podania i dawkowanie według ChPL, aby przenieść daną pozycję."/>}
         <Table<CatalogueVariant> rowKey={(_,index)=>String(index)}
           dataSource={proposal.variants} pagination={false} size="small"
           scroll={{x:1100,y:230}}
@@ -701,7 +701,7 @@ export default function CataloguePage({
       </>}
     </Modal>
     <Modal className="kl-dialog-catalogue-pdf" open={pdfUrl !== null} title={"ChPL — " + pdfName}
-      width="94vw" destroyOnClose
+      width="94vw" destroyOnHidden
       onCancel={closePdf}
       footer={<Button onClick={closePdf}>Zamknij podgląd</Button>}>
       {pdfUrl && <Suspense fallback={<Spin aria-label="Ładowanie podglądu ChPL"/>}>

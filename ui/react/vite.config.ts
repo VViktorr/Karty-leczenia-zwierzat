@@ -1,36 +1,20 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import {defineConfig} from "vite";
+import react from "@vitejs/plugin-react";
 
-// Split the large React/Ant Design vendor bundle into independently cached
-// packages instead of merely increasing chunkSizeWarningLimit.
 export default defineConfig({
   plugins: [react()],
-  base: '/',
+  base: "/",
   build: {
-    outDir: 'dist',
+    outDir: "dist",
     emptyOutDir: true,
-    assetsDir: 'assets',
-    rollupOptions: {
+    assetsDir: "assets",
+    rolldownOptions: {
       output: {
-        onlyExplicitManualChunks: true,
-        manualChunks(id) {
-          const file=id.replaceAll('\\', '/');
-          if (!file.includes('/node_modules/')) return;
-          if (/\/node_modules\/(?:react|react-dom|scheduler)\//.test(file))
-            return 'vendor-react';
-          if (file.includes('/node_modules/@ant-design/icons') ||
-              file.includes('/node_modules/@ant-design/cssinjs') ||
-              file.includes('/node_modules/@ant-design/colors') ||
-              file.includes('/node_modules/@ant-design/fast-color'))
-            return 'vendor-antd-components';
-          if (file.includes('/node_modules/rc-') ||
-              file.includes('/node_modules/@rc-component/'))
-            return 'vendor-antd-components';
-          if (file.includes('/node_modules/antd/'))
-            return 'vendor-antd';
-        }
-      }
-    }
+        codeSplitting: {
+          groups: [{name: "vendor-react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/}],
+        },
+      },
+    },
   },
-  server: {host:'127.0.0.1',port:5173}
+  server: {host: "127.0.0.1", port: 5173},
 });

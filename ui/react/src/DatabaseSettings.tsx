@@ -41,7 +41,7 @@ interface ArchiveCheck {saved:boolean;server:string;database:string;message:stri
 type BusyAction="load"|"discover"|"check"|"save"|null;
 
 function ErrorNotice({message}:{message:string}) {
-  return message?<Alert type="error" showIcon className="notice" message={message}/>:null;
+  return message?<Alert type="error" showIcon className="notice" title={message}/>:null;
 }
 
 function CredentialFields<T extends BaseSqlSettings>({form, showTrust = true}:{form:FormInstance<T>; showTrust?: boolean}) {
@@ -51,7 +51,7 @@ function CredentialFields<T extends BaseSqlSettings>({form, showTrust = true}:{f
       valuePropName="checked" extra="Włączone: konto Windows. Wyłączone: login i hasło SQL Server.">
       <Switch checkedChildren="Windows" unCheckedChildren="SQL"/>
     </Form.Item>
-    <Space direction="vertical" style={{width:"100%"}}>
+    <Space orientation="vertical" style={{width:"100%"}}>
       <Form.Item label="Login SQL Server" name="userName"
         rules={!windows?[{required:true,message:"Wpisz login SQL."}]:[]}>
         <Input autoComplete="username" disabled={windows}
@@ -162,7 +162,7 @@ export function SubiektDatabaseSettings({onSaved}: {onSaved: () => void}){
       sprawdź połączenie i wybierz magazyn.
     </Typography.Paragraph>
     <ErrorNotice message={error}/>
-    {notice&&<Alert className="notice" showIcon type={checked?"success":"info"} message={notice}/>}
+    {notice&&<Alert className="notice" showIcon type={checked?"success":"info"} title={notice}/>}
     <Form<SubiektValues> form={form} layout="vertical"
       initialValues={{windowsAuthentication:true,drugGroup:"Leki",warehouseId:null,rememberPassword:false}}
       onFinish={values=>{void save(values);}}
@@ -268,11 +268,11 @@ export function ProgramDatabaseSettings({administrator = false}: {administrator?
       katalog leków, ChPL i ustawienia lecznicy. Nie jest to baza Subiekta GT.
     </Typography.Paragraph>
     <Alert type="info" className="notice" showIcon
-      message="Nazwa bazy SQL: KartyLeczenia"
+      title="Nazwa bazy SQL: KartyLeczenia"
       description="Ta techniczna nazwa pozostaje bez zmian podczas aktualizacji programu."/>
     </>}
     <ErrorNotice message={error}/>
-    {notice&&<Alert className="notice" type={verified?"success":"info"} showIcon message={notice}/>}
+    {notice&&<Alert className="notice" type={verified?"success":"info"} showIcon title={notice}/>}
     <Form<BaseSqlSettings> form={form} layout="vertical"
       initialValues={{windowsAuthentication:true,rememberPassword:false}}
       onFinish={values=>{void run(true,values);}}

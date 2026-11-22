@@ -4,13 +4,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+if ($Version.Length -gt 32 -or $Version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?(?:-rc\.[1-9][0-9]{0,8})?\z') {
     throw 'Wersje instalatora trzeba podac recznie w formacie X.Y.Z lub X.Y.Z.W.'
 }
-foreach ($part in $Version.Split('.')) {
+$numericVersion = ($Version -split '-')[0]
+foreach ($part in $numericVersion.Split('.')) {
     if ([int]$part -gt 65535) { throw 'Skladowe wersji nie moga przekraczac 65535.' }
 }
-$fileVersion = if ($Version.Split('.').Count -eq 3) { "$Version.0" } else { $Version }
+$fileVersion = if ($numericVersion.Split('.').Count -eq 3) { "$numericVersion.0" } else { $numericVersion }
 $root = Split-Path -Parent $PSScriptRoot
 $stage = Join-Path ([IO.Path]::GetTempPath()) ("ReactKL-installer-" + [Guid]::NewGuid().ToString('N'))
 $installerScript = Join-Path $PSScriptRoot 'KartyLeczenia.ReactKL.iss'
@@ -31,14 +32,14 @@ try {
     Write-Host "ReactKL: budowanie recznie wybranej wersji $Version"
     Push-Location 'ui/react'
     try {
-        & npm install --no-audit --no-fund
+        & npm ci --no-audit --no-fund
         if ($LASTEXITCODE -ne 0) { throw 'Instalacja zaleznosci React nie powiodla sie.' }
         & npm run build
         if ($LASTEXITCODE -ne 0) { throw 'Kompilacja React nie powiodla sie.' }
     }
     finally { Pop-Location }
 
-    dotnet publish src/KartyLeczenia.ReactKL/KartyLeczenia.ReactKL.csproj -c Release -r win-x64 --self-contained true "-p:Version=$Version" "-p:FileVersion=$fileVersion" "-p:AssemblyVersion=$fileVersion" -o $stage
+    dotnet publish src/KartyLeczenia.ReactKL/KartyLeczenia.ReactKL.csproj -c Release -r win-x64 --self-contained true "-p:Version=$Version" "-p:InformationalVersion=$Version" "-p:IncludeSourceRevisionInInformationalVersion=false" "-p:FileVersion=$fileVersion" "-p:AssemblyVersion=$fileVersion" -o $stage
     if ($LASTEXITCODE -ne 0) { throw 'Publikacja aplikacji ReactKL nie powiodla sie.' }
     if (!(Test-Path -LiteralPath (Join-Path $stage 'react-ui/index.html'))) {
         throw 'Brakuje zbudowanego interfejsu React w plikach instalatora.'

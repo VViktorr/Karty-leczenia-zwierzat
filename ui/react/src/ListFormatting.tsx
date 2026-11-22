@@ -102,7 +102,7 @@ export function ListFormattingPanel({formatting, columns}: {
     });
   const fontOptions = [...new Set([...fonts, ...(current.fontFamily ? [current.fontFamily] : [])])];
   return <Form layout="vertical">
-    {error && <Alert type="warning" showIcon message={error}/>}
+    {error && <Alert type="warning" showIcon title={error}/>}
     <Form.Item label="Zakres">
       <Select value={column} onChange={setColumn} options={[
         {value:wholeList, label:"Cała lista"},

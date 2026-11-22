@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net11.0-windows10.0.19041.0</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -12,8 +12,14 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../KartyLeczenia.Core/KartyLeczenia.Core.csproj" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" PrivateAssets="buildTransitive" />
   </ItemGroup>
+  <!-- The WebView2 NuGet adds WPF alongside WinForms. This host uses WinForms. -->
+  <Target Name="RemoveUnusedWebView2Wpf" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference->WithMetadataValue('Filename','Microsoft.Web.WebView2.Wpf'))" />
+    </ItemGroup>
+  </Target>
   <ItemGroup Condition="Exists('../../ui/react/dist/index.html')">
     <Content Include="../../ui/react/dist/**/*"
              Link="react-ui/%(RecursiveDir)%(Filename)%(Extension)"

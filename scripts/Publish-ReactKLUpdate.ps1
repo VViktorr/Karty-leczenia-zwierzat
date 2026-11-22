@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Server,
     [Parameter(Mandatory = $true)][string]$Installer,
-    [Parameter(Mandatory = $true)][ValidatePattern('^\d+\.\d+\.\d+(\.\d+)?$')][string]$Version,
+    [Parameter(Mandatory = $true)][ValidateLength(1,32)][ValidatePattern('^\d+\.\d+\.\d+(?:\.\d+)?(?:-rc\.[1-9][0-9]{0,8})?\z')][string]$Version,
     [switch]$Pending,
     [switch]$TrustServerCertificate
 )
@@ -13,9 +13,19 @@ $ErrorActionPreference = 'Stop'
 $log = Join-Path $env:ProgramData 'KartyLeczenia\update-publish.log'
 $stream = $null
 $db = $null
-function FourPart([string]$v) {
-    if ($v.Split('.').Count -eq 3) { return [version]("$v.0") }
-    return [version]$v
+function ParseRelease([string]$v) {
+    if ($v.Length -gt 32 -or $v -notmatch '^(?<base>[0-9]+(?:\.[0-9]+){1,3})(?:-rc\.(?<rc>[1-9][0-9]{0,8}))?\z') {
+        throw "Niepoprawny numer wersji: $v."
+    }
+    $number = [version]$Matches['base']
+    $numeric = [version]::new($number.Major, $number.Minor, [Math]::Max($number.Build, 0), [Math]::Max($number.Revision, 0))
+    $candidate = if ($Matches.ContainsKey('rc')) { [int]$Matches['rc'] } else { [int]::MaxValue }
+    return @{ Numeric = $numeric; Candidate = $candidate }
+}
+function CompareRelease($left, $right) {
+    $comparison = $left.Numeric.CompareTo($right.Numeric)
+    if ($comparison -ne 0) { return $comparison }
+    return $left.Candidate.CompareTo($right.Candidate)
 }
 try {
     New-Item -ItemType Directory -Path (Split-Path -Parent $log) -Force | Out-Null
@@ -34,8 +44,10 @@ try {
     $meta = $file.VersionInfo
     $actualFile = '{0}.{1}.{2}.{3}' -f $meta.FileMajorPart,$meta.FileMinorPart,$meta.FileBuildPart,$meta.FilePrivatePart
     $actualProduct = '{0}.{1}.{2}.{3}' -f $meta.ProductMajorPart,$meta.ProductMinorPart,$meta.ProductBuildPart,$meta.ProductPrivatePart
-    $expected = FourPart $Version
-    if ((FourPart $actualFile) -ne $expected -or (FourPart $actualProduct) -ne $expected) {
+    $expected = ParseRelease $Version
+    $textVersion = ParseRelease $meta.ProductVersion
+    if ([version]$actualFile -ne $expected.Numeric -or [version]$actualProduct -ne $expected.Numeric -or
+        (CompareRelease $textVersion $expected) -ne 0) {
         throw "Wersja pliku $actualFile, produktu $actualProduct i wydania $Version nie zgadzają się."
     }
 
@@ -76,11 +88,11 @@ try {
             } finally { $reader.Dispose() }
             $shouldPublish = $true
             if ($null -ne $existingVersion) {
-                $old = FourPart $existingVersion
-                if ($old -gt $expected) {
+                $comparison = CompareRelease (ParseRelease $existingVersion) $expected
+                if ($comparison -gt 0) {
                     throw "W SQL jest już nowsza wersja $existingVersion. Numeru instalatora nie zmieniono automatycznie."
                 }
-                if ($old -eq $expected) {
+                if ($comparison -eq 0) {
                     if ([Convert]::ToBase64String($existingHash) -ne [Convert]::ToBase64String($hash)) {
                         throw "W SQL jest już wersja $existingVersion z inną sumą SHA-256. Użyj nowego numeru."
                     }

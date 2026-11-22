@@ -35,12 +35,12 @@ internal static class ReactInstallUpdates
     }
 
     internal static bool IsInstalled => File.Exists(InstallFile) &&
-        Version.TryParse(Read("AppVersion"), out _);
+        ReactReleaseVersion.TryParse(Read("AppVersion"), out _);
     internal static bool IsServer => string.Equals(Read("Role"), "server", StringComparison.OrdinalIgnoreCase);
     internal static string? Server => Read("Server");
 
     internal static string InstalledVersion =>
-        Version.TryParse(Read("AppVersion"), out _) ? Read("AppVersion")! : ReactUpdateService.CurrentVersion;
+        ReactReleaseVersion.TryParse(Read("AppVersion"), out _) ? Read("AppVersion")! : ReactUpdateService.CurrentVersion;
 
     internal static string PendingInstaller => Path.Combine(AppContext.BaseDirectory,
         $"KartyLeczenia-Update-Pending-v{InstalledVersion}.exe");
@@ -62,7 +62,7 @@ internal static class ReactInstallUpdates
         if (!HasPendingPublication)
             throw new InvalidOperationException("Brak instalatora oczekującego na publikację na komputerze serwera SQL.");
         string server = Server ?? "";
-        if (string.IsNullOrWhiteSpace(server) || !Version.TryParse(InstalledVersion, out _))
+        if (string.IsNullOrWhiteSpace(server) || !ReactReleaseVersion.TryParse(InstalledVersion, out _))
             throw new InvalidOperationException("Brak serwera archiwum lub wersji w archive-installation.ini.");
 
         string script = Path.Combine(AppContext.BaseDirectory, "Publish-ReactKLUpdate.ps1");

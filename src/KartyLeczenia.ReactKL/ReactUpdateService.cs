@@ -21,21 +21,20 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
         {
             string? exe = Environment.ProcessPath;
             if (string.IsNullOrWhiteSpace(exe)) return "0.0.0";
-            string? version = FileVersionInfo.GetVersionInfo(exe).FileVersion;
-            return Version.TryParse(version, out var parsed) ? parsed.ToString() : "0.0.0";
+            var metadata = FileVersionInfo.GetVersionInfo(exe);
+            string? version = metadata.ProductVersion?.Split('+', 2)[0];
+            if (ReactReleaseVersion.TryParse(version, out _)) return version!;
+            return ReactReleaseVersion.TryParse(metadata.FileVersion, out _) ? metadata.FileVersion! : "0.0.0";
         }
     }
 
-    private static Version Normalize(Version value) => new(value.Major,value.Minor,
-        Math.Max(0,value.Build),Math.Max(0,value.Revision));
-
     internal static bool IsNewer(string published, string installed)
     {
-        if (!Version.TryParse(published, out var candidate))
+        if (!ReactReleaseVersion.TryParse(published, out var candidate))
             throw new InvalidDataException("Niepoprawna wersja instalatora opublikowanego w SQL.");
-        var current = Version.TryParse(installed, out var parsed)
-            ? parsed : new Version(0,0);
-        return Normalize(candidate) > Normalize(current);
+        if (!ReactReleaseVersion.TryParse(installed, out var current))
+            current = new(new Version(0, 0, 0, 0), null);
+        return candidate.CompareTo(current) > 0;
     }
 
     private SqlConnection Connection()
@@ -59,13 +58,13 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
             using var reader=await query.ExecuteReaderAsync(CommandBehavior.SingleRow,token);
             if (!await reader.ReadAsync(token)) return null;
             string text=reader.GetString(1);
-            if (!Version.TryParse(text,out var release))
+            if (!ReactReleaseVersion.TryParse(text,out _))
                 throw new InvalidDataException("Niepoprawny numer wersji publikacji w SQL.");
             var hash=reader.GetFieldValue<byte[]>(2);
             if(hash.Length!=32)throw new InvalidDataException("Błędna suma SHA-256 aktualizacji SQL.");
             string installedVersion = ReactInstallUpdates.InstalledVersion;
-            return new(reader.GetGuid(0),release.ToString(),installedVersion,
-                Convert.ToHexString(hash),IsNewer(release.ToString(),installedVersion),reader.GetDateTime(3));
+            return new(reader.GetGuid(0),text,installedVersion,
+                Convert.ToHexString(hash),IsNewer(text,installedVersion),reader.GetDateTime(3));
         }
         catch(SqlException ex) when(ex.Number==208)
         {
@@ -76,15 +75,15 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
 
     internal async Task<string> Download(ReactUpdateInfo release, CancellationToken token)
     {
-        Version current=Version.TryParse(ReactInstallUpdates.InstalledVersion,out var local)?local:new Version(0,0);
-        if (!Version.TryParse(release.Version,out var advertised)||Normalize(advertised)<=Normalize(current))
+        if (!ReactReleaseVersion.TryParse(release.Version,out var advertised)||
+            !IsNewer(release.Version, ReactInstallUpdates.InstalledVersion))
             throw new InvalidOperationException("Brak nowszej wersji ReactKL do zainstalowania.");
         if(release.Sha256.Length!=64 || !release.Sha256.All(Uri.IsHexDigit))
             throw new InvalidDataException("Nieprawidłowy skrót SHA-256 publikacji.");
         string folder=Path.Combine(Path.GetTempPath(),"KartyLeczenia-Update",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
-        string installer=Path.Combine(folder,"KartyLeczenia-Setup-win-x64-v"+advertised+".exe");
+        string installer=Path.Combine(folder,"KartyLeczenia-Setup-win-x64-v"+release.Version+".exe");
         bool valid=false;
         try
         {
@@ -115,7 +114,9 @@ internal sealed class ReactUpdateService(ConnectionSettingsStore store)
             var metadata = FileVersionInfo.GetVersionInfo(installer);
             var fileVersion = new Version(metadata.FileMajorPart, metadata.FileMinorPart,
                 metadata.FileBuildPart, metadata.FilePrivatePart);
-            if (fileVersion != Normalize(advertised))
+            bool candidateMatches = ReactReleaseVersion.TryParse(metadata.ProductVersion, out var actual)
+                ? actual.Candidate == advertised.Candidate : advertised.Candidate is null;
+            if (fileVersion != advertised.FileVersion || !candidateMatches)
                 throw new InvalidDataException("Pobrany plik ma inną wersję niż opublikowana. Nie uruchomiono aktualizacji.");
             using(var stream=File.OpenRead(installer))
                 if(stream.ReadByte()!='M' || stream.ReadByte()!='Z')
