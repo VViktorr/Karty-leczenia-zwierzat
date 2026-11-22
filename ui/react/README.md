@@ -1,100 +1,67 @@
-# Karty Leczenia — ReactKL (React + WebView2)
+# ReactKL — interfejs React / WebView2
 
-**Jedynym interfejsem użytkownika na tej gałęzi jest React + TypeScript + WebView2.**
-WinForms służy wyłącznie jako natywne okno hostujące WebView2, bez dawnych formularzy.
-C#/.NET oraz SQL Server odpowiadają za dane, logikę leczenia, zapis i wydruki.
+Ten katalog zawiera frontend programu **Karty Leczenia**. Główna dokumentacja, instalacja serwera SQL i kompletne polecenia do Inno Setup znajdują się w [README repozytorium](../../README.md).
 
-## Budowanie lokalne (Windows 11)
+## Stos technologiczny
+
+- **React 19 + TypeScript 7 + Vite 8**
+- **Ant Design 6**, wybrane kontrolki Fluent UI i opcjonalny **AG Grid**
+- TanStack Query i TanStack Virtual do obsługi danych i długich list
+- **WebView2** do komunikacji z hostem `src/KartyLeczenia.ReactKL` (C#/.NET 11)
+
+Interfejs React jest jedynym interfejsem tej gałęzi. Natywne Windows Forms służy tylko do uruchomienia okna WebView2 — nie są dostępne dawne formularze WinForms ani AntdUI. Połączeń SQL nie nawiązuje bezpośrednio JavaScript.
+
+## Kompilacja frontendu
+
+Na Windows 11 z Node.js zgodnym z wersją w GitHub Actions (obecnie 26.13.1):
 
 ```powershell
-cd ui/react
-npm install
-npm run build
-cd ../..
-dotnet publish src/KartyLeczenia.ReactKL/KartyLeczenia.ReactKL.csproj -c Release -r win-x64 --self-contained true -o ReactKL-preview
+cd C:\Karty-leczenia-zwierzat\ui\react
+npm.cmd ci --no-audit --no-fund
+npm.cmd run test:bridge
+npm.cmd run build
+```
+
+`npm.cmd` jest używane na Windows, by uniknąć blokady uruchamiania `npm.ps1` w PowerShell. Wynik jest w katalogu `ui/react/dist`. Sam `npm run dev` służy wyłącznie do pracy nad widokami i **nie zapewnia połączenia z SQL ani Subiektem** poza hostem Windows.
+
+## Budowa aplikacji Windows (bez instalatora)
+
+```powershell
+cd C:\Karty-leczenia-zwierzat
+dotnet publish .\src\KartyLeczenia.ReactKL\KartyLeczenia.ReactKL.csproj -c Release -r win-x64 --self-contained true -o .\ReactKL-preview
 .\ReactKL-preview\KartyLeczenia.ReactKL.exe
 ```
 
-Workflow [ReactKL frontend and Windows desktop checks](../../.github/workflows/reactkl-checks.yml) kompiluje frontend,
-aplikację C#, testy regresji i tworzy artefakt `ReactKL-win-x64-preview`.
-Wymagany Microsoft Edge WebView2 Runtime.
+**Najpierw wykonaj `npm.cmd run build`**, inaczej w `react-ui` aplikacji zabraknie aktualnych plików interfejsu. Wymagane jest .NET 11 SDK 11.0.100 (zob. [`global.json`](../../global.json)). Na komputerze docelowym wymagany jest WebView2 Runtime.
 
-## Widoki
+## Kompletny instalator z numerem wersji
 
-React ma trzy wymienne układy: Modern (menu boczne), Classic (zakładki) i Fluent
-(Windows 11). Niezależnie można wybrać motyw jasny, ciemny lub morski.
-
-Interfejs obejmuje: dokumenty FS/PA/WZ, podgląd i edycję karty leczenia, podgląd
-wydruku, zapis karty do SQL, listę zapisanych kart i kosz, cennik, terminy
-ważności, katalog SQL (warianty leków i podgląd/dołączanie PDF ChPL), dane lecznicy,
-konfigurację Subiekta i archiwum oraz pełną kopię SQL
-na pendrive z Windows Hello i kontrolą SHA-256.
-
-## Bezpieczeństwo i ograniczenia
-
-- Brak AntdUI w nowym projekcie i brak przełączania na stare okna.
-- Bezpośrednie zapytania SQL wykonuje tylko C#, nie JavaScript.
-- Hasła SQL są zabezpieczane przez Windows DPAPI w istniejących ustawieniach.
-- Wydruk korzysta z `CardHtmlRenderer` z `KartyLeczenia.Core`.
-- Katalog React pozwala edytować/dodawać warianty i przypisywać PDF, a tekstowe
-  ChPL analizuje offline jako **propozycje** z ostrzeżeniami i fragmentami źródłowymi.
-  Dopiero po zatwierdzeniu przenosi proponowane dane do edytora, bez automatycznego
-  zapisu w SQL. Nadal nie ma OCR dla skanów, usuwania istniejących wariantów ani
-  pełnej kontroli zgodności danych klinicznych.
-- W kodzie są: podgląd/eksport PDF i e-mail karty, pełna kopia i odtworzenie SQL,
-  publikacja aktualizacji przez SQL oraz oddzielne formularze połączeń Subiekta
-  i bazy KartyLeczenia. Działanie na rzeczywistym Windows/SQL i przywracanie
-  archiwów wymagają testów integracyjnych.
-- Wymagane testy na Windows z rzeczywistym SQL, Subiektem i drukarką.
-
-Historyczna aplikacja WinForms jest zabezpieczona na gałęzi
-`winforms-backup-2026-11-19` i nie stanowi części pakietu ReactKL.
-
-
-## Aktualizacje i instalacja w miejsce poprzedniej wersji
-
-**Karty Leczenia (ReactKL) zastępuje dotychczasową instalację** — ten sam Inno Setup AppId
-`pl.kartyleczenia.winforms.sql`, katalog `C:\Program Files\KartyLeczenia`,
-skróty i rola serwer/stanowisko w `archive-installation.ini`. Istniejący plik
-konfiguracji archiwum jest zachowywany. Stare EXE i AntdUI.dll są usuwane
-przy instalacji, ale pliki użytkownika, bazy SQLite, PDF i .bak nie są czyszczone.
-
-Numer wersji jest zawsze podawany ręcznie:
+Z katalogu głównego, po zainstalowaniu Inno Setup 7 (lub obsługiwanego 6):
 
 ```powershell
-.\installer\Build-ReactKL.ps1 -Version 2.2.5
+cd C:\Karty-leczenia-zwierzat
+powershell -NoProfile -ExecutionPolicy Bypass -File .\installer\Build-ReactKL.ps1 -Version "4.0.1"
 ```
 
-(Powyższe `2.2.5` to przykład — faktyczny numer wybiera operator.)
-Wynik: `Instalatory\KartyLeczenia-Setup-win-x64-v<wersja>.exe`.
-Dostępny również workflow `.github/workflows/reactkl-installer.yml` z
-ręcznym polem wersji.
+Wynik: `Instalatory\KartyLeczenia-Setup-win-x64-v4.0.1.exe`. Numer `4.0.1` jest przykładem, podawanym ręcznie. Wersja `0.1.0` w `package.json` jest wersją paczki frontendu — nie numerem instalatora.
 
-W trybie serwera instalator po zainstalowaniu kopiuje się tymczasowo do
-`{app}\KartyLeczenia-Update-Pending-v<wersja>.exe`. Przy pierwszym uruchomieniu
-ReactKL publikuje ten plik do **istniejącej** tabeli
-`KartyLeczenia.dbo.program_update`, sprawdza wersję i sumę SHA-256, a po
-sukcesie usuwa kopię oczekującą. Publikacja wymaga UAC oraz uprawnień SQL.
-Jeżeli się nie uda, w Ustawieniach można użyć "Opublikuj instalator".
+Skrypt buduje React, .NET, paczkę do pierwszego importu katalogu i ChPL, a następnie uruchamia kompilator Inno Setup. Alternatywnie można użyć [ręcznego workflow](../../.github/workflows/reactkl-installer.yml).
 
-Stanowisko zdalne po uruchomieniu sprawdza tę samą tabelę i proponuje nowszą
-wersję. Pobieranie/uruchomienie wymaga zgody użytkownika; sprawdzane są
-SHA-256 i metadane pliku. Przy aktualizacji instalator nadpisuje poprzednią
-instalację. **Nie publikujemy już do osobnej tabeli react_program_update.**
+## Moduły i układy
 
-Nie zamieniaj instalatora produkcyjnego bez wcześniejszego sprawdzenia
-z prawdziwym serwerem SQL i stacjami Windows.
+Interfejs obejmuje ekrany dokumentów FS/PA/WZ, kreatora karty, zapisanych kart i kosza, katalogu leków z PDF ChPL, cennika, terminów ważności oraz ustawień połączeń Subiekta i archiwum. Dostępne są różne układy nawigacji (m.in. Modern, Classic, Windows, Fluent i warianty kompaktowe), niezależne motywy oraz skalowanie.
 
-## Konfiguracja baz — osobne zakładki
+Lista dokumentów ma pamięć odczytu na poziomie hosta; przycisk **F5** wymusza odświeżenie. Opcja **Wszystkie pobrane** dotyczy wyłącznie zwróconej porcji danych (do 500), a nie wszystkich historycznych dokumentów.
 
-Ustawienia programu mają osobne zakładki **Subiekt GT**, **Baza Karty Leczenia**,
-**Archiwizacja**, **Dane lecznicy** i **Aktualizacje**. W Subiekcie dostępne jest
-pobieranie baz podmiotów, test połączenia, grupy leków i wybór magazynu według
-nazwy, bez ręcznego wpisywania ID. Zapis połączenia wymaga poprawnej grupy i
-magazynu. Archiwizacja dotyczy tej samej bazy programowej `KartyLeczenia`,
-nie bazy Subiekta. Test połączenia **nie zapisuje ustawień**.
+## Testy i status integracji
 
-Widoczna nazwa programu, skrótów na pulpicie i w menu Start to
-**Karty Leczenia**. Techniczne nazwy pliku EXE, katalogu instalacji, bazy SQL
-i Inno AppId zachowano dla zgodności aktualizacji. Do budowania w `C:\React`
-użyj instrukcji z [głównego README](../../README.md).
+```powershell
+cd C:\Karty-leczenia-zwierzat\ui\react
+npm.cmd run test:bridge
+npm.cmd run build
+npm.cmd run test:e2e
+```
+
+Testy przeglądarkowe wymagają środowiska Playwright zgodnie z konfiguracją projektu. Kompletną kontrolę Windows (frontend, C#, regresje, publish i próbna kompilacja Inno) definiuje [`reactkl-checks.yml`](../../.github/workflows/reactkl-checks.yml).
+
+**Istnienie funkcji w kodzie i zielony CI nie dowodzą pełnej zgodności z WinForms.** Przed wdrożeniem na serwerze produkcyjnym potrzebne są testy operacji SQL, dodawania leków, backup/restore, kosza, PDF, wysyłki e-mail i aktualizacji instalatora. Szczegóły: [audyt rzeczywistego parytetu](../../docs/reactkl-audyt-rzeczywistego-parytetu-2026-11-20.md).
