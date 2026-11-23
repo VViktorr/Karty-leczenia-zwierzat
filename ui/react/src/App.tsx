@@ -1,3 +1,4 @@
+import {createPortal} from "react-dom";
 import {QueryClient} from "@tanstack/react-query";
 import TreatmentShortcuts from "./TreatmentShortcuts";
 import TreatmentWarningList from "./TreatmentWarningList";
@@ -210,7 +211,8 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   }};
 }
 
-function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
+function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
+  toolbar:HTMLDivElement|null;
   active:boolean;compact:boolean;cacheScope?:number;beforeOpen:(row:DocumentRow)=>Promise<boolean>;
   onOpen:(draft:Draft)=>void;
 }) {
@@ -340,9 +342,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
     {label:"Dowolny okres",value:"custom"}
   ];
   return <>
-    {!compact&&<div className="page-heading list-heading-actions"><Space wrap>
-      <Button onClick={reload} loading={busy}>Odśwież · F5</Button>
-    </Space></div>}
+    {active&&toolbar&&createPortal(<Button onClick={reload} loading={busy}>Odśwież · F5</Button>,toolbar)}
     <Card className={compact?"compact-documents":undefined}>
       <div className={"document-filters"+(compact?" compact-document-toolbar":"")}>
         <Segmented block size={compact?"middle":"large"} value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
@@ -357,9 +357,6 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
           placeholder="Numer lub kontrahent"/>
         <Select value={period} size={compact?"middle":"large"} onChange={next=>{setPeriod(next);setSelectedId(null);}}
           options={periods}/>
-        {compact&&<Space size={6} className="compact-document-actions">
-          <Button onClick={reload} loading={busy} title="Odśwież · F5">Odśwież ↻</Button>
-        </Space>}
         {period==="customMonth"&&<Input type="month" aria-label="Wybrany miesiąc"
           value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)}/>}
         {period==="custom"&&<>
@@ -2705,7 +2702,7 @@ export default function App() {
     try{const value=Number(localStorage.getItem("kl.uiScale"));return Number.isFinite(value)&&value>=80&&value<=200?value:100;}
     catch{return 100;}
   });
-  const [catalogueToolbar,setCatalogueToolbar]=useState<HTMLDivElement|null>(null);
+  const [sectionToolbar,setSectionToolbar]=useState<HTMLDivElement|null>(null);
   const [section,setSection]=useState<Section>(treatmentWindow?"treatment":"documents");
   const [subiektRevision,setSubiektRevision]=useState(0);
   const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
@@ -2878,7 +2875,7 @@ export default function App() {
   </>;
   const content=section==="documents"||section==="treatment"?null:
     section==="prices"?<Prices onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
-    section==="catalogue"?<CataloguePage toolbar={catalogueToolbar} onDirtyChange={setCatalogueDirty}
+    section==="catalogue"?<CataloguePage toolbar={sectionToolbar} onDirtyChange={setCatalogueDirty}
       initialEntry={catalogueEntry} onPickerOpened={()=>setCatalogueEntry(null)}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards initialCardId={savedCardToOpen}
@@ -2907,14 +2904,15 @@ export default function App() {
             {section==="catalogue"&&<span className="topbar-note">Dane wariantów i dokumenty urzędowe z bazy KartyLeczenia SQL.</span>}
           </div>
           {treatmentWindow&&<Button onClick={returnToDocuments}>Zamknij kartę</Button>}
-          {section==="catalogue"&&<div className="catalogue-toolbar" ref={setCatalogueToolbar}/>}
+          {!treatmentWindow&&(section==="catalogue"||section==="documents")&&
+            <div className={section==="catalogue"?"catalogue-toolbar":undefined} ref={setSectionToolbar}/>}
         </header>
         {!treatmentWindow&&topTabs&&<div className="top-navigation">{nav}</div>}
         <main className={"main-content"+(section==="catalogue"?" catalogue-content":"")}>
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             title="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           {!treatmentWindow&&<div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
-            <Documents key={subiektRevision} compact={compact} active={section==="documents"} cacheScope={cacheDocuments?subiektRevision:undefined} beforeOpen={beforeOpenDocument}
+            <Documents key={subiektRevision} toolbar={sectionToolbar} compact={compact} active={section==="documents"} cacheScope={cacheDocuments?subiektRevision:undefined} beforeOpen={beforeOpenDocument}
               onOpen={next=>{setDraft(next);setSection("treatment");}}/>
           </div>}
           <ErrorNotice error={windowError}/>
