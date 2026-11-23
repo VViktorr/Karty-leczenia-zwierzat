@@ -43,3 +43,22 @@ test("every skin supports both top and side menu",async ({page})=>{
     }
   }
 });
+
+test("AG Grid settings apply globally without per-list toggle in archived cards",async ({page})=>{
+  await page.goto("/");
+  await page.getByRole("button",{name:"Ustawienia",exact:true}).click();
+  await page.getByRole("tab",{name:"Komponenty"}).click();
+  await page.getByRole("combobox",{name:"Domyślny silnik tabel"}).click();
+  await page.getByText("AG Grid — zaawansowany",{exact:true}).click();
+  await page.getByRole("combobox",{name:"AG Grid — wysokość wiersza"}).click();
+  await page.getByText("44 px",{exact:true}).click();
+  await page.getByText("Filtry kolumn AG Grid",{exact:true}).click();
+  await page.reload();
+  const prefs=await page.evaluate(()=>
+    JSON.parse(localStorage.getItem("ReactKL.componentPreferences.v1")??"null"));
+  expect(prefs).toMatchObject({table:{mode:"ag"},agGrid:{rowHeight:44,filters:true}});
+  await page.getByRole("button",{name:"Zapisane karty",exact:true}).click();
+  await expect(page.locator(".kl-grid-toggle")).toHaveCount(0);
+  await page.getByRole("button",{name:"Dokumenty",exact:true}).click();
+  await expect(page.locator(".kl-grid-toggle")).toHaveCount(0);
+});
