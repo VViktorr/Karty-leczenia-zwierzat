@@ -168,6 +168,16 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
       }}
     }];
   }), [columns,preferences.sortable,preferences.filters]);
+  const rowClassRules = useMemo(() => {
+    if (typeof rowClassName !== "function") return undefined;
+    const matches = (className: string) => (params: import("ag-grid-community").RowClassParams<T>) =>
+      !!params.data && rowClassName(params.data, params.rowIndex, 0).split(/\s+/).includes(className);
+    return {
+      "ant-table-row-selected": matches("ant-table-row-selected"),
+      "ant-table-row-disabled": matches("ant-table-row-disabled"),
+      "catalogue-selected": matches("catalogue-selected"),
+    };
+  }, [rowClassName]);
   function rowAttributes(row?: T, index?: number) {
     return row ? onRow?.(row, index) : undefined;
   }
@@ -187,9 +197,8 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
         getRowId={({data}) => String(typeof rowKey === "function" ? rowKey(data, rows.indexOf(data)) :
           (data as Record<string, unknown>)[String(rowKey ?? "key")])}
         onGridReady={event => setApi(event.api)}
-        getRowClass={({data, rowIndex}) => [
-          typeof rowClassName === "function" && data ? rowClassName(data, rowIndex, 0) : rowClassName,
-        ].filter((part): part is string => typeof part === "string").join(" ")}
+        getRowClass={typeof rowClassName === "string" ? rowClassName : undefined}
+        rowClassRules={rowClassRules}
         onRowClicked={event => {
           if (event.event) rowAttributes(event.data, event.rowIndex ?? undefined)?.onClick?.(event.event as never);
         }}

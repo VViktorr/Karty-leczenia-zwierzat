@@ -170,12 +170,24 @@ export function useListColumnLayout<T extends object>(
   return {grid,columns:formatting.apply(mouseColumns,identity),tableProps:mouse.tableProps,openColumns:()=>setOpen(true),resetColumns,fitColumns,dialog};
 }
 
+// Forward the event at the table boundary before a grid intercepts bubbling.
+export function TableContextTrigger({onContextMenu,onContextMenuCapture,...props}:
+  import("react").ComponentPropsWithRef<"div">) {
+  return <div {...props} onContextMenuCapture={event=>{
+    onContextMenuCapture?.(event);
+    if(onContextMenu){
+      onContextMenu(event);
+      event.stopPropagation();
+    }
+  }}/>;
+}
+
 export function ListParametersMenu({children,onOpen}: {
   children: import("react").ReactNode;
   onOpen: () => void;
 }) {
   return <Dropdown trigger={["contextMenu"]}
     menu={{items:[{key:"parameters",label:"Parametry listy",onClick:onOpen}]}}>
-    <div>{children}</div>
+    <TableContextTrigger>{children}</TableContextTrigger>
   </Dropdown>;
 }

@@ -29,7 +29,7 @@ import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
 import {useExpiryTableLayout} from "./ExpiryTableLayout";
-import {ListParametersMenu,useListColumnLayout} from "./ListColumnLayout";
+import {ListParametersMenu,TableContextTrigger,useListColumnLayout} from "./ListColumnLayout";
 import {SubiektDatabaseSettings,ProgramDatabaseSettings} from "./DatabaseSettings";
 import { defaultPricePrint, normalizePriceSettings, withdrawalText,
   PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
@@ -371,7 +371,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
       <Dropdown trigger={["contextMenu"]} disabled={!active}
         onOpenChange={visible=>{if(!visible)setContextMenu(null);}}
         menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
-        <div ref={tableRef} onContextMenuCapture={event=>{
+        <TableContextTrigger ref={tableRef} onContextMenuCapture={event=>{
           if(!(event.target instanceof Element))return;
           const header=event.target.closest(".ant-table-thead th, .ag-header-cell");
           const id=event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key") ??
@@ -400,7 +400,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
         onRow={row=>({tabIndex:0,onClick:()=>setSelectedId(row.id),
           onDoubleClick:()=>{void open(row);}})}
         locale={{emptyText:<Empty description="Brak dokumentów"/>}}/>
-        </div>
+        </TableContextTrigger>
       </Dropdown>
       <Typography.Text type="secondary">
         {data?.loadedAt?"Ostatni odczyt "+new Date(data.loadedAt).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})+
