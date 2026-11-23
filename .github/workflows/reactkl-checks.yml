@@ -2,6 +2,8 @@ name: ReactKL frontend and Windows desktop checks
 on:
   push:
     branches: [ReactKL]
+  pull_request:
+    branches: [ReactKL]
   workflow_dispatch:
   workflow_call:
 permissions:
