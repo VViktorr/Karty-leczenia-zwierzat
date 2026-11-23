@@ -21,7 +21,7 @@ import {moveColumn as reorderColumn,useTableMouseLayout} from "./TableMouseLayou
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Dropdown, Empty,
-  Form, Input, InputNumber, Segmented, Select, Space, Spin, Steps, Switch,
+  Form, Input, InputNumber, Popover, Segmented, Select, Space, Spin, Steps, Switch,
   Tag, Tabs, Typography, Progress, theme
 } from "antd";
 import type {ThemeConfig} from "antd";
@@ -1217,10 +1217,19 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     </Card>}
     <div className="treatment-tools">
     {drugStep&&<>
-    <TreatmentOptions compact={compact} label={"Podpowiedzi ChPL ("+readySuggestions.length+")"}>
-    <Card className="treatment-autofill">
+    <Card className="treatment-species">
       <Space wrap>
-        <Typography.Text strong>Podpowiedzi z katalogu SQL</Typography.Text>
+        {wizard?<Typography.Text strong>{speciesGroups.find(item=>item.value===speciesGroup)?.label}</Typography.Text>:<>
+        <Typography.Text strong>Filtr gatunku</Typography.Text>
+        <Select value={speciesGroup} style={{minWidth:210}}
+          disabled={suggestBusy||applyBusy}
+          options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/></>}
+        <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
+          Domyślnie zapamiętuj wybór dla leku w SQL
+        </Checkbox>
+        <Popover trigger="click" title="Podpowiedzi z katalogu SQL" placement="bottomLeft"
+          content={<div style={{width:"min(540px, 75vw)"}}>
+      <Space wrap>
         <Typography.Text type="secondary">
           {suggestBusy?"Sprawdzam symbole produktów...":
             readySuggestions.length+" jednoznacznych wariantów do uzupełnienia"}
@@ -1240,21 +1249,12 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         title={"Nie udało się pobrać propozycji: "+suggestError}/>}
       {autofillMessage&&<Alert type="info" showIcon className="notice"
         title={autofillMessage}/>}
-    </Card>
-    </TreatmentOptions>
-    <Card className="treatment-species">
-      <Space wrap>
-        {wizard?<Typography.Text strong>{speciesGroups.find(item=>item.value===speciesGroup)?.label}</Typography.Text>:<>
-        <Typography.Text strong>Filtr gatunku</Typography.Text>
-        <Select value={speciesGroup} style={{minWidth:210}}
-          disabled={suggestBusy||applyBusy}
-          options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/></>}
-        <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
-          Domyślnie zapamiętuj wybór dla leku w SQL
-        </Checkbox>
-        <Typography.Text type="secondary">
-          Gatunek zawęża propozycje ChPL. O pozycjach na wydruku decyduje kolumna Druk.
-        </Typography.Text>
+            <Typography.Text type="secondary">
+              O pozycjach na wydruku decyduje kolumna Druk.
+            </Typography.Text>
+          </div>}>
+          <Button size="small">Podpowiedzi ChPL ({readySuggestions.length})</Button>
+        </Popover>
       </Space>
       {choiceError&&<Alert type="warning" className="notice" showIcon title={choiceError}/>}
     </Card></>}
