@@ -85,6 +85,33 @@ public static class CardHtmlRenderer
                 .Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase));
         }
 
+        static string GeneralSpecies(string value)
+        {
+            string name = value.Split('(', 2)[0].Trim();
+            if (Regex.IsMatch(name, @"^(bydł|krow|ciel|jałów|buhaj|bycz)", RegexOptions.IgnoreCase))
+                return "Bydło";
+            if (Regex.IsMatch(name, @"^(świn|locha|lochy|prosi|warchl|tucznik|knur)", RegexOptions.IgnoreCase))
+                return "Świnie";
+            if (Regex.IsMatch(name, @"^(drób|kur\b|kur[ay]|kurcz|indyk|kaczk|gęś|gęsi)", RegexOptions.IgnoreCase))
+                return "Drób";
+            if (Regex.IsMatch(name, @"^(owc|jagnię|tryki?\b)", RegexOptions.IgnoreCase))
+                return "Owce";
+            if (Regex.IsMatch(name, @"^(koz[ay]|koźl|kozł)", RegexOptions.IgnoreCase))
+                return "Kozy";
+            return name;
+        }
+
+        static string FormatAnimalNumbers(string value)
+        {
+            string[] numbers = Regex.Split(value, @"[,;\r\n]+")
+                .Select(number => number.Trim()).Where(number => number.Length > 0).ToArray();
+            if (numbers.Length == 0 || numbers.Any(number =>
+                !Regex.IsMatch(number, @"^(?:[A-Za-z]{1,3}\s*)?\d[\d/-]*$")))
+                return value;
+            string separator = numbers.Length <= 4 ? "\n" : ", ";
+            return string.Join(separator, numbers.Select(number => number.ToUpperInvariant()));
+        }
+
         void Rows(string section, int minimum)
         {
             var rows = selected.Where(r => r.GetValueOrDefault("Sekcja (II lub III)") == section).ToArray();
@@ -117,11 +144,18 @@ public static class CardHtmlRenderer
                                 string.Equals(descriptions[nextCell], speciesName, StringComparison.OrdinalIgnoreCase)))
                             nextCell++;
                     }
-                    var species = rows.Skip(index).Take(nextCell - index)
+                    string[] sourceSpecies = rows.Skip(index).Take(nextCell - index)
                         .Select(row => (row.GetValueOrDefault("Gatunek") ?? "").Trim())
-                        .Where(name => name.Length > 0 && !value.Contains(name, StringComparison.OrdinalIgnoreCase))
-                        .Distinct(StringComparer.OrdinalIgnoreCase);
-                    value = string.Join("\n", new[] { value }.Concat(species).Where(line => line.Length > 0));
+                        .Where(name => name.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                    string[] species = sourceSpecies.Select(GeneralSpecies)
+                        .Where(name => name.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                    string description = string.Join("\n", value.Split('\n')
+                        .Select(line => line.Trim())
+                        .Where(line => line.Length > 0 &&
+                            !sourceSpecies.Contains(line, StringComparer.OrdinalIgnoreCase) &&
+                            !species.Contains(line, StringComparer.OrdinalIgnoreCase)));
+                    value = string.Join("\n", species.Append(FormatAnimalNumbers(description))
+                        .Where(line => line.Length > 0));
                 }
                 int span = nextCell - index;
                 return span > 1 ? $"<td rowspan='{span}'>{E(value)}</td>" : $"<td>{E(value)}</td>";
