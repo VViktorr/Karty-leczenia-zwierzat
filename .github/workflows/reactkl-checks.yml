@@ -79,6 +79,9 @@ jobs:
       - name: Install Inno Setup for compiler smoke test
         shell: pwsh
         run: ./installer/Install-ReactKLCompiler.ps1
+      - name: Regression test for padded Inno Setup release metadata
+        shell: powershell
+        run: ./tests/ReactKLChecks/Test-InstallerReleaseMetadata.ps1
       - name: Validate SQL publication scripts in Windows PowerShell 5.1
         shell: powershell
         run: |
