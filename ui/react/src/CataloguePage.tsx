@@ -1,3 +1,4 @@
+import {createPortal} from "react-dom";
 import Modal from "./AppModal";
 import Table from "./AppTable";
 import {Suspense, lazy} from "react";
@@ -64,8 +65,9 @@ function emptyVariant(): UiVariant {
 }
 
 export default function CataloguePage({
-  onDirtyChange, initialEntry, onPickerOpened
+  onDirtyChange, initialEntry, onPickerOpened, toolbar
 }: {
+  toolbar?: HTMLDivElement | null;
   onDirtyChange?: (value: boolean) => void;
   initialEntry: {symbol:string;direct:boolean} | null;
   onPickerOpened: () => void;
@@ -475,30 +477,21 @@ export default function CataloguePage({
 
   return <>
     {contextHolder}
-    <div className="page-heading">
-      <div>
-        <Typography.Title level={3}>Katalog leków i ChPL</Typography.Title>
-        <Typography.Text type="secondary">
-          Dane wariantów i dokumenty urzędowe z bazy KartyLeczenia SQL.
-        </Typography.Text>
-      </div>
-      <Space wrap>
+    {toolbar&&createPortal(<Space wrap>
         <Button disabled={missingBusy||working} loading={missingBusy}
           onClick={()=>{void checkMissing();}}>Sprawdź braki w katalogu</Button>
         <Button type="primary" disabled={working}
           onClick={openPicker}>Dodaj / edytuj w katalogu</Button>
         <Button onClick={() => setVersion(value => value + 1)}
           loading={listBusy}>Odśwież katalog</Button>
-      </Space>
-    </div>
-    <Alert className="notice" showIcon type="info"
-      title="Zmiana danych klinicznych wymaga ręcznej weryfikacji z aktualną ChPL."
-      description="Dołączenie PDF nie zmienia automatycznie gatunku, dawkowania ani karencji. Zapis jest zatwierdzany osobno." />
+      </Space>,toolbar)}
+    <Alert className="notice compact-notice" showIcon type="info" closable
+      title="Zmiany kliniczne zweryfikuj z aktualną ChPL. Dołączenie PDF nie zmienia gatunku, dawkowania ani karencji. Zapis zatwierdzasz osobno."/>
     {error && <Alert className="notice" type="error" showIcon title={error} />}
     {savedNotice && <Alert className="notice" type="success" showIcon title={savedNotice} />}
     <div className="catalogue-layout">
       <Card className="catalogue-list">
-        <Button size="small" onClick={productsLayout.openColumns}>Kolumny kartotek</Button>
+        <div className="catalogue-list-toolbar">
         <Input.Search allowClear value={input}
           placeholder="Nazwa lub symbol leku..."
           onSearch={value=>{
@@ -507,10 +500,12 @@ export default function CataloguePage({
             else setQuery(trimmed);
           }}
           onChange={event => setInput(event.target.value)} />
+        <Button size="small" onClick={productsLayout.openColumns}>Kolumny</Button>
+        </div>
         <Table<CatalogueListing> grid={productsLayout.grid} {...productsLayout.tableProps} rowKey="symbol" size="small"
           loading={listBusy} dataSource={list}
           pagination={productsPagination}
-          scroll={{ y: "calc(100vh - 370px)" }}
+          scroll={{ y: "calc(100vh - 265px)" }}
           onRow={row => ({
             onClick: () => { void openProduct(row); }
           })}

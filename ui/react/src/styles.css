@@ -15,17 +15,17 @@
 .topbar-title{display:flex;align-items:center;gap:12px;font-size:17px}
 .appearance-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .appearance-controls .ant-select:first-child{width:245px}.appearance-controls .ant-select:last-child{width:140px}
-.main-content{padding:27px 28px 16px;overflow-y:auto;flex:1;min-height:0}
-.page-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:21px;flex-wrap:wrap}
+.main-content{padding:16px 22px 12px;overflow-y:auto;flex:1;min-height:0}
+.page-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .page-heading .ant-typography{margin:0}.page-heading h3.ant-typography{margin-bottom:4px}
-.document-card{box-shadow:0 8px 30px rgba(19,42,76,.035)}.document-filters{display:grid;grid-template-columns:minmax(330px,1.55fr) minmax(180px,1fr) 185px;gap:12px;align-items:center;margin-bottom:18px}
+.document-card{box-shadow:0 8px 30px rgba(19,42,76,.035)}.document-filters{display:grid;grid-template-columns:minmax(330px,1.55fr) minmax(180px,1fr) 185px;gap:8px;align-items:center;margin-bottom:10px}
 .document-filters .ant-segmented{background:var(--shell-bg);padding:5px}
 .document-filters .ant-segmented-item{min-height:34px;display:inline-flex;align-items:center;justify-content:center}
 .document-filters .ant-segmented-item-selected{background:var(--nav-active)!important;color:#fff!important;box-shadow:none!important}
 .document-filters .ant-segmented-item-selected .ant-segmented-item-label{color:#fff!important;font-weight:650}
 .document-filters .ant-segmented-item:not(.ant-segmented-item-selected):hover{color:var(--nav-active)}
 .ant-table-row:hover{cursor:pointer}
-.notice{margin-bottom:15px}.table-hint{display:block;margin-top:10px;font-size:12px}
+.notice{margin-bottom:10px}.table-hint{display:block;margin-top:10px;font-size:12px}
 .statusline{height:33px;flex:0 0 33px;padding:7px 26px;font-size:11px;color:var(--subtle);display:flex;justify-content:space-between;background:var(--panel);border-top:1px solid var(--line)}
 .loading-mask{position:fixed;right:30px;bottom:50px;background:var(--panel);border:1px solid var(--line);padding:14px 20px;border-radius:10px;box-shadow:0 8px 24px #0002;z-index:1000}
 .placeholder{max-width:760px;margin:9vh auto}.placeholder .ant-card{padding:16px}
@@ -384,3 +384,25 @@ html[data-kl-skin="orchard"] .ant-modal .ant-modal-content { border-radius: 12px
   .app-shell.nav-top .top-navigation .nav-item {padding:7px 9px;font-size:12px;}
   .app-shell.nav-side .sidebar {width:150px;flex-basis:150px;}
 }
+
+/* Keep working controls close to the lists and reserve vertical space for data. */
+.app-shell .catalogue-topbar {
+  height: auto;
+  flex-basis: auto;
+  min-height: 44px;
+  padding-block: 5px;
+  row-gap: 5px;
+  flex-wrap: wrap;
+}
+.catalogue-topbar .topbar-title { flex-wrap: wrap; gap: 2px 12px; }
+.topbar-note { font-size: 12px; color: var(--subtle); }
+.catalogue-toolbar { margin-inline-start: auto; }
+.app-shell .catalogue-content { padding-block-start: 8px; }
+.compact-notice.ant-alert { padding: 4px 10px; margin-bottom: 8px; }
+.catalogue-list-toolbar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.catalogue-list-toolbar .ant-input-search { min-width: 0; margin: 0; }
+.catalogue-editor-heading { align-items: center; gap: 8px; margin-bottom: 10px; }
+.catalogue-editor-heading h4.ant-typography { margin-top: 0; }
+.catalogue-variant-toolbar { gap: 6px; margin-bottom: 8px; }
+.settings-help { margin-bottom: 10px; color: var(--subtle); }
+.settings-help summary { cursor: pointer; }

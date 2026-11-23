@@ -341,7 +341,6 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
   return <>
     {!compact&&<div className="page-heading"><div>
       <Typography.Title level={3}>Dokumenty Subiekta GT</Typography.Title>
-      <Typography.Text type="secondary">Lista z jednego magazynu. F5 pobiera świeże dane SQL.</Typography.Text>
     </div><Space wrap>
       <Button onClick={listLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={reload} loading={busy}>Odśwież · F5</Button>
@@ -1555,9 +1554,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     {variantModal&&<Card className="treatment-variant-table"
       title={"Dobór wariantu — "+variantModal.product}
       extra={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>Wróć do leków</Button>}>
-      <Alert className="notice" type="warning" showIcon
-        title="Zweryfikuj gatunek, dawkowanie i karencję z aktualną urzędową ChPL."
-        description="Wybór zastąpi dotychczasowy gatunek, drogę podania i dawkowanie; pełną karencję zmieni tylko, gdy katalog zawiera jej dane. Nic nie jest automatycznie zapisywane do archiwum kart."/>
+      <Alert className="notice compact-notice" type="warning" showIcon closable
+        title="Sprawdź gatunek, dawkowanie i karencję z ChPL. Wybór aktualizuje edytowaną kartę. Karencja zmieni się, jeśli wariant zawiera jej dane."/>
       {canRememberVariant&&<Checkbox checked={rememberForVariant} disabled={variantBusy}
         onChange={event=>setRememberVariant(event.target.checked)}>Zapamiętaj wybór dla tego leku</Checkbox>}
       {previousChoice&&<Alert className="notice" type="info" showIcon
@@ -1803,7 +1801,6 @@ function Expiry() {
   return <>
     <div className="page-heading"><div>
       <Typography.Title level={3}>Terminy ważności leków</Typography.Title>
-      <Typography.Text type="secondary">Filtry działają lokalnie, bez obciążania serwera SQL.</Typography.Text>
     </div><Space><Button onClick={expiryLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={remote.reload} loading={remote.busy}>Odśwież z SQL</Button></Space></div>
     <Card>
@@ -2337,11 +2334,11 @@ function ClinicSettingsPanel() {
   };
   return <Card className="settings-card">
     <Typography.Title level={4}>Lecznica i lekarz — wspólne dane SQL</Typography.Title>
-    <Typography.Paragraph type="secondary">
-      Dane są przechowywane w bazie KartyLeczenia i wykorzystywane przy wydruku
-      na każdym stanowisku. Przy pierwszym połączeniu pustą kartotekę SQL można
-      uzupełnić z wcześniejszych ustawień komputera.
-    </Typography.Paragraph>
+    <details className="settings-help"><summary>Jak udostępniane są dane lecznicy?</summary>
+      <Typography.Text type="secondary">Dane z bazy KartyLeczenia są używane na wydrukach
+        na każdym stanowisku. Przy pierwszym połączeniu pustą kartotekę SQL można
+        uzupełnić z wcześniejszych ustawień komputera.</Typography.Text>
+    </details>
     <ErrorNotice error={error}/>
     {notice&&<Alert type="success" showIcon className="notice" title={notice}/>}
     <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
@@ -2648,9 +2645,6 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowP
     catch{/* Workstation settings remain optional. */}
   }
   return <>
-    <div className="page-heading">
-      <Typography.Title level={3}>Ustawienia — Karty Leczenia</Typography.Title>
-    </div>
     <Tabs activeKey={active} onChange={choose} items={[
       {key:"appearance",label:"Wygląd",children:<Card>{appearance}</Card>},
       {key:"components",label:"Komponenty",children:<ComponentsSettings/>},
@@ -2717,6 +2711,7 @@ export default function App() {
     try{const value=Number(localStorage.getItem("kl.uiScale"));return Number.isFinite(value)&&value>=80&&value<=200?value:100;}
     catch{return 100;}
   });
+  const [catalogueToolbar,setCatalogueToolbar]=useState<HTMLDivElement|null>(null);
   const [section,setSection]=useState<Section>(treatmentWindow?"treatment":"documents");
   const [subiektRevision,setSubiektRevision]=useState(0);
   const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
@@ -2889,7 +2884,7 @@ export default function App() {
   </>;
   const content=section==="documents"||section==="treatment"?null:
     section==="prices"?<Prices onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
-    section==="catalogue"?<CataloguePage onDirtyChange={setCatalogueDirty}
+    section==="catalogue"?<CataloguePage toolbar={catalogueToolbar} onDirtyChange={setCatalogueDirty}
       initialEntry={catalogueEntry} onPickerOpened={()=>setCatalogueEntry(null)}/>:
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards initialCardId={savedCardToOpen}
@@ -2911,11 +2906,15 @@ export default function App() {
         {!fluent&&!preset&&<div className="sidebar-footer">Interfejs React + WebView2<br/>Dane pozostają w SQL Server</div>}
       </aside>}
       <div className="workspace">
-        <header className="topbar">
-          <div className="topbar-title"><strong>{topTabs&&!treatmentWindow?"Karty Leczenia":sections.find(x=>x.id===section)?.name}</strong></div>
+        <header className={"topbar"+(section==="catalogue"?" catalogue-topbar":"")}>
+          <div className="topbar-title">
+            <strong>{sections.find(x=>x.id===section)?.name}</strong>
+            {section==="catalogue"&&<span className="topbar-note">Dane wariantów i dokumenty urzędowe z bazy KartyLeczenia SQL.</span>}
+          </div>
+          {section==="catalogue"&&<div className="catalogue-toolbar" ref={setCatalogueToolbar}/>}
         </header>
         {!treatmentWindow&&topTabs&&<div className="top-navigation">{nav}</div>}
-        <main className="main-content">
+        <main className={"main-content"+(section==="catalogue"?" catalogue-content":"")}>
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             title="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           {!treatmentWindow&&<div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
