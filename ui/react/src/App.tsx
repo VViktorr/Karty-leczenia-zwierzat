@@ -1853,7 +1853,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       await invoke("updateSavedCard",{
         id:selected.id,revision:card.revision,
         fields:editDraft.fields,rows:editDraft.rows,
-        newNumber:editDraft.fields["Nr karty"]
+        ...(editDraft.fields["Nr karty"]!==card.fields["Nr karty"]
+          ? {newNumber:editDraft.fields["Nr karty"]}: {})
       });
       const number=editDraft.fields["Nr karty"];
       setSelected(current=>current?{...current,number}:current);
