@@ -299,7 +299,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
       sorter:(a,b)=>(a.date||"").localeCompare(b.date||"")},
     {title:"Numer",dataIndex:"number",width:175,
       sorter:(a,b)=>a.number.localeCompare(b.number),
-      render:(number:string,row)=><Button type="link" size="small" style={{paddingInline:0}}
+      render:(number:string,row)=><Button type="link" size="small" style={{paddingInline:0,fontSize:"inherit"}}
         aria-label={"Otwórz kartę leczenia dla dokumentu "+number}
         onClick={()=>{void open(row);}} onDoubleClick={event=>event.stopPropagation()}>
         {number}
