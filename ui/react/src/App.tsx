@@ -121,6 +121,13 @@ interface SqlSettings {
   drugGroup: string; warehouseId: number | null;
 }
 
+const treatmentWindow = isDesktop() && new URLSearchParams(window.location.search).get("window") === "treatment";
+const savedCardsChangeKey = "kl.savedCards.changed";
+
+function notifySavedCardsChanged() {
+  try{localStorage.setItem(savedCardsChangeKey,crypto.randomUUID());}catch{/* storage unavailable */}
+}
+
 const sections: Array<{id: Section; name: string}> = [
   {id: "documents", name: "Dokumenty"}, {id: "prices", name: "Cennik leków"},
   {id: "catalogue", name: "Katalog leków / ChPL"},
@@ -255,9 +262,9 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
     setReading(true); setReadError("");
     try {
       if(!await beforeOpen(row)||request.signal.aborted)return;
-      const draft = await invoke<Draft>("readDocument",
-        {documentId: row.id, number: row.number}, undefined, request.signal);
-      if (!request.signal.aborted) onOpen(draft);
+      const result = await invoke<Draft|{opened:true}>("readDocument",
+        {documentId: row.id, number: row.number, openWindow:true}, undefined, request.signal);
+      if (!request.signal.aborted && "draftId" in result) onOpen(result);
     } catch (error) {
       if (!request.signal.aborted) setReadError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -846,6 +853,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
         if(result.duplicateId)setDuplicateId(result.duplicateId);
         else setError("Wykryto istniejącą kartę, ale brak jej identyfikatora w archiwum SQL.");
       } else {
+        if(result.id)notifySavedCardsChanged();
         setSavedNumber(result.number ?? "");
         if (result.id) {
           setPreviewSavedId(result.id);
@@ -1172,7 +1180,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       <Typography.Title level={3}>Karta leczenia — {draft.number}</Typography.Title>
       <Typography.Text type="secondary">{draft.payer.split("\n")[0]}</Typography.Text>
     </div><Space>
-      <Button onClick={onDocuments}>Dokumenty</Button>
+      <Button onClick={onDocuments}>{treatmentWindow?"Zamknij kartę":"Dokumenty"}</Button>
       {editingRows&&<Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>}
       {(!wizard||step===3)&&<><Button onClick={()=>{void printPreview();}} loading={busy&&!savingSql} disabled={busy||applyBusy}>Podgląd wydruku</Button>
       <Button type="primary" onClick={()=>startSave()} loading={savingSql} disabled={!!savedNumber||busy||applyBusy||referenceBusy}>Zapisz kartę do SQL</Button></>}
@@ -1800,8 +1808,16 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
   const [exportingId,setExportingId]=useState<string|null>(null);
   const [purgeError,setPurgeError]=useState("");
   const [notice,setNotice]=useState("");
+  const [archiveRevision,setArchiveRevision]=useState(0);
+  useEffect(()=>{
+    const changed=(event:StorageEvent)=>{
+      if(event.key===savedCardsChangeKey)setArchiveRevision(revision=>revision+1);
+    };
+    window.addEventListener("storage",changed);
+    return()=>window.removeEventListener("storage",changed);
+  },[]);
   const remote=useRemote<SavedCard[]>("savedCards",
-    {trash,query:search,date:treatmentDate},[trash,search,treatmentDate]);
+    {trash,query:search,date:treatmentDate},[trash,search,treatmentDate,archiveRevision]);
   useEffect(()=>{
     if(!initialCardId)return;
     let active=true;
@@ -1866,6 +1882,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
         ...(editDraft.fields["Nr karty"]!==card.fields["Nr karty"]
           ? {newNumber:editDraft.fields["Nr karty"]}: {})
       });
+      notifySavedCardsChanged();
       const number=editDraft.fields["Nr karty"];
       setSelected(current=>current?{...current,number}:current);
       setEditConfirm(false);setEditDraft(null);setEditing(false);
@@ -2273,7 +2290,7 @@ function ClinicSettingsPanel() {
     {notice&&<Alert type="success" showIcon className="notice" title={notice}/>}
     <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
       <Form.Item label="Nazwa lecznicy" name="name" rules={[{required:true}]}>
-        <Input/>
+        <Input.TextArea autoSize={{minRows:3,maxRows:8}}/>
       </Form.Item>
       <Form.Item label="Adres" name="address" rules={[{required:true}]}>
         <Input.TextArea autoSize/>
@@ -2644,11 +2661,25 @@ export default function App() {
     try{const value=Number(localStorage.getItem("kl.uiScale"));return Number.isFinite(value)&&value>=80&&value<=200?value:100;}
     catch{return 100;}
   });
-  const [section,setSection]=useState<Section>("documents");
+  const [section,setSection]=useState<Section>(treatmentWindow?"treatment":"documents");
   const [subiektRevision,setSubiektRevision]=useState(0);
   const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
   const [draft,setDraft]=useState<Draft|null>(null);
   const [draftSaved,setDraftSaved]=useState(false);
+  const [windowError,setWindowError]=useState("");
+  useEffect(()=>{
+    if(!treatmentWindow)return;
+    const request=new AbortController();
+    void invoke<Draft>("getWindowDraft",{},undefined,request.signal)
+      .then(next=>{if(!request.signal.aborted)setDraft(next);})
+      .catch(error=>{if(!request.signal.aborted)setWindowError(error instanceof Error?error.message:String(error));});
+    return()=>request.abort();
+  },[]);
+  const returnToDocuments=()=>{
+    if(treatmentWindow){
+      void invoke("closeTreatmentWindow").catch(error=>setWindowError(error instanceof Error?error.message:String(error)));
+    }else setSection("documents");
+  };
   async function beforeOpenDocument(row:DocumentRow){
     if(!draft)return true;
     if(draft.draftId===String(row.id)&&draft.number===row.number){
@@ -2757,14 +2788,15 @@ export default function App() {
       ConfigProvider.config({holderRender:children=>children});
     };
   },[layout,windows,fluent,preset,appearance]);
+  const navigationSections=isDesktop()?sections.filter(item=>item.id!=="treatment"):sections;
   const standardNav=<nav aria-label="Nawigacja Karty Leczenia" className="main-nav">
-    {sections.map(x=><button key={x.id} type="button"
+    {navigationSections.map(x=><button key={x.id} type="button"
       aria-current={section===x.id?"page":undefined}
       className={"nav-item "+(section===x.id?"is-active":"")}
       onClick={()=>navigate(x.id)}>{x.name}</button>)}
   </nav>;
   const nav=fluent?<Suspense fallback={standardNav}>
-    <FluentNavigation items={sections} current={section} palette={palette} onNavigate={navigate}/>
+    <FluentNavigation items={navigationSections} current={section} palette={palette} onNavigate={navigate}/>
   </Suspense>:standardNav;
   const controls=<div className="appearance-controls settings-appearance">
     <label>Skórka
@@ -2816,7 +2848,7 @@ export default function App() {
   } as CSSProperties;
   return <ConfigProvider theme={appearance}>
     <div className={"app-shell layout-"+layout+" palette-"+palette+(topTabs?" nav-top":" nav-side")+(compact?" layout-compact":"")+(preset?" layout-preset":"")} style={skinStyle}>
-      {!topTabs&&<aside className="sidebar">
+      {!treatmentWindow&&!topTabs&&<aside className="sidebar">
         <div className="sidebar-brand"><div className="brand-mark">KL</div>
           <div><strong>Karty Leczenia</strong>{!fluent&&!preset&&<small>ReactKL · SQL</small>}</div></div>
         {nav}
@@ -2824,20 +2856,23 @@ export default function App() {
       </aside>}
       <div className="workspace">
         <header className="topbar">
-          <div className="topbar-title"><strong>{topTabs?"Karty Leczenia":sections.find(x=>x.id===section)?.name}</strong></div>
+          <div className="topbar-title"><strong>{topTabs&&!treatmentWindow?"Karty Leczenia":sections.find(x=>x.id===section)?.name}</strong></div>
         </header>
-        {topTabs&&<div className="top-navigation">{nav}</div>}
+        {!treatmentWindow&&topTabs&&<div className="top-navigation">{nav}</div>}
         <main className="main-content">
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             title="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
-          <div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
+          {!treatmentWindow&&<div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
             <Documents key={subiektRevision} compact={compact} active={section==="documents"} cacheScope={cacheDocuments?subiektRevision:undefined} beforeOpen={beforeOpenDocument}
               onOpen={next=>{setDraft(next);setSection("treatment");}}/>
-          </div>
+          </div>}
+          <ErrorNotice error={windowError}/>
+          {treatmentWindow&&!draft&&!windowError&&<Spin aria-label="Wczytywanie karty leczenia"/>}
+          {treatmentWindow&&section==="saved"&&<Button onClick={()=>setSection("treatment")}>Wróć do tworzonej karty</Button>}
           <div hidden={section!=="treatment"} style={section==="treatment"?{display:"contents"}:undefined}>
-            <Treatment draft={draft} compact={compact} active={section==="treatment"} wizard={wizard} shortcuts={shortcuts} virtualWarnings={virtualWarnings} onSavedChange={setDraftSaved}
-              onDocuments={()=>setSection("documents")}
-              onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>
+            {(!treatmentWindow||draft)&&<Treatment draft={draft} compact={compact} active={section==="treatment"} wizard={wizard} shortcuts={shortcuts} virtualWarnings={virtualWarnings} onSavedChange={setDraftSaved}
+              onDocuments={returnToDocuments}
+              onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>}
           </div>
           {content}
         </main>

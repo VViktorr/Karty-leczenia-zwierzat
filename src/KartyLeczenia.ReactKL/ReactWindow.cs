@@ -59,8 +59,22 @@ internal sealed class ReactWindow : Form
     private readonly Dictionary<string, CancellationTokenSource> active = [];
     private readonly Dictionary<string, DocumentData> drafts = [];
 
-    internal ReactWindow()
+    private readonly DocumentData? treatmentDocument;
+    private readonly string? treatmentDraftId;
+    private readonly CoreWebView2Environment? sharedEnvironment;
+    private readonly Dictionary<string, ReactWindow> treatmentWindows = [];
+    private bool treatmentSaved;
+    private bool treatmentSaving;
+
+    internal ReactWindow(DocumentData? treatmentDocument = null, string? treatmentDraftId = null,
+        CoreWebView2Environment? sharedEnvironment = null)
     {
+        this.treatmentDocument = treatmentDocument;
+        this.treatmentDraftId = treatmentDraftId;
+        this.sharedEnvironment = sharedEnvironment;
+        if (treatmentDocument is not null && treatmentDraftId is not null)
+            drafts.Add(treatmentDraftId, treatmentDocument);
+
         cards = new CardArchiveService(archive);
         savedCardEditor = new SavedCardRevisionService(archive);
         clinicService = new SharedClinicService(archive);
@@ -75,13 +89,22 @@ internal sealed class ReactWindow : Form
         MinimumSize = new Size(480, 360);
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;
-        ReactWindowPlacement.Restore(this);
+        if (treatmentDocument is null)
+        {
+            ReactWindowPlacement.Restore(this);
+            ResizeEnd += (_, _) => ReactWindowPlacement.Save(this);
+            FormClosed += (_, _) => ReactWindowPlacement.Save(this);
+        }
+        else
+        {
+            base.Text = $"Karta leczenia — {treatmentDocument.Number}";
+            StartPosition = FormStartPosition.CenterParent;
+        }
         Controls.Add(web);
-        ResizeEnd += (_, _) => ReactWindowPlacement.Save(this);
-        FormClosed += (_, _) => ReactWindowPlacement.Save(this);
         Shown += async (_, _) =>
         {
             await StartAsync();
+            if (treatmentDocument is not null || IsDisposed) return;
             if (ReactInstallUpdates.IsServer)
                 await PublishServerUpdateOnStartup();
             else
@@ -89,6 +112,25 @@ internal sealed class ReactWindow : Form
         };
         FormClosing += async (_, e) =>
         {
+            if (treatmentDocument is not null)
+            {
+                if (e.Cancel) return;
+                if (treatmentSaving)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+                if (!treatmentSaved && e.CloseReason is (CloseReason.UserClosing or CloseReason.FormOwnerClosing))
+                {
+                    e.Cancel = MessageBox.Show(this, "Zamknąć okno i odrzucić niezapisaną kartę?",
+                        "Karta leczenia", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button2) != DialogResult.Yes;
+                }
+                if (!e.Cancel)
+                    foreach (var token in active.Values) token.Cancel();
+                return;
+            }
+            if (e.Cancel) return;
             if (backupRunning || restoreRunning)
             {
                 e.Cancel = true;
@@ -273,14 +315,14 @@ internal sealed class ReactWindow : Form
     {
         try
         {
-            LoadInstallationConnection();
+            if (treatmentDocument is null) LoadInstallationConnection();
             string dist = Path.Combine(AppContext.BaseDirectory, "react-ui");
             if (!File.Exists(Path.Combine(dist, "index.html")))
                 throw new DirectoryNotFoundException("Brak interfejsu React w folderze react-ui. Zbuduj frontend przed publikacją.");
             string profile = Path.Combine(Environment.GetFolderPath(
                 Environment.SpecialFolder.LocalApplicationData), "KartyLeczenia", "ReactWebView2");
             Directory.CreateDirectory(profile);
-            var env = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
+            var env = sharedEnvironment ?? await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
             if (IsDisposed) return;
             await web.EnsureCoreWebView2Async(env);
             var browser = web.CoreWebView2;
@@ -298,12 +340,18 @@ internal sealed class ReactWindow : Form
             };
             browser.NewWindowRequested += (_, e) => e.Handled = true;
             browser.WebMessageReceived += Message;
-            browser.Navigate(Origin + "index.html");
+            browser.Navigate(Origin + "index.html" + (treatmentDocument is null ? "" : "?window=treatment"));
         }
         catch (Exception ex)
         {
             CrashLog.Write("ReactKL.Start", ex);
+            if (IsDisposed) return;
             MessageBox.Show(this, ex.Message, "ReactKL", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (treatmentDocument is not null)
+            {
+                treatmentSaved = true;
+                Close();
+            }
         }
     }
 
@@ -362,6 +410,16 @@ internal sealed class ReactWindow : Form
 
     private async Task<object> HandleRequest(string action, JsonElement root, CancellationToken token)
     {
+        if (treatmentDocument is not null)
+        {
+            if (action == "getWindowDraft")
+                return DescribeDraft(treatmentDraftId!, treatmentDocument);
+            if (action == "closeTreatmentWindow")
+            {
+                BeginInvoke(new Action(Close));
+                return new { requested = true };
+            }
+        }
         if (action == "getCardPrintSettings")
             return new { doctorStampHeightMm = CardPrintSettings.Load() };
         if (action == "saveCardPrintSettings")
@@ -1124,25 +1182,38 @@ internal sealed class ReactWindow : Form
         {
             int id = Int(root, "documentId") ?? throw new ArgumentException("Brak numeru dokumentu.");
             string number = ReadTextField(root, "number", 120);
-            var document = await documents.ReadAsync(options, number, 0, token, id);
             string key = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            bool openWindow = treatmentDocument is null && Flag(root, "openWindow");
+            if (openWindow && treatmentWindows.TryGetValue(key, out var existing))
+            {
+                if (existing.WindowState == FormWindowState.Minimized)
+                    existing.WindowState = FormWindowState.Normal;
+                existing.Activate();
+                return new { opened = true };
+            }
+
+            var document = await documents.ReadAsync(options, number, 0, token, id);
+            token.ThrowIfCancellationRequested();
+            if (openWindow)
+            {
+                var window = new ReactWindow(document, key, web.CoreWebView2.Environment);
+                treatmentWindows.Add(key, window);
+                window.FormClosed += (_, _) => treatmentWindows.Remove(key);
+                try
+                {
+                    window.Show(this);
+                }
+                catch
+                {
+                    treatmentWindows.Remove(key);
+                    window.Dispose();
+                    throw;
+                }
+                return new { opened = true };
+            }
+
             drafts[key] = document;
-            return new { draftId = key, document.Number, document.Payer, document.Recipient,
-                documentDate = document.DocumentDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
-                hasPayerId = document.PayerId.HasValue,
-                rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),
-                    replacement = r.Get("Zamiennik produktu"),
-                    referenceSymbol = r.Get("Symbol zamiennika produktu"),
-                    descriptionGroup = r.Get(CardSchema.AnimalDescriptionGroup),
-                    countGroup = r.Get(CardSchema.AnimalCountGroup),
-                    symbol = r.Get("Symbol Subiekta"), indication = r.Get("Wskazanie ChPL"),
-                    quantity = r.Get("Ilość wydana"), batch = r.Get("Seria"),
-                    species = r.Get("Gatunek"), route = r.Get("Droga podania"),
-                    dosing = r.Get("Dawkowanie i okres stosowania"), withdrawal = r.Get("Karencja"),
-                    description = r.Get("Opis zwierząt / numer siedziby stada"),
-                    animals = r.Get("Liczba zwierząt"), diagnosis = r.Get("Rozpoznanie"),
-                    section = r.Get("Sekcja (II lub III)"),
-                    selected = r.Printed }).ToArray() };
+            return DescribeDraft(key, document);
         }
         if (action == "treatmentSuggestions" || action == "applyTreatmentSuggestions")
         {
@@ -1502,9 +1573,39 @@ internal sealed class ReactWindow : Form
             if (action == "previewDraft")
                 return new { html = await Task.Run(() => cards.RenderDraft(snapshot, reported, performed, findings), token) };
             bool confirmDuplicate = Flag(root, "confirmDuplicate");
-            return await Task.Run(() => cards.Save(snapshot, reported, performed, findings, confirmDuplicate), token);
+            treatmentSaving = true;
+            try
+            {
+                var result = await Task.Run(() => cards.Save(snapshot, reported, performed, findings, confirmDuplicate), token);
+                if (result.Id is not null) treatmentSaved = true;
+                return result;
+            }
+            finally
+            {
+                treatmentSaving = false;
+            }
         }
         throw new InvalidOperationException("Nieznana operacja interfejsu: " + action);
+    }
+
+    private static object DescribeDraft(string key, DocumentData document)
+    {
+        return new { draftId = key, document.Number, document.Payer, document.Recipient,
+            documentDate = document.DocumentDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            hasPayerId = document.PayerId.HasValue,
+            rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),
+                replacement = r.Get("Zamiennik produktu"),
+                referenceSymbol = r.Get("Symbol zamiennika produktu"),
+                descriptionGroup = r.Get(CardSchema.AnimalDescriptionGroup),
+                countGroup = r.Get(CardSchema.AnimalCountGroup),
+                symbol = r.Get("Symbol Subiekta"), indication = r.Get("Wskazanie ChPL"),
+                quantity = r.Get("Ilość wydana"), batch = r.Get("Seria"),
+                species = r.Get("Gatunek"), route = r.Get("Droga podania"),
+                dosing = r.Get("Dawkowanie i okres stosowania"), withdrawal = r.Get("Karencja"),
+                description = r.Get("Opis zwierząt / numer siedziby stada"),
+                animals = r.Get("Liczba zwierząt"), diagnosis = r.Get("Rozpoznanie"),
+                section = r.Get("Sekcja (II lub III)"),
+                selected = r.Printed }).ToArray() };
     }
 
     private async Task<(int? PayerId, string Scope)> ReadSavedCardPayer(
