@@ -10,6 +10,82 @@ import {useComponents} from "./componentSettings";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
+const gridLocalePl = {
+  selectAll: "Zaznacz wszystko",
+  selectAllSearchResults: "Zaznacz wszystkie wyniki",
+  searchOoo: "Szukaj…",
+  blanks: "(Puste)",
+  noMatches: "Brak wyników",
+  filterOoo: "Filtruj…",
+  equals: "Równa się",
+  notEqual: "Nie równa się",
+  blank: "Puste",
+  notBlank: "Niepuste",
+  empty: "Wybierz operator",
+  lessThan: "Mniejsze niż",
+  greaterThan: "Większe niż",
+  lessThanOrEqual: "Mniejsze lub równe",
+  greaterThanOrEqual: "Większe lub równe",
+  inRange: "W zakresie",
+  inRangeStart: "Od",
+  inRangeEnd: "Do",
+  contains: "Zawiera",
+  notContains: "Nie zawiera",
+  startsWith: "Zaczyna się od",
+  endsWith: "Kończy się na",
+  dateFormatOoo: "rrrr-mm-dd",
+  before: "Przed",
+  after: "Po",
+  andCondition: "I",
+  orCondition: "LUB",
+  applyFilter: "Zastosuj",
+  resetFilter: "Resetuj",
+  clearFilter: "Wyczyść",
+  cancelFilter: "Anuluj",
+  textFilter: "Filtr tekstowy",
+  numberFilter: "Filtr liczbowy",
+  dateFilter: "Filtr daty",
+  setFilter: "Filtr wartości",
+  filterPlaceholder: "Wpisz wartość filtra",
+  filterValue: "Wartość filtra",
+  filterMenuTab: "Filtr",
+  generalMenuTab: "Menu",
+  columnsMenuTab: "Kolumny",
+  columnFilter: "Filtr kolumny",
+  chooseColumns: "Wybierz kolumny",
+  autosizeThisColumn: "Dopasuj szerokość kolumny",
+  autosizeAllColumns: "Dopasuj szerokość wszystkich kolumn",
+  resetColumns: "Przywróć domyślne kolumny",
+  sortAscending: "Sortuj rosnąco",
+  sortDescending: "Sortuj malejąco",
+  sortUnSort: "Usuń sortowanie",
+  pinColumn: "Przypnij kolumnę",
+  pinLeft: "Przypnij po lewej",
+  pinRight: "Przypnij po prawej",
+  noPin: "Odepnij",
+  loadingOoo: "Ładowanie…",
+  noRowsToShow: "Brak danych",
+  page: "Strona",
+  of: "z",
+  to: "do",
+  pageSizeSelectorLabel: "Wierszy na stronę",
+  firstPage: "Pierwsza strona",
+  lastPage: "Ostatnia strona",
+  nextPage: "Następna strona",
+  previousPage: "Poprzednia strona",
+  ariaFilterInput: "Wartość filtra",
+  ariaFilterColumnsInput: "Szukaj kolumn",
+  ariaFilterMenuOpen: "Otwórz menu filtra",
+  ariaFilteringOperator: "Operator filtra",
+  ariaColumn: "Kolumna",
+  ariaSearch: "Szukaj",
+  ariaSortableColumn: "Kolumna z sortowaniem",
+  ariaSortAscending: "Sortowanie rosnące",
+  ariaSortDescending: "Sortowanie malejące",
+  ariaSortNone: "Bez sortowania",
+  ariaColumnMenu: "Menu kolumny"
+};
+
 type Column<T extends object> = NonNullable<TableProps<T>["columns"]>[number];
 
 function Header({displayName, style}: CustomInnerHeaderProps & {style?: CSSProperties}) {
@@ -98,7 +174,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
 
   return <>
     <div ref={viewport} className="kl-ag-grid" style={{height: scroll?.y ?? 360}}>
-      <AgGridReact<T> theme={gridTheme} columnDefs={columnDefs} rowData={rows}
+      <AgGridReact<T> localeText={gridLocalePl} theme={gridTheme} columnDefs={columnDefs} rowData={rows}
         defaultColDef={{minWidth:60, maxWidth:1000,resizable:preferences.resizableColumns}}
         rowBuffer={preferences.rowBuffer}
         headerHeight={preferences.headerHeight}
