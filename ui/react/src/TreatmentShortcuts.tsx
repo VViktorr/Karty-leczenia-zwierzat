@@ -1,13 +1,19 @@
 import {useHotkeys} from "react-hotkeys-hook";
+import {useComponents} from "./componentSettings";
 
 export default function TreatmentShortcuts({back, next, summary, save}: {
   back?: () => void; next?: () => void; summary?: () => void; save?: () => void;
 }) {
-  useHotkeys("alt+left", () => back?.(), {enabled: !!back, preventDefault: true}, [back]);
-  useHotkeys("alt+right", () => next?.(), {enabled: !!next, preventDefault: true}, [next]);
-  useHotkeys("alt+enter", () => summary?.(), {enabled: !!summary, preventDefault: true}, [summary]);
-  useHotkeys("mod+s", () => save?.(), {
-    enabled: !!save, preventDefault: true, enableOnFormTags: ["INPUT", "TEXTAREA"],
-  }, [save]);
+  const {shortcuts} = useComponents();
+  useHotkeys(shortcuts.back, () => back?.(),
+    {enabled:shortcuts.enabled && !!back, preventDefault:true}, [back,shortcuts.enabled,shortcuts.back]);
+  useHotkeys(shortcuts.next, () => next?.(),
+    {enabled:shortcuts.enabled && !!next, preventDefault:true}, [next,shortcuts.enabled,shortcuts.next]);
+  useHotkeys(shortcuts.summary, () => summary?.(),
+    {enabled:shortcuts.enabled && !!summary, preventDefault:true}, [summary,shortcuts.enabled,shortcuts.summary]);
+  useHotkeys(shortcuts.save, () => save?.(), {
+    enabled: shortcuts.enabled && !!save, preventDefault:true,
+    enableOnFormTags: ["INPUT","TEXTAREA"],
+  }, [save,shortcuts.enabled,shortcuts.save]);
   return null;
 }
