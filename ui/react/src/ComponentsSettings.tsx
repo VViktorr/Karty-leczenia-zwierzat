@@ -143,8 +143,10 @@ export default function ComponentsSettings() {
         {duplicateShortcuts.length>0&&<Alert type="warning"
           title="Dwa działania nie mogą mieć tego samego skrótu."/>}
         <Typography.Text type="secondary">
-          Skróty działają podczas pracy w kreatorze karty. F5 i Ctrl+Shift+L zachowują
-          swoje dotychczasowe funkcje w listach.
+          Ustawienia powyżej dotyczą kreatora karty. W widoku Dokumenty działają także:
+          {" "}<kbd>Alt+1</kbd> — Faktury, <kbd>Alt+2</kbd> — Paragony,
+          {" "}<kbd>Alt+4</kbd> — WZ i <kbd>F5</kbd> — odświeżenie listy.
+          {" "}<kbd>Ctrl+Shift+L</kbd> otwiera parametry listy.
         </Typography.Text>
       </Space>
     </Card>

@@ -346,9 +346,9 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
     <Card className={compact?"compact-documents":undefined}>
       <div className={"document-filters"+(compact?" compact-document-toolbar":"")}>
         <Segmented block size={compact?"middle":"large"} value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
-          options={[{label:compact?"Faktury":"Faktury · Alt+1",value:"invoices"},
-            {label:compact?"Paragony":"Paragony · Alt+2",value:"receipts"},
-            {label:compact?"WZ":"WZ · Alt+4",value:"warehouse"},
+          options={[{label:"Faktury",value:"invoices"},
+            {label:"Paragony",value:"receipts"},
+            {label:"WZ",value:"warehouse"},
             {label:"Wszystkie",value:"all"}]}/>
         <Input.Search allowClear size={compact?"middle":"large"} value={query}
           onChange={e=>setQuery(e.target.value)}
