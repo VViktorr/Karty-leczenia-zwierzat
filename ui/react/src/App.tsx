@@ -617,6 +617,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   });
   const [savedChoices,setSavedChoices]=useState<Record<string,SavedChoice>>({});
   const [choiceError,setChoiceError]=useState("");
+  const [savedChoicesGroup,setSavedChoicesGroup]=useState<SpeciesGroup>();
   const [animalDescriptions,setAnimalDescriptions]=useState<string[]>([]);
   const [animalError,setAnimalError]=useState("");
   const [animalBusy,setAnimalBusy]=useState(false);
@@ -674,16 +675,16 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   useEffect(()=>{
     if(!draft||!loadChoices)return;
     let active=true;
-    void invoke<SavedChoiceList>("readTreatmentChoices",{draftId:draft.draftId})
+    void invoke<SavedChoiceList>("readTreatmentChoices",{draftId:draft.draftId,speciesGroup})
       .then(data=>{
         if(!active)return;
         const preferences:Record<string,SavedChoice>={};
         for(const item of data.items)preferences[item.symbol.trim().toUpperCase()]=item;
-        setSavedChoices(preferences);setChoiceError("");
+        setSavedChoices(preferences);setSavedChoicesGroup(speciesGroup);setChoiceError("");
       })
       .catch(error=>{if(active)setChoiceError(error instanceof Error?error.message:String(error));});
     return()=>{active=false;};
-  },[draft?.draftId,loadChoices]);
+  },[draft?.draftId,loadChoices,speciesGroup,suggestTick]);
 
   useEffect(()=>{
     if(!draft?.hasPayerId){setAnimalDescriptions([]);return;}
@@ -1005,7 +1006,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   }
   const variantRow=variantModal&&rows.find(row=>row.index===variantModal.index);
   const canRememberVariant=!!variantRow&&!variantRow.referenceSymbol;
-  const previousChoice=canRememberVariant&&variantModal
+  const previousChoice=canRememberVariant&&variantModal&&savedChoicesGroup===speciesGroup
     ? savedChoices[variantModal.symbol.trim().toUpperCase()]:undefined;
   const rememberForVariant=canRememberVariant&&(rememberVariant??(wizard||remember||!!previousChoice));
   const sameChoice=(variant:TreatmentVariantChoice)=>
@@ -1020,16 +1021,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     try{
       const result=await invoke<Pick<DraftRow,"species"|"route"|"dosing"|"withdrawal"|"indication"|"description">>(
         "applyTreatmentVariant",{draftId:draft.draftId,
-          index:variantModal.index,variantId:id,remember:rememberForVariant});
-      if(rememberForVariant){
-        const chosen=variantModal.variants.find(item=>item.id===id);
-        if(chosen){
-          const symbol=variantModal.symbol.trim().toUpperCase();
-          setSavedChoices(current=>({...current,[symbol]:{
-            symbol,species:chosen.species,route:chosen.route,variantId:id
-          }}));
-        }
-      }
+          index:variantModal.index,variantId:id,remember:rememberForVariant,speciesGroup});
       setRows(current=>current.map(row=>row.index===variantModal.index
         ? {...row,...result,description:row.descriptionGroup?row.description:result.description} : row));
       setRestoredVariants(current=>Object.fromEntries(Object.entries(current).filter(([key])=>Number(key)!==variantModal.index)));

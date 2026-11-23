@@ -1229,6 +1229,9 @@ internal sealed class ReactWindow : Form
             var catalogueTask = Task.Run(() =>
                 catalogue.VariantsForSymbols(draft.Rows.Select(row =>
                     TreatmentAutofillPlanner.CatalogueSymbol(row))), token);
+            string speciesGroup = ReadTextField(root, "speciesGroup", 10);
+            if (!TreatmentSpeciesGroup.Values.Contains(speciesGroup))
+                speciesGroup = "all";
             string? preferenceWarning = null;
             async Task<SavedTreatmentChoice[]> ReadPreferences()
             {
@@ -1237,7 +1240,7 @@ internal sealed class ReactWindow : Form
                     using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
                     deadline.CancelAfter(TimeSpan.FromSeconds(3));
                     return await treatmentChoices.ReadAsync(draft.Scope,
-                        draft.Rows.Select(row => row.Get("Symbol Subiekta")), deadline.Token);
+                        draft.Rows.Select(row => row.Get("Symbol Subiekta")), deadline.Token, speciesGroup);
                 }
                 catch (Exception error) when (!token.IsCancellationRequested &&
                     error is SqlException or OperationCanceledException or InvalidOperationException)
@@ -1250,9 +1253,6 @@ internal sealed class ReactWindow : Form
             var (variants, nonMedicines) = await catalogueTask;
             var preferences = (await preferenceTask).ToDictionary(
                 item => TreatmentChoiceService.NormalizeSymbol(item.Symbol), StringComparer.Ordinal);
-            string speciesGroup = ReadTextField(root, "speciesGroup", 10);
-            if (!TreatmentSpeciesGroup.Values.Contains(speciesGroup))
-                speciesGroup = "all";
             var proposals = draft.Rows.Select((row, index) =>
             {
                 variants.TryGetValue(TreatmentAutofillPlanner.CatalogueSymbol(row), out var entries);
@@ -1379,7 +1379,8 @@ internal sealed class ReactWindow : Form
             if (!drafts.TryGetValue(id, out var draft))
                 throw new InvalidOperationException("Ponownie otwórz dokument.");
             var saved = await treatmentChoices.ReadAsync(draft.Scope,
-                draft.Rows.Select(row => row.Get("Symbol Subiekta")), token);
+                draft.Rows.Select(row => row.Get("Symbol Subiekta")), token,
+                ReadTextField(root, "speciesGroup", 10));
             return new { items = saved };
         }
         if (action == "setDraftSelections")
@@ -1467,7 +1468,7 @@ internal sealed class ReactWindow : Form
             // remembered species/route never changes clinical values itself.
             if (Flag(root, "remember") && row.Get("Symbol zamiennika produktu").Length == 0)
                 await treatmentChoices.SaveAsync(draft.Scope, symbol,
-                    choice.Species, choice.Route, variantId, token);
+                    choice.Species, choice.Route, variantId, token, ReadTextField(root, "speciesGroup", 10));
             return TreatmentVariantApplier.Apply(row, choice);
         }
         if (action == "updateDraft")
