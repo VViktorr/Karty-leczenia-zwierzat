@@ -22,6 +22,14 @@ function ParseRelease([string]$v) {
     $candidate = if ($Matches.ContainsKey('rc')) { [int]$Matches['rc'] } else { [int]::MaxValue }
     return @{ Numeric = $numeric; Candidate = $candidate }
 }
+function GetInstallerReleaseLabel([string]$fileDescription, [string]$productVersion) {
+    $labelPrefix = 'Karty Leczenia '
+    $description = $fileDescription.Trim()
+    if ($description.StartsWith($labelPrefix, [StringComparison]::Ordinal)) {
+        return $description.Substring($labelPrefix.Length).Trim()
+    }
+    return $productVersion.Trim()
+}
 function CompareRelease($left, $right) {
     $comparison = $left.Numeric.CompareTo($right.Numeric)
     if ($comparison -ne 0) { return $comparison }
@@ -49,11 +57,7 @@ try {
     # Windows version resource. These spaces are not part of the release
     # version (including RC suffixes), so normalize metadata only. Keep
     # -Version and SQL version parsing strict to prevent version spoofing.
-    $labelPrefix = 'Karty Leczenia '
-    $fileDescription = ([string]$meta.FileDescription).Trim()
-    $label = if ($fileDescription.StartsWith($labelPrefix, [StringComparison]::Ordinal)) {
-        $fileDescription.Substring($labelPrefix.Length).Trim()
-    } else { ([string]$meta.ProductVersion).Trim() }
+    $label = GetInstallerReleaseLabel ([string]$meta.FileDescription) ([string]$meta.ProductVersion)
     $textVersion = ParseRelease $label
     if ([version]$actualFile -ne $expected.Numeric -or [version]$actualProduct -ne $expected.Numeric -or
         (CompareRelease $textVersion $expected) -ne 0) {
