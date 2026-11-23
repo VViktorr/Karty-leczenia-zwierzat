@@ -51,6 +51,20 @@ export default function ComponentsSettings() {
           onChange={event=>updateComponents("pdf",{rememberZoom:event.target.checked})}>
           Zapamiętuj ostatnie powiększenie
         </Checkbox>
+        <Checkbox checked={settings.pdf.textLayer}
+          onChange={event=>updateComponents("pdf",{textLayer:event.target.checked})}>
+          Zaznaczanie i kopiowanie tekstu PDF
+        </Checkbox>
+        <Checkbox checked={settings.pdf.annotations}
+          onChange={event=>updateComponents("pdf",{annotations:event.target.checked})}>
+          Aktywne odnośniki i adnotacje PDF
+        </Checkbox>
+        <label>Liczba stron PDF ładowanych poza widocznym obszarem
+          <Select aria-label="Bufor stron PDF" style={{display:"block",width:200}}
+            value={settings.pdf.preloadPages}
+            options={[1,2,3,5].map(value=>({value,label:String(value)}))}
+            onChange={preloadPages=>updateComponents("pdf",{preloadPages})}/>
+        </label>
         <Alert type="info" showIcon title="PDF generuje WebView2; PDF.js odpowiada za jego wyświetlanie."
           description="Podgląd HTML pozostaje dostępny awaryjnie, gdy wygenerowanie PDF się nie powiedzie."/>
       </Space>
@@ -99,8 +113,19 @@ export default function ComponentsSettings() {
           onChange={event=>updateComponents("agGrid",{animateRows:event.target.checked})}>
           Animacja przesuwania wierszy
         </Checkbox>
+        <Checkbox checked={settings.agGrid.resizableColumns}
+          onChange={event=>updateComponents("agGrid",{resizableColumns:event.target.checked})}>
+          Zmienianie szerokości kolumn myszą
+        </Checkbox>
+        <label>Bufor wierszy AG Grid
+          <Select aria-label="AG Grid — bufor wierszy" style={{display:"block",width:220}}
+            value={settings.agGrid.rowBuffer}
+            options={[5,10,20,30].map(value=>({value,label:value+" wierszy"}))}
+            onChange={rowBuffer=>updateComponents("agGrid",{rowBuffer})}/>
+        </label>
         <Typography.Text type="secondary">
-          Filtry AG Grid dotyczą rekordów już pobranych, nie całej bazy SQL.
+          Filtry AG Grid dotyczą tylko rekordów pobranych z SQL. Mniejszy bufor
+          zmniejsza koszt renderowania dużych list.
         </Typography.Text>
       </Space>
     </Card>
