@@ -61,17 +61,19 @@ internal sealed class ReactWindow : Form
 
     private readonly DocumentData? treatmentDocument;
     private readonly string? treatmentDraftId;
+    private readonly string treatmentShortPayer;
     private readonly CoreWebView2Environment? sharedEnvironment;
     private readonly Dictionary<string, ReactWindow> treatmentWindows = [];
     private bool treatmentSaved;
     private bool treatmentSaving;
 
     internal ReactWindow(DocumentData? treatmentDocument = null, string? treatmentDraftId = null,
-        CoreWebView2Environment? sharedEnvironment = null)
+        CoreWebView2Environment? sharedEnvironment = null, string shortPayer = "")
     {
         this.treatmentDocument = treatmentDocument;
         this.treatmentDraftId = treatmentDraftId;
         this.sharedEnvironment = sharedEnvironment;
+        treatmentShortPayer = shortPayer;
         if (treatmentDocument is not null && treatmentDraftId is not null)
             drafts.Add(treatmentDraftId, treatmentDocument);
 
@@ -413,7 +415,7 @@ internal sealed class ReactWindow : Form
         if (treatmentDocument is not null)
         {
             if (action == "getWindowDraft")
-                return DescribeDraft(treatmentDraftId!, treatmentDocument);
+                return DescribeDraft(treatmentDraftId!, treatmentDocument, treatmentShortPayer);
             if (action == "closeTreatmentWindow")
             {
                 BeginInvoke(new Action(Close));
@@ -1196,7 +1198,8 @@ internal sealed class ReactWindow : Form
             token.ThrowIfCancellationRequested();
             if (openWindow)
             {
-                var window = new ReactWindow(document, key, web.CoreWebView2.Environment);
+                var window = new ReactWindow(document, key, web.CoreWebView2.Environment,
+                    ReadTextField(root, "shortPayer", 512));
                 treatmentWindows.Add(key, window);
                 window.FormClosed += (_, _) => treatmentWindows.Remove(key);
                 try
@@ -1588,9 +1591,9 @@ internal sealed class ReactWindow : Form
         throw new InvalidOperationException("Nieznana operacja interfejsu: " + action);
     }
 
-    private static object DescribeDraft(string key, DocumentData document)
+    private static object DescribeDraft(string key, DocumentData document, string shortPayer = "")
     {
-        return new { draftId = key, document.Number, document.Payer, document.Recipient,
+        return new { draftId = key, document.Number, document.Payer, document.Recipient, shortPayer,
             documentDate = document.DocumentDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
             hasPayerId = document.PayerId.HasValue,
             rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),

@@ -399,10 +399,14 @@ html[data-kl-skin="orchard"] .ant-modal .ant-modal-content { border-radius: 12px
 .catalogue-toolbar { margin-inline-start: auto; }
 .app-shell .catalogue-content { padding-block-start: 8px; }
 .compact-notice.ant-alert { padding: 4px 10px; margin-bottom: 8px; }
-.catalogue-list-toolbar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-.catalogue-list-toolbar .ant-input-search { min-width: 0; margin: 0; }
 .catalogue-editor-heading { align-items: center; gap: 8px; margin-bottom: 10px; }
 .catalogue-editor-heading h4.ant-typography { margin-top: 0; }
 .catalogue-variant-toolbar { gap: 6px; margin-bottom: 8px; }
 .settings-help { margin-bottom: 10px; color: var(--subtle); }
 .settings-help summary { cursor: pointer; }
+
+.treatment-topbar-title { min-width: 0; white-space: nowrap; }
+.treatment-topbar-title span { overflow: hidden; text-overflow: ellipsis; }
+.treatment-heading { justify-content: flex-end; }
+
+.list-heading-actions { justify-content: flex-end; }

@@ -4,7 +4,7 @@ import Table from "./AppTable";
 import {Suspense, lazy} from "react";
 import {compactWithdrawal, isPoultry,rplEntryFromPdfName} from "./cataloguePdfMetadata";
 import {useListPagination} from "./ListPagination";
-import {useListColumnLayout} from "./ListColumnLayout";
+import {ListParametersMenu,useListColumnLayout} from "./ListColumnLayout";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert, Button, Card, Checkbox, Empty, Input, Space, Spin,
@@ -491,7 +491,6 @@ export default function CataloguePage({
     {savedNotice && <Alert className="notice" type="success" showIcon title={savedNotice} />}
     <div className="catalogue-layout">
       <Card className="catalogue-list">
-        <div className="catalogue-list-toolbar">
         <Input.Search allowClear value={input}
           placeholder="Nazwa lub symbol leku..."
           onSearch={value=>{
@@ -500,9 +499,7 @@ export default function CataloguePage({
             else setQuery(trimmed);
           }}
           onChange={event => setInput(event.target.value)} />
-        <Button size="small" onClick={productsLayout.openColumns}>Kolumny</Button>
-        </div>
-        <Table<CatalogueListing> grid={productsLayout.grid} {...productsLayout.tableProps} rowKey="symbol" size="small"
+        <ListParametersMenu onOpen={productsLayout.openColumns}><Table<CatalogueListing> grid={productsLayout.grid} {...productsLayout.tableProps} rowKey="symbol" size="small"
           loading={listBusy} dataSource={list}
           pagination={productsPagination}
           scroll={{ y: "calc(100vh - 265px)" }}
@@ -513,7 +510,7 @@ export default function CataloguePage({
             editing?.symbol === row.symbol ? "catalogue-selected" : ""}
           locale={{ emptyText: <Empty description="Brak produktów" /> }}
           columns={productsLayout.columns}
-        />
+        /></ListParametersMenu>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           Pierwszych 200 kartotek spełniających filtr.
         </Typography.Text>
@@ -559,7 +556,7 @@ export default function CataloguePage({
           </div>
           <div className="catalogue-variant-toolbar">
             <Space wrap>
-              <Button onClick={variantsLayout.openColumns}>Kolumny wariantów</Button>
+
               <Button onClick={addVariant}>Dodaj wariant</Button>
               <Button disabled={!selected.length || working}
                 onClick={() => { void choosePdf(); }}>
@@ -576,7 +573,7 @@ export default function CataloguePage({
               Istniejące warianty nie są kasowane przez pominięcie w edytorze.
             </Typography.Text>
           </div>
-          <Table<UiVariant> {...variantsLayout.tableProps}
+          <ListParametersMenu onOpen={variantsLayout.openColumns}><Table<UiVariant> {...variantsLayout.tableProps}
             className={"catalogue-variants "+variantsLayout.tableProps.className}
             rowKey="key" dataSource={variants} size="small" pagination={false}
             loading={working}
@@ -586,7 +583,7 @@ export default function CataloguePage({
               onChange: keys => setSelected(keys.map(String))
             }}
             columns={variantsLayout.columns}
-          />
+          /></ListParametersMenu>
         </>}
       </Card>
     </div>

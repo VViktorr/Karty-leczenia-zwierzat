@@ -3,7 +3,7 @@ import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
 import {useEffect,useState} from "react";
 import {useComponents} from "./componentSettings";
-import {Button,Checkbox,InputNumber,Tabs,Typography} from "antd";
+import {Button,Checkbox,Dropdown,InputNumber,Tabs,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
 
 /** Workstation-local, WinForms-style column visibility, order and widths. */
@@ -168,4 +168,14 @@ export function useListColumnLayout<T extends object>(
     })
   };
   return {grid,columns:formatting.apply(mouseColumns,identity),tableProps:mouse.tableProps,openColumns:()=>setOpen(true),resetColumns,fitColumns,dialog};
+}
+
+export function ListParametersMenu({children,onOpen}: {
+  children: import("react").ReactNode;
+  onOpen: () => void;
+}) {
+  return <Dropdown trigger={["contextMenu"]}
+    menu={{items:[{key:"parameters",label:"Parametry listy",onClick:onOpen}]}}>
+    <div>{children}</div>
+  </Dropdown>;
 }

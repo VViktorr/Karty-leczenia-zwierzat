@@ -28,7 +28,7 @@ import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
 import {useExpiryTableLayout} from "./ExpiryTableLayout";
-import {useListColumnLayout} from "./ListColumnLayout";
+import {ListParametersMenu,useListColumnLayout} from "./ListColumnLayout";
 import {SubiektDatabaseSettings,ProgramDatabaseSettings} from "./DatabaseSettings";
 import { defaultPricePrint, normalizePriceSettings, withdrawalText,
   PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
@@ -48,7 +48,7 @@ interface DraftRow {
   description: string; animals: string; diagnosis: string; section: string; selected: boolean;
 }
 interface Draft {
-  draftId: string; number: string; payer: string; recipient: string;
+  draftId: string; number: string; payer: string; shortPayer?: string; recipient: string;
   documentDate?: string|null;
   hasPayerId: boolean; rows: DraftRow[];
 }
@@ -216,7 +216,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
 }) {
   const tableRef=useRef<HTMLDivElement>(null);
   const [contextMenu,setContextMenu]=useState<DocumentRow|"header"|null>(null);
-  useEffect(()=>{if(!active||!compact)setContextMenu(null);},[active,compact]);
+  useEffect(()=>{if(!active)setContextMenu(null);},[active]);
   const [kind, setKind] = useState<DocumentKind>("invoices");
   const [period, setPeriod] = useState<DatePeriod>("all");
   const [pageSize,setPageSize] = useState<25|50|100|"all">(()=>{
@@ -263,7 +263,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
     try {
       if(!await beforeOpen(row)||request.signal.aborted)return;
       const result = await invoke<Draft|{opened:true}>("readDocument",
-        {documentId: row.id, number: row.number, openWindow:true}, undefined, request.signal);
+        {documentId: row.id, number: row.number, shortPayer:row.shortPayer, openWindow:true}, undefined, request.signal);
       if (!request.signal.aborted && "draftId" in result) onOpen(result);
     } catch (error) {
       if (!request.signal.aborted) setReadError(error instanceof Error ? error.message : String(error));
@@ -311,7 +311,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
   ];
   const listLayout=useListColumnLayout("documents",columns,active);
   const columnMenu=[
-    {key:"columns",label:"Ustaw kolumny",onClick:listLayout.openColumns},
+    {key:"columns",label:"Parametry listy",onClick:listLayout.openColumns},
     {key:"fit",label:"Dopasuj szerokości",onClick:()=>{if(tableRef.current)listLayout.fitColumns(tableRef.current);}},
     {key:"reset",label:"Przywróć domyślne kolumny",onClick:listLayout.resetColumns}
   ];
@@ -324,7 +324,8 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
     {key:"number",label:"Kopiuj numer",onClick:()=>{void copyDocumentText(contextMenu.number);}},
     {key:"payer",label:"Kopiuj nazwę kontrahenta",onClick:()=>{
       void copyDocumentText(contextMenu.payer||contextMenu.shortPayer);
-    }}
+    }},
+    ...columnMenu
   ]:columnMenu;
   const periods: Array<{label:string;value:DatePeriod}> = [
     {label:"(nieokreślony)",value:"all"},
@@ -339,10 +340,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
     {label:"Dowolny okres",value:"custom"}
   ];
   return <>
-    {!compact&&<div className="page-heading"><div>
-      <Typography.Title level={3}>Dokumenty Subiekta GT</Typography.Title>
-    </div><Space wrap>
-      <Button onClick={listLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
+    {!compact&&<div className="page-heading list-heading-actions"><Space wrap>
       <Button onClick={reload} loading={busy}>Odśwież · F5</Button>
     </Space></div>}
     <Card className={compact?"compact-documents":undefined}>
@@ -363,9 +361,6 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
           {data?.truncated&&<Tag title="Pokazano 500 dokumentów. Zawęź wyszukiwanie."
             color="blue">Limit: 500</Tag>}
           <Button onClick={reload} loading={busy} title="Odśwież · F5">Odśwież ↻</Button>
-          <Dropdown menu={{items:columnMenu}} trigger={["click"]}>
-            <Button aria-label="Ustawienia tabeli dokumentów">⋯</Button>
-          </Dropdown>
         </Space>}
         {period==="customMonth"&&<Input type="month" aria-label="Wybrany miesiąc"
           value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)}/>}
@@ -380,17 +375,17 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
         description={data.warning||error}/>}
       {!compact&&data?.truncated&&<Alert className="notice" type="info" showIcon
         title="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
-      <Dropdown trigger={compact?["contextMenu"]:[]} open={compact&&contextMenu!==null}
+      <Dropdown trigger={["contextMenu"]} open={contextMenu!==null}
         onOpenChange={visible=>{if(!visible)setContextMenu(null);}}
         menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
         <div ref={tableRef} onContextMenuCapture={event=>{
-          if(!compact||!(event.target instanceof Element))return;
+          if(!(event.target instanceof Element))return;
           const header=event.target.closest(".ant-table-thead th, .ag-header-cell");
           const id=event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key") ??
             event.target.closest(".ag-row[row-id]")?.getAttribute("row-id");
           const row=data?.items.find(item=>String(item.id)===id);
           if(header||row){event.preventDefault();setContextMenu(header?"header":row!);if(row)setSelectedId(row.id);}
-          else event.stopPropagation();
+          else {event.preventDefault();setContextMenu("header");}
         }}>
       <Table grid={listLayout.grid} {...listLayout.tableProps} rowKey="id" loading={(busy&&!data)||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
@@ -1206,15 +1201,15 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         next={wizard&&step<4?()=>goToStep(step+1):undefined}
         save={!savedNumber&&(!wizard||step===4)?()=>startSave():undefined}/>}
     <div ref={treatmentControls} className="treatment-controls">
-    <div className="page-heading"><div>
+    {(!treatmentWindow||!wizard||step===4)&&<div className="page-heading treatment-heading">
+    {!treatmentWindow&&<div>
       <Typography.Title level={3}>Karta leczenia — {draft.number}</Typography.Title>
       <Typography.Text type="secondary">{draft.payer.split("\n")[0]}</Typography.Text>
-    </div><Space>
-      <Button onClick={onDocuments}>{treatmentWindow?"Zamknij kartę":"Dokumenty"}</Button>
-      {editingRows&&<Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>}
+    </div>}<Space>
+      {!treatmentWindow&&<Button onClick={onDocuments}>Dokumenty</Button>}
       {(!wizard||step===4)&&<><Button onClick={()=>{void printPreview();}} loading={busy&&!savingSql} disabled={busy||applyBusy}>Podgląd wydruku</Button>
       <Button type="primary" onClick={()=>startSave()} loading={savingSql} disabled={!!savedNumber||busy||applyBusy||referenceBusy||!performed}>Zapisz kartę do SQL</Button></>}
-    </Space></div>
+    </Space></div>}
     {wizard&&<div className="treatment-stepper">
       <Steps size="small" current={step} items={treatmentSteps.map(title=>({title}))}/>
       <Space wrap>
@@ -1312,7 +1307,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     {savedNumber && <Alert className="notice" type="success" showIcon title={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
     </div>
-    {editingRows&&!variantModal&&<Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
+    {editingRows&&!variantModal&&<Card className="treatment-rows"><ListParametersMenu onOpen={()=>setShowColumns(true)}><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
       columns={treatmentFormatting.apply(treatmentMouse.decorate(
         columns.filter(column=>{
           const key=treatmentColumnKey(column);
@@ -1327,7 +1322,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         (source,target)=>setColumnOrder(previous=>reorderColumn(previous,source,target)),
         60, 800, ["selected","product"]), treatmentColumnKey)} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
-      scroll={{x:1900,y:(compact||treatmentWindow)?tableHeight:"calc(100vh - 415px)"}} pagination={false}/>
+      scroll={{x:1900,y:(compact||treatmentWindow)?tableHeight:"calc(100vh - 415px)"}} pagination={false}/></ListParametersMenu>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>}
@@ -1568,11 +1563,11 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
             onClick={()=>{void applyVariant(preferredVariants[0].id);}}>Użyj ostatniego wyboru</Button>}/>}
       <ErrorNotice error={choiceError}/>
       <ErrorNotice error={variantError}/>
-      <Button size="small" onClick={variantLayout.openColumns}>Kolumny wariantów</Button>
-      <Table<TreatmentVariantChoice> {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
+
+      <ListParametersMenu onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantRows} size="small"
         pagination={variantsPagination} scroll={{x:"max-content",y:"calc(100vh - 340px)"}}
-        columns={variantLayout.columns}/>
+        columns={variantLayout.columns}/></ListParametersMenu>
     </Card>}
     {variantLayout.dialog}
     <Modal className="kl-dialog-treatment-pdf" width="94vw" open={variantPdfUrl!==null}
@@ -1686,12 +1681,10 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) 
   const pagination=useListPagination("prices",rows.length,40);
   return <>
     <div className="page-heading"><div>
-      <Typography.Title level={3}>Cennik leków</Typography.Title>
       <Typography.Text type="secondary">
         Ceny i stany z Subiekta; karencje z katalogu SQL KartyLeczenia.
       </Typography.Text>
     </div><Space wrap>
-      <Button onClick={listLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={prices.reload} disabled={level===null} loading={prices.busy}>Odśwież z SQL</Button>
       <Button onClick={()=>setShowSettings(true)} disabled={settingsBusy||!all.length}>
         Ustawienia wydruku
@@ -1734,11 +1727,11 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) 
           const next=new Set(current);rows.forEach(row=>next.add(row.symbol));return next;
         })}>Odznacz widoczne</Button>
       </Space>
-      <Table grid={listLayout.grid} {...listLayout.tableProps} rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
+      <ListParametersMenu onOpen={listLayout.openColumns}><Table grid={listLayout.grid} {...listLayout.tableProps} rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
         onRow={row=>({onClick:()=>setActivePriceSymbol(row.symbol)})}
         dataSource={rows} columns={listLayout.columns}
         pagination={pagination}
-        size="middle" scroll={{x:1180,y:"calc(100vh - 425px)"}}/>
+        size="middle" scroll={{x:1180,y:"calc(100vh - 425px)"}}/></ListParametersMenu>
       <Typography.Text type="secondary">
         {selected.length} z {rows.length} widocznych pozycji do wydruku.
         Bufor danych magazynowych: 30 sekund; karencje z SQL: maksymalnie 1 minuta.
@@ -1799,9 +1792,7 @@ function Expiry() {
   const expiryLayout=useExpiryTableLayout(expiryColumns);
   const pagination=useListPagination("expiry",rows.length,40);
   return <>
-    <div className="page-heading"><div>
-      <Typography.Title level={3}>Terminy ważności leków</Typography.Title>
-    </div><Space><Button onClick={expiryLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
+    <div className="page-heading list-heading-actions"><Space>
       <Button onClick={remote.reload} loading={remote.busy}>Odśwież z SQL</Button></Space></div>
     <Card>
       <Space wrap style={{marginBottom:12}}>
@@ -1817,10 +1808,10 @@ function Expiry() {
         </Button>
       </Space>
       <ErrorNotice error={remote.error}/>
-      <Table grid={expiryLayout.grid} {...expiryLayout.tableProps} rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
+      <ListParametersMenu onOpen={expiryLayout.openColumns}><Table grid={expiryLayout.grid} {...expiryLayout.tableProps} rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
         loading={remote.busy} dataSource={rows}
         pagination={pagination} scroll={{x:1040,y:"calc(100vh - 400px)"}}
-        columns={expiryLayout.columns}/>
+        columns={expiryLayout.columns}/></ListParametersMenu>
       <Typography.Text type="secondary">
         Wyświetlono {rows.length} pozycji. Dane magazynowe są buforowane maksymalnie 30 sekund. „Odśwież z SQL” pomija bufor.
       </Typography.Text>
@@ -2066,10 +2057,9 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
   const savedLayout=useListColumnLayout("saved-cards",savedColumns);
   const pagination=useListPagination("saved-cards",remote.data?.length??0,35);
   return <>
-    <div className="page-heading"><Typography.Title level={3}>Zapisane karty leczenia</Typography.Title>
+    <div className="page-heading list-heading-actions">
       <Space><Segmented value={trash?"trash":"active"} onChange={v=>setTrash(v==="trash")}
         options={[{label:"Archiwum",value:"active"},{label:"Kosz",value:"trash"}]}/>
-      <Button onClick={savedLayout.openColumns}>Kolumny · Ctrl+Shift+L</Button>
       <Button onClick={remote.reload}>Odśwież</Button></Space></div>
     <Card>
       <Space wrap style={{marginBottom:12}}>
@@ -2087,10 +2077,10 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       </Space>
       <ErrorNotice error={error || remote.error}/>
       {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
-      <Table grid={savedLayout.grid} {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
+      <ListParametersMenu onOpen={savedLayout.openColumns}><Table grid={savedLayout.grid} {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
         scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={pagination}
         onRow={row=>({onDoubleClick:()=>{void open(row);}})}
-        columns={savedLayout.columns}/>
+        columns={savedLayout.columns}/></ListParametersMenu>
     </Card>
     {savedLayout.dialog}
     <Modal className="kl-dialog-card-trash" open={trashTarget!==null}
@@ -2907,10 +2897,12 @@ export default function App() {
       </aside>}
       <div className="workspace">
         <header className={"topbar"+(section==="catalogue"?" catalogue-topbar":"")}>
-          <div className="topbar-title">
-            <strong>{sections.find(x=>x.id===section)?.name}</strong>
+          <div className={"topbar-title"+(treatmentWindow?" treatment-topbar-title":"")}>
+            <strong>{treatmentWindow&&draft?`Karta leczenia do ${draft.number}`:sections.find(x=>x.id===section)?.name}</strong>
+            {treatmentWindow&&draft?.shortPayer&&<span title={draft.shortPayer}>{draft.shortPayer}</span>}
             {section==="catalogue"&&<span className="topbar-note">Dane wariantów i dokumenty urzędowe z bazy KartyLeczenia SQL.</span>}
           </div>
+          {treatmentWindow&&<Button onClick={returnToDocuments}>Zamknij kartę</Button>}
           {section==="catalogue"&&<div className="catalogue-toolbar" ref={setCatalogueToolbar}/>}
         </header>
         {!treatmentWindow&&topTabs&&<div className="top-navigation">{nav}</div>}
