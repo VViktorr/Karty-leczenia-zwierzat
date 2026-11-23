@@ -51,7 +51,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
     element?.addEventListener("kl-fit-columns", fit);
     return () => element?.removeEventListener("kl-fit-columns", fit);
   }, [api]);
-  const rowHeight = Number.parseInt(String((style as Record<string, unknown> | undefined)?.["--kl-row-height"]));
+
   const columnDefs = useMemo(() => (columns ?? []).flatMap<ColDef<T>>(column => {
     if ("children" in column) return [];
     const index = "dataIndex" in column ? column.dataIndex : undefined;
@@ -91,7 +91,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
         rowBuffer={preferences.rowBuffer}
         headerHeight={preferences.headerHeight}
         animateRows={preferences.animateRows}
-        rowHeight={rowHeight || preferences.rowHeight}
+        rowHeight={preferences.rowHeight}
         loading={typeof loading === "boolean" ? loading : loading?.spinning}
         loadingOverlayComponent={() => <Spin aria-label="Ładowanie danych"/>}
         noRowsOverlayComponent={() => locale?.emptyText ?? <Empty description="Brak danych"/>}
