@@ -83,7 +83,7 @@ export function setComponents(next: ComponentPreferences) {
   try { localStorage.setItem(key, JSON.stringify(current)); } catch { /* session fallback */ }
   notify();
 }
-export function updateComponents<K extends keyof ComponentPreferences>(
+export function updateComponents<K extends "pdf" | "table" | "cache" | "shortcuts">(
   section: K, patch: Partial<ComponentPreferences[K]>) {
   setComponents({...current, [section]: {...current[section], ...patch}});
 }
