@@ -1,5 +1,5 @@
-import {Alert, Button, Card, Checkbox, Select, Slider, Space, Switch, Typography} from "antd";
-import {defaultComponents, resetComponents, updateComponents, useComponents,
+import {Alert, Button, Card, Checkbox, Select, Space, Switch, Typography} from "antd";
+import {resetComponents, updateComponents, useComponents,
   type ShortcutAction} from "./componentSettings";
 
 const zoomOptions = [50,75,100,125,150,175,200].map(value=>({value,label:value+"%"}));
@@ -51,6 +51,20 @@ export default function ComponentsSettings() {
           onChange={event=>updateComponents("pdf",{rememberZoom:event.target.checked})}>
           Zapamiętuj ostatnie powiększenie
         </Checkbox>
+        <Checkbox checked={settings.pdf.textLayer}
+          onChange={event=>updateComponents("pdf",{textLayer:event.target.checked})}>
+          Zaznaczanie i kopiowanie tekstu PDF
+        </Checkbox>
+        <Checkbox checked={settings.pdf.annotations}
+          onChange={event=>updateComponents("pdf",{annotations:event.target.checked})}>
+          Aktywne odnośniki i adnotacje PDF
+        </Checkbox>
+        <label>Liczba stron PDF ładowanych poza widocznym obszarem
+          <Select aria-label="Bufor stron PDF" style={{display:"block",width:200}}
+            value={settings.pdf.preloadPages}
+            options={[1,2,3,5].map(value=>({value,label:String(value)}))}
+            onChange={preloadPages=>updateComponents("pdf",{preloadPages})}/>
+        </label>
         <Alert type="info" showIcon title="PDF generuje WebView2; PDF.js odpowiada za jego wyświetlanie."
           description="Podgląd HTML pozostaje dostępny awaryjnie, gdy wygenerowanie PDF się nie powiedzie."/>
       </Space>
@@ -67,6 +81,52 @@ export default function ComponentsSettings() {
           onChange={event=>updateComponents("table",{rememberColumns:event.target.checked})}>
           Zapamiętuj widok i kolejność kolumn na tym stanowisku
         </Checkbox>
+      </Space>
+    </Card>
+    <Card size="small" title="AG Grid — wspólne ustawienia tabel">
+      <Space direction="vertical" size={12} style={{width:"100%"}}>
+        <Typography.Text type="secondary">
+          Te parametry obowiązują wszystkie zgodne tabele w programie, gdy wybrany jest silnik AG Grid.
+          Wyboru dokonujesz tutaj, bez osobnych przełączników nad listami.
+        </Typography.Text>
+        <label>Wysokość wiersza
+          <Select aria-label="AG Grid — wysokość wiersza" style={{display:"block",width:220}}
+            value={settings.agGrid.rowHeight}
+            options={[28,32,36,40,44,48,52].map(value=>({value,label:value+" px"}))}
+            onChange={rowHeight=>updateComponents("agGrid",{rowHeight})}/>
+        </label>
+        <label>Wysokość nagłówka
+          <Select aria-label="AG Grid — wysokość nagłówka" style={{display:"block",width:220}}
+            value={settings.agGrid.headerHeight}
+            options={[32,36,40,44,48,52].map(value=>({value,label:value+" px"}))}
+            onChange={headerHeight=>updateComponents("agGrid",{headerHeight})}/>
+        </label>
+        <Checkbox checked={settings.agGrid.sortable}
+          onChange={event=>updateComponents("agGrid",{sortable:event.target.checked})}>
+          Sortowanie po kliknięciu nagłówka
+        </Checkbox>
+        <Checkbox checked={settings.agGrid.filters}
+          onChange={event=>updateComponents("agGrid",{filters:event.target.checked})}>
+          Filtry kolumn AG Grid
+        </Checkbox>
+        <Checkbox checked={settings.agGrid.animateRows}
+          onChange={event=>updateComponents("agGrid",{animateRows:event.target.checked})}>
+          Animacja przesuwania wierszy
+        </Checkbox>
+        <Checkbox checked={settings.agGrid.resizableColumns}
+          onChange={event=>updateComponents("agGrid",{resizableColumns:event.target.checked})}>
+          Zmienianie szerokości kolumn myszą
+        </Checkbox>
+        <label>Bufor wierszy AG Grid
+          <Select aria-label="AG Grid — bufor wierszy" style={{display:"block",width:220}}
+            value={settings.agGrid.rowBuffer}
+            options={[5,10,20,30].map(value=>({value,label:value+" wierszy"}))}
+            onChange={rowBuffer=>updateComponents("agGrid",{rowBuffer})}/>
+        </label>
+        <Typography.Text type="secondary">
+          Filtry AG Grid dotyczą tylko rekordów pobranych z SQL. Mniejszy bufor
+          zmniejsza koszt renderowania dużych list.
+        </Typography.Text>
       </Space>
     </Card>
     <Card size="small" title="Skróty klawiaturowe — React Hotkeys Hook">

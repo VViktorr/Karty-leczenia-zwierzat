@@ -65,6 +65,12 @@ Lista dokumentów ma pamięć odczytu na poziomie hosta; przycisk **F5** wymusza
 
 Zmienione ustawienia przechowuje WebView2 `localStorage` pod kluczem `ReactKL.componentPreferences.v1`. Domyślne wartości są walidowane, a panel pozwala je przywrócić. Stare nazwy układów z oddzielnym menu górnym/bocznym zostają zmigrowane do skórki z odpowiednim przełącznikiem menu.
 
+### Rozszerzone globalne ustawienia AG Grid i PDF
+
+Silnik tabel wybieramy wyłącznie w **Ustawienia → Komponenty**: Ant Design lub AG Grid. Przełączniki widoku nad poszczególnymi listami, także w archiwum kart, zostały usunięte. AG Grid może działać w całym ReactKL, gdy tabela obsługuje taki sam zestaw akcji. Tabele o złożonych nagłówkach, zaznaczaniu lub rozwijanych wierszach zachowują bezpieczny widok Ant Design.
+
+Dodatkowe ustawienia AG Grid: wysokość wierszy i nagłówków, sortowanie, filtry kolumn, animacja wierszy, możliwość zmiany szerokości oraz bufor wierszy. Parametry te dotyczą wszystkich tabel renderowanych przez AG Grid, a filtrowanie działa tylko na pobranej części danych. Dodatkowe ustawienia PDF.js: zaznaczanie tekstu, adnotacje/odnośniki oraz liczba stron w buforze przy przewijaniu.
+
 ## Testy i status integracji
 
 ```powershell
