@@ -182,12 +182,13 @@ export function TableContextTrigger({onContextMenu,onContextMenuCapture,...props
   }}/>;
 }
 
-export function ListParametersMenu({children,onOpen}: {
+export function ListParametersMenu({children,onOpen,fillHeight}: {
   children: import("react").ReactNode;
   onOpen: () => void;
+  fillHeight?: boolean;
 }) {
   return <Dropdown trigger={["contextMenu"]}
     menu={{items:[{key:"parameters",label:"Parametry listy",onClick:onOpen}]}}>
-    <TableContextTrigger>{children}</TableContextTrigger>
+    <TableContextTrigger className={fillHeight?"fill-list-table":undefined}>{children}</TableContextTrigger>
   </Dropdown>;
 }

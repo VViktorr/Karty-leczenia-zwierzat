@@ -490,7 +490,7 @@ export default function CataloguePage({
     {error && <Alert className="notice" type="error" showIcon title={error} />}
     {savedNotice && <Alert className="notice" type="success" showIcon title={savedNotice} />}
     <div className="catalogue-layout">
-      <Card className="catalogue-list">
+      <Card className="catalogue-list fill-list-card">
         <Input.Search allowClear value={input}
           placeholder="Nazwa lub symbol leku..."
           onSearch={value=>{
@@ -499,10 +499,10 @@ export default function CataloguePage({
             else setQuery(trimmed);
           }}
           onChange={event => setInput(event.target.value)} />
-        <ListParametersMenu onOpen={productsLayout.openColumns}><Table<CatalogueListing> grid={productsLayout.grid} {...productsLayout.tableProps} rowKey="symbol" size="small"
+        <ListParametersMenu fillHeight onOpen={productsLayout.openColumns}><Table<CatalogueListing> grid={productsLayout.grid} {...productsLayout.tableProps} rowKey="symbol" size="small"
           loading={listBusy} dataSource={list}
           pagination={productsPagination}
-          scroll={{ y: "calc(100vh - 265px)" }}
+          scroll={{ y: "100%" }}
           onRow={row => ({
             onClick: () => { void openProduct(row); }
           })}
@@ -515,7 +515,7 @@ export default function CataloguePage({
           Pierwszych 200 kartotek spełniających filtr.
         </Typography.Text>
       </Card>
-      <Card className="catalogue-editor">
+      <Card className="catalogue-editor fill-list-card">
         {!editing ? <Empty description="Wybierz lek z katalogu" /> : <>
           <div className="catalogue-editor-heading">
             <div>
@@ -569,11 +569,11 @@ export default function CataloguePage({
               Istniejące warianty nie są kasowane przez pominięcie w edytorze.
             </Typography.Text>
           </div>
-          <ListParametersMenu onOpen={variantsLayout.openColumns}><Table<UiVariant> {...variantsLayout.tableProps}
+          <ListParametersMenu fillHeight onOpen={variantsLayout.openColumns}><Table<UiVariant> {...variantsLayout.tableProps}
             className={"catalogue-variants "+variantsLayout.tableProps.className}
             rowKey="key" dataSource={variants} size="small" pagination={false}
             loading={working}
-            scroll={{ x: 1990, y: "calc(100vh - 530px)" }}
+            scroll={{ x: 1990, y: "100%" }}
             rowSelection={{
               selectedRowKeys: selected,
               onChange: keys => setSelected(keys.map(String))

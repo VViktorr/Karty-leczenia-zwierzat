@@ -343,7 +343,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
   ];
   return <>
     {active&&toolbar&&createPortal(<Button onClick={reload} loading={busy}>Odśwież · F5</Button>,toolbar)}
-    <Card className={"documents-card"+(compact?" compact-documents":"")}>
+    <Card className={"fill-list-card"+(compact?" compact-documents":"")}>
       <div className={"document-filters"+(compact?" compact-document-toolbar":"")}>
         <Segmented block size={compact?"middle":"large"} value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
           options={[{label:"Faktury",value:"invoices"},
@@ -371,7 +371,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
       <Dropdown trigger={["contextMenu"]} disabled={!active}
         onOpenChange={visible=>{if(!visible)setContextMenu(null);}}
         menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
-        <TableContextTrigger className="documents-table-area" ref={tableRef} onContextMenuCapture={event=>{
+        <TableContextTrigger className="fill-list-table" ref={tableRef} onContextMenuCapture={event=>{
           if(!(event.target instanceof Element))return;
           const header=event.target.closest(".ant-table-thead th, .ag-header-cell");
           const id=event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key") ??
@@ -500,24 +500,6 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   const wizard=treatmentWindow||wizardEnabled;
   const drugStep=!wizard||step===1;
   const editingRows=drugStep;
-  const treatmentControls = useRef<HTMLDivElement>(null);
-  const [tableHeight, setTableHeight] = useState(180);
-  useEffect(()=>{
-    const controls=treatmentControls.current;
-    const main=controls?.closest<HTMLElement>("main");
-    if(!active||(!compact&&!treatmentWindow)||!controls||!main)return;
-    const measure=()=>{
-      const padding=getComputedStyle(main);
-      const available=main.clientHeight-controls.offsetHeight
-        - parseFloat(padding.paddingTop)-parseFloat(padding.paddingBottom)-76;
-      setTableHeight(Math.max(180,Math.floor(available)));
-    };
-    const observer=new ResizeObserver(measure);
-    observer.observe(controls);
-    observer.observe(main);
-    measure();
-    return()=>observer.disconnect();
-  },[active,compact,draft]);
   const [showColumns,setShowColumns]=useState(false);
   const treatmentMouse = useTableMouseLayout("treatment");
   const treatmentFormatting = useListFormatting("treatment");
@@ -1200,7 +1182,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         back={wizard&&step>0?()=>goToStep(step-1):undefined}
         next={wizard&&step<4?()=>goToStep(step+1):undefined}
         save={!savedNumber&&(!wizard||step===4)?()=>startSave():undefined}/>}
-    <div ref={treatmentControls} className="treatment-controls">
+    <div className="treatment-controls">
     {(!treatmentWindow||!wizard||step===4)&&<div className="page-heading treatment-heading">
     {!treatmentWindow&&<div>
       <Typography.Title level={3}>Karta leczenia — {draft.number}</Typography.Title>
@@ -1307,7 +1289,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     {savedNumber && <Alert className="notice" type="success" showIcon title={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
     </div>
-    {editingRows&&!variantModal&&<Card className="treatment-rows"><ListParametersMenu onOpen={()=>setShowColumns(true)}><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
+    {editingRows&&!variantModal&&<Card className="treatment-rows fill-list-card"><ListParametersMenu fillHeight onOpen={()=>setShowColumns(true)}><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
       columns={treatmentFormatting.apply(treatmentMouse.decorate(
         columns.filter(column=>{
           const key=treatmentColumnKey(column);
@@ -1322,7 +1304,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         (source,target)=>setColumnOrder(previous=>reorderColumn(previous,source,target)),
         60, 800, ["selected","product"]), treatmentColumnKey)} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
-      scroll={{x:1900,y:(compact||treatmentWindow)?tableHeight:"calc(100vh - 415px)"}} pagination={false}/></ListParametersMenu>
+      scroll={{x:1900,y:"100%"}} pagination={false}/></ListParametersMenu>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>}
@@ -1558,7 +1540,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
               : "Brak"}
         ]}/>
     </Modal>
-    {variantModal&&<Card className="treatment-variant-table"
+    {variantModal&&<Card className="treatment-variant-table fill-list-card"
       title={"Dobór wariantu — "+variantModal.product}
       extra={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>Wróć do leków</Button>}>
       <Alert className="notice compact-notice" type="warning" showIcon closable
@@ -1576,9 +1558,9 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       <ErrorNotice error={choiceError}/>
       <ErrorNotice error={variantError}/>
 
-      <ListParametersMenu onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
+      <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantRows} size="small"
-        pagination={variantsPagination} scroll={{x:"max-content",y:"calc(100vh - 340px)"}}
+        pagination={variantsPagination} scroll={{x:"max-content",y:"100%"}}
         columns={variantLayout.columns}/></ListParametersMenu>
     </Card>}
     {variantLayout.dialog}
@@ -1701,7 +1683,7 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
         Drukuj ({selected.length})
       </Button>
     </Space>,toolbar)}
-    <Card>
+    <Card className="fill-list-card">
       <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
         <Select style={{minWidth:160}} loading={levels.busy} value={level} placeholder="Poziom ceny"
           onChange={setLevel} options={(levels.data??[]).map(x=>({label:x.name,value:x.number}))}/>
@@ -1735,11 +1717,11 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
           const next=new Set(current);rows.forEach(row=>next.add(row.symbol));return next;
         })}>Odznacz widoczne</Button>
       </Space>
-      <ListParametersMenu onOpen={listLayout.openColumns}><Table grid={listLayout.grid} {...listLayout.tableProps} rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
+      <ListParametersMenu fillHeight onOpen={listLayout.openColumns}><Table grid={listLayout.grid} {...listLayout.tableProps} rowKey={(row,index)=>row.symbol||String(index)} loading={prices.busy&&level!==null}
         onRow={row=>({onClick:()=>setActivePriceSymbol(row.symbol)})}
         dataSource={rows} columns={listLayout.columns}
         pagination={pagination}
-        size="middle" scroll={{x:1180,y:"max(180px, calc(100vh - 330px))"}}/></ListParametersMenu>
+        size="middle" scroll={{x:1180,y:"100%"}}/></ListParametersMenu>
       <Typography.Text type="secondary">
         {selected.length} z {rows.length} widocznych pozycji do wydruku.
         Bufor danych magazynowych: 30 sekund; karencje z SQL: maksymalnie 1 minuta.
@@ -1802,7 +1784,7 @@ function Expiry() {
   return <>
     <div className="page-heading list-heading-actions"><Space>
       <Button onClick={remote.reload} loading={remote.busy}>Odśwież z SQL</Button></Space></div>
-    <Card>
+    <Card className="fill-list-card">
       <Space wrap style={{marginBottom:12}}>
         <Segmented className="expiry-filters" value={range} onChange={setRange} options={[
           {label:"Wszystkie",value:"all"}, {label:"Przeterminowane",value:"expired"},
@@ -1816,9 +1798,9 @@ function Expiry() {
         </Button>
       </Space>
       <ErrorNotice error={remote.error}/>
-      <ListParametersMenu onOpen={expiryLayout.openColumns}><Table grid={expiryLayout.grid} {...expiryLayout.tableProps} rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
+      <ListParametersMenu fillHeight onOpen={expiryLayout.openColumns}><Table grid={expiryLayout.grid} {...expiryLayout.tableProps} rowKey={(x,index)=>x.productId+"-"+x.movementId+"-"+index}
         loading={remote.busy} dataSource={rows}
-        pagination={pagination} scroll={{x:1040,y:"calc(100vh - 400px)"}}
+        pagination={pagination} scroll={{x:1040,y:"100%"}}
         columns={expiryLayout.columns}/></ListParametersMenu>
       <Typography.Text type="secondary">
         Wyświetlono {rows.length} pozycji. Dane magazynowe są buforowane maksymalnie 30 sekund. „Odśwież z SQL” pomija bufor.
@@ -2069,7 +2051,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       <Space><Segmented value={trash?"trash":"active"} onChange={v=>setTrash(v==="trash")}
         options={[{label:"Archiwum",value:"active"},{label:"Kosz",value:"trash"}]}/>
       <Button onClick={remote.reload}>Odśwież</Button></Space></div>
-    <Card>
+    <Card className="fill-list-card">
       <Space wrap style={{marginBottom:12}}>
         <Input.Search allowClear value={query} onChange={e=>setQuery(e.target.value)}
           onSearch={value=>{
@@ -2085,8 +2067,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       </Space>
       <ErrorNotice error={error || remote.error}/>
       {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
-      <ListParametersMenu onOpen={savedLayout.openColumns}><Table grid={savedLayout.grid} {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
-        scroll={{x:800,y:"calc(100vh - 385px)"}} pagination={pagination}
+      <ListParametersMenu fillHeight onOpen={savedLayout.openColumns}><Table grid={savedLayout.grid} {...savedLayout.tableProps} rowKey="id" loading={remote.busy} dataSource={remote.data ?? []}
+        scroll={{x:800,y:"100%"}} pagination={pagination}
         onRow={row=>({onDoubleClick:()=>{void open(row);}})}
         columns={savedLayout.columns}/></ListParametersMenu>
     </Card>
@@ -2953,7 +2935,7 @@ export default function App() {
             <div className={section==="catalogue"||section==="prices"?"catalogue-toolbar":undefined} ref={setSectionToolbar}/>}
         </header>
         {!treatmentWindow&&topTabs&&<div className="top-navigation">{nav}</div>}
-        <main className={"main-content"+(section==="catalogue"?" catalogue-content":section==="documents"?" documents-content":"")}>
+        <main className={"main-content"+(section==="settings"?"":" fill-list-content")+(section==="catalogue"?" catalogue-content":"")}>
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             title="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           {!treatmentWindow&&<div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
