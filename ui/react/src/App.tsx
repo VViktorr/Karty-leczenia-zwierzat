@@ -358,8 +358,6 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
         <Select value={period} size={compact?"middle":"large"} onChange={next=>{setPeriod(next);setSelectedId(null);}}
           options={periods}/>
         {compact&&<Space size={6} className="compact-document-actions">
-          {data?.truncated&&<Tag title="Pokazano 500 dokumentów. Zawęź wyszukiwanie."
-            color="blue">Limit: 500</Tag>}
           <Button onClick={reload} loading={busy} title="Odśwież · F5">Odśwież ↻</Button>
         </Space>}
         {period==="customMonth"&&<Input type="month" aria-label="Wybrany miesiąc"
@@ -373,8 +371,6 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
       {data&&(data.warning||error)&&<Alert className="notice" type="warning" showIcon
         title="Nie udało się odświeżyć dokumentów. Pokazuję ostatnią wczytaną listę."
         description={data.warning||error}/>}
-      {!compact&&data?.truncated&&<Alert className="notice" type="info" showIcon
-        title="Pokazano 500 dokumentów. Zawęź wyszukiwanie."/>}
       <Dropdown trigger={["contextMenu"]} open={contextMenu!==null}
         onOpenChange={visible=>{if(!visible)setContextMenu(null);}}
         menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
@@ -412,8 +408,8 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
       <Typography.Text type="secondary">
         {data?.loadedAt?"Ostatni odczyt "+new Date(data.loadedAt).toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})+
           (data.cached?" · lista z pamięci":" · odświeżono z SQL")+" · ":""}
-        {data?.items.length??0} dokumentów. {pageSize==="all"
-          ? "Pokazano wszystkie pobrane pozycje (limit SQL: 500). "
+        {data?.items.length??0} dokumentów. {data?.truncated
+          ? "Osiągnięto limit odczytu. Zawęź wyszukiwanie. "
           : ""}Kliknij numer dokumentu, kliknij dwukrotnie wiersz lub naciśnij Enter, aby otworzyć kartę.
       </Typography.Text>
     </Card>
