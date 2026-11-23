@@ -5,7 +5,7 @@ import type {ReactNode} from "react";
 import {skinPresets, presetNames, type PresetName} from "./skinPresets";
 import {initializeNavigation, setComponents, useComponents} from "./componentSettings";
 import ComponentsSettings from "./ComponentsSettings";
-import CardPdfPreview from "./CardPdfPreview";
+
 import type {CSSProperties} from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
@@ -37,6 +37,7 @@ import type { BackupProgress } from "./bridge";
 import type { DocumentKind, DocumentRow, DocumentsResult, DatePeriod } from "./bridge";
 
 const ChplPdfViewer = lazy(() => import("./ChplPdfViewer"));
+const CardPdfPreview = lazy(() => import("./CardPdfPreview"));
 const FluentNavigation = lazy(() => import("./FluentNavigation")) as typeof import("./FluentNavigation").default;
 
 type PaletteName = "light" | "dark" | "sea";
@@ -1533,9 +1534,11 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       </Space>}>
       {pdfMessage&&<Alert className="notice" type="info" showIcon title={pdfMessage}/>}
       {preview && (isDesktop() ?
-        <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={preview}
-          request={previewSavedId ? {id:previewSavedId,trash:false}
-            : {draftId:draft.draftId,reported,performed,findings,rows}}/> :
+        <Suspense fallback={<Spin aria-label="Ładowanie podglądu PDF"/>}>
+          <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={preview}
+            request={previewSavedId ? {id:previewSavedId,trash:false}
+              : {draftId:draft.draftId,reported,performed,findings,rows}}/>
+        </Suspense> :
         <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
           style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>)}
     </Modal>
@@ -2144,8 +2147,10 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       <ErrorNotice error={error}/>
       {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
       {printHtml&&(isDesktop()&&printTarget ?
-        <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={printHtml}
-          request={{id:printTarget.id,trash}}/> :
+        <Suspense fallback={<Spin aria-label="Ładowanie podglądu PDF"/>}>
+          <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={printHtml}
+            request={{id:printTarget.id,trash}}/>
+        </Suspense> :
         <iframe ref={printFrame} title="Wydruk zapisanej karty" srcDoc={printHtml}
           style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>)}
     </Modal>
