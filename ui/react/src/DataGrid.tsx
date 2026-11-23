@@ -197,7 +197,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
         getRowId={({data}) => String(typeof rowKey === "function" ? rowKey(data, rows.indexOf(data)) :
           (data as Record<string, unknown>)[String(rowKey ?? "key")])}
         onGridReady={event => setApi(event.api)}
-        getRowClass={typeof rowClassName === "string" ? rowClassName : undefined}
+        rowClass={typeof rowClassName === "string" ? rowClassName : undefined}
         rowClassRules={rowClassRules}
         onRowClicked={event => {
           if (event.event) rowAttributes(event.data, event.rowIndex ?? undefined)?.onClick?.(event.event as never);
