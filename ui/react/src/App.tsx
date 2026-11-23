@@ -368,7 +368,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
       {data&&(data.warning||error)&&<Alert className="notice" type="warning" showIcon
         title="Nie udało się odświeżyć dokumentów. Pokazuję ostatnią wczytaną listę."
         description={data.warning||error}/>}
-      <Dropdown trigger={["contextMenu"]} open={contextMenu!==null}
+      <Dropdown trigger={["contextMenu"]} disabled={!active}
         onOpenChange={visible=>{if(!visible)setContextMenu(null);}}
         menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
         <div ref={tableRef} onContextMenuCapture={event=>{
@@ -377,8 +377,8 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
           const id=event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key") ??
             event.target.closest(".ag-row[row-id]")?.getAttribute("row-id");
           const row=data?.items.find(item=>String(item.id)===id);
-          if(header||row){event.preventDefault();setContextMenu(header?"header":row!);if(row)setSelectedId(row.id);}
-          else {event.preventDefault();setContextMenu("header");}
+          setContextMenu(header?"header":row??"header");
+          if(row)setSelectedId(row.id);
         }}>
       <Table grid={listLayout.grid} {...listLayout.tableProps} rowKey="id" loading={(busy&&!data)||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
