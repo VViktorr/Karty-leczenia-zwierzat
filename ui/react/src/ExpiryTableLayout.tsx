@@ -2,6 +2,7 @@ import Modal from "./AppModal";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
 import {useEffect,useState} from "react";
+import {useComponents} from "./componentSettings";
 import {Button,Checkbox,InputNumber,Tabs,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
 
@@ -44,18 +45,20 @@ function restoreWidths():Record<string,number>{
   return {};
 }
 export function useExpiryTableLayout<T extends object>(columns:ColumnsType<T>){
-  const [visible,setVisible]=useState<string[]>(()=>restoreKeys("visible"));
-  const [order,setOrder]=useState<string[]>(restoreOrder);
-  const [widths,setWidths]=useState<Record<string,number>>(restoreWidths);
+  const rememberColumns=useComponents().table.rememberColumns;
+  const [visible,setVisible]=useState<string[]>(()=>rememberColumns?restoreKeys("visible"):[...keys]);
+  const [order,setOrder]=useState<string[]>(()=>rememberColumns?restoreOrder():[...keys]);
+  const [widths,setWidths]=useState<Record<string,number>>(()=>rememberColumns?restoreWidths():{});
   const [open,setOpen]=useState(false);
 
   useEffect(()=>{
+    if(!rememberColumns)return;
     try{
       localStorage.setItem(prefix+"visible",JSON.stringify(visible));
       localStorage.setItem(prefix+"order",JSON.stringify(order));
       localStorage.setItem(prefix+"widths",JSON.stringify(widths));
     }catch{/* Keep active layout for this session. */}
-  },[visible,order,widths]);
+  },[visible,order,widths,rememberColumns]);
 
   useEffect(()=>{
     const key=(event:KeyboardEvent)=>{
