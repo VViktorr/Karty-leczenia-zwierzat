@@ -994,8 +994,13 @@ internal sealed class ReactWindow : Form
                 throw new ArgumentException("Nieprawidłowe pozycje karty.");
             // Archive access stays available if the separate Subiekt SQL source
             // is temporarily unavailable. Run the small guarded write off UI.
+            string? requestedNumber = root.TryGetProperty("newNumber", out var numberField)
+                ? numberField.ValueKind == JsonValueKind.String
+                    ? ReadTextField(root, "newNumber", 40)
+                    : throw new ArgumentException("Nieprawidłowy numer karty.")
+                : null;
             return await Task.Run(() =>
-                savedCardEditor.Update(id, revision, fields, rows), token);
+                savedCardEditor.Update(id, revision, fields, rows, requestedNumber), token);
         }
         if (action == "trashCard")
             return await TrashCard(token, ReadTextField(root, "id", 40), Flag(root, "trash"));
@@ -1091,6 +1096,7 @@ internal sealed class ReactWindow : Form
             string key = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
             drafts[key] = document;
             return new { draftId = key, document.Number, document.Payer, document.Recipient,
+                documentDate = document.DocumentDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
                 hasPayerId = document.PayerId.HasValue,
                 rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),
                     replacement = r.Get("Zamiennik produktu"),
