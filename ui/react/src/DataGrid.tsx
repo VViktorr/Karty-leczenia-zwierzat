@@ -58,10 +58,11 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
     const id = String(column.key ?? index);
     const sort = "sorter" in column ? column.sorter : undefined;
     const columnSort = typeof sort === "function" ? sort : undefined;
-    const headerStyle = column.onHeaderCell?.(column)?.style;
+    const headerName = typeof column.title === "string" ? column.title : id;
+    const headerStyle = column.onHeaderCell?.({ ...column, title: headerName })?.style;
     return [{
       colId: id,
-      headerName: typeof column.title === "string" ? column.title : id,
+      headerName,
       width: typeof column.width === "number" ? column.width : 160,
       flex: column.width === undefined ? 1 : null,
       sortable:preferences.sortable && typeof index === "string",
