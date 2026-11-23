@@ -496,26 +496,26 @@ return <Space orientation="vertical" style={{width:"100%"}}>
       </Space>;
 }
 
-const treatmentSteps=["Gatunek i leki","Zwierzęta i leczenie","Daty","Podsumowanie"];
+const treatmentSteps=["Gatunek","Warianty leków","Zwierzęta","Rozpoznanie","Podsumowanie"];
 const validAnimalCount=(value:string)=>/^\d+$/.test(value.trim()) &&
   Number(value)>0 && Number(value)<=2147483647;
 
-function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, onDocuments, onOpenSaved,onSavedChange}: {
+function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, virtualWarnings, onDocuments, onOpenSaved,onSavedChange}: {
   draft: Draft | null; compact: boolean; active:boolean; wizard:boolean;shortcuts:boolean;virtualWarnings:boolean; onDocuments: () => void; onOpenSaved: (id:string)=>void;
   onSavedChange:(saved:boolean)=>void;
 }) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
   const [step,setStep]=useState(0);
   const [summaryHtml,setSummaryHtml]=useState("");
-  const drugStep=!wizard||step===0;
-  const animalStep=!wizard||step===1;
-  const editingRows=drugStep||animalStep;
+  const wizard=treatmentWindow||wizardEnabled;
+  const drugStep=!wizard||step===1;
+  const editingRows=drugStep;
   const treatmentControls = useRef<HTMLDivElement>(null);
   const [tableHeight, setTableHeight] = useState(180);
   useEffect(()=>{
     const controls=treatmentControls.current;
     const main=controls?.closest<HTMLElement>("main");
-    if(!active||!compact||!controls||!main)return;
+    if(!active||(!compact&&!treatmentWindow)||!controls||!main)return;
     const measure=()=>{
       const padding=getComputedStyle(main);
       const available=main.clientHeight-controls.offsetHeight
@@ -632,6 +632,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
   const [animalBusy,setAnimalBusy]=useState(false);
   const [groupDescription,setGroupDescription]=useState("");
   const [groupCount,setGroupCount]=useState("");
+  const [diagnosis,setDiagnosis]=useState("");
   const [groupSpecies,setGroupSpecies]=useState("");
   const [groupSection,setGroupSection]=useState("II");
   const autoApplied=useRef(new Set<string>());
@@ -650,7 +651,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
     setPerformed(initial);
     setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});setRowSpeciesGroups({});setRestoredVariants({});
     setSavedChoices({});setAnimalDescriptions([]);setAnimalError("");
-    setGroupDescription("");setGroupCount("");setGroupSpecies("");setGroupSection("II");
+    setGroupDescription("");setGroupCount("");setDiagnosis("");setGroupSpecies("");setGroupSection("II");
   }, [draft]);
   useEffect(()=>{
     if(!draft){setSuggestions([]);return;}
@@ -678,7 +679,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       .finally(()=>{if(!cancelled)setSuggestBusy(false);});
     return()=>{cancelled=true;};
   },[draft,suggestTick,speciesGroup,wizard,remember]);
-  const loadChoices=active&&(remember||variantModal!==null);
+  const loadChoices=active&&(drugStep&&remember||variantModal!==null);
   useEffect(()=>{
     if(!draft||!loadChoices)return;
     let active=true;
@@ -733,7 +734,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       description:row.description,count:row.animals});
   }
   function startSave(currentRows=rows){
-    if(pendingSaveDates.current)return;
+    if(pendingSaveDates.current||!performed)return;
     const selected=currentRows.filter(row=>row.selected);
     if(!selected.length){
       setError("Zaznacz przynajmniej jedną pozycję w kolumnie Druk.");
@@ -751,7 +752,11 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
     const candidates=selected.filter(row=>row.species===missing.species && row.section===missing.section &&
       description(row)===description(missing) && row.animals.trim()===missing.animals.trim() &&
       row.descriptionGroup===missing.descriptionGroup && row.countGroup===missing.countGroup);
-    if(wizard)setStep(1);
+    if(wizard){
+      setStep(2);
+      setError("Uzupełnij numery i liczbę leczonych zwierząt.");
+      return;
+    }
     setAnimalEdit({candidates,checked:candidates.map(row=>row.index),
       description:description(missing),count:missing.animals,beforeSave:true});
   }
@@ -1061,6 +1066,12 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
         ];
   const variantLayout=useListColumnLayout("treatment-variant",variantColumns,false,"species");
   const variantsPagination=useListPagination("treatment-variants",variantModal?.variants.length??0,12);
+  useEffect(()=>{
+    if(active&&wizard&&step===4&&performed)void printPreview(true);
+    // Refresh the preview after the wizard applies the animal details and diagnosis.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[active,wizard,step]);
+
   if (!draft) return <Card>
     <Empty description="Wybierz dokument w zakładce Dokumenty">
       <Button type="primary" onClick={onDocuments}>Przejdź do dokumentów</Button>
@@ -1090,18 +1101,33 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       return applied.groups.includes(speciesGroup);
     return (compatibility[row.index]??[]).includes(speciesGroup);
   };
-  const changingStepBlocked=busy||applyBusy||referenceBusy||variantBusy||(wizard&&step===0&&suggestBusy);
+  const changingStepBlocked=busy||applyBusy||referenceBusy||variantBusy||!!variantModal;
   function goToStep(next:number){
     if(changingStepBlocked)return;
+    if(next>step&&step===1&&!rows.some(row=>row.selected)){
+      setError("Zaznacz przynajmniej jeden lek do wydruku.");
+      return;
+    }
+    if(next>step&&step===2){
+      const description=groupDescription.trim();
+      const animals=groupCount.trim();
+      if(!description||!validAnimalCount(animals)){
+        setError("Wpisz numery zwierząt i podaj dodatnią liczbę leczonych zwierząt.");
+        return;
+      }
+      const group=crypto.randomUUID();
+      setRows(current=>current.map(row=>row.selected
+        ? {...row,description,animals,descriptionGroup:group,countGroup:group}:row));
+    }
+    if(next>step&&step===3){
+      setRows(current=>current.map(row=>row.selected?{...row,diagnosis:diagnosis.trim()}:row));
+      setSummaryHtml("");
+    }
     setError("");
     setStep(next);
-    if(next===3&&!savedNumber){
-      setSummaryHtml("");
-      if(rows.some(row=>row.selected)&&performed)void printPreview(true);
-    }
   }
   function goToIssue(index:number,field?:keyof DraftRow){
-    if(wizard)setStep(field==="species"?0:1);
+    if(wizard)setStep(field==="description"||field==="animals"?2:field==="diagnosis"?3:1);
     if(field)setVisibleColumns(current=>current.includes(field)?current:[...current,field]);
     window.setTimeout(()=>{
       const row=document.querySelector('.treatment-rows tr[data-row-key="'+index+'"]');
@@ -1117,8 +1143,8 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       (item.status==="ready"||item.variantCount===1);
   };
   const sortedRows=rows.slice().sort((a,b)=>
-    Number(isUnambiguous(a))-Number(isUnambiguous(b))||
-    Number(isCompatible(b))-Number(isCompatible(a))||a.index-b.index);
+    Number(isCompatible(b))-Number(isCompatible(a))||
+    Number(isUnambiguous(a))-Number(isUnambiguous(b))||a.index-b.index);
   const columns: ColumnsType<DraftRow> = [
     {title:"Druk",dataIndex:"selected",width:63,render:(value:boolean,row) =>
       <Checkbox checked={value}
@@ -1178,9 +1204,8 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       !animalEdit&&!dateStep&&!saveReview&&!duplicateId&&!suggestReviewOpen&&!showColumns&&!variantPdfUrl&&
       <TreatmentShortcuts
         back={wizard&&step>0?()=>goToStep(step-1):undefined}
-        next={wizard&&step<3&&(step!==2||!!performed)?()=>goToStep(step+1):undefined}
-        summary={wizard&&step<3?()=>goToStep(3):undefined}
-        save={!savedNumber&&(!wizard||step===3)?()=>startSave():undefined}/>}
+        next={wizard&&step<4?()=>goToStep(step+1):undefined}
+        save={!savedNumber&&(!wizard||step===4)?()=>startSave():undefined}/>}
     <div ref={treatmentControls} className="treatment-controls">
     <div className="page-heading"><div>
       <Typography.Title level={3}>Karta leczenia — {draft.number}</Typography.Title>
@@ -1188,18 +1213,21 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
     </div><Space>
       <Button onClick={onDocuments}>{treatmentWindow?"Zamknij kartę":"Dokumenty"}</Button>
       {editingRows&&<Button onClick={()=>setShowColumns(true)}>Kolumny · Ctrl+Shift+L</Button>}
-      {(!wizard||step===3)&&<><Button onClick={()=>{void printPreview();}} loading={busy&&!savingSql} disabled={busy||applyBusy}>Podgląd wydruku</Button>
-      <Button type="primary" onClick={()=>startSave()} loading={savingSql} disabled={!!savedNumber||busy||applyBusy||referenceBusy}>Zapisz kartę do SQL</Button></>}
+      {(!wizard||step===4)&&<><Button onClick={()=>{void printPreview();}} loading={busy&&!savingSql} disabled={busy||applyBusy}>Podgląd wydruku</Button>
+      <Button type="primary" onClick={()=>startSave()} loading={savingSql} disabled={!!savedNumber||busy||applyBusy||referenceBusy||!performed}>Zapisz kartę do SQL</Button></>}
     </Space></div>
     {wizard&&<div className="treatment-stepper">
       <Steps size="small" current={step} items={treatmentSteps.map(title=>({title}))}/>
       <Space wrap>
         <Button disabled={step===0||changingStepBlocked} onClick={()=>goToStep(step-1)}>Wstecz</Button>
-        {step<3&&<Button type="primary" disabled={changingStepBlocked||(step===2&&!performed)}
+        {step<4&&<Button type="primary" disabled={changingStepBlocked}
           onClick={()=>goToStep(step+1)}>Dalej</Button>}
-        {step<2&&<Button disabled={changingStepBlocked} onClick={()=>goToStep(3)}>Przejdź do podsumowania</Button>}
       </Space>
     </div>}
+    {wizard&&step===0&&<Card title="Wybierz gatunek">
+      <Select aria-label="Gatunek" value={speciesGroup} style={{minWidth:240}}
+        options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/>
+    </Card>}
     <div className="treatment-tools">
     {drugStep&&<>
     <TreatmentOptions compact={compact} label={"Podpowiedzi ChPL ("+readySuggestions.length+")"}>
@@ -1229,10 +1257,11 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
     </TreatmentOptions>
     <Card className="treatment-species">
       <Space wrap>
+        {wizard?<Typography.Text strong>{speciesGroups.find(item=>item.value===speciesGroup)?.label}</Typography.Text>:<>
         <Typography.Text strong>Filtr gatunku</Typography.Text>
         <Select value={speciesGroup} style={{minWidth:210}}
           disabled={suggestBusy||applyBusy}
-          options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/>
+          options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/></>}
         <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
           Domyślnie zapamiętuj wybór dla leku w SQL
         </Checkbox>
@@ -1242,7 +1271,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       </Space>
       {choiceError&&<Alert type="warning" className="notice" showIcon title={choiceError}/>}
     </Card></>}
-    {animalStep&&<TreatmentOptions compact={compact} label="Wspólny opis i liczba zwierząt">
+    {!wizard&&<TreatmentOptions compact={compact} label="Wspólny opis i liczba zwierząt">
     <Card className="treatment-animals">
       <Typography.Text strong>Wspólny opis i liczba zwierząt</Typography.Text>
       <Typography.Paragraph type="secondary">
@@ -1276,7 +1305,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
     </Card>
     </TreatmentOptions>}
     </div>
-    {animalStep&&<Card className="treatment-meta">
+    {!wizard&&<Card className="treatment-meta">
       <Space wrap>
         <label>Wyniki badań <Input value={findings} onChange={e=>{setFindings(e.target.value);setSavedNumber("");}} style={{width:340}}/></label>
       </Space>
@@ -1284,7 +1313,7 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
     {savedNumber && <Alert className="notice" type="success" showIcon title={"Zapisano kartę "+savedNumber}/>}
     <ErrorNotice error={error}/>
     </div>
-    {editingRows&&<Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
+    {editingRows&&!variantModal&&<Card className="treatment-rows"><Table<DraftRow> {...treatmentMouse.tableProps} rowKey="index" dataSource={sortedRows}
       columns={treatmentFormatting.apply(treatmentMouse.decorate(
         columns.filter(column=>{
           const key=treatmentColumnKey(column);
@@ -1299,16 +1328,40 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
         (source,target)=>setColumnOrder(previous=>reorderColumn(previous,source,target)),
         60, 800, ["selected","product"]), treatmentColumnKey)} size="small"
       rowClassName={row=>isCompatible(row)?"":"ant-table-row-disabled"}
-      scroll={{x:1900,y:compact?tableHeight:"calc(100vh - 415px)"}} pagination={false}/>
+      scroll={{x:1900,y:(compact||treatmentWindow)?tableHeight:"calc(100vh - 415px)"}} pagination={false}/>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
     </Card>}
-    {wizard&&step===2&&<Card title="Daty i godziny karty leczenia">
-      <TreatmentDateFields reported={reported} performed={performed}
-        onChange={dates=>{setReported(dates.reported);setPerformed(dates.performed);setSavedNumber("");}}/>
+    {wizard&&step===2&&<Card title="Numery i liczba leczonych zwierząt">
+      <Space orientation="vertical" style={{width:"100%",maxWidth:700}}>
+        {animalDescriptions.length>0&&<Select aria-label="Zapamiętane numery zwierząt"
+          style={{width:"100%"}} placeholder="Wstaw zapamiętane numery" showSearch
+          onChange={value=>setGroupDescription(value)}
+          options={animalDescriptions.map(value=>({value,label:value}))}/>}
+        <label>Numery zwierząt
+          <Input.TextArea value={groupDescription} autoSize={{minRows:4,maxRows:12}}
+            onChange={event=>{setGroupDescription(event.target.value);setError("");}}/>
+        </label>
+        <label>Liczba leczonych zwierząt
+          <Input value={groupCount} inputMode="numeric"
+            onChange={event=>{setGroupCount(event.target.value);setError("");}}/>
+        </label>
+        {draft.hasPayerId&&<Button loading={animalBusy} disabled={!groupDescription.trim()}
+          onClick={()=>{void rememberAnimalDescription();}}>Zapamiętaj numery w SQL</Button>}
+        <ErrorNotice error={animalError}/>
+      </Space>
     </Card>}
-    {wizard&&step===3&&<Card title="Podsumowanie karty">
-      {!rows.some(row=>row.selected)&&<Alert type="warning" showIcon title="Zaznacz pozycje do druku na etapie Gatunek i leki."/>}
+    {wizard&&step===3&&<Card title="Rozpoznanie (opcjonalne)">
+      <Input.TextArea aria-label="Rozpoznanie" value={diagnosis} autoSize={{minRows:3,maxRows:8}}
+        onChange={event=>setDiagnosis(event.target.value)}/>
+      <label>Wyniki badań
+        <Input value={findings} onChange={event=>setFindings(event.target.value)}/>
+      </label>
+    </Card>}
+    {wizard&&step===4&&<Card title="Podsumowanie karty">
+      <TreatmentDateFields reported={reported} performed={performed}
+        onChange={dates=>{setReported(dates.reported);setPerformed(dates.performed);setSummaryHtml("");setSavedNumber("");}}/>
+      {!rows.some(row=>row.selected)&&<Alert type="warning" showIcon title="Zaznacz pozycje do druku na etapie Warianty leków."/>}
       {rows.some(row=>row.selected&&Object.hasOwn(restoredVariants,row.index))&&
         <Space wrap>{rows.filter(row=>row.selected&&Object.hasOwn(restoredVariants,row.index)).map(row=>
           <Tag color="blue" key={row.index}>{row.product} · zapamiętany wariant</Tag>)}</Space>}
@@ -1499,12 +1552,9 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
               : "Brak"}
         ]}/>
     </Modal>
-    <Modal className="kl-dialog-treatment-variant" width="90vw" open={variantModal!==null}
-      title={"Dobór wariantu leku — "+(variantModal?.product||"")}
-      onCancel={()=>{if(!variantBusy)setVariantModal(null);}}
-      footer={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>
-        Anuluj
-      </Button>}>
+    {variantModal&&<Card className="treatment-variant-table"
+      title={"Dobór wariantu — "+variantModal.product}
+      extra={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>Wróć do leków</Button>}>
       <Alert className="notice" type="warning" showIcon
         title="Zweryfikuj gatunek, dawkowanie i karencję z aktualną urzędową ChPL."
         description="Wybór zastąpi dotychczasowy gatunek, drogę podania i dawkowanie; pełną karencję zmieni tylko, gdy katalog zawiera jej dane. Nic nie jest automatycznie zapisywane do archiwum kart."/>
@@ -1523,9 +1573,9 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
       <Button size="small" onClick={variantLayout.openColumns}>Kolumny wariantów</Button>
       <Table<TreatmentVariantChoice> {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantRows} size="small"
-        pagination={variantsPagination} scroll={{x:"max-content",y:340}}
+        pagination={variantsPagination} scroll={{x:"max-content",y:"calc(100vh - 340px)"}}
         columns={variantLayout.columns}/>
-    </Modal>
+    </Card>}
     {variantLayout.dialog}
     <Modal className="kl-dialog-treatment-pdf" width="94vw" open={variantPdfUrl!==null}
       title={"Dokument ChPL — "+variantPdfName}

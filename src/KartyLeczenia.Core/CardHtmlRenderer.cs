@@ -66,11 +66,10 @@ public static class CardHtmlRenderer
             """);
         static string AnimalDescription(Dictionary<string, string> row)
         {
-            string description = row.GetValueOrDefault("Opis zwierząt / numer siedziby stada") ?? "";
-            string species = row.GetValueOrDefault("Gatunek") ?? "";
-            if (species.Length > 0 && !description.Contains(species, StringComparison.OrdinalIgnoreCase)) description += "\n" + species;
+            string description = (row.GetValueOrDefault("Opis zwierząt / numer siedziby stada") ?? "").Trim();
             string numbers = (row.GetValueOrDefault("Numery zwierząt") ?? "").Trim();
-            return numbers.Length > 0 ? (description.Trim() + "\n" + numbers).Trim() : description;
+            return string.Join("\n", new[] { description, numbers }
+                .Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase));
         }
 
         void Rows(string section, int minimum)
@@ -82,15 +81,37 @@ public static class CardHtmlRenderer
             string AnimalCell(int index, string[] values, string groupField, ref int nextCell)
             {
                 if (index < nextCell) return "";
+                bool isDescription = groupField == CardSchema.AnimalDescriptionGroup;
                 string? group = rows[index].GetValueOrDefault(groupField);
-                string? species = rows[index].GetValueOrDefault("Gatunek");
+                string value = values[index];
                 nextCell = index + 1;
                 while (!string.IsNullOrEmpty(group) && nextCell < rows.Length &&
-                    rows[nextCell].GetValueOrDefault(groupField) == group && values[nextCell] == values[index] &&
-                    string.Equals(rows[nextCell].GetValueOrDefault("Gatunek"), species, StringComparison.OrdinalIgnoreCase))
+                    rows[nextCell].GetValueOrDefault(groupField) == group && values[nextCell] == value)
                     nextCell++;
+
+                if (isDescription)
+                {
+                    // Older cards may have the default species in every animal-description cell.
+                    string speciesName = (rows[index].GetValueOrDefault("Gatunek") ?? "").Trim();
+                    if (string.IsNullOrEmpty(group) && speciesName.Length > 0 &&
+                        (value.Length == 0 || string.Equals(value, speciesName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        while (nextCell < rows.Length &&
+                            string.IsNullOrEmpty(rows[nextCell].GetValueOrDefault(groupField)) &&
+                            string.Equals(rows[nextCell].GetValueOrDefault("Gatunek")?.Trim(), speciesName,
+                                StringComparison.OrdinalIgnoreCase) &&
+                            (descriptions[nextCell].Length == 0 ||
+                                string.Equals(descriptions[nextCell], speciesName, StringComparison.OrdinalIgnoreCase)))
+                            nextCell++;
+                    }
+                    var species = rows.Skip(index).Take(nextCell - index)
+                        .Select(row => (row.GetValueOrDefault("Gatunek") ?? "").Trim())
+                        .Where(name => name.Length > 0 && !value.Contains(name, StringComparison.OrdinalIgnoreCase))
+                        .Distinct(StringComparer.OrdinalIgnoreCase);
+                    value = string.Join("\n", new[] { value }.Concat(species).Where(line => line.Length > 0));
+                }
                 int span = nextCell - index;
-                return span > 1 ? $"<td rowspan='{span}'>{E(values[index])}</td>" : $"<td>{E(values[index])}</td>";
+                return span > 1 ? $"<td rowspan='{span}'>{E(value)}</td>" : $"<td>{E(value)}</td>";
             }
 
             int nextDescription = 0, nextCount = 0;
