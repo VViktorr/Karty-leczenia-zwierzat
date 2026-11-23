@@ -414,3 +414,5 @@ html[data-kl-skin="orchard"] .ant-modal .ant-modal-content { border-radius: 12px
 .treatment-heading { justify-content: flex-end; }
 
 .list-heading-actions { justify-content: flex-end; }
+
+.kl-ag-grid .ag-cell-value { width: 100%; min-width: 0; }

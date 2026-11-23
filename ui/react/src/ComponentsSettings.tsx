@@ -31,19 +31,19 @@ export default function ComponentsSettings() {
     <Card size="small" title="PDF — karty leczenia i dokumenty ChPL">
       <Space direction="vertical" size={12} style={{width:"100%"}}>
         <label>Tryb przeglądania PDF
-          <Select style={{display:"block",maxWidth:420}} aria-label="Tryb przeglądania PDF"
+          <Select style={{display:"flex",maxWidth:420}} aria-label="Tryb przeglądania PDF"
             value={settings.pdf.mode} onChange={mode=>updateComponents("pdf",{mode})}
             options={[{value:"scroll",label:"Przewijanie ciągłe wszystkich stron"},
               {value:"pages",label:"Jedna strona — poprzednia / następna"}]}/>
         </label>
         <label>Silnik podglądu
-          <Select style={{display:"block",maxWidth:420}} aria-label="Silnik podglądu PDF"
+          <Select style={{display:"flex",maxWidth:420}} aria-label="Silnik podglądu PDF"
             value={settings.pdf.viewer} onChange={viewer=>updateComponents("pdf",{viewer})}
             options={[{value:"react",label:"React-PDF / PDF.js"},
               {value:"native",label:"Natywny podgląd WebView2"}]}/>
         </label>
         <label>Domyślne powiększenie
-          <Select aria-label="Domyślne powiększenie PDF" style={{display:"block",width:180}}
+          <Select aria-label="Domyślne powiększenie PDF" style={{display:"flex",width:180}}
             value={settings.pdf.zoom} options={zoomOptions}
             onChange={zoom=>updateComponents("pdf",{zoom})}/>
         </label>
@@ -60,7 +60,7 @@ export default function ComponentsSettings() {
           Aktywne odnośniki i adnotacje PDF
         </Checkbox>
         <label>Liczba stron PDF ładowanych poza widocznym obszarem
-          <Select aria-label="Bufor stron PDF" style={{display:"block",width:200}}
+          <Select aria-label="Bufor stron PDF" style={{display:"flex",width:200}}
             value={settings.pdf.preloadPages}
             options={[1,2,3,5].map(value=>({value,label:String(value)}))}
             onChange={preloadPages=>updateComponents("pdf",{preloadPages})}/>
@@ -72,7 +72,7 @@ export default function ComponentsSettings() {
     <Card size="small" title="Tabele i układ kolumn">
       <Space direction="vertical" size={12}>
         <label>Domyślny widok tabel
-          <Select aria-label="Domyślny silnik tabel" style={{display:"block",width:280}}
+          <Select aria-label="Domyślny silnik tabel" style={{display:"flex",width:280}}
             value={settings.table.mode} onChange={mode=>updateComponents("table",{mode})}
             options={[{value:"antd",label:"Ant Design — standardowy"},
               {value:"ag",label:"AG Grid — zaawansowany"}]}/>
@@ -90,13 +90,13 @@ export default function ComponentsSettings() {
           Wyboru dokonujesz tutaj, bez osobnych przełączników nad listami.
         </Typography.Text>
         <label>Wysokość wiersza
-          <Select aria-label="AG Grid — wysokość wiersza" style={{display:"block",width:220}}
+          <Select aria-label="AG Grid — wysokość wiersza" style={{display:"flex",width:220}}
             value={settings.agGrid.rowHeight}
             options={[28,32,36,40,44,48,52].map(value=>({value,label:value+" px"}))}
             onChange={rowHeight=>updateComponents("agGrid",{rowHeight})}/>
         </label>
         <label>Wysokość nagłówka
-          <Select aria-label="AG Grid — wysokość nagłówka" style={{display:"block",width:220}}
+          <Select aria-label="AG Grid — wysokość nagłówka" style={{display:"flex",width:220}}
             value={settings.agGrid.headerHeight}
             options={[32,36,40,44,48,52].map(value=>({value,label:value+" px"}))}
             onChange={headerHeight=>updateComponents("agGrid",{headerHeight})}/>
@@ -118,7 +118,7 @@ export default function ComponentsSettings() {
           Zmienianie szerokości kolumn myszą
         </Checkbox>
         <label>Bufor wierszy AG Grid
-          <Select aria-label="AG Grid — bufor wierszy" style={{display:"block",width:220}}
+          <Select aria-label="AG Grid — bufor wierszy" style={{display:"flex",width:220}}
             value={settings.agGrid.rowBuffer}
             options={[5,10,20,30].map(value=>({value,label:value+" wierszy"}))}
             onChange={rowBuffer=>updateComponents("agGrid",{rowBuffer})}/>
@@ -135,7 +135,7 @@ export default function ComponentsSettings() {
           onChange={enabled=>updateComponents("shortcuts",{enabled})}/>
         {shortcutActions.map(action=><label key={action} style={{display:"block"}}>
           {shortcutLabels[action]}
-          <Select aria-label={shortcutLabels[action]} style={{display:"block",width:260}}
+          <Select aria-label={shortcutLabels[action]} style={{display:"flex",width:260}}
             disabled={!settings.shortcuts.enabled}
             value={settings.shortcuts[action]} options={shortcutOptions}
             onChange={value=>changeShortcut(action,value)}/>
@@ -151,7 +151,7 @@ export default function ComponentsSettings() {
     <Card size="small" title="Buforowanie danych React (TanStack Query)">
       <Space direction="vertical" size={12}>
         <label>Czas świeżości danych klienta
-          <Select aria-label="Czas świeżości danych" style={{display:"block",width:200}}
+          <Select aria-label="Czas świeżości danych" style={{display:"flex",width:200}}
             value={settings.cache.staleSeconds}
             options={[5,15,30,60].map(value=>({value,label:value+" sekund"}))}
             onChange={staleSeconds=>updateComponents("cache",{staleSeconds})}/>

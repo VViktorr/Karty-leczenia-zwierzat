@@ -13,7 +13,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 type Column<T extends object> = NonNullable<TableProps<T>["columns"]>[number];
 
 function Header({displayName, style}: CustomInnerHeaderProps & {style?: CSSProperties}) {
-  return <span style={style}>{displayName}</span>;
+  return <span style={{flex:"1 1 auto",minWidth:0,...style}}>{displayName}</span>;
 }
 
 function Cell<T extends object>({data, value, node, columnDefinition}: CustomCellRendererProps<T> &
@@ -58,6 +58,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
     const id = String(column.key ?? index);
     const sort = "sorter" in column ? column.sorter : undefined;
     const columnSort = typeof sort === "function" ? sort : undefined;
+    const headerStyle = column.onHeaderCell?.(column)?.style;
     return [{
       colId: id,
       headerName: typeof column.title === "string" ? column.title : id,
@@ -71,12 +72,22 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
         ? (params.data as Record<string, unknown>)[index] : undefined,
       cellRenderer: Cell,
       cellRendererParams: {columnDefinition: column},
-      cellStyle: params => ({
-        textAlign: column.align ?? "left",
-        ...(params.data ? column.onCell?.(params.data, params.node.rowIndex ?? 0)?.style : undefined)
-      }) as import("ag-grid-community").CellStyle,
+      cellClass: params => params.data
+        ? column.onCell?.(params.data, params.node.rowIndex ?? 0)?.className ?? "" : "",
+      cellStyle: params => {
+        const style = params.data ? column.onCell?.(params.data, params.node.rowIndex ?? 0)?.style : undefined;
+        return {
+          fontFamily: style?.fontFamily ?? "",
+          fontSize: typeof style?.fontSize === "number" ? style.fontSize + "px" : style?.fontSize ?? "",
+          fontWeight: style?.fontWeight ?? "",
+          color: style?.color ?? "",
+          backgroundColor: style?.backgroundColor ?? "",
+          textAlign: style?.textAlign ?? column.align ?? "left",
+        };
+      },
+      headerStyle: {backgroundColor: headerStyle?.backgroundColor ?? ""},
       headerComponentParams: {innerHeaderComponent: Header, innerHeaderComponentParams: {
-        style: column.onHeaderCell?.({ ...column, title: id })?.style
+        style: headerStyle
       }}
     }];
   }), [columns,preferences.sortable,preferences.filters]);
