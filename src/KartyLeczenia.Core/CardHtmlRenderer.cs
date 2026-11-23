@@ -120,7 +120,7 @@ public static class CardHtmlRenderer
         // that the absolutely positioned PNG stays inside this print fragment.
         decimal stampHeight = doctorStampHeightMm is >= 1 and <= 150
             ? doctorStampHeightMm.Value : 30m;
-        if (showStamp && doctorStampHeightMm is not >= 1 and <= 150 && stamp!.Length >= 24)
+        if (showStamp && !(doctorStampHeightMm is >= 1 and <= 150) && stamp!.Length >= 24)
         {
             int pixels = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(
                 stamp.AsSpan(20, 4));
