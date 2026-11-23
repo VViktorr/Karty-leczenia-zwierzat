@@ -114,13 +114,26 @@ public static class CardHtmlRenderer
                 return span > 1 ? $"<td rowspan='{span}'>{E(value)}</td>" : $"<td>{E(value)}</td>";
             }
 
-            int nextDescription = 0, nextCount = 0;
+            int nextDescription = 0, nextCount = 0, nextDiagnosis = 0;
             int index = 0;
             foreach (var row in rows)
             {
                 string V(string key) => E(row.GetValueOrDefault(key));
                 string description = AnimalCell(index, descriptions, CardSchema.AnimalDescriptionGroup, ref nextDescription);
                 string count = AnimalCell(index, counts, CardSchema.AnimalCountGroup, ref nextCount);
+                string diagnosisCell = "";
+                if (index >= nextDiagnosis)
+                {
+                    string diagnosis = (row.GetValueOrDefault("Rozpoznanie") ?? "").Trim();
+                    int groupEnd = Math.Min(nextDescription, nextCount);
+                    nextDiagnosis = index + 1;
+                    while (nextDiagnosis < groupEnd && string.Equals(
+                        rows[nextDiagnosis].GetValueOrDefault("Rozpoznanie")?.Trim() ?? "",
+                        diagnosis, StringComparison.Ordinal))
+                        nextDiagnosis++;
+                    int span = nextDiagnosis - index;
+                    diagnosisCell = span > 1 ? $"<td rowspan='{span}'>{E(diagnosis)}</td>" : $"<td>{E(diagnosis)}</td>";
+                }
                 string notes = string.Join("\n", (row.GetValueOrDefault("Zalecenia / uwagi") ?? "").Split('\n')
                     .Where(line => !System.Text.RegularExpressions.Regex.IsMatch(line,
                         @"^\s*WZ\s+.+?, poz\. ID \d+, ruch ID \d*: .*; seria: .*; ważność: .+",
@@ -129,7 +142,7 @@ public static class CardHtmlRenderer
                 string route = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Droga podania")) ? "" : "<br>" + V("Droga podania");
                 string replacement = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Zamiennik produktu"))
                     ? "" : "<br><small>Zamiennik produktu: " + V("Zamiennik produktu") + "</small>";
-                html.Append($"<tr><td class='lp'>{++index}</td>{description}{count}<td>{V("Rozpoznanie")}</td><td>{V("Produkt")}{replacement}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
+                html.Append($"<tr><td class='lp'>{++index}</td>{description}{count}{diagnosisCell}<td>{V("Produkt")}{replacement}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
             }
             for (; index < minimum; index++) html.Append("<tr class='empty'>" + string.Concat(Enumerable.Repeat("<td>&nbsp;</td>", 9)) + "</tr>");
         }
