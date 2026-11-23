@@ -1334,7 +1334,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       <Space orientation="vertical" style={{width:"100%",maxWidth:700}}>
         {animalDescriptions.length>0&&<Select aria-label="Zapamiętane numery zwierząt"
           style={{width:"100%"}} placeholder="Wstaw zapamiętane numery" showSearch
-          onChange={value=>setGroupDescription(value)}
+          onChange={value=>setGroupDescription(value.toUpperCase())}
           optionRender={option=><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
             <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{option.data.label}</span>
             <Button type="text" size="small" danger disabled={animalBusy}
@@ -1342,10 +1342,10 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
               onMouseDown={event=>{event.preventDefault();event.stopPropagation();}}
               onClick={event=>{event.stopPropagation();void deleteAnimalDescription(option.data.value);}}>×</Button>
           </div>}
-          options={animalDescriptions.map(value=>({value,label:value}))}/>}
+          options={animalDescriptions.map(value=>({value,label:value.toUpperCase()}))}/>}
         <label>Numery zwierząt
           <Input.TextArea value={groupDescription} autoSize={{minRows:4,maxRows:12}}
-            onChange={event=>{setGroupDescription(event.target.value);setError("");}}/>
+            onChange={event=>{setGroupDescription(event.target.value.toUpperCase());setError("");}}/>
         </label>
         <label>Liczba leczonych zwierząt
           <Input value={groupCount} inputMode="numeric"
