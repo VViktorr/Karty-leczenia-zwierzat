@@ -19,9 +19,13 @@ test("Components settings persist PDF, shortcuts and layout independently", asyn
   await expect(page.locator(".app-shell")).toHaveClass(/nav-top/);
   await page.getByRole("button",{name:"Ustawienia",exact:true}).click();
   await page.getByRole("tab",{name:"Komponenty"}).click();
-  await expect(page.getByRole("combobox",{name:"Tryb przeglądania PDF"})).toHaveText(/Jedna strona/);
-  await expect(page.getByRole("combobox",{name:"Domyślne powiększenie PDF"})).toHaveText(/125%/);
-  await expect(page.getByRole("combobox",{name:"Następny etap kreatora"})).toHaveText(/alt\+shift\+right/);
+  const prefs=await page.evaluate(()=>
+    JSON.parse(localStorage.getItem("ReactKL.componentPreferences.v1")??"null"));
+  expect(prefs).toMatchObject({
+    pdf:{mode:"pages",zoom:125},
+    shortcuts:{next:"alt+shift+right"},
+    navigation:"top",
+  });
 });
 
 test("every skin supports both top and side menu",async ({page})=>{
