@@ -87,7 +87,8 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
   return <>
     <div ref={viewport} className="kl-ag-grid" style={{height: scroll?.y ?? 360}}>
       <AgGridReact<T> theme={gridTheme} columnDefs={columnDefs} rowData={rows}
-        defaultColDef={{minWidth:60, maxWidth:1000}}
+        defaultColDef={{minWidth:60, maxWidth:1000,resizable:preferences.resizableColumns}}
+        rowBuffer={preferences.rowBuffer}
         headerHeight={preferences.headerHeight}
         animateRows={preferences.animateRows}
         rowHeight={rowHeight || preferences.rowHeight}
