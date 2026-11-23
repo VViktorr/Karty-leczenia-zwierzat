@@ -112,7 +112,7 @@ internal sealed class SavedCardRevisionService(ConnectionSettingsStore settings)
             if (newValues.GetValueOrDefault("Drukuj") == "True")
             {
                 foreach (var key in new[] { "Produkt", "Gatunek", "Droga podania",
-                                             "Dawkowanie i okres stosowania", "Rozpoznanie" })
+                                             "Dawkowanie i okres stosowania" })
                     if (string.IsNullOrWhiteSpace(newValues.GetValueOrDefault(key)))
                         throw new ArgumentException($"Pozycja {i + 1}: uzupełnij {key}.");
             }
