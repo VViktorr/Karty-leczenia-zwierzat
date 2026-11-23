@@ -728,6 +728,27 @@ static class Program
                 "saved-card revision must change after edits");
             Check(CardHtmlRenderer.Render(editedSaved).Contains("Zamiennik A"),
                 "revised card print must include explicitly entered replacement");
+            // Stamp belongs to the signature section, never to the sheet's
+            // absolute-positioned bottom edge (which can cross PDF pages).
+            string stampedHtml = CardHtmlRenderer.Render(editedSaved, 38m);
+            int signaturesStart = stampedHtml.IndexOf("<div class='signatures'>", StringComparison.Ordinal);
+            int stampStart = stampedHtml.IndexOf("<img class='doctor-stamp'", StringComparison.Ordinal);
+            int signaturesEnd = stampedHtml.IndexOf("<div class='results'>", StringComparison.Ordinal);
+            Check(signaturesStart >= 0 && stampStart > signaturesStart && stampStart < signaturesEnd,
+                "doctor stamp must stay inside the printable signature block");
+            Check(stampedHtml.Contains("class='doctor-stamp' style='height:38mm'"),
+                "configured doctor stamp size must be retained");
+            Check(stampedHtml.Contains("page-break-inside:avoid") &&
+                  stampedHtml.Contains(".signatures {display:table") &&
+                  !stampedHtml.Contains(".doctor-stamp {position:absolute") &&
+                  !stampedHtml.Contains(".sheet.has-doctor-stamp"),
+                "doctor stamp and signatures must not be cut between printed pages");
+            string unstampedHtml = CardHtmlRenderer.Render(
+                editedSaved with { DoctorStampPng = null });
+            Check(!unstampedHtml.Contains("<img class='doctor-stamp'") &&
+                  unstampedHtml.Contains("<div class='signatures'>"),
+                "signature block must remain intact even when no stamp is configured");
+
             foreach (string invalidCount in new[] { "", "0", "-1", "1,5", "dwa", "2147483648" })
             {
                 var invalidRow = new Dictionary<string,string>(savedRow)
