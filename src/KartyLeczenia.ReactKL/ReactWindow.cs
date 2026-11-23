@@ -1096,6 +1096,7 @@ internal sealed class ReactWindow : Form
             string key = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
             drafts[key] = document;
             return new { draftId = key, document.Number, document.Payer, document.Recipient,
+                documentDate = document.DocumentDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
                 hasPayerId = document.PayerId.HasValue,
                 rows = document.Rows.Select((r, index) => new {index, product = r.Get("Produkt"),
                     replacement = r.Get("Zamiennik produktu"),
