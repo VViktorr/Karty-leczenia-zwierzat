@@ -523,7 +523,6 @@ export default function CataloguePage({
                 {editing.name || (original?"Kartoteka leku":"Nowa kartoteka leku")}
               </Typography.Title>
               <Space>
-                <Tag>{editing.symbol}</Tag>
                 <Tag color="blue">{variants.length} wariantów</Tag>
                 {dirty && <Tag color="orange">Niezapisane zmiany</Tag>}
               </Space>
@@ -538,13 +537,10 @@ export default function CataloguePage({
             </Space>
           </div>
           <div className="catalogue-product-fields">
-            <label>Symbol leku (identyfikator w katalogu SQL)
+            <label>Symbol leku
               <Input value={editing.symbol} readOnly />
             </label>
-            <label>Nazwa leku
-              <Input value={editing.name} readOnly />
-            </label>
-            <label>Numer RPL / identyfikator wpisu
+            <label>Nr RPL
               <Input value={editing.rplId}
                 onChange={event => changeField("rplId", event.target.value)} />
             </label>

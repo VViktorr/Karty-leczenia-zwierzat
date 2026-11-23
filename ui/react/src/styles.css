@@ -44,9 +44,13 @@
 .catalogue-list .ant-table-row{cursor:pointer}
 .catalogue-list .catalogue-selected td{background:var(--shell-bg)!important;font-weight:600}
 .catalogue-editor-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px}
-.catalogue-product-fields{display:grid;grid-template-columns:minmax(190px,1.2fr) minmax(130px,.5fr);gap:10px 15px;margin-bottom:16px}
+.catalogue-editor { container-type: inline-size; }
+.catalogue-product-fields { display: grid; grid-template-columns: minmax(145px, 1fr) minmax(100px, .65fr) minmax(210px, 3fr); gap: 8px 12px; margin-bottom: 10px; }
 .catalogue-product-fields label{display:flex;flex-direction:column;gap:6px;color:var(--text);font-size:13px;font-weight:500}
-.catalogue-product-fields label:last-child{grid-column:1/-1}
+@container (max-width: 520px) {
+  .catalogue-product-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catalogue-product-fields label:last-child { grid-column: 1 / -1; }
+}
 .catalogue-variant-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:13px}
 .catalogue-variants .ant-input-textarea textarea{font-size:12px;line-height:1.4;resize:vertical}
 .catalogue-variants .ant-table-thead>tr>th{white-space:nowrap}
