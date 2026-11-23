@@ -2,6 +2,7 @@ import Modal from "./AppModal";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
 import {useEffect,useState} from "react";
+import {useComponents} from "./componentSettings";
 import {Button,Checkbox,InputNumber,Tabs,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
 
@@ -9,6 +10,7 @@ import type {ColumnsType} from "antd/es/table";
 export function useListColumnLayout<T extends object>(
   listId:string,columns:ColumnsType<T>,shortcutEnabled=true,requiredColumn?:string
 ) {
+  const rememberColumns=useComponents().table.rememberColumns;
   const identity=(column:ColumnsType<T>[number]):string =>
     String(column.key ?? ("dataIndex" in column ? column.dataIndex : ""));
   const definitions=columns.map(column=>({
@@ -19,6 +21,7 @@ export function useListColumnLayout<T extends object>(
   const keys=definitions.map(item=>item.key);
   const storageKey="kl.columns."+listId+".v1";
   function read():{visible:string[];order:string[];widths:Record<string,number>} {
+    if(!rememberColumns)return {visible:keys,order:keys,widths:{}};
     try{
       const parsed:unknown=JSON.parse(localStorage.getItem(storageKey)??"null");
       if(parsed && typeof parsed==="object" && !Array.isArray(parsed)){
@@ -51,9 +54,10 @@ export function useListColumnLayout<T extends object>(
   const [open,setOpen]=useState(false);
 
   useEffect(()=>{
+    if(!rememberColumns)return;
     try{localStorage.setItem(storageKey,JSON.stringify({visible,order,widths}));}
     catch{/* No SQL dependency; current session remains usable. */}
-  },[storageKey,visible,order,widths]);
+  },[storageKey,visible,order,widths,rememberColumns]);
   useEffect(()=>{
     if(!shortcutEnabled)return;
     const shortcut=(event:KeyboardEvent)=>{
