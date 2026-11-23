@@ -2,6 +2,7 @@ import Modal from "./AppModal";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Checkbox, Divider, InputNumber, Select, Space, Switch, Typography } from "antd";
 import { invoke } from "./bridge";
+import {useComponents, updateComponents} from "./componentSettings";
 
 export interface PricePrintRow {
   symbol: string; name: string; gross: number | null; latestBatch: string;
@@ -338,16 +339,53 @@ export function PricePrintPreview({
   rows,settings,heading,onClose
 }:{rows:PricePrintRow[];settings:PricePrintOptions;heading:string;onClose:()=>void}){
   const frame=useRef<HTMLIFrameElement>(null);
+  const mode=useComponents().pdf.mode;
+  const [pages,setPages]=useState(1);
+  const [page,setPage]=useState(1);
   const documentText=useMemo(()=>pricePrintHtml(rows,settings,heading),[rows,settings,heading]);
+  // The price-list renderer paginates asynchronously after fonts load.
+  // Observe its actual generated page nodes rather than guessing row counts.
+  useEffect(()=>{
+    const iframe=frame.current;
+    const document=iframe?.contentDocument;
+    const container=document?.getElementById("pages");
+    if(!container)return;
+    const apply=()=>{
+      const sheets=Array.from(container.querySelectorAll<HTMLElement>(".sheet"));
+      setPages(Math.max(1,sheets.length));
+      setPage(current=>Math.max(1,Math.min(current,sheets.length||1)));
+      sheets.forEach((sheet,i)=>{sheet.style.display=mode==="pages"&&i!==page-1?"none":"";});
+    };
+    apply();
+    const observer=new MutationObserver(apply);
+    observer.observe(container,{childList:true});
+    return()=>observer.disconnect();
+  },[documentText,mode,page]);
   return <Modal className="kl-dialog-price-preview" open width="96vw" title={"Podgląd wielostronicowy — "+rows.length+" leków"}
     onCancel={onClose} destroyOnHidden
-    footer={<Space>
+    footer={<Space wrap>
       <Typography.Text type="secondary">Każda kartka ma własny nagłówek tabeli i numer strony.</Typography.Text>
       <Button onClick={onClose}>Zamknij</Button>
-      <Button type="primary" onClick={()=>frame.current?.contentWindow?.print()}>Drukuj</Button>
+      <Button type="primary" onClick={()=>{
+        // All pages must be visible when the print engine paginates.
+        frame.current?.contentDocument?.querySelectorAll<HTMLElement>(".sheet")
+          .forEach(sheet=>{sheet.style.display="";});
+        frame.current?.contentWindow?.print();
+      }}>Drukuj</Button>
     </Space>}>
+    <Space wrap style={{marginBottom:8}}>
+      <Button onClick={()=>updateComponents("pdf",{mode:mode==="pages"?"scroll":"pages"})}>
+        {mode==="pages"?"Przewijanie":"Tryb stron"}
+      </Button>
+      {mode==="pages"&&<>
+        <Button disabled={page<=1} onClick={()=>setPage(n=>n-1)}>Poprzednia</Button>
+        <Typography.Text>Strona {page} z {pages}</Typography.Text>
+        <Button disabled={page>=pages} onClick={()=>setPage(n=>n+1)}>Następna</Button>
+      </>}
+    </Space>
     <iframe ref={frame} title="Strony cennika A4" srcDoc={documentText}
       sandbox="allow-same-origin allow-scripts allow-modals"
+      onLoad={()=>setPages(Math.max(1,frame.current?.contentDocument?.querySelectorAll(".sheet").length??1))}
       style={{width:"100%",height:"74vh",border:0,background:"#d8d9dd"}}/>
   </Modal>;
 }
