@@ -342,6 +342,7 @@ export function PricePrintPreview({
   const mode=useComponents().pdf.mode;
   const [pages,setPages]=useState(1);
   const [page,setPage]=useState(1);
+  const [frameReady,setFrameReady]=useState(0);
   const documentText=useMemo(()=>pricePrintHtml(rows,settings,heading),[rows,settings,heading]);
   // The price-list renderer paginates asynchronously after fonts load.
   // Observe its actual generated page nodes rather than guessing row counts.
@@ -360,7 +361,7 @@ export function PricePrintPreview({
     const observer=new MutationObserver(apply);
     observer.observe(container,{childList:true});
     return()=>observer.disconnect();
-  },[documentText,mode,page]);
+  },[documentText,mode,page,frameReady]);
   return <Modal className="kl-dialog-price-preview" open width="96vw" title={"Podgląd wielostronicowy — "+rows.length+" leków"}
     onCancel={onClose} destroyOnHidden
     footer={<Space wrap>
@@ -385,7 +386,7 @@ export function PricePrintPreview({
     </Space>
     <iframe ref={frame} title="Strony cennika A4" srcDoc={documentText}
       sandbox="allow-same-origin allow-scripts allow-modals"
-      onLoad={()=>setPages(Math.max(1,frame.current?.contentDocument?.querySelectorAll(".sheet").length??1))}
+      onLoad={()=>setFrameReady(value=>value+1)}
       style={{width:"100%",height:"74vh",border:0,background:"#d8d9dd"}}/>
   </Modal>;
 }
