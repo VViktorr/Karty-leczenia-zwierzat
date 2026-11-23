@@ -109,16 +109,9 @@ internal sealed class SavedCardRevisionService(ConnectionSettingsStore settings)
                 }
                 newValues[key] = value;
             }
-            if (newValues.GetValueOrDefault("Drukuj") == "True")
-            {
-                foreach (var key in new[] { "Produkt", "Gatunek", "Droga podania",
-                                             "Dawkowanie i okres stosowania" })
-                    if (string.IsNullOrWhiteSpace(newValues.GetValueOrDefault(key)))
-                        throw new ArgumentException($"Pozycja {i + 1}: uzupełnij {key}.");
-            }
             updatedRows.Add(newValues);
         }
-        CardArchiveService.ValidateAnimalCounts(updatedRows);
+        CardArchiveService.ValidateAnimalDetails(updatedRows);
         var updated = original with { Fields = updatedFields, Rows = updatedRows };
         // Validate the same print payload before touching the SQL record.
         _ = CardHtmlRenderer.Render(updated);

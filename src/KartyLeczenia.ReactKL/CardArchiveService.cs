@@ -51,7 +51,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Zakres mapowania towarów"] = source.Scope
         };
         var rows = CaptureRows(source);
-        ValidateAnimalCounts(rows);
+        ValidateAnimalDetails(rows);
         var card = new Card(fields, rows)
         {
             ClinicStampPng = clinic.UseClinicStamp ? clinic.ClinicStampPng : null,
@@ -178,13 +178,20 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         });
     }
 
-    internal static void ValidateAnimalCounts(IReadOnlyList<Dictionary<string, string>> rows)
+    internal static void ValidateAnimalDetails(IReadOnlyList<Dictionary<string, string>> rows)
     {
         for (int index = 0; index < rows.Count; index++)
         {
             var row = rows[index];
             if (!string.Equals(row.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase))
                 continue;
+            string description = (row.GetValueOrDefault("Opis zwierząt / numer siedziby stada") ?? "").Trim();
+            string species = (row.GetValueOrDefault("Gatunek") ?? "").Trim();
+            bool hasDescription = description.Length > 0 &&
+                (!string.IsNullOrWhiteSpace(row.GetValueOrDefault(CardSchema.AnimalDescriptionGroup)) ||
+                 !string.Equals(description, species, StringComparison.OrdinalIgnoreCase));
+            if (!hasDescription && string.IsNullOrWhiteSpace(row.GetValueOrDefault("Numery zwierząt")))
+                throw new ArgumentException($"Pozycja {index + 1}: uzupełnij numery lub opis zwierząt.");
             string value = (row.GetValueOrDefault("Liczba zwierząt") ?? "").Trim();
             if (!int.TryParse(value, System.Globalization.NumberStyles.None,
                 System.Globalization.CultureInfo.InvariantCulture, out int count) || count <= 0)

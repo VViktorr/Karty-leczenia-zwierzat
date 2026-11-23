@@ -688,6 +688,7 @@ static class Program
                 ["Drukuj"]="True", ["Sekcja (II lub III)"]="II",
                 ["Produkt"]="Produkt źródłowy",["Symbol Subiekta"]="SUB-123",
                 ["Gatunek"]="Bydło",["Droga podania"]="domięśniowo",
+                ["Opis zwierząt / numer siedziby stada"]="PL123456789",
                 ["Dawkowanie i okres stosowania"]="1 ml",["Karencja"]="28 dni",
                 ["Rozpoznanie"]="Rozpoznanie",["Liczba zwierząt"]="2",["Status karencji"]=CardSchema.RegistryVerified
             };
@@ -756,6 +757,28 @@ static class Program
                   !unstampedHtml.Contains("<img class='doctor-stamp'") &&
                   unstampedHtml.Contains("<div class='footnote'>"),
                 "closing section remains unbreakable even without a stamp");
+
+            var optionalFields = new Dictionary<string,string>(savedRow)
+            {
+                ["Gatunek"] = "", ["Droga podania"] = "",
+                ["Dawkowanie i okres stosowania"] = "", ["Rozpoznanie"] = ""
+            };
+            var updatedWithoutOptionalFields = SavedCardRevisionService.ApplyChanges(
+                originalSaved, changedFields, [optionalFields], 2026, 14);
+            Check(updatedWithoutOptionalFields.Rows[0]["Dawkowanie i okres stosowania"] == "",
+                "archive edits accept missing optional clinical fields");
+            var missingAnimalDescription = new Dictionary<string,string>(savedRow)
+            {
+                ["Opis zwierząt / numer siedziby stada"] = ""
+            };
+            bool missingAnimalDescriptionBlocked = false;
+            try
+            {
+                _ = SavedCardRevisionService.ApplyChanges(
+                    originalSaved, changedFields, [missingAnimalDescription], 2026, 14);
+            }
+            catch (ArgumentException) { missingAnimalDescriptionBlocked = true; }
+            Check(missingAnimalDescriptionBlocked, "archive edits require animal numbers or a description");
 
             var renumbered = SavedCardRevisionService.ApplyChanges(
                 originalSaved, changedFields, [savedRow], 2026, 14, "K/25/2026");

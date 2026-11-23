@@ -2192,6 +2192,14 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
         Nowy numer: <strong>{editDraft?.fields["Nr karty"]}</strong>.
         Numer zostanie zaktualizowany w SQL i na PDF. Zajęty numer zostanie odrzucony.
       </Typography.Paragraph>
+      {editDraft?.rows.map((row,index)=>{
+        if(row["Drukuj"]?.toLowerCase()!=="true")return null;
+        const missing=[["Seria","serii"],["Karencja","karencji"]]
+          .filter(([key])=>!row[key]?.trim()).map(([,label])=>label);
+        return missing.length>0?<Typography.Text key={index} type="warning" style={{display:"block"}}>
+          Pozycja {index+1} ({row["Produkt"]}): brak {missing.join(" i ")}.
+        </Typography.Text>:null;
+      })}
     </Modal>
     <Modal className="kl-dialog-saved-preview" width="92vw" open={printHtml!==null} title="Podgląd zapisanej karty leczenia"
       onCancel={()=>setPrintHtml(null)} footer={<Space wrap>
