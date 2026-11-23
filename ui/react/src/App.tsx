@@ -804,6 +804,17 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     finally{setAnimalBusy(false);}
   }
 
+  async function deleteAnimalDescription(description:string){
+    if(!draft?.hasPayerId||animalBusy)return;
+    setAnimalBusy(true);setAnimalError("");
+    try{
+      await invoke("deleteAnimalDescription",{draftId:draft.draftId,description});
+      setAnimalDescriptions(current=>current.filter(value=>value!==description));
+    }catch(error){
+      setAnimalError(error instanceof Error?error.message:String(error));
+    }finally{setAnimalBusy(false);}
+  }
+
   function changeRemember(next:boolean){
     setRemember(next);
     try{localStorage.setItem("ReactKL.rememberTreatmentChoices",String(next));}
@@ -1324,6 +1335,13 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         {animalDescriptions.length>0&&<Select aria-label="Zapamiętane numery zwierząt"
           style={{width:"100%"}} placeholder="Wstaw zapamiętane numery" showSearch
           onChange={value=>setGroupDescription(value)}
+          optionRender={option=><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{option.data.label}</span>
+            <Button type="text" size="small" danger disabled={animalBusy}
+              title="Usuń zapamiętane numery" aria-label={"Usuń zapamiętane numery: "+option.data.value}
+              onMouseDown={event=>{event.preventDefault();event.stopPropagation();}}
+              onClick={event=>{event.stopPropagation();void deleteAnimalDescription(option.data.value);}}>×</Button>
+          </div>}
           options={animalDescriptions.map(value=>({value,label:value}))}/>}
         <label>Numery zwierząt
           <Input.TextArea value={groupDescription} autoSize={{minRows:4,maxRows:12}}

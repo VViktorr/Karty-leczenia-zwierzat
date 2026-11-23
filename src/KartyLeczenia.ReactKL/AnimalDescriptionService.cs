@@ -88,4 +88,19 @@ internal sealed class AnimalDescriptionService(ConnectionSettingsStore archive)
         await cmd.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         await tx.CommitAsync(token).ConfigureAwait(false);
     }
+
+    internal async Task DeleteAsync(string scope, int? payerId, string description, CancellationToken token)
+    {
+        byte[] key = DescriptionKey(scope, payerId.GetValueOrDefault(), description);
+        await using var db = Connect();
+        await db.OpenAsync(token).ConfigureAwait(false);
+        using var command = new SqlCommand("""
+            DELETE FROM dbo.animal_descriptions
+            WHERE description_key=@key AND source_scope=@scope AND payer_id=@payer;
+            """, db) { CommandTimeout = 10 };
+        command.Parameters.Add("@key", SqlDbType.Binary, 32).Value = key;
+        command.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = scope;
+        command.Parameters.Add("@payer", SqlDbType.Int).Value = payerId.GetValueOrDefault();
+        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
 }

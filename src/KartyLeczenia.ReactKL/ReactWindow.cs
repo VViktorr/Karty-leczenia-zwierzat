@@ -1356,7 +1356,7 @@ internal sealed class ReactWindow : Form
             }
             return new { applied, skipped };
         }
-        if (action == "readAnimalDescriptions" || action == "saveAnimalDescription")
+        if (action is "readAnimalDescriptions" or "saveAnimalDescription" or "deleteAnimalDescription")
         {
             string id = ReadTextField(root, "draftId", 30);
             if (!drafts.TryGetValue(id, out var draft))
@@ -1364,8 +1364,13 @@ internal sealed class ReactWindow : Form
             if (action == "readAnimalDescriptions")
                 return new { items = await animalDescriptions.ReadAsync(
                     draft.Scope, draft.PayerId, token) };
-            await animalDescriptions.SaveAsync(draft.Scope, draft.PayerId,
-                ReadTextField(root, "description", 2000), token);
+            string description = ReadTextField(root, "description", 2000);
+            if (action == "deleteAnimalDescription")
+            {
+                await animalDescriptions.DeleteAsync(draft.Scope, draft.PayerId, description, token);
+                return new { deleted = true };
+            }
+            await animalDescriptions.SaveAsync(draft.Scope, draft.PayerId, description, token);
             return new { saved = true };
         }
         if (action == "readTreatmentChoices")
