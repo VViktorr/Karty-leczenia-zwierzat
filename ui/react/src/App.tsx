@@ -467,7 +467,8 @@ function TreatmentOptions({compact, label, children}: {
 function TreatmentDateFields({reported,performed,onChange}: {
   reported:string;performed:string;onChange:(dates:{reported:string;performed:string})=>void;
 }) {
-return <Space orientation="vertical" style={{width:"100%"}}>
+  return <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 330px), 1fr))",
+      alignItems:"end",gap:10,maxWidth:900,marginBottom:8}}>
         <label>Data i godzina zgłoszenia (opcjonalnie)
           <DatePicker value={reported?dayjs(reported).locale("pl"):null}
             showTime={{format:"HH:mm"}} needConfirm format="DD.MM.YYYY HH:mm"
@@ -480,7 +481,7 @@ return <Space orientation="vertical" style={{width:"100%"}}>
             locale={{...datePickerPl,lang:{...datePickerPl.lang,ok:"Zatwierdź"}}}
             style={{width:"100%"}}
             onChange={value=>onChange({performed:value?.format("YYYY-MM-DDTHH:mm")??"",reported})}/></label>
-      </Space>;
+      </div>;
 }
 
 const treatmentSteps=["Gatunek","Warianty leków","Zwierzęta","Rozpoznanie","Podsumowanie"];
