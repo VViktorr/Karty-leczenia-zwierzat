@@ -6,6 +6,7 @@ import {Empty, Pagination, Spin, theme} from "antd";
 import type {TableProps} from "antd";
 import {useEffect, useMemo, useRef, useState} from "react";
 import type {CSSProperties, ReactNode} from "react";
+import {useComponents} from "./componentSettings";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -24,7 +25,8 @@ function Cell<T extends object>({data, value, node, columnDefinition}: CustomCel
 
 export default function DataGrid<T extends object>({columns, dataSource, pagination, loading,
   rowKey, scroll, size, rowClassName, style, onRow, locale, resize, move}:
-  TableProps<T> & {resize: (key: string, width: number) => void; move: (order: string[]) => void}) {
+  TableProps<T> & {resize?: (key: string, width: number) => void; move?: (order: string[]) => void}) {
+  const preferences=useComponents().agGrid;
   const viewport = useRef<HTMLDivElement>(null);
   const [api, setApi] = useState<GridApi<T>>();
   const {token} = theme.useToken();
@@ -61,7 +63,9 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
       headerName: typeof column.title === "string" ? column.title : id,
       width: typeof column.width === "number" ? column.width : 160,
       flex: column.width === undefined ? 1 : null,
-      sortable: !!columnSort,
+      sortable:preferences.sortable && !!columnSort,
+      filter: preferences.filters && typeof index === "string",
+      floatingFilter: preferences.filters && typeof index === "string",
       comparator: columnSort ? (_a, _b, a, b) => a.data && b.data ? columnSort(a.data, b.data) : 0 : undefined,
       valueGetter: params => params.data && typeof index === "string"
         ? (params.data as Record<string, unknown>)[index] : undefined,
@@ -75,7 +79,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
         style: column.onHeaderCell?.({ ...column, title: id })?.style
       }}
     }];
-  }), [columns]);
+  }), [columns,preferences.sortable,preferences.filters]);
   function rowAttributes(row?: T, index?: number) {
     return row ? onRow?.(row, index) : undefined;
   }
@@ -84,7 +88,9 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
     <div ref={viewport} className="kl-ag-grid" style={{height: scroll?.y ?? 360}}>
       <AgGridReact<T> theme={gridTheme} columnDefs={columnDefs} rowData={rows}
         defaultColDef={{minWidth:60, maxWidth:1000}}
-        rowHeight={rowHeight || (size === "small" ? 32 : 42)}
+        headerHeight={preferences.headerHeight}
+        animateRows={preferences.animateRows}
+        rowHeight={rowHeight || preferences.rowHeight}
         loading={typeof loading === "boolean" ? loading : loading?.spinning}
         loadingOverlayComponent={() => <Spin aria-label="Ładowanie danych"/>}
         noRowsOverlayComponent={() => locale?.emptyText ?? <Empty description="Brak danych"/>}
@@ -109,11 +115,11 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
         }}
         onColumnMoved={event => {
           if (event.finished && event.source === "uiColumnMoved")
-            move(event.api.getAllDisplayedColumns().map(column => column.getColId()));
+            move?.(event.api.getAllDisplayedColumns().map(column => column.getColId()));
         }}
         onColumnResized={event => {
           if (event.finished && (event.source === "uiColumnResized" || event.source === "autosizeColumns") && event.column)
-            resize(event.column.getColId(), event.column.getActualWidth());
+            resize?.(event.column.getColId(), event.column.getActualWidth());
         }}/>
     </div>
     {pages && <Pagination {...pages} current={page} pageSize={pageSize} total={rows.length}
