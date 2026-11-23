@@ -416,3 +416,30 @@ html[data-kl-skin="orchard"] .ant-modal .ant-modal-content { border-radius: 12px
 .list-heading-actions { justify-content: flex-end; }
 
 .kl-ag-grid .ag-cell-value { width: 100%; min-width: 0; }
+
+/* Switches and segmented choices follow the skin in windows and dialogs. */
+html[data-kl-skin="orchard"] { --kl-switch-track-radius: 999px; --kl-switch-handle-radius: 999px; --kl-segment-radius: 10px; }
+html[data-kl-skin="material"] { --kl-switch-track-radius: 999px; --kl-switch-handle-radius: 999px; --kl-segment-radius: 999px; }
+html[data-kl-skin="fluent"] { --kl-switch-track-radius: 999px; --kl-switch-handle-radius: 999px; --kl-segment-radius: 6px; }
+html[data-kl-skin="spectrum"] { --kl-switch-track-radius: 5px; --kl-switch-handle-radius: 3px; --kl-segment-radius: 4px; }
+html[data-kl-skin="nordic"] { --kl-switch-track-radius: 999px; --kl-switch-handle-radius: 999px; --kl-segment-radius: 8px; }
+html[data-kl-skin="forest"] { --kl-switch-track-radius: 999px; --kl-switch-handle-radius: 8px 2px; --kl-segment-radius: 10px; }
+html[data-kl-skin="sandstone"] { --kl-switch-track-radius: 8px; --kl-switch-handle-radius: 5px; --kl-segment-radius: 7px; }
+html[data-kl-skin="midnight"] { --kl-switch-track-radius: 5px; --kl-switch-handle-radius: 2px; --kl-segment-radius: 4px; }
+html[data-kl-skin="windows"] { --kl-segment-radius: 4px; }
+html[data-kl-skin="aero"] { --kl-segment-radius: 4px; }
+html[data-kl-skin="carbon"] { --kl-segment-radius: 0; }
+
+html:is([data-kl-skin="orchard"], [data-kl-skin="material"], [data-kl-skin="fluent"], [data-kl-skin="spectrum"], [data-kl-skin="nordic"], [data-kl-skin="forest"], [data-kl-skin="sandstone"], [data-kl-skin="midnight"]) .ant-switch { border-radius: var(--kl-switch-track-radius); }
+html:is([data-kl-skin="orchard"], [data-kl-skin="material"], [data-kl-skin="fluent"], [data-kl-skin="spectrum"], [data-kl-skin="nordic"], [data-kl-skin="forest"], [data-kl-skin="sandstone"], [data-kl-skin="midnight"]) .ant-switch .ant-switch-handle::before {
+  border-radius: var(--kl-switch-handle-radius);
+}
+html[data-kl-skin] .ant-segmented :is(.ant-segmented-item, .ant-segmented-thumb) {
+  border-radius: var(--kl-segment-radius);
+}
+html:is([data-kl-skin="fluent"], [data-kl-skin="nordic"], [data-kl-skin="midnight"]) .ant-switch:not(.ant-switch-disabled) {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+html[data-kl-skin="orchard"] .ant-switch .ant-switch-handle::before {
+  box-shadow: 0 1px 3px #0004;
+}
