@@ -838,6 +838,38 @@ internal sealed class ReactWindow : Form
         }
         // Archive browsing and trash management use the program database only.
         // They must remain available when Subiekt GT is temporarily offline.
+        if (action == "previewCardPdf")
+        {
+            // Preview the exact PDF engine used for downloads and e-mail,
+            // without modifying the archive or writing a user-visible file.
+            string id = ReadTextField(root, "id", 40);
+            string html;
+            if (id.Length > 0)
+            {
+                html = cards.RenderSaved(id, Flag(root, "trash"));
+            }
+            else
+            {
+                object draftPreview = await HandleRequest("previewDraft", root, token);
+                html = JsonSerializer.SerializeToElement(draftPreview)
+                    .GetProperty("html").GetString() ??
+                    throw new InvalidDataException("Nie udało się przygotować karty do podglądu PDF.");
+            }
+            string temporary = await CardPdfService.RenderAsync(this, html, token);
+            try
+            {
+                var pdf = await File.ReadAllBytesAsync(temporary, token);
+                if (pdf.Length > 25_000_000)
+                    throw new InvalidDataException("Podgląd PDF przekracza limit rozmiaru 25 MB.");
+                return new { base64 = Convert.ToBase64String(pdf) };
+            }
+            finally
+            {
+                try { File.Delete(temporary); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
         if (action == "renderSavedCard")
         {
             string id = ReadTextField(root, "id", 40);

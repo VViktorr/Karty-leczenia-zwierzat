@@ -361,3 +361,26 @@ html[data-kl-skin="orchard"] .ant-modal .ant-modal-content { border-radius: 12px
 .settings-appearance label:first-child .ant-select { width: min(300px, 70vw); }
 .workflow-option { display: flex; align-items: center; gap: 8px; }
 .treatment-warning-scroll { max-height: 300px; overflow: auto; }
+
+/* Menu orientation is a user setting independent of the active skin. */
+.app-shell.nav-top {display:block;}
+.app-shell.nav-top .workspace {height:100%;width:100%;}
+.app-shell.nav-top .top-navigation {overflow-x:auto;flex-shrink:0;}
+.app-shell.nav-top .top-navigation .main-nav {display:flex;flex-direction:row;flex-wrap:nowrap;gap:4px;}
+.app-shell.nav-top .top-navigation .nav-item {white-space:nowrap;padding:9px 13px;}
+.app-shell.nav-top .top-navigation .fluent-nav-provider {background:transparent;}
+.app-shell.nav-top .top-navigation .fluent-nav-provider .main-nav {display:flex;flex-direction:row;}
+.app-shell.nav-top .top-navigation .fluent-nav-button {flex-shrink:0;}
+.app-shell.nav-side {display:flex;}
+.app-shell.nav-side .main-nav {display:flex;flex-direction:column;}
+.app-shell.nav-side .fluent-nav-provider .main-nav {display:flex;flex-direction:column;}
+.app-shell.nav-side .sidebar {overflow-y:auto;min-height:0;}
+.app-shell.nav-top.layout-compact .top-navigation {padding:3px 8px;}
+.app-shell.nav-top.layout-compact .top-navigation .nav-item {padding:5px 9px;}
+.app-shell.nav-side.layout-compact .sidebar {width:154px;flex-basis:154px;padding:9px 6px;}
+.app-shell.nav-side.layout-compact .sidebar-brand {margin-bottom:12px;}
+.app-shell.nav-side.layout-compact .nav-item {padding:7px 8px;font-size:12px;}
+@media(max-width:780px) {
+  .app-shell.nav-top .top-navigation .nav-item {padding:7px 9px;font-size:12px;}
+  .app-shell.nav-side .sidebar {width:150px;flex-basis:150px;}
+}
