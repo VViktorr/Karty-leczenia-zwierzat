@@ -728,6 +728,34 @@ static class Program
                 "saved-card revision must change after edits");
             Check(CardHtmlRenderer.Render(editedSaved).Contains("Zamiennik A"),
                 "revised card print must include explicitly entered replacement");
+
+            var renumbered = SavedCardRevisionService.ApplyChanges(
+                originalSaved, changedFields, [savedRow], 2026, 14, "K/25/2026");
+            Check(renumbered.Fields["Nr karty"] == "K/25/2026" &&
+                  CardHtmlRenderer.Render(renumbered).Contains("K/25/2026"),
+                "an explicitly changed archive number must appear in the printed card");
+            Check(renumbered.DoctorStampPng?.SequenceEqual(originalSaved.DoctorStampPng!) == true &&
+                  renumbered.Fields["Dokument źródłowy"] == originalSaved.Fields["Dokument źródłowy"],
+                "renumbering must preserve the source document and stamps");
+            Check(SavedCardRevisionService.ValidateCardNumber("K/25/2026", 2026) == (2026, 25L),
+                "card number format must match the archive SQL year and sequence");
+            foreach (var invalidNumber in new[] {
+                "K/0/2026", "K/25/2027", "PA/25/2026",
+                "K/999999999999999999999/2026", "K/abc/2026"
+            })
+            {
+                bool invalidRejected = false;
+                try { _ = SavedCardRevisionService.ValidateCardNumber(invalidNumber, 2026); }
+                catch (ArgumentException) { invalidRejected = true; }
+                Check(invalidRejected, "invalid or wrong-year archive card numbers must be rejected");
+            }
+            var sourceWithDate = new DocumentData("FS 123", "Płatnik", "", [], "test")
+            {
+                DocumentDate = new DateTime(2026, 7, 13)
+            };
+            Check(sourceWithDate.DocumentDate == new DateTime(2026, 7, 13),
+                "source document date must be available to the card wizard without touching SQL");
+
             foreach (string invalidCount in new[] { "", "0", "-1", "1,5", "dwa", "2147483648" })
             {
                 var invalidRow = new Dictionary<string,string>(savedRow)
