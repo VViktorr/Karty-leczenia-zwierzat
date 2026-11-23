@@ -12,6 +12,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = worker;
 // Shared viewer for ChPL and treatment-card PDFs. Only the PDF bytes differ;
 // all toolbar, page navigation, zoom and native-viewer settings are identical.
 export default function ChplPdfViewer({url, name}: {url: string; name: string}) {
+  return <PdfDocumentViewer key={url} url={url} name={name}/>;
+}
+
+function PdfDocumentViewer({url, name}: {url: string; name: string}) {
   const preferences = useComponents().pdf;
   const viewport = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
@@ -23,7 +27,9 @@ export default function ChplPdfViewer({url, name}: {url: string; name: string}) 
   useEffect(() => {setMode(preferences.mode);}, [preferences.mode]);
   useEffect(() => {setNative(preferences.viewer === "native");}, [preferences.viewer]);
   useEffect(() => {setZoom(preferences.zoom);}, [preferences.zoom]);
-  useEffect(() => {setPages(0);setPage(1);}, [url]);
+  useEffect(() => {
+    if(mode==="pages")viewport.current?.scrollTo({top:0,left:0});
+  }, [mode,page,native]);
   useEffect(() => {
     const element = viewport.current;
     if (!element) return;
@@ -82,8 +88,8 @@ export default function ChplPdfViewer({url, name}: {url: string; name: string}) 
       <Document file={url} onLoadSuccess={({numPages})=>{setPages(numPages);setPage(1);}}
         loading={<Spin aria-label="Ładowanie dokumentu PDF"/>}
         error={<Alert type="error" title="Nie udało się wyświetlić PDF. Wybierz pobranie lub podgląd natywny."/>}>
-        {pages>0 && (mode==="pages" || virtualPages.length===0 ?
-          renderPage(mode==="pages"?Math.min(page,pages):1) :
+        {mode==="pages" || virtualPages.length===0 ?
+          renderPage(mode==="pages"?Math.min(page,pages||1):1) :
           <div style={{position:"relative",height:virtualizer.getTotalSize()}}>
             {virtualPages.map(item=>
               <div key={item.key} ref={virtualizer.measureElement} data-index={item.index}
@@ -91,7 +97,7 @@ export default function ChplPdfViewer({url, name}: {url: string; name: string}) 
                   transform:`translateY(${item.start}px)`,paddingBottom:14}}>
                 {renderPage(item.index+1)}
               </div>)}
-          </div>)}
+          </div>}
       </Document>}
     </div>
   </>;
