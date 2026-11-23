@@ -28,13 +28,14 @@ public static class CardHtmlRenderer
             table {width:100%;border-collapse:collapse;table-layout:fixed} th,td {border:.3mm solid #111;overflow-wrap:anywhere;padding:1mm;line-height:1.13;vertical-align:top}
             th {font-weight:normal;text-align:center;vertical-align:middle;font-size:8.3pt} thead {display:table-header-group} tr {break-inside:avoid;page-break-inside:avoid}
             tbody td {height:8mm;font-size:8pt} .group {height:12mm;font-size:8.6pt} .columns {height:29mm} .lp {text-align:center} .empty td {height:7.5mm}
-            .statement {width:37%;margin:1mm 0 0 auto;font-size:8pt;line-height:1.1;break-inside:avoid}
-            /* Keep the stamp, signature line and caption in one printable block. */
-            .signatures {display:table;width:100%;table-layout:fixed;padding-top:4.5mm;text-align:center;break-inside:avoid;page-break-inside:avoid}
-            .signature {display:table-cell;padding:0 8mm;min-height:10mm;vertical-align:bottom}
-            .signature:first-child {width:58%}.signature:last-child {width:42%}
-            .doctor-stamp {display:block;margin:0 auto 1mm;height:30mm;width:auto;max-width:100%;object-fit:contain;break-inside:avoid;page-break-inside:avoid}
-            .signature small {display:block;font-size:8pt}.results {border-top:.3mm solid #222;margin-top:2mm;padding-top:1mm;font-size:9pt}.footnote {font-size:7.5pt;margin-top:1mm}
+            /* Move the entire closing section to the next page when it doesn't fit. */
+            .print-footer {position:relative;break-inside:avoid;page-break-inside:avoid}
+            .print-footer.has-doctor-stamp {min-height:var(--doctor-stamp-height)}
+            .statement {width:37%;margin:1mm 0 0 auto;font-size:8pt;line-height:1.1}
+            .signatures {display:grid;grid-template-columns:58% 42%;padding-top:4.5mm;text-align:center}
+            /* Original stamp placement and overlay are intentional. */
+            .doctor-stamp {position:absolute;left:29%;bottom:0;transform:translateX(-50%);z-index:1;width:auto;height:auto;max-width:none;max-height:none;pointer-events:none}
+            .signature {padding:0 8mm;min-height:10mm}.signature small {display:block;font-size:8pt}.results {border-top:.3mm solid #222;margin-top:2mm;padding-top:1mm;font-size:9pt}.footnote {font-size:7.5pt;margin-top:1mm}
             .tools {font-size:12px;background:#eef2f6;border:1px solid #cbd5e1;padding:10px;margin-bottom:12px} .source {font-size:12px;overflow-wrap:anywhere}
             @media screen {body {background:#e2e8f0;padding:20px}.sheet {width:297mm;min-height:210mm;background:white;padding:7mm;box-shadow:0 2px 15px #0002}.tools{max-width:283mm;margin:0 auto 12px}}
             @media print {.tools {display:none!important}.sheet {width:100%;padding:0;box-shadow:none}}
@@ -114,9 +115,27 @@ public static class CardHtmlRenderer
         Rows("II", 5); html.Append("</tbody></table><div class='section'>III. Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</div><table>" + columns + "<tbody>");
         Rows("III", 3); html.Append("</tbody></table>");
         html.Append(AdministrationRouteLegend.Html);
+        // Keep all closing text together while letting the stamp overlap it,
+        // as it did before PR #5. The invisible minimum height only ensures
+        // that the absolutely positioned PNG stays inside this print fragment.
+        decimal stampHeight = doctorStampHeightMm is >= 1 and <= 150
+            ? doctorStampHeightMm.Value : 30m;
+        if (showStamp && doctorStampHeightMm is not >= 1 and <= 150 && stamp!.Length >= 24)
+        {
+            int pixels = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(
+                stamp.AsSpan(20, 4));
+            if (pixels is > 0 and < 100000)
+                stampHeight = pixels * 25.4m / 96m;
+        }
+        string footerStyle = showStamp
+            ? " class='print-footer has-doctor-stamp' style='--doctor-stamp-height:" +
+              stampHeight.ToString(System.Globalization.CultureInfo.InvariantCulture) + "mm'"
+            : " class='print-footer'";
+        html.Append("<div" + footerStyle + ">");
         html.Append("<div class='statement'>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii</div>");
         string doctor = showStamp ? "" : F("Lekarz i nr prawa wykonywania zawodu");
-        html.Append("<div class='signatures'><div class='signature'>");
+        html.Append($"<div class='signatures'><div class='signature'>{doctor}<br>........................................................<small>(podpis i pieczęć lekarza weterynarii)</small></div><div class='signature'><br>........................................................<small>(podpis posiadacza zwierzęcia)</small></div></div>");
+        html.Append($"<div class='results'>IV. Wyniki badań uzupełniających: {Fill("Wyniki badań")}</div><div class='footnote'>*) W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych.</div>");
         if (showStamp)
         {
             string heightStyle = doctorStampHeightMm is >= 1 and <= 150
@@ -124,10 +143,7 @@ public static class CardHtmlRenderer
                 : "";
             html.Append($"<img class='doctor-stamp'{heightStyle} alt='Pieczątka lekarza' src='data:image/png;base64,{Convert.ToBase64String(stamp!)}'>");
         }
-        else html.Append(doctor + "<br>");
-        html.Append("........................................................<small>(podpis i pieczęć lekarza weterynarii)</small></div><div class='signature'><br>........................................................<small>(podpis posiadacza zwierzęcia)</small></div></div>");
-        html.Append($"<div class='results'>IV. Wyniki badań uzupełniających: {Fill("Wyniki badań")}</div><div class='footnote'>*) W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych.</div>");
-        html.Append("</div>");
+        html.Append("</div></div>");
         html.Append("<details class='tools'><summary>Dokument źródłowy i źródła karencji (nie drukowane)</summary><p>" + F("Dokument źródłowy") + "</p>");
         foreach (var row in selected) html.Append("<p class='source'>" + E(row.GetValueOrDefault("Produkt")) + "<br>" + E(row.GetValueOrDefault("Źródło karencji")) + "<br>" + E(row.GetValueOrDefault("Status karencji")) + "</p>");
         html.Append("</details></body></html>");
