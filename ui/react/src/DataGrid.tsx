@@ -1,13 +1,20 @@
 import {AgGridReact} from "ag-grid-react";
 import type {CustomCellRendererProps, CustomInnerHeaderProps} from "ag-grid-react";
-import {AllCommunityModule, ModuleRegistry, themeQuartz} from "ag-grid-community";
+import {
+  ClientSideRowModelModule, ColumnApiModule, ColumnAutoSizeModule,
+  ModuleRegistry, PaginationModule, themeQuartz
+} from "ag-grid-community";
 import type {ColDef, GridApi} from "ag-grid-community";
 import {Empty, Pagination, Spin, theme} from "antd";
 import type {TableProps} from "antd";
 import {useEffect, useMemo, useRef, useState} from "react";
 import type {CSSProperties, ReactNode} from "react";
 
-ModuleRegistry.registerModules([AllCommunityModule]);
+// Only the modules used by this optional grid. AllCommunityModule also
+// includes editors, filters and exporters which ReactKL does not use here.
+ModuleRegistry.registerModules([
+  ClientSideRowModelModule, ColumnApiModule, ColumnAutoSizeModule, PaginationModule
+]);
 
 type Column<T extends object> = NonNullable<TableProps<T>["columns"]>[number];
 
