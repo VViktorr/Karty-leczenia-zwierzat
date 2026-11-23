@@ -30,6 +30,7 @@ public sealed record DocumentSuggestion(int Id, string Number, string Payer = ""
 public sealed record DocumentData(string Number, string Payer, string Recipient, List<TreatmentRow> Rows, string Scope)
 {
     public int? PayerId { get; init; }
+    public DateTime? DocumentDate { get; init; }
 }
 
 public sealed class DocumentService
@@ -247,12 +248,15 @@ public sealed class DocumentService
         if (withdrawalSource is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(withdrawalSource));
         await using var con = new SqlConnection(options.BuildConnectionString());
         await con.OpenAsync(token);
-        using var head = new SqlCommand("""
+        string documentDateColumn = await DateColumn(con, token);
+        string headDate = documentDateColumn.Length == 0 ? "CAST(NULL AS datetime)" : "d." + documentDateColumn;
+        using var head = new SqlCommand($"""
             SELECT d.dok_Id, d.dok_NrPelny, d.dok_PlatnikId,
               pl.adrh_NazwaPelna AS PN, pl.adrh_Nazwa AS PS, pl.adrh_Adres AS PA,
               pl.adrh_Kod AS PK, pl.adrh_Miejscowosc AS PM,
               od.adrh_NazwaPelna AS ONa, od.adrh_Nazwa AS OS, od.adrh_Adres AS OA,
-              od.adrh_Kod AS OKo, od.adrh_Miejscowosc AS OM
+              od.adrh_Kod AS OKo, od.adrh_Miejscowosc AS OM,
+              {headDate} AS DocumentDate
             FROM dbo.dok__Dokument d
             LEFT JOIN dbo.adr_Historia pl ON pl.adrh_Id=d.dok_PlatnikAdreshId
             LEFT JOIN dbo.adr_Historia od ON od.adrh_Id=d.dok_OdbiorcaAdreshId
@@ -261,20 +265,21 @@ public sealed class DocumentService
         head.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
         head.Parameters.Add("@number", SqlDbType.NVarChar, 100).Value = documentNumber.Trim();
         head.Parameters.Add("@documentId", SqlDbType.Int).Value = (object?)documentId ?? DBNull.Value;
-        int id; int? payerId; string number; string payer; string recipient;
+        int id; int? payerId; string number; string payer; string recipient; DateTime? documentDate;
         await using (var reader = await head.ExecuteReaderAsync(token))
         {
             if (!await reader.ReadAsync(token)) throw new InvalidOperationException("Nie znaleziono dokumentu.");
             string V(string n) => reader[n] is DBNull ? "" : reader[n].ToString() ?? "";
             string N(string full, string shortName) => string.IsNullOrWhiteSpace(V(full)) ? V(shortName) : V(full);
             id = Convert.ToInt32(reader["dok_Id"]); number = V("dok_NrPelny");
+            documentDate = reader["DocumentDate"] is DateTime date ? date : null;
             payerId = reader["dok_PlatnikId"] is DBNull ? null : Convert.ToInt32(reader["dok_PlatnikId"]);
             payer = N("PN", "PS") + "\n" + V("PA") + "\n" + V("PK") + " " + V("PM");
             recipient = N("ONa", "OS") + "\n" + V("OA") + "\n" + V("OKo") + " " + V("OM");
             if (await reader.ReadAsync(token)) throw new InvalidOperationException("Numer dokumentu nie jest jednoznaczny.");
         }
         string withdrawal = withdrawalSource == 0 ? "CAST(NULL AS nvarchar(4000))" : withdrawalSource == 1 ? "t.tw_Opis" : "t.tw_Pole" + (withdrawalSource - 1);
-        string deliveryDateColumn = await DateColumn(con, token);
+        string deliveryDateColumn = documentDateColumn;
         string sourceDate = deliveryDateColumn.Length == 0 ? "CAST(NULL AS datetime)" : "received." + deliveryDateColumn;
         string laterDate = deliveryDateColumn.Length == 0 ? "CAST(NULL AS datetime)" : "laterDoc." + deliveryDateColumn;
         using var cmd = new SqlCommand($"""
@@ -378,7 +383,8 @@ public sealed class DocumentService
             throw new InvalidOperationException("Nie znaleziono pozycji leków na WZ powiązanych z tym dokumentem w wybranym magazynie.");
         return new(number, payer, recipient, DocumentRowMerger.Merge(deliveries), options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant())
         {
-            PayerId = payerId
+            PayerId = payerId,
+            DocumentDate = documentDate
         };
     }
 }
