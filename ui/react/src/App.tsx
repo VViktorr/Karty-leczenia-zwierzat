@@ -45,6 +45,7 @@ interface DraftRow {
 }
 interface Draft {
   draftId: string; number: string; payer: string; recipient: string;
+  documentDate?: string|null;
   hasPayerId: boolean; rows: DraftRow[];
 }
 interface TreatmentVariantChoice {
@@ -625,7 +626,13 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
     pendingSaveDates.current=null;setSaveReview(null);
     setDuplicateId(null);setDateStep(null);setAnimalEdit(null);setReferenceEdit(null);
-    setReported("");setPerformed(localDateTime());
+    // Subiekt document date is the starting date, not the creation date of the card.
+    // Preserve the local current time because trade documents often contain only a date.
+    const initial = draft?.documentDate && /^\d{4}-\d{2}-\d{2}$/.test(draft.documentDate)
+      ? draft.documentDate+"T"+localDateTime().slice(11,16)
+      : localDateTime();
+    setReported(draft?.documentDate ? initial : "");
+    setPerformed(initial);
     setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});setRowSpeciesGroups({});setRestoredVariants({});
     setSavedChoices({});setAnimalDescriptions([]);setAnimalError("");
     setGroupDescription("");setGroupCount("");setGroupSpecies("");setGroupSection("II");
