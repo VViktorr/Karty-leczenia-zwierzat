@@ -15,6 +15,7 @@ export default function CardPdfPreview({request, fallbackHtml, name}:{
   useEffect(()=>{
     let active=true;
     let objectUrl:string|null=null;
+    setState({url:null,error:"",busy:true});
     void invoke<{base64:string}>("previewCardPdf",JSON.parse(requestKey) as Record<string,unknown>)
       .then(result=>{
         if(!active)return;
