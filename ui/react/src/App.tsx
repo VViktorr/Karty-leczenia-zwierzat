@@ -343,7 +343,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
   ];
   return <>
     {active&&toolbar&&createPortal(<Button onClick={reload} loading={busy}>Odśwież · F5</Button>,toolbar)}
-    <Card className={compact?"compact-documents":undefined}>
+    <Card className={"documents-card"+(compact?" compact-documents":"")}>
       <div className={"document-filters"+(compact?" compact-document-toolbar":"")}>
         <Segmented block size={compact?"middle":"large"} value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
           options={[{label:"Faktury",value:"invoices"},
@@ -371,7 +371,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
       <Dropdown trigger={["contextMenu"]} disabled={!active}
         onOpenChange={visible=>{if(!visible)setContextMenu(null);}}
         menu={{items:rowMenu,onClick:()=>setContextMenu(null)}}>
-        <TableContextTrigger ref={tableRef} onContextMenuCapture={event=>{
+        <TableContextTrigger className="documents-table-area" ref={tableRef} onContextMenuCapture={event=>{
           if(!(event.target instanceof Element))return;
           const header=event.target.closest(".ant-table-thead th, .ag-header-cell");
           const id=event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key") ??
@@ -382,7 +382,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
         }}>
       <Table grid={listLayout.grid} {...listLayout.tableProps} rowKey="id" loading={(busy&&!data)||reading} dataSource={data?.items??[]} columns={listLayout.columns}
         rowClassName={row=>row.id===selectedId?"ant-table-row-selected":""}
-        size={compact?"small":"middle"} scroll={{x:900,y:compact?"calc(100vh - 250px)":"calc(100vh - 390px)"}} pagination={{
+        size={compact?"small":"middle"} scroll={{x:900,y:"100%"}} pagination={{
           current:page,pageSize:effectivePageSize,placement:["bottomEnd"],
           pageSizeOptions:[25,50,100,allPageSize],
           showSizeChanger:{
@@ -2953,7 +2953,7 @@ export default function App() {
             <div className={section==="catalogue"||section==="prices"?"catalogue-toolbar":undefined} ref={setSectionToolbar}/>}
         </header>
         {!treatmentWindow&&topTabs&&<div className="top-navigation">{nav}</div>}
-        <main className={"main-content"+(section==="catalogue"?" catalogue-content":"")}>
+        <main className={"main-content"+(section==="catalogue"?" catalogue-content":section==="documents"?" documents-content":"")}>
           {!isDesktop()&&<Alert type="info" className="notice" showIcon
             title="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           {!treatmentWindow&&<div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
