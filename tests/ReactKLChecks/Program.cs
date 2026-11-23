@@ -728,27 +728,34 @@ static class Program
                 "saved-card revision must change after edits");
             Check(CardHtmlRenderer.Render(editedSaved).Contains("Zamiennik A"),
                 "revised card print must include explicitly entered replacement");
-            // Stamp belongs to the signature section, never to the sheet's
-            // absolute-positioned bottom edge (which can cross PDF pages).
+            // All closing text must travel together to the next printed page.
+            // The stamp is deliberately an overlay, not a table cell in the
+            // signature layout: preserve the pre-PR#5 visual placement.
             string stampedHtml = CardHtmlRenderer.Render(editedSaved, 38m);
+            int footerStart = stampedHtml.IndexOf("<div class='print-footer has-doctor-stamp'", StringComparison.Ordinal);
+            int statementStart = stampedHtml.IndexOf("<div class='statement'>", StringComparison.Ordinal);
             int signaturesStart = stampedHtml.IndexOf("<div class='signatures'>", StringComparison.Ordinal);
+            int resultsStart = stampedHtml.IndexOf("<div class='results'>", StringComparison.Ordinal);
+            int footnoteStart = stampedHtml.IndexOf("<div class='footnote'>", StringComparison.Ordinal);
             int stampStart = stampedHtml.IndexOf("<img class='doctor-stamp'", StringComparison.Ordinal);
-            int signaturesEnd = stampedHtml.IndexOf("<div class='results'>", StringComparison.Ordinal);
-            Check(signaturesStart >= 0 && stampStart > signaturesStart && stampStart < signaturesEnd,
-                "doctor stamp must stay inside the printable signature block");
-            Check(stampedHtml.Contains("class='doctor-stamp' style='height:38mm'"),
-                "configured doctor stamp size must be retained");
-            Check(stampedHtml.Contains("page-break-inside:avoid") &&
-                  stampedHtml.Contains(".signatures {display:table") &&
-                  !stampedHtml.Contains(".doctor-stamp {position:absolute") &&
+            int footerEnd = stampedHtml.IndexOf("</div></div>", stampStart, StringComparison.Ordinal);
+            Check(footerStart >= 0 && footerStart < statementStart &&
+                  statementStart < signaturesStart && signaturesStart < resultsStart &&
+                  resultsStart < footnoteStart && footnoteStart < stampStart &&
+                  stampStart < footerEnd,
+                "statement, signatures, results, footnote and stamp must occupy one closing print block");
+            Check(stampedHtml.Contains(".print-footer {position:relative;break-inside:avoid;page-break-inside:avoid") &&
+                  stampedHtml.Contains(".doctor-stamp {position:absolute;left:29%;bottom:0") &&
+                  stampedHtml.Contains("style='--doctor-stamp-height:38mm'") &&
+                  stampedHtml.Contains("class='doctor-stamp' style='height:38mm'") &&
                   !stampedHtml.Contains(".sheet.has-doctor-stamp"),
-                "doctor stamp and signatures must not be cut between printed pages");
+                "closing section must paginate together while preserving the overlapping stamp size and placement");
             string unstampedHtml = CardHtmlRenderer.Render(
                 editedSaved with { DoctorStampPng = null });
-            Check(!unstampedHtml.Contains("<img class='doctor-stamp'") &&
-                  unstampedHtml.Contains("<div class='signatures'>"),
-                "signature block must remain intact even when no stamp is configured");
-
+            Check(unstampedHtml.Contains("<div class='print-footer'>") &&
+                  !unstampedHtml.Contains("<img class='doctor-stamp'") &&
+                  unstampedHtml.Contains("<div class='footnote'>"),
+                "closing section remains unbreakable even without a stamp");
 
             var renumbered = SavedCardRevisionService.ApplyChanges(
                 originalSaved, changedFields, [savedRow], 2026, 14, "K/25/2026");
