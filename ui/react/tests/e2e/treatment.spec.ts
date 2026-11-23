@@ -69,3 +69,14 @@ test("appearance and shortcuts are configured in Settings", async ({page}) => {
   await page.getByRole("button", {name: "Ustawienia", exact: true}).click();
   await expect(page.getByRole("switch", {name: "Skróty klawiaturowe karty"})).not.toBeChecked();
 });
+
+
+test("optional AG Grid loads document rows on demand and opens the treatment card", async ({page}) => {
+  await page.goto("/");
+  await page.getByRole("button", {name: "Widok AG Grid"}).click();
+  await expect(page.locator(".ag-root-wrapper")).toBeVisible();
+  const row = page.locator(".ag-row").filter({hasText: "FS 1/2026"});
+  await expect(row).toBeVisible();
+  await row.dblclick();
+  await expect(page.getByRole("heading", {name: "Karta leczenia — FS 1/2026"})).toBeVisible();
+});
