@@ -2789,7 +2789,10 @@ export default function App() {
     <label className="workflow-option"><Switch checked={shortcuts} onChange={setShortcuts}
       aria-label="Skróty klawiaturowe karty"/> Skróty klawiaturowe karty</label>
     {shortcuts&&<Typography.Text type="secondary">
-      Alt + ← / → zmienia etap. Alt + Enter otwiera podsumowanie. Ctrl + S zapisuje kartę.
+      Skróty przypisane w Ustawienia → Komponenty:
+      {" "}wstecz: {components.shortcuts.back}, dalej: {components.shortcuts.next},
+      {" "}podsumowanie: {components.shortcuts.summary}, zapisz: {components.shortcuts.save}.
+      {!components.shortcuts.enabled&&" Są obecnie wyłączone w ustawieniach komponentów."}
     </Typography.Text>}
     <label className="workflow-option"><Switch checked={cacheDocuments} onChange={setCacheDocuments}
       aria-label="Podręczna lista dokumentów"/> Podręczna lista dokumentów przez 15 sekund</label>
