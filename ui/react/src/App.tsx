@@ -2721,6 +2721,8 @@ export default function App() {
   const compact=preset?.dense||windows||layout==="compact";
   const topTabs=components.navigation==="top";
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
+  const [switchStyle,setSwitchStyle]=useState(()=>saved("kl.switchStyle",["skin","solid","outline","soft"] as const,"skin"));
+  const [segmentStyle,setSegmentStyle]=useState(()=>saved("kl.segmentStyle",["skin","solid","outline"] as const,"skin"));
   const [uiScale,setUiScale]=useState<number>(()=>{
     try{const value=Number(localStorage.getItem("kl.uiScale"));return Number.isFinite(value)&&value>=80&&value<=200?value:100;}
     catch{return 100;}
@@ -2853,6 +2855,23 @@ export default function App() {
       ConfigProvider.config({holderRender:children=>children});
     };
   },[layout,windows,fluent,preset,appearance]);
+  useEffect(()=>{
+    const root=document.documentElement;
+    root.dataset.klSwitchStyle=switchStyle;
+    root.dataset.klSegmentStyle=segmentStyle;
+    root.style.setProperty("--kl-toggle-accent",primary);
+    root.style.setProperty("--kl-toggle-text",colors?.text??(dark?"#f5f5f5":"#242424"));
+    try{
+      localStorage.setItem("kl.switchStyle",switchStyle);
+      localStorage.setItem("kl.segmentStyle",segmentStyle);
+    }catch{/* Current selection remains available in this window. */}
+    return()=>{
+      delete root.dataset.klSwitchStyle;
+      delete root.dataset.klSegmentStyle;
+      root.style.removeProperty("--kl-toggle-accent");
+      root.style.removeProperty("--kl-toggle-text");
+    };
+  },[switchStyle,segmentStyle,primary,colors,dark]);
   const navigationSections=isDesktop()?sections.filter(item=>item.id!=="treatment"):sections;
   const standardNav=<nav aria-label="Nawigacja Karty Leczenia" className="main-nav">
     {navigationSections.map(x=><button key={x.id} type="button"
@@ -2876,6 +2895,16 @@ export default function App() {
     <label>Motyw
       <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
         {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
+    </label>
+    <label>Przełączniki włącz/wyłącz
+      <Select aria-label="Styl przełączników włącz/wyłącz" value={switchStyle} onChange={setSwitchStyle}
+        options={[{value:"skin",label:"Zgodnie ze skórką"},{value:"solid",label:"Z wypełnieniem"},
+          {value:"outline",label:"Z obrysem"},{value:"soft",label:"Z delikatnym tłem"}]}/>
+    </label>
+    <label>Przełączniki wielopozycyjne
+      <Select aria-label="Styl przełączników wielopozycyjnych" value={segmentStyle} onChange={setSegmentStyle}
+        options={[{value:"skin",label:"Zgodnie ze skórką"},{value:"solid",label:"Wypełniona aktywna opcja"},
+          {value:"outline",label:"Osobne obramowane opcje"}]}/>
     </label>
     <label>Skalowanie interfejsu
       <Select aria-label="Skalowanie interfejsu" value={uiScale} onChange={setUiScale}

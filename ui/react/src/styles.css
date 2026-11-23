@@ -443,3 +443,33 @@ html:is([data-kl-skin="fluent"], [data-kl-skin="nordic"], [data-kl-skin="midnigh
 html[data-kl-skin="orchard"] .ant-switch .ant-switch-handle::before {
   box-shadow: 0 1px 3px #0004;
 }
+
+html[data-kl-switch-style="solid"] .ant-switch:not(.ant-switch-disabled) {
+  box-shadow: none;
+}
+html:is([data-kl-switch-style="outline"], [data-kl-switch-style="soft"]) .ant-switch-checked:not(.ant-switch-disabled) {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--kl-toggle-accent);
+}
+html[data-kl-switch-style="soft"] .ant-switch-checked:not(.ant-switch-disabled) {
+  background: color-mix(in srgb, var(--kl-toggle-accent) 22%, transparent);
+  box-shadow: none;
+}
+html:is([data-kl-switch-style="outline"], [data-kl-switch-style="soft"]) .ant-switch-checked:not(.ant-switch-disabled) .ant-switch-handle::before {
+  background: var(--kl-toggle-accent);
+}
+html:is([data-kl-switch-style="outline"], [data-kl-switch-style="soft"]) .ant-switch-checked:not(.ant-switch-disabled) .ant-switch-inner-checked {
+  color: var(--kl-toggle-text);
+}
+html[data-kl-segment-style="solid"] .ant-segmented:not(.ant-segmented-disabled) :is(.ant-segmented-item-selected, .ant-segmented-thumb) {
+  background: var(--kl-toggle-accent);
+  color: white;
+}
+html[data-kl-segment-style="outline"] .ant-segmented:not(.ant-segmented-disabled) .ant-segmented-item {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 28%, transparent);
+}
+html[data-kl-segment-style="outline"] .ant-segmented:not(.ant-segmented-disabled) :is(.ant-segmented-item-selected, .ant-segmented-thumb) {
+  background: transparent !important;
+  color: var(--kl-toggle-text) !important;
+  box-shadow: inset 0 0 0 2px var(--kl-toggle-accent) !important;
+}
