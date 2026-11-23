@@ -45,10 +45,15 @@ try {
     $actualFile = '{0}.{1}.{2}.{3}' -f $meta.FileMajorPart,$meta.FileMinorPart,$meta.FileBuildPart,$meta.FilePrivatePart
     $actualProduct = '{0}.{1}.{2}.{3}' -f $meta.ProductMajorPart,$meta.ProductMinorPart,$meta.ProductBuildPart,$meta.ProductPrivatePart
     $expected = ParseRelease $Version
+    # Inno Setup pads the FileDescription field with trailing spaces in the
+    # Windows version resource. These spaces are not part of the release
+    # version (including RC suffixes), so normalize metadata only. Keep
+    # -Version and SQL version parsing strict to prevent version spoofing.
     $labelPrefix = 'Karty Leczenia '
-    $label = if ($meta.FileDescription -and $meta.FileDescription.StartsWith($labelPrefix, [StringComparison]::Ordinal)) {
-        $meta.FileDescription.Substring($labelPrefix.Length)
-    } else { $meta.ProductVersion }
+    $fileDescription = ([string]$meta.FileDescription).Trim()
+    $label = if ($fileDescription.StartsWith($labelPrefix, [StringComparison]::Ordinal)) {
+        $fileDescription.Substring($labelPrefix.Length).Trim()
+    } else { ([string]$meta.ProductVersion).Trim() }
     $textVersion = ParseRelease $label
     if ([version]$actualFile -ne $expected.Numeric -or [version]$actualProduct -ne $expected.Numeric -or
         (CompareRelease $textVersion $expected) -ne 0) {
