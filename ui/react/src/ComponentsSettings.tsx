@@ -1,5 +1,5 @@
-import {Alert, Button, Card, Checkbox, Select, Slider, Space, Switch, Typography} from "antd";
-import {defaultComponents, resetComponents, updateComponents, useComponents,
+import {Alert, Button, Card, Checkbox, Select, Space, Switch, Typography} from "antd";
+import {resetComponents, updateComponents, useComponents,
   type ShortcutAction} from "./componentSettings";
 
 const zoomOptions = [50,75,100,125,150,175,200].map(value=>({value,label:value+"%"}));
@@ -67,6 +67,41 @@ export default function ComponentsSettings() {
           onChange={event=>updateComponents("table",{rememberColumns:event.target.checked})}>
           Zapamiętuj widok i kolejność kolumn na tym stanowisku
         </Checkbox>
+      </Space>
+    </Card>
+    <Card size="small" title="AG Grid — wspólne ustawienia tabel">
+      <Space direction="vertical" size={12} style={{width:"100%"}}>
+        <Typography.Text type="secondary">
+          Te parametry obowiązują wszystkie zgodne tabele w programie, gdy wybrany jest silnik AG Grid.
+          Wyboru dokonujesz tutaj, bez osobnych przełączników nad listami.
+        </Typography.Text>
+        <label>Wysokość wiersza
+          <Select aria-label="AG Grid — wysokość wiersza" style={{display:"block",width:220}}
+            value={settings.agGrid.rowHeight}
+            options={[28,32,36,40,44,48,52].map(value=>({value,label:value+" px"}))}
+            onChange={rowHeight=>updateComponents("agGrid",{rowHeight})}/>
+        </label>
+        <label>Wysokość nagłówka
+          <Select aria-label="AG Grid — wysokość nagłówka" style={{display:"block",width:220}}
+            value={settings.agGrid.headerHeight}
+            options={[32,36,40,44,48,52].map(value=>({value,label:value+" px"}))}
+            onChange={headerHeight=>updateComponents("agGrid",{headerHeight})}/>
+        </label>
+        <Checkbox checked={settings.agGrid.sortable}
+          onChange={event=>updateComponents("agGrid",{sortable:event.target.checked})}>
+          Sortowanie po kliknięciu nagłówka
+        </Checkbox>
+        <Checkbox checked={settings.agGrid.filters}
+          onChange={event=>updateComponents("agGrid",{filters:event.target.checked})}>
+          Filtry kolumn AG Grid
+        </Checkbox>
+        <Checkbox checked={settings.agGrid.animateRows}
+          onChange={event=>updateComponents("agGrid",{animateRows:event.target.checked})}>
+          Animacja przesuwania wierszy
+        </Checkbox>
+        <Typography.Text type="secondary">
+          Filtry AG Grid dotyczą rekordów już pobranych, nie całej bazy SQL.
+        </Typography.Text>
       </Space>
     </Card>
     <Card size="small" title="Skróty klawiaturowe — React Hotkeys Hook">
