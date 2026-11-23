@@ -91,16 +91,24 @@ internal sealed class ReactWindow : Form
         MinimumSize = new Size(480, 360);
         Size = new Size(1400, 850);
         AutoScaleMode = AutoScaleMode.Dpi;
-        if (treatmentDocument is null)
-        {
-            ReactWindowPlacement.Restore(this);
-            ResizeEnd += (_, _) => ReactWindowPlacement.Save(this);
-            FormClosed += (_, _) => ReactWindowPlacement.Save(this);
-        }
-        else
+        bool isTreatmentWindow = treatmentDocument is not null;
+        if (treatmentDocument is not null)
         {
             base.Text = $"Karta leczenia — {treatmentDocument.Number}";
             StartPosition = FormStartPosition.CenterParent;
+        }
+        ReactWindowPlacement.Restore(this, isTreatmentWindow);
+        ResizeEnd += (_, _) => ReactWindowPlacement.Save(this, isTreatmentWindow);
+        FormClosed += (_, _) => ReactWindowPlacement.Save(this, isTreatmentWindow);
+        if (isTreatmentWindow)
+        {
+            var lastWindowState = WindowState;
+            Resize += (_, _) =>
+            {
+                if (!Visible || lastWindowState == WindowState) return;
+                lastWindowState = WindowState;
+                ReactWindowPlacement.Save(this, isTreatmentWindow);
+            };
         }
         Controls.Add(web);
         Shown += async (_, _) =>

@@ -11,9 +11,9 @@ namespace KartyLeczenia.ReactKL;
 internal static class ReactWindowPlacement
 {
     private sealed record Placement(int X, int Y, int Width, int Height, bool Maximized);
-    private static readonly string PathName = Path.Combine(
+    private static string PlacementPath(bool isTreatmentWindow) => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "KartyLeczenia", "reactkl-window.json");
+        "KartyLeczenia", isTreatmentWindow ? "reactkl-treatment-window.json" : "reactkl-window.json");
 
     internal static Rectangle VisibleBounds(Rectangle saved, IReadOnlyList<Rectangle> workAreas,
         Rectangle fallback, Size minimum)
@@ -46,12 +46,13 @@ internal static class ReactWindowPlacement
             width, height);
     }
 
-    internal static void Restore(Form window)
+    internal static void Restore(Form window, bool isTreatmentWindow = false)
     {
+        string path = PlacementPath(isTreatmentWindow);
         try
         {
-            if (!File.Exists(PathName)) return;
-            var saved = JsonSerializer.Deserialize<Placement>(File.ReadAllText(PathName));
+            if (!File.Exists(path)) return;
+            var saved = JsonSerializer.Deserialize<Placement>(File.ReadAllText(path));
             if (saved is null) return;
             Rectangle fallback = window.Bounds;
             var workAreas = Screen.AllScreens.Select(s => s.WorkingArea).ToArray();
@@ -69,8 +70,9 @@ internal static class ReactWindowPlacement
         }
     }
 
-    internal static void Save(Form window)
+    internal static void Save(Form window, bool isTreatmentWindow = false)
     {
+        string path = PlacementPath(isTreatmentWindow);
         try
         {
             if (window.WindowState == FormWindowState.Minimized) return;
@@ -78,14 +80,14 @@ internal static class ReactWindowPlacement
                 ? window.RestoreBounds : window.Bounds;
             if (bounds.Width < window.MinimumSize.Width ||
                 bounds.Height < window.MinimumSize.Height) return;
-            Directory.CreateDirectory(Path.GetDirectoryName(PathName)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var value = new Placement(bounds.X, bounds.Y, bounds.Width, bounds.Height,
                 window.WindowState == FormWindowState.Maximized);
-            string temporary = PathName + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
                 File.WriteAllText(temporary, JsonSerializer.Serialize(value));
-                File.Move(temporary, PathName, overwrite: true);
+                File.Move(temporary, path, overwrite: true);
             }
             finally
             {
