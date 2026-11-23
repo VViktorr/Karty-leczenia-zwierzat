@@ -282,6 +282,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
         if(chosen){event.preventDefault();setKind(chosen);return;}
       }
       if(event.key==="Enter" && event.target instanceof HTMLElement &&
+        !event.target.closest("button,input,a,[role=button]") &&
         event.target.closest("tr[data-row-key]")){
         const id=Number(event.target.closest("tr[data-row-key]")?.getAttribute("data-row-key"));
         const row=data?.items.find(item=>item.id===id);
@@ -295,7 +296,12 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
     {title:"Data",dataIndex:"date",width:125,render:date,
       sorter:(a,b)=>(a.date||"").localeCompare(b.date||"")},
     {title:"Numer",dataIndex:"number",width:175,
-      sorter:(a,b)=>a.number.localeCompare(b.number)},
+      sorter:(a,b)=>a.number.localeCompare(b.number),
+      render:(number:string,row)=><Button type="link" size="small" style={{paddingInline:0}}
+        aria-label={"Otwórz kartę leczenia dla dokumentu "+number}
+        onClick={()=>{void open(row);}} onDoubleClick={event=>event.stopPropagation()}>
+        {number}
+      </Button>},
     {title:"Kontrahent",dataIndex:"shortPayer",ellipsis:true,
       render:(value:string,row)=><span title={row.payer}>{value||row.payer}</span>},
     {title:"Brutto",dataIndex:"gross",align:"right",width:145,
@@ -414,7 +420,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen}: {
           (data.cached?" · lista z pamięci":" · odświeżono z SQL")+" · ":""}
         {data?.items.length??0} dokumentów. {pageSize==="all"
           ? "Pokazano wszystkie pobrane pozycje (limit SQL: 500). "
-          : ""}Dwuklik lub Enter na wierszu otwiera kartę.
+          : ""}Kliknij numer dokumentu, kliknij dwukrotnie wiersz lub naciśnij Enter, aby otworzyć kartę.
       </Typography.Text>
     </Card>
     {listLayout.dialog}
