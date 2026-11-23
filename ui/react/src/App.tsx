@@ -45,6 +45,7 @@ interface DraftRow {
 }
 interface Draft {
   draftId: string; number: string; payer: string; recipient: string;
+  documentDate?: string|null;
   hasPayerId: boolean; rows: DraftRow[];
 }
 interface TreatmentVariantChoice {
@@ -625,7 +626,13 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
     pendingSaveDates.current=null;setSaveReview(null);
     setDuplicateId(null);setDateStep(null);setAnimalEdit(null);setReferenceEdit(null);
-    setReported("");setPerformed(localDateTime());
+    // Subiekt document date is the starting date, not the creation date of the card.
+    // Preserve the local current time because trade documents often contain only a date.
+    const initial = draft?.documentDate && /^\d{4}-\d{2}-\d{2}$/.test(draft.documentDate)
+      ? draft.documentDate+"T"+localDateTime().slice(11,16)
+      : localDateTime();
+    setReported(draft?.documentDate ? initial : "");
+    setPerformed(initial);
     setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});setRowSpeciesGroups({});setRestoredVariants({});
     setSavedChoices({});setAnimalDescriptions([]);setAnimalError("");
     setGroupDescription("");setGroupCount("");setGroupSpecies("");setGroupSection("II");
@@ -1845,10 +1852,14 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
     try{
       await invoke("updateSavedCard",{
         id:selected.id,revision:card.revision,
-        fields:editDraft.fields,rows:editDraft.rows
+        fields:editDraft.fields,rows:editDraft.rows,
+        ...(editDraft.fields["Nr karty"]!==card.fields["Nr karty"]
+          ? {newNumber:editDraft.fields["Nr karty"]}: {})
       });
+      const number=editDraft.fields["Nr karty"];
+      setSelected(current=>current?{...current,number}:current);
       setEditConfirm(false);setEditDraft(null);setEditing(false);
-      setNotice("Zaktualizowano istniejącą kartę w SQL, zachowując jej numer.");
+      setNotice("Zaktualizowano kartę w SQL, w tym jej numer.");
       remote.reload();
       try{
         const refreshed=await invoke<StoredCard>("savedCard",{id:selected.id,trash:false});
@@ -1865,6 +1876,13 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
   }
   function confirmUpdate(){
     if(!selected||!editDraft||editBusy)return;
+    const number=editDraft.fields["Nr karty"]||"";
+    const existingYear=card?.fields["Nr karty"]?.split("/")[2];
+    if(!/^K\/[1-9]\d*\/[0-9]{4}$/i.test(number)||
+       number.split("/")[2]!==existingYear||number.length>40){
+      setError("Wpisz numer w formacie K/numer/rok. Rok musi pozostać bez zmian.");
+      return;
+    }
     setError("");setEditConfirm(true);
   }
   async function printSaved(row: SavedCard) {
@@ -2049,14 +2067,18 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       onCancel={()=>{if(!editBusy)discardSaved();}}>
       {!card ? <Spin/> : <>
         {editing&&<Alert className="notice" type="warning" showIcon
-          title="Edycja istniejącej karty — bez zmiany numeru"
-          description="Zmiany pól klinicznych wymagają ponownej weryfikacji ChPL. Dane źródłowe Subiekta, numer karty i pieczątki pozostają zachowane."/>}
+          title="Edycja istniejącej karty, również numeru"
+          description="Możesz zmienić numer K/numer/rok w tym samym roku, jeśli jest wolny. Dane Subiekta i pieczątki pozostają zachowane."/>}
         {!editConfirm&&<ErrorNotice error={error}/>}
         {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
         <Descriptions bordered column={2} size="small"
           items={Object.entries(editing&&editDraft?editDraft.fields:card.fields)
             .map(([key,value])=>({key,label:key,children:
-              editing&&archivedEditableFields.has(key)
+              editing&&key==="Nr karty"
+                ? <Input aria-label="Nr karty" value={value} maxLength={40}
+                    placeholder="K/25/2026"
+                    onChange={event=>editHeader(key,event.target.value)}/>
+              : editing&&archivedEditableFields.has(key)
                 ? <Input.TextArea aria-label={key} value={value} autoSize={{minRows:1,maxRows:3}}
                     placeholder={key.includes("data i godzina")?"dd.MM.rrrr gg:mm":undefined}
                     onChange={event=>editHeader(key,event.target.value)}/>
@@ -2097,7 +2119,8 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       <ErrorNotice error={error}/>
       <Typography.Paragraph>
         Przed zatwierdzeniem sprawdź dawkowanie, karencję, gatunki i daty wykonania.
-        Karta zachowa dotychczasowy numer.
+        Nowy numer: <strong>{editDraft?.fields["Nr karty"]}</strong>.
+        Numer zostanie zaktualizowany w SQL i na PDF. Zajęty numer zostanie odrzucony.
       </Typography.Paragraph>
     </Modal>
     <Modal className="kl-dialog-saved-preview" width="92vw" open={printHtml!==null} title="Podgląd zapisanej karty leczenia"
