@@ -31,3 +31,16 @@ test("all supported PDF and keyboard preferences survive normalisation",()=>{
   assert.equal(result.shortcuts.next,"alt+shift+right");
   assert.equal(result.navigation,"top");
 });
+
+test("AG Grid preferences validate limits and survive reload",()=>{
+  const chosen=normalizeComponents({
+    table:{mode:"ag",rememberColumns:true},
+    agGrid:{rowHeight:44,headerHeight:48,sortable:false,filters:true,animateRows:true},
+  });
+  assert.equal(chosen.table.mode,"ag");
+  assert.deepEqual(chosen.agGrid,{rowHeight:44,headerHeight:48,sortable:false,filters:true,animateRows:true});
+  const invalid=normalizeComponents({agGrid:{
+    rowHeight:500,headerHeight:1,sortable:"false",filters:123,animateRows:null,
+  }});
+  assert.deepEqual(invalid.agGrid,defaultComponents.agGrid);
+});
