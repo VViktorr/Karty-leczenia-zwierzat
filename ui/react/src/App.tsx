@@ -3,7 +3,7 @@ import TreatmentShortcuts from "./TreatmentShortcuts";
 import TreatmentWarningList from "./TreatmentWarningList";
 import type {ReactNode} from "react";
 import {skinPresets, presetNames, type PresetName} from "./skinPresets";
-import {initializeNavigation, updateComponents, useComponents} from "./componentSettings";
+import {initializeNavigation, setComponents, useComponents} from "./componentSettings";
 import ComponentsSettings from "./ComponentsSettings";
 import CardPdfPreview from "./CardPdfPreview";
 import type {CSSProperties} from "react";
@@ -2768,7 +2768,7 @@ export default function App() {
     </label>
     <label>Położenie menu
       <Select aria-label="Położenie menu" value={components.navigation}
-        onChange={navigation=>updateComponents("navigation",navigation)}
+        onChange={navigation=>setComponents({...components,navigation})}
         options={[{value:"side",label:"Menu boczne"},{value:"top",label:"Menu górne"}]}/>
     </label>
     <label>Motyw
