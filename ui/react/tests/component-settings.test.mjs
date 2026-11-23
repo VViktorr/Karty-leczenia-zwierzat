@@ -38,9 +38,22 @@ test("AG Grid preferences validate limits and survive reload",()=>{
     agGrid:{rowHeight:44,headerHeight:48,sortable:false,filters:true,animateRows:true},
   });
   assert.equal(chosen.table.mode,"ag");
-  assert.deepEqual(chosen.agGrid,{rowHeight:44,headerHeight:48,sortable:false,filters:true,animateRows:true});
+  assert.deepEqual(chosen.agGrid,{rowHeight:44,headerHeight:48,sortable:false,filters:true,animateRows:true,resizableColumns:true,rowBuffer:10});
   const invalid=normalizeComponents({agGrid:{
     rowHeight:500,headerHeight:1,sortable:"false",filters:123,animateRows:null,
+    resizableColumns:"yes",rowBuffer:1000,
   }});
   assert.deepEqual(invalid.agGrid,defaultComponents.agGrid);
+});
+
+test("PDF virtualisation and AG Grid performance preferences are validated",()=>{
+  const chosen=normalizeComponents({
+    pdf:{textLayer:false,annotations:false,preloadPages:3},
+    agGrid:{resizableColumns:false,rowBuffer:5},
+  });
+  assert.equal(chosen.pdf.textLayer,false);
+  assert.equal(chosen.pdf.annotations,false);
+  assert.equal(chosen.pdf.preloadPages,3);
+  assert.equal(chosen.agGrid.resizableColumns,false);
+  assert.equal(chosen.agGrid.rowBuffer,5);
 });
