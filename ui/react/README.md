@@ -49,9 +49,21 @@ Skrypt buduje React, .NET, paczkę do pierwszego importu katalogu i ChPL, a nast
 
 ## Moduły i układy
 
-Interfejs obejmuje ekrany dokumentów FS/PA/WZ, kreatora karty, zapisanych kart i kosza, katalogu leków z PDF ChPL, cennika, terminów ważności oraz ustawień połączeń Subiekta i archiwum. Dostępne są różne układy nawigacji (m.in. Modern, Classic, Windows, Fluent i warianty kompaktowe), niezależne motywy oraz skalowanie.
+Interfejs obejmuje ekrany dokumentów FS/PA/WZ, kreatora karty, zapisanych kart i kosza, katalogu leków z PDF ChPL, cennika, terminów ważności oraz ustawień połączeń Subiekta i archiwum. Dostępne są niezależne skórki (Modern, Windows, Fluent, Kompaktowy oraz Orchard, Material, Aero, Spectrum, Carbon, Nordic, Forest, Sandstone i Midnight), przełącznik menu **górne / boczne** działający dla każdej skórki, jasne/ciemne motywy i skalowanie.
 
 Lista dokumentów ma pamięć odczytu na poziomie hosta; przycisk **F5** wymusza odświeżenie. Opcja **Wszystkie pobrane** dotyczy wyłącznie zwróconej porcji danych (do 500), a nie wszystkich historycznych dokumentów.
+
+## Konfiguracja komponentów
+
+**Ustawienia → Komponenty** to konfiguracja lokalna stanowiska (bez zmian SQL):
+
+- **PDF:** wspólny podgląd `react-pdf`/`pdfjs-dist` dla ChPL i kart leczenia; przewijanie wszystkich stron (z wirtualizacją `@tanstack/react-virtual`) lub pojedyncze strony z przyciskami „Poprzednia/Następna”, zoom 50–200%, przełączanie na natywny podgląd WebView2, opcjonalna pamięć zoomu. Cennik korzysta z tych samych ustawień przewijania/stron w istniejącym HTML.
+- **Karty leczenia:** host `previewCardPdf` generuje rzeczywisty dokument PDF identycznym mechanizmem `CardPdfService.RenderAsync` co eksport. Podgląd HTML jest awaryjnym rozwiązaniem w razie błędu lub pracy bez hosta. Do drukowania używaj trybu „Podgląd natywny / drukuj”, który drukuje wygenerowany PDF.
+- **Tabele:** globalny domyślny silnik Ant Design/AG Grid z opcjonalną pamięcią per lista; istniejące indywidualne ustawienia list mogą mieć pierwszeństwo.
+- **Skróty:** `react-hotkeys-hook` konfiguruje skróty kreatora (etap wstecz/dalej, podsumowanie i zapis), wraz z włączeniem/wyłączeniem. Skróty list F5 i Ctrl+Shift+L pozostają niezależne.
+- **Bufor React Query:** 5/15/30/60 s czasu świeżości i opcja jednego ponowienia. Serwerowe limity i buforowanie SQL pozostają niezależne.
+
+Zmienione ustawienia przechowuje WebView2 `localStorage` pod kluczem `ReactKL.componentPreferences.v1`. Domyślne wartości są walidowane, a panel pozwala je przywrócić. Stare nazwy układów z oddzielnym menu górnym/bocznym zostają zmigrowane do skórki z odpowiednim przełącznikiem menu.
 
 ## Testy i status integracji
 
