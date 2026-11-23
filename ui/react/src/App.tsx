@@ -3,6 +3,9 @@ import TreatmentShortcuts from "./TreatmentShortcuts";
 import TreatmentWarningList from "./TreatmentWarningList";
 import type {ReactNode} from "react";
 import {skinPresets, presetNames, type PresetName} from "./skinPresets";
+import {initializeNavigation, updateComponents, useComponents} from "./componentSettings";
+import ComponentsSettings from "./ComponentsSettings";
+import CardPdfPreview from "./CardPdfPreview";
 import type {CSSProperties} from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/pl";
@@ -127,12 +130,10 @@ function saved<T extends string>(key: string, values: readonly T[], fallback: T)
   try { const value = localStorage.getItem(key); return values.find(item => item === value) ?? fallback; }
   catch { return fallback; }
 }
-const layouts = ["modern", "classic", "windows", "fluent", "compact-tabs", "compact-sidebar", ...presetNames] as const;
+const layouts = ["modern", "windows", "fluent", "compact", ...presetNames] as const;
 type LayoutName = (typeof layouts)[number];
 const layoutLabels = {
-  modern:"Modern — menu boczne", classic:"Classic — zakładki",
-  windows:"Windows — pasek poleceń", fluent:"Fluent UI React — menu boczne",
-  "compact-tabs":"Zakładki kompaktowe", "compact-sidebar":"Menu boczne kompaktowe"
+  modern:"Modern",windows:"Windows",fluent:"Fluent UI React",compact:"Kompaktowy"
 };
 function layoutLabel(layout: LayoutName) {
   return getSkinPreset(layout)?.label ?? layoutLabels[layout as keyof typeof layoutLabels];
@@ -1526,11 +1527,17 @@ function Treatment({draft, compact, active, wizard, shortcuts, virtualWarnings, 
           onClick={()=>{void pdfFromPreview(false);}}>Zapisz PDF</Button>
         <Button loading={pdfBusy==="mail"} disabled={!!pdfBusy}
           onClick={()=>{void pdfFromPreview(true);}}>Wyślij mailem</Button>
-        <Button type="primary" onClick={()=>previewFrame.current?.contentWindow?.print()}>Drukuj</Button>
+        <Button type="primary" disabled={isDesktop()}
+          title={isDesktop()?"Wybierz Podgląd natywny / drukuj w oknie PDF":"Drukuj z podglądu HTML"}
+          onClick={()=>previewFrame.current?.contentWindow?.print()}>Drukuj</Button>
       </Space>}>
       {pdfMessage&&<Alert className="notice" type="info" showIcon title={pdfMessage}/>}
-      {preview && <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
-        style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
+      {preview && (isDesktop() ?
+        <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={preview}
+          request={previewSavedId ? {id:previewSavedId,trash:false}
+            : {draftId:draft.draftId,reported,performed,findings,rows}}/> :
+        <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
+          style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>)}
     </Modal>
     </>}
   </>;
@@ -2130,12 +2137,17 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           onClick={()=>{void cardPdf(printTarget,false);}}>Zapisz PDF</Button>}
         {printTarget&&<Button loading={pdfBusy===printTarget.id}
           onClick={()=>{void cardPdf(printTarget,true);}}>Wyślij mailem</Button>}
-        <Button type="primary" onClick={()=>printFrame.current?.contentWindow?.print()}>Drukuj</Button>
+        <Button type="primary" disabled={isDesktop()}
+          title={isDesktop()?"Wybierz Podgląd natywny / drukuj w oknie PDF":"Drukuj z podglądu HTML"}
+          onClick={()=>printFrame.current?.contentWindow?.print()}>Drukuj</Button>
       </Space>}>
       <ErrorNotice error={error}/>
       {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
-      {printHtml&&<iframe ref={printFrame} title="Wydruk zapisanej karty" srcDoc={printHtml}
-        style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>}
+      {printHtml&&(isDesktop()&&printTarget ?
+        <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={printHtml}
+          request={{id:printTarget.id,trash}}/> :
+        <iframe ref={printFrame} title="Wydruk zapisanej karty" srcDoc={printHtml}
+          style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>)}
     </Modal>
   </>;
 }
@@ -2563,6 +2575,7 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowP
     </div>
     <Tabs activeKey={active} onChange={choose} items={[
       {key:"appearance",label:"Wygląd",children:<Card>{appearance}</Card>},
+      {key:"components",label:"Komponenty",children:<ComponentsSettings/>},
       {key:"treatment",label:"Karty leczenia",children:<Card>
         <Space orientation="vertical" size={12}>
         <Space wrap><Switch checked={wizard} onChange={onWizardChange} aria-label="Kreator kart leczenia"/>
@@ -2607,12 +2620,20 @@ export default function App() {
       .catch(()=>{if(active)setRunningVersion("niedostępna");});
     return()=>{active=false;};
   },[]);
-  const [layout,setLayout]=useState<LayoutName>(()=>saved("kl.layout",layouts,"modern"));
+  const components=useComponents();
+  const [layout,setLayout]=useState<LayoutName>(()=>{
+    let legacy="";
+    try{legacy=localStorage.getItem("kl.layout")??"";}catch{/* no storage */}
+    initializeNavigation(legacy);
+    if(legacy==="compact-tabs"||legacy==="compact-sidebar")return "compact";
+    if(legacy==="classic")return "modern";
+    return saved("kl.layout",layouts,"modern");
+  });
   const windows=layout==="windows";
   const fluent=layout==="fluent";
   const preset=getSkinPreset(layout);
-  const compact=preset?.dense||windows||layout==="compact-tabs"||layout==="compact-sidebar";
-  const topTabs=preset?.navigation==="tabs"||windows||layout==="classic"||layout==="compact-tabs";
+  const compact=preset?.dense||windows||layout==="compact";
+  const topTabs=components.navigation==="top";
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
   const [uiScale,setUiScale]=useState<number>(()=>{
     try{const value=Number(localStorage.getItem("kl.uiScale"));return Number.isFinite(value)&&value>=80&&value<=200?value:100;}
@@ -2673,6 +2694,13 @@ export default function App() {
   const colors=preset?.[dark?"dark":"light"];
   const primary=palette==="sea"?"#15836f":colors?.accent??(windows?(dark?"#2367a7":"#005fb8"):
     fluent?(dark?"#276bb0":"#0f6cbd"):dark?"#78a5fa":"#1768d8");
+  useEffect(()=>{
+    readCache.setDefaultOptions({queries:{
+      retry:components.cache.retry?1:false,
+      staleTime:components.cache.staleSeconds*1000,
+      gcTime:Math.max(60_000,components.cache.staleSeconds*4000)
+    }});
+  },[components.cache.retry,components.cache.staleSeconds]);
   const appearance=useMemo<ThemeConfig>(()=>{
     const desktop=windows||fluent||!!preset;
     const panel=colors?.panel??(dark?"#242424":"#fff");
@@ -2738,6 +2766,11 @@ export default function App() {
       <Select aria-label="Skórka" value={layout} onChange={setLayout}
         options={layouts.map(value=>({value,label:layoutLabel(value)}))}/>
     </label>
+    <label>Położenie menu
+      <Select aria-label="Położenie menu" value={components.navigation}
+        onChange={navigation=>updateComponents("navigation",navigation)}
+        options={[{value:"side",label:"Menu boczne"},{value:"top",label:"Menu górne"}]}/>
+    </label>
     <label>Motyw
       <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
         {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
@@ -2774,7 +2807,7 @@ export default function App() {
     "--skin-radius":preset.radius+"px", fontFamily:preset.fontFamily,
   } as CSSProperties;
   return <ConfigProvider theme={appearance}>
-    <div className={"app-shell layout-"+layout+" palette-"+palette+(compact?" layout-compact":"")+(preset?" layout-preset":"")} style={skinStyle}>
+    <div className={"app-shell layout-"+layout+" palette-"+palette+(topTabs?" nav-top":" nav-side")+(compact?" layout-compact":"")+(preset?" layout-preset":"")} style={skinStyle}>
       {!topTabs&&<aside className="sidebar">
         <div className="sidebar-brand"><div className="brand-mark">KL</div>
           <div><strong>Karty Leczenia</strong>{!fluent&&!preset&&<small>ReactKL · SQL</small>}</div></div>
@@ -2801,7 +2834,7 @@ export default function App() {
           {content}
         </main>
         <footer className="statusline"><span>Karty Leczenia{runningVersion&&" · Wersja "+runningVersion}</span>
-          <span>Układ {layoutLabel(layout)} · motyw {palette} · skala {uiScale}%</span></footer>
+          <span>Skórka {layoutLabel(layout)} · menu {topTabs?"górne":"boczne"} · motyw {palette} · skala {uiScale}%</span></footer>
       </div>
     </div>
   </ConfigProvider>;
