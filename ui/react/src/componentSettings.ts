@@ -6,7 +6,8 @@ export type GridMode = "antd" | "ag";
 export type NavigationMode = "top" | "side";
 export type ShortcutAction = "back" | "next" | "summary" | "save";
 export type ComponentPreferences = {
-  pdf: {mode: PageMode; viewer: ViewerMode; zoom: number; rememberZoom: boolean};
+  pdf: {mode: PageMode; viewer: ViewerMode; zoom: number; rememberZoom: boolean;
+    textLayer: boolean; annotations: boolean; preloadPages: number};
   table: {mode: GridMode; rememberColumns: boolean};
   agGrid: {
     rowHeight: number;
@@ -14,6 +15,8 @@ export type ComponentPreferences = {
     sortable: boolean;
     filters: boolean;
     animateRows: boolean;
+    resizableColumns: boolean;
+    rowBuffer: number;
   };
   cache: {staleSeconds: number; retry: boolean};
   shortcuts: {enabled: boolean; back: string; next: string; summary: string; save: string};
@@ -21,9 +24,11 @@ export type ComponentPreferences = {
 };
 
 export const defaultComponents: ComponentPreferences = {
-  pdf: {mode: "scroll", viewer: "react", zoom: 100, rememberZoom: true},
+  pdf: {mode: "scroll", viewer: "react", zoom: 100, rememberZoom: true,
+    textLayer: true, annotations: true, preloadPages: 2},
   table: {mode: "antd", rememberColumns: true},
-  agGrid: {rowHeight: 36, headerHeight: 40, sortable: true, filters: false, animateRows: false},
+  agGrid: {rowHeight: 36, headerHeight: 40, sortable: true, filters: false,
+    animateRows: false, resizableColumns: true, rowBuffer: 10},
   cache: {staleSeconds: 15, retry: false},
   shortcuts: {enabled: true, back: "alt+left", next: "alt+right",
     summary: "alt+enter", save: "mod+s"},
@@ -54,6 +59,9 @@ export function normalizeComponents(raw: unknown): ComponentPreferences {
       viewer: enumValue(pdf.viewer, ["react","native"], defaults.pdf.viewer),
       zoom: [50,75,100,125,150,175,200].includes(zoom)?zoom:defaults.pdf.zoom,
       rememberZoom: typeof pdf.rememberZoom === "boolean" ? pdf.rememberZoom : defaults.pdf.rememberZoom,
+      textLayer: typeof pdf.textLayer === "boolean" ? pdf.textLayer : defaults.pdf.textLayer,
+      annotations: typeof pdf.annotations === "boolean" ? pdf.annotations : defaults.pdf.annotations,
+      preloadPages: [1,2,3,5].includes(Number(pdf.preloadPages)) ? Number(pdf.preloadPages) : defaults.pdf.preloadPages,
     },
     table: {
       mode: enumValue(table.mode, ["antd","ag"], defaults.table.mode),
@@ -68,6 +76,10 @@ export function normalizeComponents(raw: unknown): ComponentPreferences {
       sortable: typeof agGrid.sortable === "boolean" ? agGrid.sortable : defaults.agGrid.sortable,
       filters: typeof agGrid.filters === "boolean" ? agGrid.filters : defaults.agGrid.filters,
       animateRows: typeof agGrid.animateRows === "boolean" ? agGrid.animateRows : defaults.agGrid.animateRows,
+      resizableColumns: typeof agGrid.resizableColumns === "boolean"
+        ? agGrid.resizableColumns : defaults.agGrid.resizableColumns,
+      rowBuffer: [5,10,20,30].includes(Number(agGrid.rowBuffer))
+        ? Number(agGrid.rowBuffer) : defaults.agGrid.rowBuffer,
     },
     cache: {
       staleSeconds: [5,15,30,60].includes(staleSeconds)
