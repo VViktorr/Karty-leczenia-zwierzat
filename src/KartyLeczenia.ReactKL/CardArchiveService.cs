@@ -30,7 +30,7 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         => (performed.Year, performed.Date);
 
     internal SaveResult Save(DocumentData source, DateTime? reported, DateTime performed,
-        string findings, bool confirmDuplicate)
+        string findings, bool confirmDuplicate, bool shortRoutes = false, bool shortWithdrawals = false)
     {
         if (source.Rows.All(x => !x.Printed))
             throw new InvalidOperationException("Zaznacz przynajmniej jeden lek do wydruku.");
@@ -47,6 +47,8 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Zgłoszenie — data i godzina"] = reported?.ToString("dd.MM.yyyy HH:mm") ?? "",
             ["Wykonanie — data i godzina"] = performed.ToString("dd.MM.yyyy HH:mm"),
             ["Wyniki badań"] = findings,
+            ["Skróty dróg podania"] = shortRoutes.ToString(),
+            ["Skróty karencji"] = shortWithdrawals.ToString(),
             ["Dokument źródłowy"] = source.Number,
             ["Zakres mapowania towarów"] = source.Scope
         };
@@ -155,7 +157,8 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         return CardPrintSettings.Render(card);
     }
 
-    internal string RenderDraft(DocumentData source, DateTime? reported, DateTime performed, string findings)
+    internal string RenderDraft(DocumentData source, DateTime? reported, DateTime performed, string findings,
+        bool shortRoutes = false, bool shortWithdrawals = false)
     {
         var clinic = clinicService.Load().Settings;
         var fields = new Dictionary<string, string>
@@ -167,6 +170,8 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Zgłoszenie — data i godzina"] = reported?.ToString("dd.MM.yyyy HH:mm") ?? "",
             ["Wykonanie — data i godzina"] = performed.ToString("dd.MM.yyyy HH:mm"),
             ["Wyniki badań"] = findings,
+            ["Skróty dróg podania"] = shortRoutes.ToString(),
+            ["Skróty karencji"] = shortWithdrawals.ToString(),
             ["Dokument źródłowy"] = source.Number,
             ["Zakres mapowania towarów"] = source.Scope
         };

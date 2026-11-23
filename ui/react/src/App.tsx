@@ -495,6 +495,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
   const [step,setStep]=useState(0);
   const [summaryHtml,setSummaryHtml]=useState("");
+  const [shortRoutes,setShortRoutes]=useState(false);
+  const [shortWithdrawals,setShortWithdrawals]=useState(false);
   const wizard=treatmentWindow||wizardEnabled;
   const drugStep=!wizard||step===1;
   const editingRows=drugStep;
@@ -626,6 +628,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   const autoApplied=useRef(new Set<string>());
   useEffect(() => {
     autoApplied.current.clear();
+    setShortRoutes(false);setShortWithdrawals(false);
     setStep(0);setSummaryHtml("");setFindings("");setPreview(null);setError("");
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
     pendingSaveDates.current=null;setSaveReview(null);
@@ -857,7 +860,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     setBusy(true);setSavingSql(true);setError("");
     try {
       const result = await invoke<SaveResult>("saveDraft", {
-        draftId:draft.draftId, ...dates, findings, confirmDuplicate, rows
+        draftId:draft.draftId, ...dates, findings, confirmDuplicate, rows, shortRoutes, shortWithdrawals
       });
       if (result.duplicate) {
         if(result.duplicateId)setDuplicateId(result.duplicateId);
@@ -880,7 +883,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     try{
       const request=previewSavedId
         ? {id:previewSavedId,trash:false}
-        : {draftId:draft.draftId,reported,performed,findings,rows};
+        : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals};
       const result=await invoke<{cancelled:boolean;fileName:string;recipient:string}>(
         mail?"emailCardPdf":"saveCardPdf",request);
       if(!result.cancelled)setPdfMessage(mail
@@ -900,7 +903,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     setBusy(true);setError("");
     try {
       const data = await invoke<{html:string}>("previewDraft", {
-        draftId:draft.draftId, reported, performed, findings, rows
+        draftId:draft.draftId, reported, performed, findings, rows, shortRoutes, shortWithdrawals
       });
       setPreviewSavedId(null);setPdfMessage("");
       if(inSummary)setSummaryHtml(data.html);
@@ -1069,7 +1072,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     if(active&&wizard&&step===4&&performed)void printPreview(true);
     // Refresh the preview after the wizard applies the animal details and diagnosis.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[active,wizard,step]);
+  },[active,wizard,step,shortRoutes,shortWithdrawals]);
 
   if (!draft) return <Card>
     <Empty description="Wybierz dokument w zakładce Dokumenty">
@@ -1364,7 +1367,12 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         <Input value={findings} onChange={event=>setFindings(event.target.value)}/>
       </label>
     </Card>}
-    {wizard&&step===4&&<Card title="Podsumowanie karty">
+    {wizard&&step===4&&<Card title="Podsumowanie karty" extra={<Space wrap>
+      <label><Switch size="small" checked={shortRoutes} disabled={busy||!!savedNumber}
+        aria-label="Skróć drogę podania" onChange={setShortRoutes}/> Skróć drogę podania</label>
+      <label><Switch size="small" checked={shortWithdrawals} disabled={busy||!!savedNumber}
+        aria-label="Skróć karencję" onChange={setShortWithdrawals}/> Skróć karencję</label>
+    </Space>}>
       <TreatmentDateFields reported={reported} performed={performed}
         onChange={dates=>{setReported(dates.reported);setPerformed(dates.performed);setSummaryHtml("");setSavedNumber("");}}/>
       {!rows.some(row=>row.selected)&&<Alert type="warning" showIcon title="Zaznacz pozycje do druku na etapie Warianty leków."/>}
@@ -1606,7 +1614,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         <Suspense fallback={<Spin aria-label="Ładowanie podglądu PDF"/>}>
           <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={preview}
             request={previewSavedId ? {id:previewSavedId,trash:false}
-              : {draftId:draft.draftId,reported,performed,findings,rows}}/>
+              : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals}}/>
         </Suspense> :
         <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
           style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>)}

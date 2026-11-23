@@ -1578,13 +1578,15 @@ internal sealed class ReactWindow : Form
             var reported = OptionalDate(root, "reported");
             var performed = RequiredDate(root, "performed", "wykonanie czynności weterynaryjnych");
             string findings = ReadTextField(root, "findings", 2000);
+            bool shortRoutes = Flag(root, "shortRoutes");
+            bool shortWithdrawals = Flag(root, "shortWithdrawals");
             if (action == "previewDraft")
-                return new { html = await Task.Run(() => cards.RenderDraft(snapshot, reported, performed, findings), token) };
+                return new { html = await Task.Run(() => cards.RenderDraft(snapshot, reported, performed, findings, shortRoutes, shortWithdrawals), token) };
             bool confirmDuplicate = Flag(root, "confirmDuplicate");
             treatmentSaving = true;
             try
             {
-                var result = await Task.Run(() => cards.Save(snapshot, reported, performed, findings, confirmDuplicate), token);
+                var result = await Task.Run(() => cards.Save(snapshot, reported, performed, findings, confirmDuplicate, shortRoutes, shortWithdrawals), token);
                 if (result.Id is not null) treatmentSaved = true;
                 return result;
             }

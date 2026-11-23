@@ -1,8 +1,19 @@
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 namespace KartyLeczenia;
 public static class CardHtmlRenderer
 {
+    private static string AbbreviateWithdrawal(string text)
+    {
+        // Preserve durations, conditions and line breaks. Only shorten familiar labels and units.
+        const RegexOptions options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
+        text = Regex.Replace(text, @"\btkanki jadalne(?=\s*:)", "tk.", options);
+        text = Regex.Replace(text, @"\bmleko(?=\s*:)", "ml.", options);
+        return Regex.Replace(text, @"(?<=\d)\s+(?:godzina|godziny|godzin|godz\.)(?!\p{L})",
+            " h", options);
+    }
+
     public static string Render(Card card, decimal? doctorStampHeightMm = null)
     {
         var selected = card.Rows.Where(r => string.Equals(r.GetValueOrDefault("Drukuj"), "True", StringComparison.OrdinalIgnoreCase)).ToList();
@@ -11,6 +22,8 @@ public static class CardHtmlRenderer
         static string E(string? value) => WebUtility.HtmlEncode(value ?? "").Replace("\r\n", "\n").Replace("\n", "<br>");
         string F(string key) => E(card.Fields.GetValueOrDefault(key));
         string Fill(string key) => string.IsNullOrWhiteSpace(card.Fields.GetValueOrDefault(key)) ? "................................" : F(key);
+        bool shortRoutes = card.Fields.GetValueOrDefault("Skróty dróg podania") == bool.TrueString;
+        bool shortWithdrawals = card.Fields.GetValueOrDefault("Skróty karencji") == bool.TrueString;
         var stamp = card.DoctorStampPng;
         bool showStamp = stamp is not null && CardSchema.HasPngHeader(stamp);
         var html = new StringBuilder("""
@@ -139,10 +152,13 @@ public static class CardHtmlRenderer
                         @"^\s*WZ\s+.+?, poz\. ID \d+, ruch ID \d*: .*; seria: .*; ważność: .+",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
                     .Replace("Sprawdź / uzupełnij serię i ważność.", "", StringComparison.OrdinalIgnoreCase).Trim();
-                string route = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Droga podania")) ? "" : "<br>" + V("Droga podania");
+                string routeText = row.GetValueOrDefault("Droga podania") ?? "";
+                string route = string.IsNullOrWhiteSpace(routeText) ? "" :
+                    "<br>" + E(shortRoutes ? AdministrationRouteLegend.Abbreviate(routeText) : routeText);
+                string withdrawal = row.GetValueOrDefault("Karencja") ?? "";
                 string replacement = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Zamiennik produktu"))
                     ? "" : "<br><small>Zamiennik produktu: " + V("Zamiennik produktu") + "</small>";
-                html.Append($"<tr><td class='lp'>{++index}</td>{description}{count}{diagnosisCell}<td>{V("Produkt")}{replacement}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{V("Karencja")}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
+                html.Append($"<tr><td class='lp'>{++index}</td>{description}{count}{diagnosisCell}<td>{V("Produkt")}{replacement}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{E(shortWithdrawals ? AbbreviateWithdrawal(withdrawal) : withdrawal)}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
             }
             for (; index < minimum; index++) html.Append("<tr class='empty'>" + string.Concat(Enumerable.Repeat("<td>&nbsp;</td>", 9)) + "</tr>");
         }
