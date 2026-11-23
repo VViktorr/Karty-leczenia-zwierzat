@@ -40,6 +40,13 @@ export default function ChplPdfViewer({url, name}: {url: string; name: string}) 
     overscan:preferences.preloadPages,
     getItemKey:index=>index,
   });
+  // The dialog can initially report a zero-height viewport. Paint the first
+  // page while the virtualizer waits for a measurable scroll range.
+  const virtualPages=virtualizer.getVirtualItems();
+  const renderPage=(number:number)=><Page pageNumber={number} width={pageWidth}
+    renderTextLayer={preferences.textLayer} renderAnnotationLayer={preferences.annotations}
+    loading={<Spin aria-label={"Ładowanie strony "+number}/>}/>;
+
   function changeZoom(value:number) {
     const next=Math.max(50,Math.min(200,value));
     setZoom(next);
@@ -75,20 +82,16 @@ export default function ChplPdfViewer({url, name}: {url: string; name: string}) 
       <Document file={url} onLoadSuccess={({numPages})=>{setPages(numPages);setPage(1);}}
         loading={<Spin aria-label="Ładowanie dokumentu PDF"/>}
         error={<Alert type="error" title="Nie udało się wyświetlić PDF. Wybierz pobranie lub podgląd natywny."/>}>
-        {mode==="pages" ? (pages>0&&<Page pageNumber={Math.min(page,pages)}
-          width={pageWidth} renderTextLayer={preferences.textLayer}
-          renderAnnotationLayer={preferences.annotations}
-          loading={<Spin aria-label="Ładowanie strony"/>}/>) :
-        <div style={{position:"relative",height:virtualizer.getTotalSize()}}>
-          {virtualizer.getVirtualItems().map(item=>
-            <div key={item.key} ref={virtualizer.measureElement} data-index={item.index}
-              style={{position:"absolute",top:0,left:0,width:"100%",
-                transform:`translateY(${item.start}px)`,paddingBottom:14}}>
-              <Page pageNumber={item.index+1} width={pageWidth} renderTextLayer={preferences.textLayer}
-                renderAnnotationLayer={preferences.annotations}
-                loading={<Spin aria-label={"Ładowanie strony "+(item.index+1)}/>}/>
-            </div>)}
-        </div>}
+        {pages>0 && (mode==="pages" || virtualPages.length===0 ?
+          renderPage(mode==="pages"?Math.min(page,pages):1) :
+          <div style={{position:"relative",height:virtualizer.getTotalSize()}}>
+            {virtualPages.map(item=>
+              <div key={item.key} ref={virtualizer.measureElement} data-index={item.index}
+                style={{position:"absolute",top:0,left:0,width:"100%",
+                  transform:`translateY(${item.start}px)`,paddingBottom:14}}>
+                {renderPage(item.index+1)}
+              </div>)}
+          </div>)}
       </Document>}
     </div>
   </>;
