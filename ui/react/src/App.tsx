@@ -1596,7 +1596,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   </>;
 }
 
-function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) => void}) {
+function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: boolean) => void; toolbar:HTMLDivElement|null}) {
   const [activePriceSymbol,setActivePriceSymbol]=useState("");
   const levels=useRemote<PriceLevel[]>("priceLevels",{},[]);
   const [level,setLevel]=useState<number|null>(null);
@@ -1673,11 +1673,7 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) 
   const listLayout=useListColumnLayout("prices",columns);
   const pagination=useListPagination("prices",rows.length,40);
   return <>
-    <div className="page-heading"><div>
-      <Typography.Text type="secondary">
-        Ceny i stany z Subiekta; karencje z katalogu SQL KartyLeczenia.
-      </Typography.Text>
-    </div><Space wrap>
+    {toolbar&&createPortal(<Space wrap>
       <Button onClick={prices.reload} disabled={level===null} loading={prices.busy}>Odśwież z SQL</Button>
       <Button onClick={()=>setShowSettings(true)} disabled={settingsBusy||!all.length}>
         Ustawienia wydruku
@@ -1685,14 +1681,13 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) 
       <Button type="primary" disabled={settingsBusy||!selected.length} onClick={()=>setShowPreview(true)}>
         Drukuj ({selected.length})
       </Button>
-    </Space></div>
+    </Space>,toolbar)}
     <Card>
-      <div className="document-filters">
-        <Select loading={levels.busy} value={level} placeholder="Poziom ceny"
+      <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+        <Select style={{minWidth:160}} loading={levels.busy} value={level} placeholder="Poziom ceny"
           onChange={setLevel} options={(levels.data??[]).map(x=>({label:x.name,value:x.number}))}/>
         <Input placeholder="Szukaj leku lub symbolu" value={filter}
-          allowClear onChange={e=>setFilter(e.target.value)} style={{minWidth:190}}/>
-        <Space><Switch checked={net} onChange={setNet}/> Cena netto</Space>
+          allowClear onChange={e=>setFilter(e.target.value)} style={{minWidth:190,flex:"1 1 240px"}}/>
         <Select value={settings.withdrawalFormat}
           onChange={v=>changeFormat({withdrawalFormat:v})}
           style={{minWidth:190}}
@@ -1703,6 +1698,7 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) 
           onChange={v=>changeFormat({routeCodes:v==="codes"})}
           options={[{label:"Drogi — skróty",value:"codes"},
             {label:"Drogi — pełne nazwy",value:"full"}]} style={{minWidth:180}}/>
+        <Space><Switch checked={net} onChange={setNet}/> Cena netto</Space>
       </div>
       <ErrorNotice error={levels.error||(level===null?"":prices.error)||settingsError}/>
       <Space wrap style={{marginBottom:12}}>
@@ -1724,7 +1720,7 @@ function Prices({onCatalogue}: {onCatalogue: (symbol: string, direct?: boolean) 
         onRow={row=>({onClick:()=>setActivePriceSymbol(row.symbol)})}
         dataSource={rows} columns={listLayout.columns}
         pagination={pagination}
-        size="middle" scroll={{x:1180,y:"calc(100vh - 425px)"}}/></ListParametersMenu>
+        size="middle" scroll={{x:1180,y:"max(180px, calc(100vh - 330px))"}}/></ListParametersMenu>
       <Typography.Text type="secondary">
         {selected.length} z {rows.length} widocznych pozycji do wydruku.
         Bufor danych magazynowych: 30 sekund; karencje z SQL: maksymalnie 1 minuta.
@@ -2874,7 +2870,7 @@ export default function App() {
       aria-label="Tryb długiej listy ostrzeżeń"/> Tryb długiej listy ostrzeżeń w podsumowaniu</label>
   </>;
   const content=section==="documents"||section==="treatment"?null:
-    section==="prices"?<Prices onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
+    section==="prices"?<Prices toolbar={sectionToolbar} onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
     section==="catalogue"?<CataloguePage toolbar={sectionToolbar} onDirtyChange={setCatalogueDirty}
       initialEntry={catalogueEntry} onPickerOpened={()=>setCatalogueEntry(null)}/>:
     section==="expiry"?<Expiry/>:
@@ -2897,15 +2893,16 @@ export default function App() {
         {!fluent&&!preset&&<div className="sidebar-footer">Interfejs React + WebView2<br/>Dane pozostają w SQL Server</div>}
       </aside>}
       <div className="workspace">
-        <header className={"topbar"+(section==="catalogue"?" catalogue-topbar":"")}>
+        <header className={"topbar"+(section==="catalogue"||section==="prices"?" catalogue-topbar":"")}>
           <div className={"topbar-title"+(treatmentWindow?" treatment-topbar-title":"")}>
             <strong>{treatmentWindow&&draft?`Karta leczenia do ${draft.number}`:sections.find(x=>x.id===section)?.name}</strong>
             {treatmentWindow&&draft?.shortPayer&&<span title={draft.shortPayer}>{draft.shortPayer}</span>}
+            {section==="prices"&&<span className="topbar-note">Ceny i stany z Subiekta, karencje z katalogu KartyLeczenia SQL.</span>}
             {section==="catalogue"&&<span className="topbar-note">Dane wariantów i dokumenty urzędowe z bazy KartyLeczenia SQL.</span>}
           </div>
           {treatmentWindow&&<Button onClick={returnToDocuments}>Zamknij kartę</Button>}
-          {!treatmentWindow&&(section==="catalogue"||section==="documents")&&
-            <div className={section==="catalogue"?"catalogue-toolbar":undefined} ref={setSectionToolbar}/>}
+          {!treatmentWindow&&(section==="catalogue"||section==="documents"||section==="prices")&&
+            <div className={section==="catalogue"||section==="prices"?"catalogue-toolbar":undefined} ref={setSectionToolbar}/>}
         </header>
         {!treatmentWindow&&topTabs&&<div className="top-navigation">{nav}</div>}
         <main className={"main-content"+(section==="catalogue"?" catalogue-content":"")}>
