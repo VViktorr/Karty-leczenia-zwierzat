@@ -11,13 +11,11 @@ pdfjs.GlobalWorkerOptions.workerSrc = worker;
 
 // Shared viewer for ChPL and treatment-card PDFs. Only the PDF bytes differ;
 // all toolbar, page navigation, zoom and native-viewer settings are identical.
-type PdfViewerProps = {url:string; name:string; nativePrintRequest?:number};
-
-export default function ChplPdfViewer({url, name, nativePrintRequest}: PdfViewerProps) {
-  return <PdfDocumentViewer key={url} url={url} name={name} nativePrintRequest={nativePrintRequest}/>;
+export default function ChplPdfViewer({url, name}: {url: string; name: string}) {
+  return <PdfDocumentViewer key={url} url={url} name={name}/>;
 }
 
-function PdfDocumentViewer({url, name, nativePrintRequest}: PdfViewerProps) {
+function PdfDocumentViewer({url, name}: {url: string; name: string}) {
   const preferences = useComponents().pdf;
   const viewport = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
@@ -29,7 +27,6 @@ function PdfDocumentViewer({url, name, nativePrintRequest}: PdfViewerProps) {
   useEffect(() => {setMode(preferences.mode);}, [preferences.mode]);
   useEffect(() => {setNative(preferences.viewer === "native");}, [preferences.viewer]);
   useEffect(() => {setZoom(preferences.zoom);}, [preferences.zoom]);
-  useEffect(() => {if(nativePrintRequest)setNative(true);}, [nativePrintRequest]);
   useEffect(() => {
     if(mode==="pages")viewport.current?.scrollTo({top:0,left:0});
   }, [mode,page,native]);

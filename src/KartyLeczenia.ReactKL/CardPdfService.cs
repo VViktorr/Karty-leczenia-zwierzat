@@ -1,3 +1,4 @@
+using System.Drawing.Printing;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -20,9 +21,27 @@ internal static class CardPdfService
             : $"karta-leczenia-{number}.pdf";
     }
 
-    internal static async Task<string> RenderAsync(
+    internal static Task<string> RenderAsync(
         Form owner, string html, CancellationToken token, bool landscape = true,
         double marginMm = 7, bool allowScripts = true)
+        => RenderOrPrintAsync(owner, html, token, landscape, marginMm, allowScripts);
+
+    internal static async Task<bool> PrintAsync(Form owner, string html, CancellationToken token)
+    {
+        using var dialog = new PrintDialog
+        {
+            UseEXDialog = true,
+            AllowSomePages = true,
+            PrinterSettings = new PrinterSettings { MinimumPage = 1, MaximumPage = 9999 }
+        };
+        if (dialog.ShowDialog(owner) != DialogResult.OK) return false;
+        await RenderOrPrintAsync(owner, html, token, true, 7, true, dialog.PrinterSettings);
+        return true;
+    }
+
+    private static async Task<string> RenderOrPrintAsync(
+        Form owner, string html, CancellationToken token, bool landscape,
+        double marginMm, bool allowScripts, PrinterSettings? printer = null)
     {
         if (string.IsNullOrWhiteSpace(html))
             throw new ArgumentException("Brak treści karty do wygenerowania PDF.");
@@ -79,6 +98,17 @@ internal static class CardPdfService
             print.MarginTop = print.MarginBottom = print.MarginLeft =
                 print.MarginRight = marginMm / 25.4;
             print.ShouldPrintBackgrounds = true;
+            if (printer is not null)
+            {
+                print.PrinterName = printer.PrinterName;
+                print.Copies = Math.Max(1, (int)printer.Copies);
+                if (printer.PrintRange == PrintRange.SomePages)
+                    print.PageRanges = $"{printer.FromPage}-{printer.ToPage}";
+                var status = await browser.CoreWebView2.PrintAsync(print);
+                if (status != CoreWebView2PrintStatus.Succeeded)
+                    throw new IOException($"Nie udało się wysłać karty do drukarki: {status}.");
+                return "";
+            }
             if (!await browser.CoreWebView2.PrintToPdfAsync(output, print) ||
                 !File.Exists(output) || new FileInfo(output).Length < 100)
                 throw new IOException("Nie udało się utworzyć dokumentu PDF.");

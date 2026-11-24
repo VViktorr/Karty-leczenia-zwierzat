@@ -619,8 +619,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   const [referenceBusy,setReferenceBusy]=useState(false);
   const [findings, setFindings] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
-  const [pdfPrintRequest,setPdfPrintRequest]=useState(0);
-  useEffect(()=>{if(preview===null)setPdfPrintRequest(0);},[preview]);
+  const [printingCard,setPrintingCard]=useState(false);
   const [previewSavedId,setPreviewSavedId]=useState<string|null>(null);
   const [pdfBusy,setPdfBusy]=useState<"pdf"|"mail"|null>(null);
   const [pdfMessage,setPdfMessage]=useState("");
@@ -1687,15 +1686,22 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
           onClick={()=>{void pdfFromPreview(false);}}>Zapisz PDF</Button>
         <Button loading={pdfBusy==="mail"} disabled={!!pdfBusy}
           onClick={()=>{void pdfFromPreview(true);}}>Wyślij mailem</Button>
-        <Button type="primary" onClick={()=>{
-          if(isDesktop())setPdfPrintRequest(value=>value+1);
-          else previewFrame.current?.contentWindow?.print();
+        <Button type="primary" loading={printingCard} disabled={!!pdfBusy} onClick={async()=>{
+          if(!isDesktop()){previewFrame.current?.contentWindow?.print();return;}
+          if(printingCard)return;
+          setPrintingCard(true);
+          setPdfMessage("");
+          try{
+            await invoke("printCard",previewSavedId ? {id:previewSavedId,trash:false}
+              : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals,withdrawalBySpecies,speciesGroup});
+          }catch(error){setPdfMessage(error instanceof Error?error.message:String(error));}
+          finally{setPrintingCard(false);}
         }}>Drukuj</Button>
       </Space>}>
       {pdfMessage&&<Alert className="notice" type="info" showIcon title={pdfMessage}/>}
       {preview && (isDesktop() ?
         <Suspense fallback={<Spin aria-label="Ładowanie podglądu PDF"/>}>
-          <CardPdfPreview nativePrintRequest={pdfPrintRequest} name="Karta-leczenia.pdf" fallbackHtml={preview}
+          <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={preview}
             request={previewSavedId ? {id:previewSavedId,trash:false}
               : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals,withdrawalBySpecies,speciesGroup}}/>
         </Suspense> :
@@ -1937,8 +1943,7 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
   const [editBusy,setEditBusy]=useState(false);
   const [editConfirm,setEditConfirm]=useState(false);
   const [printHtml,setPrintHtml]=useState<string|null>(null);
-  const [pdfPrintRequest,setPdfPrintRequest]=useState(0);
-  useEffect(()=>{if(printHtml===null)setPdfPrintRequest(0);},[printHtml]);
+  const [printingCard,setPrintingCard]=useState(false);
   const [previewBusy,setPreviewBusy]=useState<string|null>(null);
   const [printTarget,setPrintTarget]=useState<SavedCard|null>(null);
   const [pdfBusy,setPdfBusy]=useState<string|null>(null);
@@ -2315,16 +2320,21 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
           onClick={()=>{void cardPdf(printTarget,false);}}>Zapisz PDF</Button>}
         {printTarget&&<Button loading={pdfBusy===printTarget.id}
           onClick={()=>{void cardPdf(printTarget,true);}}>Wyślij mailem</Button>}
-        <Button type="primary" onClick={()=>{
-          if(isDesktop())setPdfPrintRequest(value=>value+1);
-          else printFrame.current?.contentWindow?.print();
+        <Button type="primary" loading={printingCard} disabled={!!pdfBusy} onClick={async()=>{
+          if(!isDesktop()){printFrame.current?.contentWindow?.print();return;}
+          if(printingCard)return;
+          setPrintingCard(true);
+          setError("");
+          try{if(printTarget)await invoke("printCard",{id:printTarget.id,trash});}
+          catch(error){setError(error instanceof Error?error.message:String(error));}
+          finally{setPrintingCard(false);}
         }}>Drukuj</Button>
       </Space>}>
       <ErrorNotice error={error}/>
       {notice&&<Alert className="notice" type="info" showIcon title={notice}/>}
       {printHtml&&(isDesktop()&&printTarget ?
         <Suspense fallback={<Spin aria-label="Ładowanie podglądu PDF"/>}>
-          <CardPdfPreview nativePrintRequest={pdfPrintRequest} name="Karta-leczenia.pdf" fallbackHtml={printHtml}
+          <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={printHtml}
             request={{id:printTarget.id,trash}}/>
         </Suspense> :
         <iframe ref={printFrame} title="Wydruk zapisanej karty" srcDoc={printHtml}

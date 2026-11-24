@@ -935,7 +935,7 @@ internal sealed class ReactWindow : Form
         }
         // Archive browsing and trash management use the program database only.
         // They must remain available when Subiekt GT is temporarily offline.
-        if (action == "previewCardPdf")
+        if (action is "previewCardPdf" or "printCard")
         {
             // Preview the exact PDF engine used for downloads and e-mail,
             // without modifying the archive or writing a user-visible file.
@@ -952,6 +952,8 @@ internal sealed class ReactWindow : Form
                     .GetProperty("html").GetString() ??
                     throw new InvalidDataException("Nie udało się przygotować karty do podglądu PDF.");
             }
+            if (action == "printCard")
+                return new { printed = await CardPdfService.PrintAsync(this, html, token) };
             string temporary = await CardPdfService.RenderAsync(this, html, token);
             try
             {
