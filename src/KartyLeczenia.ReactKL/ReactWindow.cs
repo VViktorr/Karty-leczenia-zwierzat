@@ -1233,8 +1233,9 @@ internal sealed class ReactWindow : Form
 
             var document = await documents.ReadAsync(options, number, 0, token, id);
             token.ThrowIfCancellationRequested();
-            if (openWindow && await cards.FindActiveCardAsync(document, token) is string savedCardId)
-                return new { savedCardId };
+            if (openWindow && !Flag(root, "newCard") &&
+                await cards.FindActiveCardAsync(document, token) is { } savedCard)
+                return new { savedCardId = savedCard.Id, savedCardNumber = savedCard.Number };
             token.ThrowIfCancellationRequested();
             if (openWindow)
             {

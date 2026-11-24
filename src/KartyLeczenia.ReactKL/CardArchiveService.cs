@@ -22,7 +22,9 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         return connection;
     }
 
-    internal async Task<string?> FindActiveCardAsync(DocumentData document, CancellationToken token)
+    internal sealed record ActiveCard(string Id, string? Number);
+
+    internal async Task<ActiveCard?> FindActiveCardAsync(DocumentData document, CancellationToken token)
     {
         var options = connectionStore.Load().Options;
         if (options is null) return null;
@@ -31,14 +33,17 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         { ApplicationIntent = ApplicationIntent.ReadWrite }.ConnectionString);
         await db.OpenAsync(token).ConfigureAwait(false);
         using var command = new SqlCommand("""
-            SELECT TOP (1) id FROM dbo.treatment_cards
+            SELECT TOP (1) id, card_year, card_sequence FROM dbo.treatment_cards
             WHERE source_scope=@scope AND document=@document AND deleted_at_utc IS NULL
             ORDER BY archive_order DESC;
             """, db) { CommandTimeout = 10 };
         command.Parameters.Add("@scope", SqlDbType.NVarChar, -1).Value = document.Scope;
         command.Parameters.Add("@document", SqlDbType.NVarChar, -1).Value = document.Number;
-        var result = await command.ExecuteScalarAsync(token).ConfigureAwait(false);
-        return result is Guid id ? id.ToString("N") : null;
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        if (!await reader.ReadAsync(token).ConfigureAwait(false)) return null;
+        string? number = reader.IsDBNull(1) || reader.IsDBNull(2) ? null :
+            $"K/{reader.GetInt64(2)}/{reader.GetInt32(1):D4}";
+        return new(reader.GetGuid(0).ToString("N"), number);
     }
 
     internal sealed record SaveResult(bool Duplicate, string? DuplicateId, string? Number, string? Id, string? Html = null);

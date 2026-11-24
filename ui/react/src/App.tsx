@@ -258,21 +258,25 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved
     setPageSize(value);setPage(1);
     try{localStorage.setItem("kl.documents.pageSize",String(value));}catch{}
   }
-  const open = async (row: DocumentRow) => {
+  const open = async (row: DocumentRow, newCard=false) => {
     if (openedDocument.current) return;
     const request = new AbortController();
     openedDocument.current = request;
     setReading(true); setReadError("");
     try {
       if(!await beforeOpen(row)||request.signal.aborted)return;
-      const result = await invoke<Draft|{opened:true}|{savedCardId:string}>("readDocument",
-        {documentId: row.id, number: row.number, shortPayer:row.shortPayer, openWindow:true}, undefined, request.signal);
+      const result = await invoke<Draft|{opened:true}|{savedCardId:string;savedCardNumber?:string|null}>("readDocument",
+        {documentId: row.id, number: row.number, shortPayer:row.shortPayer, openWindow:true,newCard}, undefined, request.signal);
       if(request.signal.aborted)return;
       if("savedCardId" in result){
-        Modal.confirm({
-          title:"Karta leczenia już istnieje",
-          content:"Do dokumentu "+row.number+" wystawiono już kartę. Otworzyć ją do edycji?",
+        const existing=Modal.confirm({
+          title:"Aktywna karta leczenia",
+          content:<>Dokument {row.number} ma w archiwum aktywną kartę{result.savedCardNumber?" "+result.savedCardNumber:""}.</>,
           okText:"Otwórz do edycji",cancelText:"Anuluj",
+          footer:(_,{OkBtn,CancelBtn})=><Space wrap>
+            <Button onClick={()=>{existing.destroy();void open(row,true);}}>Wystaw nową kartę</Button>
+            <CancelBtn/><OkBtn/>
+          </Space>,
           onOk:()=>onEditSaved(result.savedCardId)
         });
       }else if("draftId" in result)onOpen(result);
@@ -2113,6 +2117,7 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
         setTrashError("Stan karty już się zmienił. Lista została odświeżona.");
         return;
       }
+      notifySavedCardsChanged();
       setTrashTarget(null);
       setNotice(restore?"Przywrócono kartę z kosza.":"Przeniesiono kartę do kosza.");
     } catch (error) {
