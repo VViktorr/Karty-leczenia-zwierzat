@@ -2994,15 +2994,17 @@ export default function App() {
       <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
         {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
     </label>
-    <label>Dymki
-      <Select aria-label="Styl dymków" value={tooltipStyle} onChange={setTooltipStyle}
-        options={[{value:"dark",label:"Ciemne tło, jasny tekst"},{value:"light",label:"Białe tło, ciemny tekst"},
-          {value:"outline",label:"Jasny z konturem skórki"},{value:"contrast",label:"Wysoki kontrast"}]}/>
-    </label>
-    <Tooltip placement="top" trigger={["hover","focus"]}
-      title={<span style={{fontSize:components.tableTextPreview.fontSize}}>Pełna nazwa kontrahenta</span>}>
-      <Button>Podgląd dymka</Button>
-    </Tooltip>
+    <div className="tooltip-appearance-controls">
+      <label>Dymki
+        <Select aria-label="Styl dymków" value={tooltipStyle} onChange={setTooltipStyle}
+          options={[{value:"dark",label:"Ciemne tło, jasny tekst"},{value:"light",label:"Białe tło, ciemny tekst"},
+            {value:"outline",label:"Jasny z konturem skórki"},{value:"contrast",label:"Wysoki kontrast"}]}/>
+      </label>
+      <Tooltip placement="top" trigger={["hover","focus"]}
+        title={<span style={{fontSize:components.tableTextPreview.fontSize}}>Pełna nazwa kontrahenta</span>}>
+        <Button>Podgląd dymka</Button>
+      </Tooltip>
+    </div>
     <label>Przełączniki włącz/wyłącz
       <Select aria-label="Styl przełączników włącz/wyłącz" value={switchStyle} onChange={setSwitchStyle}
         options={[{value:"skin",label:"Zgodnie ze skórką"},{value:"solid",label:"Z wypełnieniem"},
