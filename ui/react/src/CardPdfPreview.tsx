@@ -5,8 +5,8 @@ import ChplPdfViewer from "./ChplPdfViewer";
 
 // Use the same WebView2 PrintToPdfAsync result as PDF download and e-mail.
 // HTML is shown only when PDF creation fails (for example in browser-only mode).
-export default function CardPdfPreview({request, fallbackHtml, name}:{
-  request: Record<string,unknown>; fallbackHtml:string; name:string;
+export default function CardPdfPreview({request, fallbackHtml, name, nativePrintRequest}:{
+  request: Record<string,unknown>; fallbackHtml:string; name:string; nativePrintRequest:number;
 }) {
   const requestKey=JSON.stringify(request);
   const [state,setState]=useState<{url:string|null;error:string;busy:boolean}>({
@@ -34,7 +34,7 @@ export default function CardPdfPreview({request, fallbackHtml, name}:{
   },[requestKey]);
   return <>
     {state.busy&&<Spin aria-label="Generowanie podglądu PDF karty leczenia"/>}
-    {state.url ? <ChplPdfViewer url={state.url} name={name}/> :
+    {state.url ? <ChplPdfViewer url={state.url} name={name} nativePrintRequest={nativePrintRequest}/> :
       !state.busy&&<>
         <Alert type="warning" showIcon title="Nie udało się utworzyć podglądu PDF."
           description={state.error+" Wyświetlam awaryjny podgląd HTML."}/>
@@ -42,7 +42,7 @@ export default function CardPdfPreview({request, fallbackHtml, name}:{
           style={{width:"100%",height:"65vh",border:0,background:"#fff",marginTop:8}}/>
       </>}
     {state.url&&<Typography.Text type="secondary" style={{display:"block",fontSize:12}}>
-      To jest rzeczywisty PDF wygenerowany przez WebView2. Aby drukować, wybierz „Podgląd natywny / drukuj”.
+      {nativePrintRequest ? "W pasku podglądu PDF wybierz ikonę drukarki." : "Podgląd rzeczywistego PDF wygenerowanego przez WebView2."}
     </Typography.Text>}
   </>;
 }
