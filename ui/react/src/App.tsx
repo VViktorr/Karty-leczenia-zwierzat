@@ -1064,18 +1064,22 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
               </Space>},
           {title:"Droga podania",dataIndex:"route",width:140,
             render:(value:string)=>formatWizardRoute(value??"",showRouteCodes)},
-          {title:"Dawkowanie",dataIndex:"dose",width:230,ellipsis:true},
-          {title:"Karencja — tkanki",dataIndex:"tissues",width:180,ellipsis:true},
-          {title:"Karencja — mleko",dataIndex:"milk",width:145,ellipsis:true,
+          {title:"Dawkowanie",dataIndex:"dose",width:230},
+          {title:"Karencja — tkanki",dataIndex:"tissues",width:180},
+          {title:"Karencja — mleko",dataIndex:"milk",width:145,
             render:(value:string,row)=>isPoultry(row.species) ? "—" : value},
-          {title:"Karencja — jaja",dataIndex:"eggs",width:145,ellipsis:true},
-          {title:"Wskazanie",dataIndex:"indication",width:225,ellipsis:true},
+          {title:"Karencja — jaja",dataIndex:"eggs",width:145},
+          {title:"Wskazanie",dataIndex:"indication",width:225},
           {title:"PDF ChPL",dataIndex:"pdf",width:130,
             render:(value:string)=>value
               ? <Button size="small" disabled={variantBusy}
                   onClick={()=>{void viewVariantPdf(value);}}>Otwórz ChPL</Button>
               : "Brak"}
         ];
+  for(const column of variantColumns){
+    column.onCell=()=>({style:{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}});
+  }
+
   const variantLayout=useListColumnLayout("treatment-variant",variantColumns,false,"species");
   const variantsPagination=useListPagination("treatment-variants",variantModal?.variants.length??0,12);
   useEffect(()=>{
@@ -1603,7 +1607,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       <ErrorNotice error={choiceError}/>
       <ErrorNotice error={variantError}/>
 
-      <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
+      <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> wrapRows {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantRows} size="small"
         pagination={variantsPagination} scroll={{x:"max-content",y:"100%"}}
         columns={variantLayout.columns}/></ListParametersMenu>
