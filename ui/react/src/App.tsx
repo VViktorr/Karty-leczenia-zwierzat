@@ -5,7 +5,7 @@ import TreatmentWarningList from "./TreatmentWarningList";
 import type {ReactNode} from "react";
 import {skinPresets, presetNames, type PresetName} from "./skinPresets";
 import {initializeNavigation, setComponents, useComponents} from "./componentSettings";
-import ComponentsSettings from "./ComponentsSettings";
+import ComponentsSettings, {TableSettings} from "./ComponentsSettings";
 
 import type {CSSProperties} from "react";
 import dayjs from "dayjs";
@@ -2696,6 +2696,7 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowP
   return <>
     <Tabs activeKey={active} onChange={choose} items={[
       {key:"appearance",label:"Wygląd",children:<Card>{appearance}</Card>},
+      {key:"tables",label:"Tabele",children:<TableSettings/>},
       {key:"components",label:"Komponenty",children:<ComponentsSettings/>},
       {key:"treatment",label:"Karty leczenia",children:<Card>
         <Space orientation="vertical" size={12}>
@@ -2704,6 +2705,7 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowP
           {workflowPreferences}
         </Space>
       </Card>},
+      {key:"clinic",label:"Dane lecznicy",children:<ClinicSettingsPanel/>},
       {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings onSaved={onSubiektSaved}/>},
       {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
       {key:"administrator",label:"Konto administratora SQL",children:<ProgramDatabaseSettings administrator/>},
@@ -2715,7 +2717,6 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowP
         <BackupPanel/>
         <RestorePanel/>
       </Space>},
-      {key:"clinic",label:"Dane lecznicy",children:<ClinicSettingsPanel/>},
       {key:"updates",label:"Aktualizacje",children:<UpdatePanel/>}
     ]}/>
   </>;
