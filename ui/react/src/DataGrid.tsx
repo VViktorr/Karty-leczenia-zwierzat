@@ -89,7 +89,7 @@ const gridLocalePl = {
 type Column<T extends object> = NonNullable<TableProps<T>["columns"]>[number];
 
 function Header({displayName, style}: CustomInnerHeaderProps & {style?: CSSProperties}) {
-  return <span style={{flex:"1 1 auto",minWidth:0,...style}}>{displayName}</span>;
+  return <span style={{flex:"1 1 auto",minWidth:0,whiteSpace:"normal",overflowWrap:"anywhere",...style}}>{displayName}</span>;
 }
 
 function Cell<T extends object>({data, value, node, columnDefinition}: CustomCellRendererProps<T> &
@@ -139,6 +139,8 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
     return [{
       colId: id,
       headerName,
+      wrapHeaderText: true,
+      autoHeaderHeight: true,
       width: typeof column.width === "number" ? column.width : 160,
       flex: column.width === undefined ? 1 : null,
       sortable:preferences.sortable && typeof index === "string",
