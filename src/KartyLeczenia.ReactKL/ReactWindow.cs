@@ -1589,13 +1589,19 @@ internal sealed class ReactWindow : Form
             string findings = ReadTextField(root, "findings", 2000);
             bool shortRoutes = Flag(root, "shortRoutes");
             bool shortWithdrawals = Flag(root, "shortWithdrawals");
+            bool withdrawalBySpecies = Flag(root, "withdrawalBySpecies");
+            string selectedSpecies = ReadTextField(root, "speciesGroup", 10) switch
+            {
+                "cattle" => "Bydło", "swine" => "Świnie", "poultry" => "Drób",
+                "dog" => "Pies", "cat" => "Kot", _ => ""
+            };
             if (action == "previewDraft")
-                return new { html = await Task.Run(() => cards.RenderDraft(snapshot, reported, performed, findings, shortRoutes, shortWithdrawals), token) };
+                return new { html = await Task.Run(() => cards.RenderDraft(snapshot, reported, performed, findings, shortRoutes, shortWithdrawals, withdrawalBySpecies, selectedSpecies), token) };
             bool confirmDuplicate = Flag(root, "confirmDuplicate");
             treatmentSaving = true;
             try
             {
-                var result = await Task.Run(() => cards.Save(snapshot, reported, performed, findings, confirmDuplicate, shortRoutes, shortWithdrawals), token);
+                var result = await Task.Run(() => cards.Save(snapshot, reported, performed, findings, confirmDuplicate, shortRoutes, shortWithdrawals, withdrawalBySpecies, selectedSpecies), token);
                 if (result.Id is not null) treatmentSaved = true;
                 return result;
             }
