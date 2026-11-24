@@ -509,3 +509,10 @@ html[data-kl-segment-style="outline"] .ant-segmented:not(.ant-segmented-disabled
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+.kl-table-nowrap-headers.ant-table-wrapper .ant-table-thead > tr > th,
+.kl-table-nowrap-headers.ant-table-wrapper .ant-table-thead .ant-table-column-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
