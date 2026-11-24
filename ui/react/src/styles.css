@@ -477,9 +477,7 @@ html[data-kl-segment-style="outline"] .ant-segmented:not(.ant-segmented-disabled
 .fill-list-content > :not(.fill-list-card, .catalogue-layout) { flex-shrink: 0; }
 .fill-list-card { display: flex; flex: 1 0 280px; flex-direction: column; }
 .fill-list-card > .ant-card-body,
-.fill-list-table,
-.fill-list-table > .ant-table-wrapper,
-.fill-list-table :is(.ant-spin-nested-loading, .ant-spin-container, .ant-table, .ant-table-container) {
+.fill-list-table {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -489,12 +487,12 @@ html[data-kl-segment-style="outline"] .ant-segmented:not(.ant-segmented-disabled
 .fill-list-table :is(.ant-table-header, .ant-pagination) {
   flex-shrink: 0;
 }
-.fill-list-table .ant-table-body,
 .fill-list-table > .kl-ag-grid {
   flex: 1 1 0;
   min-height: 0;
 }
-.fill-list-table .ant-table-body { max-height: none; }
+.fill-list-table:has(> .ant-table-wrapper) { overflow: auto; }
+.fill-list-table > .ant-table-wrapper { flex: 0 0 auto; min-width: 0; }
 
 .fill-list-content > .catalogue-layout { flex: 1 0 360px; align-items: stretch; }
 .catalogue-layout > .fill-list-card { min-height: 0; }
