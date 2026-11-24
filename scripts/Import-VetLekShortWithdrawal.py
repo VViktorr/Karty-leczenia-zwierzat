@@ -26,6 +26,36 @@ def normalized(value):
     return " ".join((value or "").casefold().split())
 
 
+SPECIES_ALIASES = {
+    "świnie": "świnia", "kury": "kura", "indyki": "indyk",
+    "konie": "koń", "gołębie": "gołąb", "psy": "pies", "koty": "kot",
+    "owce": "owca", "kozy": "koza", "króliki": "królik",
+}
+ROUTE_ALIASES = {
+    "im": "domięśniowo", "domięśniowa": "domięśniowo",
+    "iv": "dożylnie", "dożylna": "dożylnie",
+    "sc": "podskórnie", "podskórna": "podskórnie",
+    "po": "doustnie", "doustna": "doustnie",
+    "imm": "dowymieniowo", "dowymieniowa": "dowymieniowo",
+}
+
+
+def species_key(value):
+    key = normalized(value)
+    return SPECIES_ALIASES.get(key, key)
+
+
+def route_key(value):
+    key = normalized(value)
+    match = re.fullmatch(r"(.+) [(]([a-z]+)[)]", key)
+    if match:
+        name, code = match.groups()
+        canonical = ROUTE_ALIASES.get(name, name)
+        if canonical == ROUTE_ALIASES.get(code):
+            return canonical
+    return ROUTE_ALIASES.get(key, key)
+
+
 def period(value):
     match = PERIOD.fullmatch(normalized(value).rstrip("."))
     if match:
@@ -40,8 +70,9 @@ def vetlek_periods(text, species):
     current_species = None
     for line in text.splitlines():
         line = line.strip()
-        if normalized(line.rstrip(":")) in species:
-            current_species = normalized(line.rstrip(":"))
+        heading = species_key(line.rstrip(":"))
+        if heading in species:
+            current_species = heading
             continue
         label, sep, value = line.partition(":")
         commodity = COMMODITIES.get(normalized(label))
@@ -67,8 +98,8 @@ def rows(cursor, catalog):
         product = products.get(product_id, {})
         section = catalog["summaries"].get(product_id, {}).get("sec", {}).get("karencja", {})
         text = section.get("x", "")
-        routes = {normalized(item) for item in product.get("rt", [])}
-        species_names = {normalized(item) for item in product.get("sp", [])}
+        routes = {route_key(item) for item in product.get("rt", [])}
+        species_names = {species_key(item) for item in product.get("sp", [])}
         values = vetlek_periods(text, species_names)
         for commodity, full in zip(("tissues", "milk", "eggs"), (tissues, milk, eggs)):
             if not full:
@@ -78,11 +109,13 @@ def rows(cursor, catalog):
                 label, sep, value = full.partition(":")
                 if sep and COMMODITIES.get(normalized(label)) == commodity:
                     candidate = period(value)
-            matches = values.get((normalized(species), commodity))
+            matches = values.get((species_key(species), commodity))
             if not text:
                 reason = "missing_vetlek_source"
-            elif normalized(species) not in species_names or routes != {normalized(route)} or not route:
-                reason = "species_or_route_requires_review"
+            elif species_key(species) not in species_names or not species_key(species):
+                reason = "species_requires_review"
+            elif routes != {route_key(route)} or not route_key(route):
+                reason = "route_requires_review"
             elif not candidate or matches != {candidate}:
                 reason = "withdrawal_requires_review"
             else:
