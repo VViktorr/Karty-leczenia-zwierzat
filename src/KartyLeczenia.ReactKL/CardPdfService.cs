@@ -21,7 +21,8 @@ internal static class CardPdfService
     }
 
     internal static async Task<string> RenderAsync(
-        Form owner, string html, CancellationToken token)
+        Form owner, string html, CancellationToken token, bool landscape = true,
+        double marginMm = 7, bool allowScripts = true)
     {
         if (string.IsNullOrWhiteSpace(html))
             throw new ArgumentException("Brak treści karty do wygenerowania PDF.");
@@ -53,6 +54,7 @@ internal static class CardPdfService
                 userDataFolder: profile);
             token.ThrowIfCancellationRequested();
             await browser.EnsureCoreWebView2Async(environment);
+            browser.CoreWebView2.Settings.IsScriptEnabled = allowScripts;
             var ready = new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             EventHandler<CoreWebView2NavigationCompletedEventArgs> navigation =
@@ -71,11 +73,11 @@ internal static class CardPdfService
             finally { browser.CoreWebView2.NavigationCompleted -= navigation; }
             token.ThrowIfCancellationRequested();
             var print = browser.CoreWebView2.Environment.CreatePrintSettings();
-            print.Orientation = CoreWebView2PrintOrientation.Landscape;
+            print.Orientation = landscape ? CoreWebView2PrintOrientation.Landscape : CoreWebView2PrintOrientation.Portrait;
             print.PageWidth = 210 / 25.4;
             print.PageHeight = 297 / 25.4;
             print.MarginTop = print.MarginBottom = print.MarginLeft =
-                print.MarginRight = 7 / 25.4;
+                print.MarginRight = marginMm / 25.4;
             print.ShouldPrintBackgrounds = true;
             if (!await browser.CoreWebView2.PrintToPdfAsync(output, print) ||
                 !File.Exists(output) || new FileInfo(output).Length < 100)
