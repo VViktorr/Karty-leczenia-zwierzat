@@ -484,6 +484,39 @@ function TreatmentDateFields({reported,performed,onChange}: {
       </div>;
 }
 
+const routeLabels:Record<string,string>={
+  IM:"domięśniowo",IV:"dożylnie",SC:"podskórnie",ID:"śródskórnie",IP:"dootrzewnowo",
+  IA:"dostawowo",PO:"doustnie",IUT:"domacicznie",IMM:"dowymieniowo",IVAG:"dopochwowo",
+  TOP:"miejscowo",EXT:"zewnętrznie","POUR-ON":"przez polewanie","SPOT-ON":"punktowo na skórę",
+  OPH:"do oka",OT:"do ucha",AUR:"do ucha",PR:"doodbytniczo"
+};
+const routeNames:Record<string,string>={
+  domięśniowa:"IM",dożylna:"IV",podskórna:"SC",śródskórna:"ID",dootrzewnowa:"IP",
+  dostawowa:"IA",doustna:"PO","per os":"PO",domaciczna:"IUT",wewnątrzmacicznie:"IUT",
+  dowymieniowa:"IMM",dosutkowo:"IMM",dopochwowa:"IVAG",doodbytnicza:"PR"
+};
+function routeCode(value:string){
+  const name=value.trim();
+  const code=name.replaceAll(".","").toUpperCase();
+  if(Object.hasOwn(routeLabels,code))return code;
+  const annotated=name.match(/^(.*?)\s*\(([A-Za-z.]+)\)$/);
+  const label=(annotated?.[1]??name).toLocaleLowerCase("pl");
+  const match=routeNames[label]??Object.keys(routeLabels).find(key=>routeLabels[key]===label);
+  return annotated&&match!==annotated[2].replaceAll(".","").toUpperCase()?undefined:match;
+}
+function formatWizardRoute(value:string,short:boolean){
+  const parts=value.split("/");
+  const codes=parts.map(routeCode);
+  return codes.every(Boolean)?codes.map(code=>short?code:routeLabels[code!]).join(" / "):value;
+}
+function RouteCodesLegend({routes}:{routes:string[]}){
+  const codes=new Set(routes.flatMap(route=>formatWizardRoute(route,true).split(" / "))
+    .filter(code=>Object.hasOwn(routeLabels,code)));
+  return codes.size>0?<Typography.Text type="secondary">
+    Drogi podania · {[...codes].map(code=>code+" — "+routeLabels[code]).join(", ")}
+  </Typography.Text>:null;
+}
+
 const treatmentSteps=["Gatunek","Warianty leków","Zwierzęta","Rozpoznanie","Podsumowanie"];
 const validAnimalCount=(value:string)=>/^\d+$/.test(value.trim()) &&
   Number(value)>0 && Number(value)<=2147483647;
@@ -496,6 +529,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   const [step,setStep]=useState(0);
   const [summaryHtml,setSummaryHtml]=useState("");
   const [shortRoutes,setShortRoutes]=useState(false);
+  const [showRouteCodes,setShowRouteCodes]=useState(false);
+  const [editingRouteIndex,setEditingRouteIndex]=useState<number|null>(null);
   const [shortWithdrawals,setShortWithdrawals]=useState(false);
   const wizard=treatmentWindow||wizardEnabled;
   const drugStep=!wizard||step===1;
@@ -1027,7 +1062,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
                 {sameChoice(row)&&
                   <Tag color="blue">Ostatni wybór</Tag>}
               </Space>},
-          {title:"Droga podania",dataIndex:"route",width:140},
+          {title:"Droga podania",dataIndex:"route",width:140,
+            render:(value:string)=>formatWizardRoute(value??"",showRouteCodes)},
           {title:"Dawkowanie",dataIndex:"dose",width:230,ellipsis:true},
           {title:"Karencja — tkanki",dataIndex:"tissues",width:180,ellipsis:true},
           {title:"Karencja — mleko",dataIndex:"milk",width:145,ellipsis:true,
@@ -1162,7 +1198,9 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
             checked={value==="III"} disabled={applyBusy||busy}
             onChange={event=>{void update(row.index,"section",event.target.checked?"III":"II");}}/>
         : <Input.TextArea autoSize={{minRows:1,maxRows:3}}
-        aria-label={title} data-treatment-field={key} value={value}
+        aria-label={title} data-treatment-field={key}
+        value={key==="route"&&editingRouteIndex!==row.index?formatWizardRoute(value??"",showRouteCodes):value}
+        onFocus={key==="route"?()=>setEditingRouteIndex(row.index):undefined}
         title={key==="description"?"Dwuklik otwiera dane zwierząt":undefined}
         onDoubleClick={key==="description"?()=>openAnimalEdit(row):undefined}
         onKeyDown={key==="description"?event=>{
@@ -1172,7 +1210,10 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
           const next=e.target.value;
           setRows(current => current.map(item => item.index===row.index ? {...item,[key]:next} : item));
         }}
-        onBlur={e => {void update(row.index,key,e.target.value);}}/>
+        onBlur={e => {
+          if(key==="route")setEditingRouteIndex(null);
+          void update(row.index,key,key==="route"?value:e.target.value);
+        }}/>
     }))
   ];
   return <>
@@ -1216,6 +1257,9 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
           Domyślnie zapamiętuj wybór dla leku w SQL
         </Checkbox>
+        <Select aria-label="Wyświetlanie drogi podania" value={showRouteCodes?"codes":"full"}
+          onChange={value=>setShowRouteCodes(value==="codes")}
+          options={[{value:"full",label:"Droga podania — pełna nazwa"},{value:"codes",label:"Droga podania — skróty"}]}/>
         <Popover trigger="click" title="Podpowiedzi z katalogu SQL" placement="bottomLeft"
           content={<div style={{width:"min(540px, 75vw)"}}>
       <Space wrap>
@@ -1307,6 +1351,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       scroll={{x:1900,y:"100%"}} pagination={false}/></ListParametersMenu>
       <Typography.Text type="secondary">Wybranych do wydruku: {rows.filter(r => r.selected).length} z {rows.length}.
         {speciesGroup!=="all"&&" Niezgodnych: "+rows.filter(row=>!isCompatible(row)).length+"."}</Typography.Text>
+      {showRouteCodes&&visibleColumns.includes("route")&&<RouteCodesLegend routes={sortedRows.map(row=>row.route)}/> }
     </Card>}
     {wizard&&step===2&&<Card title="Numery i liczba leczonych zwierząt">
       <Space orientation="vertical" style={{width:"100%",maxWidth:700}}>
@@ -1562,6 +1607,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         dataSource={variantRows} size="small"
         pagination={variantsPagination} scroll={{x:"max-content",y:"100%"}}
         columns={variantLayout.columns}/></ListParametersMenu>
+      {showRouteCodes&&<RouteCodesLegend routes={variantRows.map(row=>row.route)}/> }
     </Card>}
     {variantLayout.dialog}
     <Modal className="kl-dialog-treatment-pdf" width="94vw" open={variantPdfUrl!==null}
