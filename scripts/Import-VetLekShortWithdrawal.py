@@ -3,6 +3,8 @@
 Set REACTKL_SQL_CONNECTION to an ODBC connection string for KartyLeczenia.
 Preview: python Import-VetLekShortWithdrawal.py VetLek-katalog.json review.csv
 Apply:   python Import-VetLekShortWithdrawal.py VetLek-katalog.json review.csv --apply
+Local archive: python Import-VetLekShortWithdrawal.py review.csv --from-archive
+Apply local:   python Import-VetLekShortWithdrawal.py review.csv --from-archive --apply
 Set approved to 1 only on rows marked ready after checking the source.
 """
 
@@ -102,7 +104,7 @@ def vetlek_periods(text, species):
 
 
 def rows(cursor, catalog):
-    products = {product["id"]: product for product in catalog["products"]}
+    products = {product["id"]: product for product in catalog["products"]} if catalog else {}
     for variant_id, rpl, species, route, tissues, milk, eggs in cursor.execute("""
         SELECT v.id, COALESCE(NULLIF(v.rpl_id,N''),p.rpl_id),v.species,v.route,
                v.edible_tissues,v.milk,v.eggs
@@ -112,7 +114,7 @@ def rows(cursor, catalog):
         registry_id = str(rpl or "").strip()
         product_id = registry_id if registry_id.startswith("rpl:") else "rpl:" + registry_id
         product = products.get(product_id, {})
-        section = catalog["summaries"].get(product_id, {}).get("sec", {}).get("karencja", {})
+        section = catalog["summaries"].get(product_id, {}).get("sec", {}).get("karencja", {}) if catalog else {}
         text = section.get("x", "")
         routes = {route_key(item) for item in product.get("rt", [])}
         species_names = {species_key(item) for item in product.get("sp", [])}
@@ -126,7 +128,9 @@ def rows(cursor, catalog):
                 if sep and COMMODITIES.get(normalized(label)) == commodity:
                     candidate = period(value)
             matches = values.get((species_key(species), commodity))
-            if not text:
+            if catalog is None:
+                reason = "ready" if candidate else "withdrawal_requires_review"
+            elif not text:
                 reason = "missing_vetlek_source"
             elif (species_key(species) not in species_names and
                   SPECIES_PARENTS.get(species_key(species)) not in species_names):
@@ -164,13 +168,16 @@ WHERE v.id=? AND COALESCE(v.species,N'') COLLATE Latin1_General_100_BIN2=?
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("catalog", type=Path)
+    parser.add_argument("catalog", nargs="?", type=Path)
     parser.add_argument("review", type=Path)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--from-archive", action="store_true")
     args = parser.parse_args()
+    if args.from_archive == (args.catalog is not None):
+        parser.error("Wybierz plik VetLek JSON albo opcję --from-archive.")
+    catalog = None if args.from_archive else json.loads(args.catalog.read_text(encoding="utf-8-sig"))
     import pyodbc
 
-    catalog = json.loads(args.catalog.read_text(encoding="utf-8-sig"))
     with pyodbc.connect(os.environ["REACTKL_SQL_CONNECTION"]) as db:
         cursor = db.cursor()
         database, table = cursor.execute("""
