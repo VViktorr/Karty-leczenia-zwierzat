@@ -1052,6 +1052,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     finally{setVariantBusy(false);}
   }
   const [wrapVariantRows,setWrapVariantRows]=useLocalToggle("kl.treatmentVariant.wrapRows");
+  const [wrapVariantHeaders,setWrapVariantHeaders]=useLocalToggle("kl.treatmentVariant.wrapHeaders");
   const variantColumns:ColumnsType<TreatmentVariantChoice> = [
           {title:"Gatunek",dataIndex:"species",width:170,
             render:(species:string,row:TreatmentVariantChoice)=>
@@ -1085,8 +1086,12 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   }
 
   const variantLayout=useListColumnLayout("treatment-variant",variantColumns,false,"species",
-    <Checkbox checked={wrapVariantRows} style={{marginBottom:12}}
-      onChange={event=>setWrapVariantRows(event.target.checked)}>Zawijaj treść wierszy</Checkbox>);
+    <Space wrap style={{marginBottom:12}}>
+      <Checkbox checked={wrapVariantHeaders}
+        onChange={event=>setWrapVariantHeaders(event.target.checked)}>Zawijaj nagłówki</Checkbox>
+      <Checkbox checked={wrapVariantRows}
+        onChange={event=>setWrapVariantRows(event.target.checked)}>Zawijaj treść wierszy</Checkbox>
+    </Space>);
   const variantsPagination=useListPagination("treatment-variants",variantModal?.variants.length??0,12);
   useEffect(()=>{
     if(active&&wizard&&step===4&&performed)void printPreview(true);
@@ -1613,7 +1618,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       <ErrorNotice error={choiceError}/>
       <ErrorNotice error={variantError}/>
 
-      <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> wrapRows={wrapVariantRows} {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
+      <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> wrapRows={wrapVariantRows} wrapHeaders={wrapVariantHeaders} {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantRows} size="small"
         pagination={variantsPagination} scroll={{x:"max-content",y:"100%"}}
         columns={variantLayout.columns}/></ListParametersMenu>
