@@ -1201,7 +1201,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       }},
     {title:"Ilość",dataIndex:"quantity",width:100},
     {title:"Wskazanie z ChPL",dataIndex:"indication",width:220,ellipsis:true,
-      render:(value:string)=><span title={value}>{value||"—"}</span>},
+      render:(value:string)=>value||"—"},
     ...editable.map(({key,title}) => ({
       title, dataIndex:key, width:key==="section" ? 150 : key==="dosing" || key==="withdrawal" ? 245 : 170,
       render:(value:string,row:DraftRow) => key==="replacement"
@@ -1269,12 +1269,16 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         <Select value={speciesGroup} style={{minWidth:210}}
           disabled={suggestBusy||applyBusy}
           options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/></>}
-        <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
-          Domyślnie zapamiętuj wybór dla leku w SQL
-        </Checkbox>
-        <Select aria-label="Wyświetlanie drogi podania" value={showRouteCodes?"codes":"full"}
-          onChange={value=>setShowRouteCodes(value==="codes")}
-          options={[{value:"full",label:"Droga podania — pełna nazwa"},{value:"codes",label:"Droga podania — skróty"}]}/>
+        {variantModal ? canRememberVariant&&<Checkbox checked={rememberForVariant} disabled={variantBusy}
+          onChange={event=>setRememberVariant(event.target.checked)}>Zapamiętaj wariant</Checkbox>
+          : <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
+            Domyślnie zapamiętuj wariant
+          </Checkbox>}
+        <Space size={4}>Droga:
+          <Segmented size="small" aria-label="Wyświetlanie drogi podania" value={showRouteCodes?"codes":"full"}
+            onChange={value=>setShowRouteCodes(value==="codes")}
+            options={[{value:"full",label:"Pełna"},{value:"codes",label:"Skrót"}]}/>
+        </Space>
         <Popover trigger="click" title="Podpowiedzi z katalogu SQL" placement="bottomLeft"
           content={<div style={{width:"min(540px, 75vw)"}}>
       <Space wrap>
@@ -1293,9 +1297,9 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         Warianty niejednoznaczne, bez potwierdzonej ChPL albo z już wpisanymi danymi
         wymagają ręcznego wyboru. Nic nie jest automatycznie zapisywane do SQL.
       </Typography.Text>
-      {suggestError&&<Alert type="warning" showIcon className="notice"
+      {suggestError&&<Alert key={suggestError} type="warning" showIcon closable className="notice compact-notice"
         title={"Nie udało się pobrać propozycji: "+suggestError}/>}
-      {autofillMessage&&<Alert type="info" showIcon className="notice"
+      {autofillMessage&&<Alert key={autofillMessage} type="info" showIcon closable className="notice compact-notice"
         title={autofillMessage}/>}
             <Typography.Text type="secondary">
               O pozycjach na wydruku decyduje kolumna Druk.
@@ -1303,8 +1307,13 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
           </div>}>
           <Button size="small">Podpowiedzi ChPL ({readySuggestions.length})</Button>
         </Popover>
+        {variantModal&&<>
+          <Typography.Text strong>{variantModal.product}</Typography.Text>
+          <Button size="small" disabled={variantBusy} onClick={()=>setVariantModal(null)}>Wróć do leków</Button>
+        </>}
       </Space>
-      {choiceError&&<Alert type="warning" className="notice" showIcon title={choiceError}/>}
+      {choiceError&&<Alert key={choiceError} type="warning" className="notice compact-notice"
+        showIcon closable title={choiceError}/>}
     </Card></>}
     {!wizard&&<TreatmentOptions compact={compact} label="Wspólny opis i liczba zwierząt">
     <Card className="treatment-animals">
@@ -1600,24 +1609,26 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
               : "Brak"}
         ]}/>
     </Modal>
-    {variantModal&&<Card className="treatment-variant-table fill-list-card"
-      title={"Dobór wariantu — "+variantModal.product}
-      extra={<Button disabled={variantBusy} onClick={()=>setVariantModal(null)}>Wróć do leków</Button>}>
-      <Alert className="notice compact-notice" type="warning" showIcon closable
-        title="Sprawdź gatunek, dawkowanie i karencję z ChPL. Wybór aktualizuje edytowaną kartę. Karencja zmieni się, jeśli wariant zawiera jej dane."/>
-      {canRememberVariant&&<Checkbox checked={rememberForVariant} disabled={variantBusy}
-        onChange={event=>setRememberVariant(event.target.checked)}>Zapamiętaj wybór dla tego leku</Checkbox>}
-      {previousChoice&&<Alert className="notice" type="info" showIcon
-        title={"Ostatni wybór: "+previousChoice.species+" / "+previousChoice.route}
-        description={preferredVariants.length>1
-          ?"Kilka aktualnych wariantów pasuje do zapamiętanego wyboru. Wybierz właściwy w tabeli."
-          :"Potwierdź aktualny wariant w tabeli."}
-        action={preferredVariants.length===1&&preferredVariants[0].dose?.trim()&&
-          <Button size="small" disabled={variantBusy}
-            onClick={()=>{void applyVariant(preferredVariants[0].id);}}>Użyj ostatniego wyboru</Button>}/>}
-      <ErrorNotice error={choiceError}/>
-      <ErrorNotice error={variantError}/>
-
+    {variantModal&&<Card className="treatment-variant-table fill-list-card">
+      <Alert key={"verify-"+variantModal.index} className="notice compact-notice" type="warning" showIcon closable
+        title="Przed wyborem sprawdź gatunek, dawkowanie i karencję w ChPL."/>
+      {previousChoice&&<Alert key={"last-"+variantModal.index+"-"+previousChoice.variantId}
+        className="notice compact-notice" type="info" showIcon closable
+        title={"Ostatni wybór: "+previousChoice.species+" / "+formatWizardRoute(previousChoice.route,showRouteCodes)}
+        action={<Space size={4} wrap>
+          <Popover title="Ostatni wybór" trigger="click" content={<div style={{maxWidth:420}}>
+            {preferredVariants.length>0
+              ? preferredVariants.map(item=><div key={item.id}>{item.indication||"Brak wskazania w katalogu."}</div>)
+              : "Sprawdź aktualne warianty w tabeli."}
+          </div>}>
+            <Button size="small" type="text">Szczegóły</Button>
+          </Popover>
+          {preferredVariants.length===1&&preferredVariants[0].dose?.trim()&&
+            <Button size="small" disabled={variantBusy}
+              onClick={()=>{void applyVariant(preferredVariants[0].id);}}>Użyj</Button>}
+        </Space>}/>}
+      {variantError&&<Alert key={variantError} className="notice compact-notice" type="error"
+        showIcon closable title={variantError}/>}
       <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> wrapRows={wrapVariantRows} wrapHeaders={wrapVariantHeaders} {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantRows} size="small"
         pagination={variantsPagination} scroll={{x:"max-content",y:"100%"}}
@@ -1723,9 +1734,7 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
     {title:"Karencja z katalogu",key:"withdrawal",width:440,ellipsis:true,
       render:(_value,row)=> {
         const text=withdrawalText(row,settings);
-        return <span title={text||"Brak karencji w wybranym formacie katalogu SQL"}>
-          {text||<Typography.Text type="secondary">—</Typography.Text>}
-        </span>;
+        return text||<Typography.Text type="secondary" title="Brak karencji w wybranym formacie katalogu SQL">—</Typography.Text>;
       }},
     {title:"Katalog",key:"status",width:135,
       render:(_value,row)=>row.needsCompletion
