@@ -2796,6 +2796,7 @@ export default function App() {
   const compact=preset?.dense||windows||layout==="compact";
   const topTabs=components.navigation==="top";
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
+  const [tooltipStyle,setTooltipStyle]=useState(()=>saved("kl.tooltipStyle",["dark","light"] as const,"dark"));
   const [switchStyle,setSwitchStyle]=useState(()=>saved("kl.switchStyle",["skin","solid","outline","soft"] as const,"skin"));
   const [segmentStyle,setSegmentStyle]=useState(()=>saved("kl.segmentStyle",["skin","solid","outline"] as const,"skin"));
   const [uiScale,setUiScale]=useState<number>(()=>{
@@ -2895,6 +2896,7 @@ export default function App() {
           colorText:colors?.text??(dark?"#f5f5f5":"#242424"),colorBgElevated:panel,
           colorFillAlter:surface,colorPrimaryBg:selection}:{})},
       components:{
+        Tooltip:tooltipStyle==="light"?{colorBgSpotlight:"#fff",colorTextLightSolid:"#242424"}:{},
         Segmented:{itemSelectedBg:primary,itemSelectedColor:"#fff"},
         Table:{
           headerBg:desktop?surface:(dark?"#273447":"#f3f6fa"),
@@ -2920,7 +2922,7 @@ export default function App() {
         }:{})
       }
     };
-  },[dark,layout,primary,topTabs,compact,windows,fluent,palette,preset,colors]);
+  },[dark,layout,primary,topTabs,compact,windows,fluent,palette,preset,colors,tooltipStyle]);
   useEffect(()=>{
     if(windows||fluent||preset)document.documentElement.dataset.klSkin=layout;
     else delete document.documentElement.dataset.klSkin;
@@ -2937,6 +2939,7 @@ export default function App() {
     root.style.setProperty("--kl-toggle-accent",primary);
     root.style.setProperty("--kl-toggle-text",colors?.text??(dark?"#f5f5f5":"#242424"));
     try{
+      localStorage.setItem("kl.tooltipStyle",tooltipStyle);
       localStorage.setItem("kl.switchStyle",switchStyle);
       localStorage.setItem("kl.segmentStyle",segmentStyle);
     }catch{/* Current selection remains available in this window. */}
@@ -2946,7 +2949,7 @@ export default function App() {
       root.style.removeProperty("--kl-toggle-accent");
       root.style.removeProperty("--kl-toggle-text");
     };
-  },[switchStyle,segmentStyle,primary,colors,dark]);
+  },[switchStyle,segmentStyle,primary,colors,dark,tooltipStyle]);
   const navigationSections=isDesktop()?sections.filter(item=>item.id!=="treatment"):sections;
   const standardNav=<nav aria-label="Nawigacja Karty Leczenia" className="main-nav">
     {navigationSections.map(x=><button key={x.id} type="button"
@@ -2970,6 +2973,10 @@ export default function App() {
     <label>Motyw
       <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
         {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
+    </label>
+    <label>Dymki
+      <Select aria-label="Styl dymków" value={tooltipStyle} onChange={setTooltipStyle}
+        options={[{value:"dark",label:"Ciemne tło, jasny tekst"},{value:"light",label:"Białe tło, ciemny tekst"}]}/>
     </label>
     <label>Przełączniki włącz/wyłącz
       <Select aria-label="Styl przełączników włącz/wyłącz" value={switchStyle} onChange={setSwitchStyle}
