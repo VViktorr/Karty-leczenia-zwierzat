@@ -128,6 +128,26 @@ export function TableSettings() {
         </Checkbox>
       </Space>
     </Card>
+    <Card size="small" title="Podgląd długiego tekstu">
+      <Space wrap>
+        <Checkbox checked={settings.tableTextPreview.enabled}
+          onChange={event=>updateComponents("tableTextPreview",{enabled:event.target.checked})}>
+          Pokazuj dymki w tabelach
+        </Checkbox>
+        <label>Opóźnienie{" "}
+          <Select aria-label="Opóźnienie dymka" disabled={!settings.tableTextPreview.enabled}
+            value={settings.tableTextPreview.delaySeconds} style={{width:92}}
+            options={[1,2,3,4,5].map(value=>({value,label:value+" s"}))}
+            onChange={delaySeconds=>updateComponents("tableTextPreview",{delaySeconds})}/>
+        </label>
+        <label>Rozmiar tekstu{" "}
+          <Select aria-label="Rozmiar tekstu dymka" disabled={!settings.tableTextPreview.enabled}
+            value={settings.tableTextPreview.fontSize} style={{width:100}}
+            options={[14,16,18,20,22,24].map(value=>({value,label:value+" px"}))}
+            onChange={fontSize=>updateComponents("tableTextPreview",{fontSize})}/>
+        </label>
+      </Space>
+    </Card>
     <Card size="small" title="AG Grid — wspólne ustawienia tabel">
       <Space direction="vertical" size={12} style={{width:"100%"}}>
         <Typography.Text type="secondary">
