@@ -32,7 +32,14 @@ internal static class CardPdfService
         {
             UseEXDialog = true,
             AllowSomePages = true,
-            PrinterSettings = new PrinterSettings { MinimumPage = 1, MaximumPage = 9999 }
+            PrinterSettings = new PrinterSettings
+            {
+                MinimumPage = 1,
+                MaximumPage = 9999,
+                FromPage = 1,
+                ToPage = 1,
+                PrintRange = PrintRange.AllPages
+            }
         };
         if (dialog.ShowDialog(owner) != DialogResult.OK) return false;
         await RenderOrPrintAsync(owner, html, token, true, 7, true, dialog.PrinterSettings);
