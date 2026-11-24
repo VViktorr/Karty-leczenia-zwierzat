@@ -103,7 +103,18 @@ def vetlek_periods(text, species):
     return result
 
 
-def rows(cursor, catalog):
+def is_unconditionally_prohibited(value, commodity):
+    value = normalized(value).rstrip(".")
+    label, separator, rest = value.partition(":")
+    if separator and COMMODITIES.get(label) == commodity:
+        value = rest.strip()
+    return bool(re.fullmatch(
+        r"(?:produkt )?niedopuszcz(?:ony|ona|one|ono)(?: do spożycia przez ludzi)?",
+        value,
+    ))
+
+
+def rows(cursor, catalog, prohibited_only=False):
     products = {product["id"]: product for product in catalog["products"]} if catalog else {}
     for variant_id, rpl, species, route, tissues, milk, eggs in cursor.execute("""
         SELECT v.id, COALESCE(NULLIF(v.rpl_id,N''),p.rpl_id),v.species,v.route,
@@ -128,7 +139,11 @@ def rows(cursor, catalog):
                 if sep and COMMODITIES.get(normalized(label)) == commodity:
                     candidate = period(value)
             matches = values.get((species_key(species), commodity))
-            if catalog is None:
+            if prohibited_only:
+                if "niedopuszcz" not in normalized(full):
+                    continue
+                reason = "ready" if is_unconditionally_prohibited(full, commodity) else "withdrawal_requires_review"
+            elif catalog is None:
                 reason = "ready" if candidate else "withdrawal_requires_review"
             elif not text:
                 reason = "missing_vetlek_source"
@@ -142,7 +157,9 @@ def rows(cursor, catalog):
             else:
                 reason = "ready"
             short = ""
-            if reason == "ready":
+            if reason == "ready" and prohibited_only:
+                short = "Niedopuszczone"
+            elif reason == "ready":
                 count, unit = candidate
                 short = f"{count} " + ("h" if unit == "hours" else ("dzień" if count == 1 else "dni"))
             yield dict(approved="", reason=reason, variant_id=str(variant_id), rpl=product_id,
@@ -154,7 +171,7 @@ def rows(cursor, catalog):
 INSERT = """
 INSERT dbo.catalog_variant_withdrawal
     (variant_id,commodity,short_text,status,duration,unit,source_text)
-SELECT v.id, ?, ?, 'period', ?, ?, ?
+SELECT v.id, ?, ?, ?, ?, ?, ?
 FROM dbo.catalog_variants v WITH (UPDLOCK,HOLDLOCK)
 WHERE v.id=? AND COALESCE(v.species,N'') COLLATE Latin1_General_100_BIN2=?
     AND COALESCE(v.route,N'') COLLATE Latin1_General_100_BIN2=?
@@ -172,7 +189,11 @@ def main():
     parser.add_argument("review", type=Path)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--from-archive", action="store_true")
+    parser.add_argument("--prohibited-only", action="store_true",
+                        help="Pokaż tylko wpisy z niedopuszczeniem do spożycia (tryb bazy ReactKL).")
     args = parser.parse_args()
+    if args.prohibited_only and not args.from_archive:
+        parser.error("--prohibited-only wymaga --from-archive.")
     if args.from_archive == (args.catalog is not None):
         parser.error("Wybierz plik VetLek JSON albo opcję --from-archive.")
     catalog = None if args.from_archive else json.loads(args.catalog.read_text(encoding="utf-8-sig"))
@@ -185,7 +206,7 @@ def main():
         """).fetchone()
         if database != "KartyLeczenia" or table is None:
             raise SystemExit("Wybierz bazę KartyLeczenia z tabelą krótkich karencji.")
-        current = list(rows(cursor, catalog))
+        current = list(rows(cursor, catalog, args.prohibited_only))
         if not args.apply:
             with args.review.open("x", encoding="utf-8-sig", newline="") as file:
                 writer = csv.DictWriter(file, fieldnames=FIELDS, delimiter=";")
@@ -209,8 +230,9 @@ def main():
         for key in sorted(approved):
             row = ready[key]
             commodity = row["commodity"]
-            count, unit = period(row["short_text"])
-            cursor.execute(INSERT, commodity, row["short_text"], count, unit,
+            count, unit = (None, None) if args.prohibited_only else period(row["short_text"])
+            status = "not_authorized" if args.prohibited_only else "period"
+            cursor.execute(INSERT, commodity, row["short_text"], status, count, unit,
                            row["source_text"], int(row["variant_id"]), row["species"],
                            row["route"], commodity, row["source_text"], commodity)
             inserted += cursor.rowcount
