@@ -103,11 +103,45 @@ def vetlek_periods(text, species):
     return result
 
 
-def prohibition_short_text(value, commodity):
+MILK_PRODUCER_PROHIBITIONS = {
+    "produkt niedopuszczony do stosowania u zwierząt produkujących mleko przeznaczone do spożycia przez ludzi",
+    "niedopuszczony do stosowania u zwierząt produkujących mleko przeznaczone do spożycia przez ludzi",
+}
+MILK_SPECIES_PROHIBITIONS = {
+    "bydło": {
+        "niedopuszczony u krów mlecznych",
+        "niedopuszczony do stosowania u krów produkujących mleko do spożycia przez ludzi",
+    },
+    "koń": {
+        "niedopuszczony u klaczy mlecznych",
+        "nie dotyczy — produkt niedopuszczony u zwierząt produkujących mleko przeznaczone do spożycia przez ludzi",
+    },
+    "owca": {"niedopuszczony u owiec produkujących mleko przeznaczone do spożycia przez ludzi"},
+}
+TISSUE_SPECIES_PROHIBITIONS = {
+    "koń": {
+        "produkt niedopuszczony do stosowania u koni, których tkanki przeznaczone są do spożycia przez ludzi",
+        "niedopuszczony do uboju",
+        "niedopuszczony do stosowania u koni przeznaczonych do spożycia przez ludzi",
+    },
+    "konie (klacze)": {"niedopuszczony do uboju"},
+    "osły": {"niedopuszczony do stosowania u osłów przeznaczonych do spożycia przez ludzi"},
+}
+
+
+def prohibition_short_text(value, commodity, species):
     value = normalized(value).rstrip(".")
     label, separator, rest = value.partition(":")
     if separator and COMMODITIES.get(label) == commodity:
         value = rest.strip()
+    key = species_key(species)
+    if commodity == "milk" and (
+        value in MILK_SPECIES_PROHIBITIONS.get(key, ()) or
+        (key in MILK_SPECIES_PROHIBITIONS and value in MILK_PRODUCER_PROHIBITIONS)
+    ):
+        return "Niedopuszczony"
+    if commodity == "tissues" and value in TISSUE_SPECIES_PROHIBITIONS.get(key, ()):
+        return "Niedopuszczony"
     if commodity == "milk" and value == (
         "niedopuszczony u bydła produkującego mleko do spożycia przez ludzi, także w zasuszeniu. "
         "nie stosować w drugiej połowie ciąży u jałówek przeznaczonych do takiej produkcji"
@@ -154,7 +188,7 @@ def rows(cursor, catalog, prohibited_only=False):
                     continue
                 if "niedopuszcz" not in normalized(full):
                     continue
-                prohibited_short = prohibition_short_text(full, commodity)
+                prohibited_short = prohibition_short_text(full, commodity, species)
                 reason = "ready" if prohibited_short else "withdrawal_requires_review"
             elif catalog is None:
                 reason = "ready" if candidate else "withdrawal_requires_review"
