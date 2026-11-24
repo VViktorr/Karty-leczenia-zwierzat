@@ -211,10 +211,11 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
   }};
 }
 
-function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
+function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved, toolbar}: {
   toolbar:HTMLDivElement|null;
   active:boolean;compact:boolean;cacheScope?:number;beforeOpen:(row:DocumentRow)=>Promise<boolean>;
   onOpen:(draft:Draft)=>void;
+  onEditSaved:(id:string)=>void;
 }) {
   const tableRef=useRef<HTMLDivElement>(null);
   const [contextMenu,setContextMenu]=useState<DocumentRow|"header"|null>(null);
@@ -264,9 +265,17 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, toolbar}: {
     setReading(true); setReadError("");
     try {
       if(!await beforeOpen(row)||request.signal.aborted)return;
-      const result = await invoke<Draft|{opened:true}>("readDocument",
+      const result = await invoke<Draft|{opened:true}|{savedCardId:string}>("readDocument",
         {documentId: row.id, number: row.number, shortPayer:row.shortPayer, openWindow:true}, undefined, request.signal);
-      if (!request.signal.aborted && "draftId" in result) onOpen(result);
+      if(request.signal.aborted)return;
+      if("savedCardId" in result){
+        Modal.confirm({
+          title:"Karta leczenia już istnieje",
+          content:"Do dokumentu "+row.number+" wystawiono już kartę. Otworzyć ją do edycji?",
+          okText:"Otwórz do edycji",cancelText:"Anuluj",
+          onOk:()=>onEditSaved(result.savedCardId)
+        });
+      }else if("draftId" in result)onOpen(result);
     } catch (error) {
       if (!request.signal.aborted) setReadError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1894,8 +1903,8 @@ function Expiry() {
   </>;
 }
 
-function SavedCards({initialCardId,onInitialCardOpened}:{
-  initialCardId:string|null;onInitialCardOpened:()=>void;
+function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
+  initialCardId:string|null;initialEdit:boolean;onInitialCardOpened:()=>void;
 }) {
   const [trash,setTrash]=useState(false);
   const [query,setQuery]=useState("");
@@ -1949,7 +1958,9 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
           client:loaded.fields["Właściciel i adres"]||"",
           document:loaded.fields["Dokument źródłowy"]||""
         });
-        setCard(loaded);setError("");onInitialCardOpened();
+        setCard(loaded);setError("");
+        if(initialEdit)startEditing(loaded);
+        onInitialCardOpened();
       })
       .catch(reason=>{
         if(active){setError(reason instanceof Error?reason.message:String(reason));
@@ -1957,7 +1968,7 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
       });
     return()=>{active=false;};
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[initialCardId]);
+  },[initialCardId,initialEdit]);
   const open=async (row: SavedCard) => {
     setEditing(false);setEditDraft(null);setCard(null);setSelected(row);
     try{
@@ -1978,9 +1989,11 @@ function SavedCards({initialCardId,onInitialCardOpened}:{
     else finish();
   }
   function beginEdit(){
-    if(trash||!card)return;
-    setEditDraft({revision:card.revision,fields:{...card.fields},
-      rows:card.rows.map(row=>({...row}))});
+    if(!trash&&card)startEditing(card);
+  }
+  function startEditing(source:StoredCard){
+    setEditDraft({revision:source.revision,fields:{...source.fields},
+      rows:source.rows.map(row=>({...row}))});
     setEditing(true);setError("");setNotice("");
   }
   function editHeader(key:string,value:string){
@@ -2789,7 +2802,7 @@ export default function App() {
   const [sectionToolbar,setSectionToolbar]=useState<HTMLDivElement|null>(null);
   const [section,setSection]=useState<Section>(treatmentWindow?"treatment":"documents");
   const [subiektRevision,setSubiektRevision]=useState(0);
-  const [savedCardToOpen,setSavedCardToOpen]=useState<string|null>(null);
+  const [savedCardToOpen,setSavedCardToOpen]=useState<{id:string;edit:boolean}|null>(null);
   const [draft,setDraft]=useState<Draft|null>(null);
   const [draftSaved,setDraftSaved]=useState(false);
   const [windowError,setWindowError]=useState("");
@@ -2989,7 +3002,7 @@ export default function App() {
     section==="catalogue"?<CataloguePage toolbar={sectionToolbar} onDirtyChange={setCatalogueDirty}
       initialEntry={catalogueEntry} onPickerOpened={()=>setCatalogueEntry(null)}/>:
     section==="expiry"?<Expiry/>:
-    section==="saved"?<SavedCards initialCardId={savedCardToOpen}
+    section==="saved"?<SavedCards initialCardId={savedCardToOpen?.id??null} initialEdit={savedCardToOpen?.edit??false}
       onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage wizard={wizard} onWizardChange={changeWizard} appearance={controls}
         workflowPreferences={workflowPreferences} onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
   const skinStyle=preset&&colors&&{
@@ -3025,6 +3038,7 @@ export default function App() {
             title="Podgląd przeglądarkowy. Połączenie SQL działa w aplikacji Windows ReactKL."/>}
           {!treatmentWindow&&<div hidden={section!=="documents"} style={section==="documents"?{display:"contents"}:undefined}>
             <Documents key={subiektRevision} toolbar={sectionToolbar} compact={compact} active={section==="documents"} cacheScope={cacheDocuments?subiektRevision:undefined} beforeOpen={beforeOpenDocument}
+              onEditSaved={id=>{setSavedCardToOpen({id,edit:true});setSection("saved");}}
               onOpen={next=>{setDraft(next);setSection("treatment");}}/>
           </div>}
           <ErrorNotice error={windowError}/>
@@ -3033,7 +3047,7 @@ export default function App() {
           <div hidden={section!=="treatment"} style={section==="treatment"?{display:"contents"}:undefined}>
             {(!treatmentWindow||draft)&&<Treatment draft={draft} compact={compact} active={section==="treatment"} wizard={wizard} shortcuts={shortcuts} virtualWarnings={virtualWarnings} onSavedChange={setDraftSaved}
               onDocuments={returnToDocuments}
-              onOpenSaved={id=>{setSavedCardToOpen(id);setSection("saved");}}/>}
+              onOpenSaved={id=>{setSavedCardToOpen({id,edit:false});setSection("saved");}}/>}
           </div>
           {content}
         </main>
