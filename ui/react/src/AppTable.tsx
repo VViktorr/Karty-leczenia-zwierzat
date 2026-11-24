@@ -47,5 +47,6 @@ export default function AppTable<T extends object>({grid, className, style, wrap
     ? <Suspense fallback={<Spin aria-label="Ładowanie tabeli"/>}>
         <DataGrid<T> {...props} columns={columns} wrapRows={wrapRows} wrapHeaders={wrapHeaders} style={style} resize={grid?.resize} move={grid?.move}/>
       </Suspense>
-    : <Table<T> {...props} columns={columns} className={[className, !wrapHeaders && "kl-table-nowrap-headers"].filter(Boolean).join(" ")} style={style}/>;
+    : <Table<T> {...props} columns={columns}
+        scroll={props.scroll?.y === "100%" ? {...props.scroll, y:undefined} : props.scroll} className={[className, !wrapHeaders && "kl-table-nowrap-headers"].filter(Boolean).join(" ")} style={style}/>;
 }
