@@ -8,7 +8,8 @@ import type {ColumnsType} from "antd/es/table";
 
 /** Workstation-local, WinForms-style column visibility, order and widths. */
 export function useListColumnLayout<T extends object>(
-  listId:string,columns:ColumnsType<T>,shortcutEnabled=true,requiredColumn?:string
+  listId:string,columns:ColumnsType<T>,shortcutEnabled=true,requiredColumn?:string,
+  formattingOptions?:import("react").ReactNode
 ) {
   const rememberColumns=useComponents().table.rememberColumns;
   const identity=(column:ColumnsType<T>[number]):string =>
@@ -155,7 +156,7 @@ export function useListColumnLayout<T extends object>(
     </div>
     <Button size="small" onClick={resetColumns}>Przywróć domyślne kolumny</Button>
       </>},
-      {key:"format",label:"Formatowanie",children:<ListFormattingPanel formatting={formatting} columns={definitions}/>}
+      {key:"format",label:"Formatowanie",children:<>{formattingOptions}<ListFormattingPanel formatting={formatting} columns={definitions}/></>}
     ]}/>
   </Modal>;
   const grid = {
