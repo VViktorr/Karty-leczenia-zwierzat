@@ -150,6 +150,8 @@ def rows(cursor, catalog, prohibited_only=False):
                     candidate = period(value)
             matches = values.get((species_key(species), commodity))
             if prohibited_only:
+                if commodity == "milk" and species_key(species) in {"kura", "cielęta"}:
+                    continue
                 if "niedopuszcz" not in normalized(full):
                     continue
                 prohibited_short = prohibition_short_text(full, commodity)
