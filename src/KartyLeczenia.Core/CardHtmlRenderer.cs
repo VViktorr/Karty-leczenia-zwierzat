@@ -24,6 +24,8 @@ public static class CardHtmlRenderer
         string Fill(string key) => string.IsNullOrWhiteSpace(card.Fields.GetValueOrDefault(key)) ? "................................" : F(key);
         bool shortRoutes = card.Fields.GetValueOrDefault("Skróty dróg podania") == bool.TrueString;
         bool shortWithdrawals = card.Fields.GetValueOrDefault("Skróty karencji") == bool.TrueString;
+        bool withdrawalBySpecies = card.Fields.GetValueOrDefault("Karencja wg gatunku") == bool.TrueString;
+        string selectedSpecies = card.Fields.GetValueOrDefault("Gatunek karty") ?? "";
         var stamp = card.DoctorStampPng;
         bool showStamp = stamp is not null && CardSchema.HasPngHeader(stamp);
         var html = new StringBuilder("""
@@ -147,7 +149,7 @@ public static class CardHtmlRenderer
                     string[] sourceSpecies = rows.Skip(index).Take(nextCell - index)
                         .Select(row => (row.GetValueOrDefault("Gatunek") ?? "").Trim())
                         .Where(name => name.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                    string[] species = sourceSpecies.Select(GeneralSpecies)
+                    string[] species = (selectedSpecies.Length > 0 ? new[] { selectedSpecies } : sourceSpecies).Select(GeneralSpecies)
                         .Where(name => name.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                     string description = string.Join("\n", value.Split('\n')
                         .Select(line => line.Trim())
@@ -190,6 +192,17 @@ public static class CardHtmlRenderer
                 string route = string.IsNullOrWhiteSpace(routeText) ? "" :
                     "<br>" + E(shortRoutes ? AdministrationRouteLegend.Abbreviate(routeText) : routeText);
                 string withdrawal = row.GetValueOrDefault("Karencja") ?? "";
+                if (withdrawalBySpecies)
+                {
+                    string species = GeneralSpecies(row.GetValueOrDefault("Gatunek") ?? "");
+                    withdrawal = string.Join("\n", withdrawal.ReplaceLineEndings("\n").Split('\n')
+                        .Where(line => !Regex.IsMatch(line.Trim(),
+                            @"^Mleko:\s*Nie dotyczy(?:\s*\(nie są gatunkami produkującymi mleko przeznaczone do spożycia przez ludzi\))?\.?$",
+                            RegexOptions.IgnoreCase))
+                        .Select(line => Regex.Replace(line, @"^Tkanki(?: jadalne)?:\s*",
+                            species.Length == 0 ? "Tkanki: " : "Tkanki: " + species + " — ",
+                            RegexOptions.IgnoreCase)));
+                }
                 string replacement = string.IsNullOrWhiteSpace(row.GetValueOrDefault("Zamiennik produktu"))
                     ? "" : "<br><small>Zamiennik produktu: " + V("Zamiennik produktu") + "</small>";
                 html.Append($"<tr><td class='lp'>{++index}</td>{description}{count}{diagnosisCell}<td>{V("Produkt")}{replacement}</td><td>{V("Seria")}</td><td>{V("Ilość wydana")}<br>{V("Dawkowanie i okres stosowania")}{route}</td><td>{E(shortWithdrawals ? AbbreviateWithdrawal(withdrawal) : withdrawal)}<br>{V("Produkt spożywczy")}</td><td>{E(notes)}</td></tr>");
