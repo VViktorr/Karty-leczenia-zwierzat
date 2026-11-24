@@ -1,7 +1,7 @@
 import Modal from "./AppModal";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {moveColumn,useTableMouseLayout} from "./TableMouseLayout";
-import {useEffect,useState} from "react";
+import {createContext,useContext,useEffect,useState,type ReactNode} from "react";
 import {useComponents} from "./componentSettings";
 import {Button,Checkbox,Dropdown,InputNumber,Tabs,Typography} from "antd";
 import type {ColumnsType} from "antd/es/table";
@@ -183,13 +183,47 @@ export function TableContextTrigger({onContextMenu,onContextMenuCapture,...props
   }}/>;
 }
 
+const ListMenuContext = createContext(false);
+const expandedEditActions = new WeakMap<Element, () => void>();
+const expandedEditLabel = "Otwórz w większym oknie edycji";
+
+export function ExpandedEditTarget({children,onOpen}: {children:ReactNode;onOpen?:()=>void}) {
+  const inListMenu = useContext(ListMenuContext);
+  const target = <div data-expanded-edit={onOpen ? "" : undefined} ref={element=>{
+    if(!element)return;
+    if(onOpen)expandedEditActions.set(element,onOpen);
+    else expandedEditActions.delete(element);
+  }}>{children}</div>;
+
+  return inListMenu || !onOpen ? target : <Dropdown trigger={["contextMenu"]}
+    menu={{items:[{key:"expand",label:expandedEditLabel,onClick:onOpen}]}}>
+    {target}
+  </Dropdown>;
+}
+
 export function ListParametersMenu({children,onOpen,fillHeight}: {
-  children: import("react").ReactNode;
+  children: ReactNode;
   onOpen: () => void;
   fillHeight?: boolean;
 }) {
+  const [expand,setExpand] = useState<(()=>void)|undefined>();
   return <Dropdown trigger={["contextMenu"]}
-    menu={{items:[{key:"parameters",label:"Parametry listy",onClick:onOpen}]}}>
-    <TableContextTrigger className={fillHeight?"fill-list-table":undefined}>{children}</TableContextTrigger>
+    menu={{items:[
+      {key:"parameters",label:"Parametry listy",onClick:onOpen},
+      ...(expand ? [{key:"expand",label:expandedEditLabel,onClick:expand}] : [])
+    ]}}>
+    <TableContextTrigger className={fillHeight?"fill-list-table":undefined}
+      onContextMenuCapture={event=>{
+        const target = event.target;
+        const editor = target instanceof Element
+          ? target.closest("[data-expanded-edit]") ??
+            target.closest("td, .ag-cell")?.querySelector("[data-expanded-edit]")
+          : null;
+        const action = editor && event.currentTarget.contains(editor)
+          ? expandedEditActions.get(editor) : undefined;
+        setExpand(()=>action);
+      }}>
+      <ListMenuContext.Provider value={true}>{children}</ListMenuContext.Provider>
+    </TableContextTrigger>
   </Dropdown>;
 }

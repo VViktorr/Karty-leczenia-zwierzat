@@ -1,5 +1,6 @@
 import {useState, type ComponentProps} from "react";
-import {Dropdown, Input} from "antd";
+import {Input} from "antd";
+import {ExpandedEditTarget} from "./ListColumnLayout";
 import Modal from "./AppModal";
 
 type Props = Omit<ComponentProps<typeof Input.TextArea>, "onChange"> & {
@@ -15,15 +16,9 @@ export default function ExpandableTextArea({onValueChange, onApply, editValue, .
   const editable = !props.disabled && !props.readOnly && !!onValueChange;
 
   return <>
-    <Dropdown trigger={["contextMenu"]} disabled={!editable} menu={{items:[
-      {key:"expand", label:"Otwórz w większym oknie edycji", onClick:open}
-    ]}}>
-      <span style={{display:"block"}} onContextMenu={event=>{
-        if (editable) event.stopPropagation();
-      }}>
-        <Input.TextArea {...props} onChange={event=>onValueChange?.(event.target.value)}/>
-      </span>
-    </Dropdown>
+    <ExpandedEditTarget onOpen={editable ? open : undefined}>
+      <Input.TextArea {...props} onChange={event=>onValueChange?.(event.target.value)}/>
+    </ExpandedEditTarget>
     {draft !== null && <Modal className="kl-dialog-expanded-text" open width="min(1000px, 92vw)"
       title={props["aria-label"] || "Edycja tekstu"} okText="Zastosuj" cancelText="Anuluj"
       maskClosable={false} onCancel={()=>setDraft(null)}

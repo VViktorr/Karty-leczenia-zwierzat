@@ -30,7 +30,7 @@ import type { ColumnsType } from "antd/es/table";
 import { invoke, isDesktop } from "./bridge";
 import CataloguePage from "./CataloguePage";
 import {useExpiryTableLayout} from "./ExpiryTableLayout";
-import {ListParametersMenu,TableContextTrigger,useListColumnLayout} from "./ListColumnLayout";
+import {ExpandedEditTarget,ListParametersMenu,TableContextTrigger,useListColumnLayout} from "./ListColumnLayout";
 import {SubiektDatabaseSettings,ProgramDatabaseSettings} from "./DatabaseSettings";
 import { defaultPricePrint, normalizePriceSettings, withdrawalText,
   PricePrintSettingsPanel, PricePrintPreview } from "./PricePrint";
@@ -1768,13 +1768,9 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
     {title:"Karencja z katalogu",key:"withdrawal",width:440,ellipsis:true,
       render:(_value,row)=> {
         const text=withdrawalText(row,settings);
-        return <Dropdown trigger={["contextMenu"]} menu={{items:[
-          {key:"expand",label:"Otwórz w większym oknie edycji",onClick:()=>onCatalogue(row.symbol,true,true)}
-        ]}}>
-          <div onContextMenu={event=>event.stopPropagation()}>
-            {text ? <TableTextPreview text={text}>{text}</TableTextPreview> : "—"}
-          </div>
-        </Dropdown>;
+        return <ExpandedEditTarget onOpen={()=>onCatalogue(row.symbol,true,true)}>
+          {text ? <TableTextPreview text={text}>{text}</TableTextPreview> : "—"}
+        </ExpandedEditTarget>;
       }},
     {title:"Katalog",key:"status",width:135,
       render:(_value,row)=>row.needsCompletion
