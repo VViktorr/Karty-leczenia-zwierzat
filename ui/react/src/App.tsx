@@ -45,7 +45,7 @@ type PaletteName = "light" | "dark" | "sea";
 type Section = "documents" | "prices" | "catalogue" | "treatment" | "saved" | "expiry" | "settings";
 interface DraftRow {
   index: number; product: string; replacement: string; referenceSymbol?: string; descriptionGroup?: string; countGroup?: string; symbol: string; indication: string; quantity: string; batch: string;
-  species: string; route: string; dosing: string; withdrawal: string;
+  species: string; defaultSpecies?: boolean; route: string; dosing: string; withdrawal: string;
   description: string; animals: string; diagnosis: string; section: string; selected: boolean;
 }
 interface Draft {
@@ -626,6 +626,15 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   const [suggestTick,setSuggestTick]=useState(0);
   const [suggestionGroup,setSuggestionGroup]=useState<SpeciesGroup>();
   const [speciesGroup,setSpeciesGroup]=useState<SpeciesGroup>("cattle");
+  function changeSpeciesGroup(group:SpeciesGroup){
+    setSpeciesGroup(group);
+    const species=group==="cattle"?"Bydło":speciesGroups.find(option=>option.value===group)?.label;
+    if(group==="all"||!species)return;
+    setRows(current=>current.map(row=>row.defaultSpecies
+      ? {...row,species,description:!row.descriptionGroup && row.description===row.species
+          ? species : row.description}
+      : row));
+  }
   const [compatibility,setCompatibility]=useState<Record<number,SpeciesGroup[]>>({});
   const [restoredVariants,setRestoredVariants]=useState<Record<number,boolean>>({});
   const [rowSpeciesGroups,setRowSpeciesGroups]=useState<Record<number,{species:string;groups:SpeciesGroup[]}>>({});
@@ -952,7 +961,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       setRows(current=>current.map(row=>{
         const item=applied.get(row.index);
         const original=rows.find(value=>value.index===row.index);
-        return item ? {...row,...item,description:row.description===original?.description &&
+        return item ? {...row,...item,defaultSpecies:false,description:row.description===original?.description &&
           !row.descriptionGroup?item.description:row.description} : row;
       }));
       setRestoredVariants(current=>{
@@ -1042,7 +1051,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         "applyTreatmentVariant",{draftId:draft.draftId,
           index:variantModal.index,variantId:id,remember:rememberForVariant,speciesGroup});
       setRows(current=>current.map(row=>row.index===variantModal.index
-        ? {...row,...result,description:row.descriptionGroup?row.description:result.description} : row));
+        ? {...row,...result,defaultSpecies:false,description:row.descriptionGroup?row.description:result.description} : row));
       setRestoredVariants(current=>Object.fromEntries(Object.entries(current).filter(([key])=>Number(key)!==variantModal.index)));
       setVariantModal(null);
       setSuggestTick(tick=>tick+1);
@@ -1225,7 +1234,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         }:undefined} disabled={applyBusy||busy}
         onChange={e => {
           const next=e.target.value;
-          setRows(current => current.map(item => item.index===row.index ? {...item,[key]:next} : item));
+          setRows(current => current.map(item => item.index===row.index ? {...item,[key]:next,...(key==="species"?{defaultSpecies:false}:{})} : item));
         }}
         onBlur={e => {
           if(key==="route")setEditingRouteIndex(null);
@@ -1260,7 +1269,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     </div>}
     {wizard&&step===0&&<Card title="Wybierz gatunek">
       <Select aria-label="Gatunek" value={speciesGroup} style={{minWidth:240}}
-        options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/>
+        options={speciesGroups} onChange={changeSpeciesGroup}/>
     </Card>}
     <div className="treatment-tools">
     {drugStep&&<>
@@ -1270,7 +1279,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         <Typography.Text strong>Filtr gatunku</Typography.Text>
         <Select value={speciesGroup} style={{minWidth:210}}
           disabled={suggestBusy||applyBusy}
-          options={speciesGroups} onChange={value=>setSpeciesGroup(value)}/></>}
+          options={speciesGroups} onChange={changeSpeciesGroup}/></>}
         {variantModal ? canRememberVariant&&<Checkbox checked={rememberForVariant} disabled={variantBusy}
           onChange={event=>setRememberVariant(event.target.checked)}>Zapamiętaj wariant</Checkbox>
           : <Checkbox checked={remember} onChange={event=>changeRemember(event.target.checked)}>
