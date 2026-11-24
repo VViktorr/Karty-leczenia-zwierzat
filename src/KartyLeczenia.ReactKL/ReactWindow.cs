@@ -1626,6 +1626,7 @@ internal sealed class ReactWindow : Form
                 symbol = r.Get("Symbol Subiekta"), indication = r.Get("Wskazanie ChPL"),
                 quantity = r.Get("Ilość wydana"), batch = r.Get("Seria"),
                 species = r.Get("Gatunek"), route = r.Get("Droga podania"),
+                defaultSpecies = r.Get("Domyślny gatunek") == bool.TrueString,
                 dosing = r.Get("Dawkowanie i okres stosowania"), withdrawal = r.Get("Karencja"),
                 description = r.Get("Opis zwierząt / numer siedziby stada"),
                 animals = r.Get("Liczba zwierząt"), diagnosis = r.Get("Rozpoznanie"),
