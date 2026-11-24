@@ -1,5 +1,6 @@
 import type {TableProps} from "antd";
 import {Spin, Table, Tooltip} from "antd";
+import type {ReactNode} from "react";
 import {lazy, Suspense, useMemo} from "react";
 import {useComponents} from "./componentSettings";
 
@@ -7,6 +8,19 @@ import {useComponents} from "./componentSettings";
 const cursorTooltipPosition = {alignPoint: true};
 
 const DataGrid = lazy(() => import("./DataGrid")) as typeof import("./DataGrid").default;
+
+export function TableTextPreview({text, children}: {text: string | number; children: ReactNode}) {
+  const {tableTextPreview} = useComponents();
+  if (!tableTextPreview.enabled || (typeof text === "string" && !text.trim())) return children;
+  return <Tooltip {...cursorTooltipPosition} placement="top"
+    mouseEnterDelay={tableTextPreview.delaySeconds}
+    styles={{root:{maxWidth:"min(560px, 80vw)"}}}
+    title={<div style={{fontSize:tableTextPreview.fontSize,whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>
+      {text}
+    </div>}>
+    <span>{children}</span>
+  </Tooltip>;
+}
 
 type GridOptions = {
   id: string;
@@ -31,14 +45,7 @@ export default function AppTable<T extends object>({grid, className, style, wrap
           const output=column.render ? column.render(value,row,index) : value;
           if(typeof output!=="string" && typeof output!=="number")return output;
           if(typeof output==="string" && !output.trim())return output;
-          return <Tooltip {...cursorTooltipPosition} placement="top"
-            mouseEnterDelay={tableTextPreview.delaySeconds}
-            styles={{root:{maxWidth:"min(560px, 80vw)"}}}
-            title={<div style={{fontSize:tableTextPreview.fontSize,whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>
-              {output}
-            </div>}>
-            <span>{output}</span>
-          </Tooltip>;
+          return <TableTextPreview text={output}>{output}</TableTextPreview>;
         }};
       });
     return addTextPreview(props.columns);

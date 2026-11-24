@@ -13,7 +13,7 @@ import "dayjs/locale/pl";
 import datePickerPl from "antd/es/date-picker/locale/pl_PL";
 import {isPoultry} from "./cataloguePdfMetadata";
 import Modal from "./AppModal";
-import Table from "./AppTable";
+import Table, {TableTextPreview} from "./AppTable";
 import {Suspense, lazy} from "react";
 import {ListFormattingPanel,useListFormatting} from "./ListFormatting";
 import {useListPagination} from "./ListPagination";
@@ -313,8 +313,8 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved
         onClick={()=>{void open(row);}} onDoubleClick={event=>event.stopPropagation()}>
         {number}
       </Button>},
-    {title:"Kontrahent",dataIndex:"shortPayer",ellipsis:true,
-      render:(value:string,row)=><span title={row.payer}>{value||row.payer}</span>},
+    {title:"Kontrahent",dataIndex:"shortPayer",ellipsis:{showTitle:false},
+      render:(value:string,row)=><TableTextPreview text={row.payer||value}>{value||row.payer}</TableTextPreview>},
     {title:"Brutto",dataIndex:"gross",align:"right",width:145,
       render:(value:number|null,row)=>currency(value,row.currency||"zł"),
       sorter:(a,b)=>(a.gross??0)-(b.gross??0)},
