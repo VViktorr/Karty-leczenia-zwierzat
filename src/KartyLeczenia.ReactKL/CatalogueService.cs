@@ -13,7 +13,7 @@ internal sealed record CatalogueVariantModel(
     string Source = "", string Short = "", string Price = "", string Pdf = "", string Eggs = "");
 internal sealed record CatalogueProductModel(
     string Symbol, string Name, string RplId, string Description,
-    string Revision, List<CatalogueVariantModel> Variants);
+    string Revision, List<CatalogueVariantModel> Variants, bool NonMedicine = false);
 
 /// <summary>
 /// SQL catalogue adapter for the React client. Based on the existing SQL schema,
@@ -226,6 +226,8 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         // Null/empty revision means an entirely new catalogue product,
         // the same INSERT-versus-rowversion rule as the final WinForms.
         bool creating = string.IsNullOrWhiteSpace(product.Revision);
+        if (product.NonMedicine && (!creating || product.Variants.Count != 0))
+            throw new ArgumentException("Oznaczenie „To nie lek” jest dostępne przy dodawaniu nowej kartoteki bez wariantów.");
         byte[]? revision = null;
         if (!creating)
         {
@@ -268,8 +270,12 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             IF EXISTS(SELECT 1 FROM dbo.catalog_products WITH(UPDLOCK,HOLDLOCK)
                 WHERE UPPER(symbol)=UPPER(@symbol))
                 THROW 50004,N'Kartoteka już istnieje. Wczytaj ją ponownie.',1;
-            INSERT dbo.catalog_products(symbol,name,description,rpl_id,status)
-                VALUES(@symbol,@name,@description,@rpl,N'Wprowadzono w aplikacji');
+            IF @nonMedicine = 1
+                INSERT dbo.catalog_products(symbol,name,description,rpl_id,status,decision)
+                    VALUES(@symbol,@name,@description,@rpl,N'To nie lek',N'NOT_MEDICINE');
+            ELSE
+                INSERT dbo.catalog_products(symbol,name,description,rpl_id,status)
+                    VALUES(@symbol,@name,@description,@rpl,N'Wprowadzono w aplikacji');
             """ : """
             UPDATE dbo.catalog_products SET name=@name,description=@description,rpl_id=@rpl
             WHERE symbol=@symbol AND revision=@revision
@@ -278,7 +284,9 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
             """, tx))
         {
             command.Parameters.Add("@symbol",SqlDbType.NVarChar,128).Value=product.Symbol;
-            if (!creating)
+            if (creating)
+                command.Parameters.Add("@nonMedicine",SqlDbType.Bit).Value=product.NonMedicine;
+            else
                 command.Parameters.Add("@revision",SqlDbType.Binary,8).Value=revision!;
             command.Parameters.Add("@name",SqlDbType.NVarChar,-1).Value=product.Name;
             command.Parameters.Add("@description",SqlDbType.NVarChar,-1).Value=product.Description;
