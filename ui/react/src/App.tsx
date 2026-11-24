@@ -531,7 +531,9 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   const [shortRoutes,setShortRoutes]=useState(false);
   const [showRouteCodes,setShowRouteCodes]=useState(false);
   const [editingRouteIndex,setEditingRouteIndex]=useState<number|null>(null);
-  const [shortWithdrawals,setShortWithdrawals]=useState(false);
+  const [withdrawalFormat,setWithdrawalFormat]=useState<"full"|"short"|"species">("full");
+  const shortWithdrawals=withdrawalFormat==="short";
+  const withdrawalBySpecies=withdrawalFormat==="species";
   const wizard=treatmentWindow||wizardEnabled;
   const drugStep=!wizard||step===1;
   const editingRows=drugStep;
@@ -646,7 +648,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   const autoApplied=useRef(new Set<string>());
   useEffect(() => {
     autoApplied.current.clear();
-    setShortRoutes(false);setShortWithdrawals(false);
+    setShortRoutes(false);setWithdrawalFormat("full");
     setStep(0);setSummaryHtml("");setFindings("");setPreview(null);setError("");
     setRows(draft?.rows ?? []);setSavedNumber("");setVariantModal(null);
     pendingSaveDates.current=null;setSaveReview(null);
@@ -878,7 +880,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     setBusy(true);setSavingSql(true);setError("");
     try {
       const result = await invoke<SaveResult>("saveDraft", {
-        draftId:draft.draftId, ...dates, findings, confirmDuplicate, rows, shortRoutes, shortWithdrawals
+        draftId:draft.draftId, ...dates, findings, confirmDuplicate, rows, shortRoutes, shortWithdrawals, withdrawalBySpecies, speciesGroup
       });
       if (result.duplicate) {
         if(result.duplicateId)setDuplicateId(result.duplicateId);
@@ -901,7 +903,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     try{
       const request=previewSavedId
         ? {id:previewSavedId,trash:false}
-        : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals};
+        : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals,withdrawalBySpecies,speciesGroup};
       const result=await invoke<{cancelled:boolean;fileName:string;recipient:string}>(
         mail?"emailCardPdf":"saveCardPdf",request);
       if(!result.cancelled)setPdfMessage(mail
@@ -921,7 +923,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     setBusy(true);setError("");
     try {
       const data = await invoke<{html:string}>("previewDraft", {
-        draftId:draft.draftId, reported, performed, findings, rows, shortRoutes, shortWithdrawals
+        draftId:draft.draftId, reported, performed, findings, rows, shortRoutes, shortWithdrawals, withdrawalBySpecies, speciesGroup
       });
       setPreviewSavedId(null);setPdfMessage("");
       if(inSummary)setSummaryHtml(data.html);
@@ -1097,7 +1099,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     if(active&&wizard&&step===4&&performed)void printPreview(true);
     // Refresh the preview after the wizard applies the animal details and diagnosis.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[active,wizard,step,shortRoutes,shortWithdrawals]);
+  },[active,wizard,step,shortRoutes,withdrawalFormat]);
 
   if (!draft) return <Card>
     <Empty description="Wybierz dokument w zakładce Dokumenty">
@@ -1413,8 +1415,11 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     {wizard&&step===4&&<Card title="Podsumowanie karty" extra={<Space wrap>
       <label><Switch size="small" checked={shortRoutes} disabled={busy||!!savedNumber}
         aria-label="Skróć drogę podania" onChange={setShortRoutes}/> Skróć drogę podania</label>
-      <label><Switch size="small" checked={shortWithdrawals} disabled={busy||!!savedNumber}
-        aria-label="Skróć karencję" onChange={setShortWithdrawals}/> Skróć karencję</label>
+      <Select aria-label="Format karencji na karcie" size="small" value={withdrawalFormat}
+        disabled={busy||!!savedNumber} onChange={setWithdrawalFormat} options={[
+          {value:"full",label:"Karencja pełna"},{value:"short",label:"Karencja skrócona"},
+          {value:"species",label:"Karencja wg gatunku"}
+        ]}/>
     </Space>}>
       <TreatmentDateFields reported={reported} performed={performed}
         onChange={dates=>{setReported(dates.reported);setPerformed(dates.performed);setSummaryHtml("");setSavedNumber("");}}/>
@@ -1660,7 +1665,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         <Suspense fallback={<Spin aria-label="Ładowanie podglądu PDF"/>}>
           <CardPdfPreview name="Karta-leczenia.pdf" fallbackHtml={preview}
             request={previewSavedId ? {id:previewSavedId,trash:false}
-              : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals}}/>
+              : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals,withdrawalBySpecies,speciesGroup}}/>
         </Suspense> :
         <iframe ref={previewFrame} title="Podgląd karty leczenia" srcDoc={preview}
           style={{width:"100%",height:"72vh",border:0,background:"#fff"}}/>)}
