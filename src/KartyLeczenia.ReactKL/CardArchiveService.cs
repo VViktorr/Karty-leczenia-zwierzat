@@ -30,7 +30,8 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
         => (performed.Year, performed.Date);
 
     internal SaveResult Save(DocumentData source, DateTime? reported, DateTime performed,
-        string findings, bool confirmDuplicate, bool shortRoutes = false, bool shortWithdrawals = false)
+        string findings, bool confirmDuplicate, bool shortRoutes = false, bool shortWithdrawals = false,
+        bool withdrawalBySpecies = false, string selectedSpecies = "")
     {
         if (source.Rows.All(x => !x.Printed))
             throw new InvalidOperationException("Zaznacz przynajmniej jeden lek do wydruku.");
@@ -49,6 +50,8 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Wyniki badań"] = findings,
             ["Skróty dróg podania"] = shortRoutes.ToString(),
             ["Skróty karencji"] = shortWithdrawals.ToString(),
+            ["Karencja wg gatunku"] = withdrawalBySpecies.ToString(),
+            ["Gatunek karty"] = selectedSpecies,
             ["Dokument źródłowy"] = source.Number,
             ["Zakres mapowania towarów"] = source.Scope
         };
@@ -158,7 +161,8 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
     }
 
     internal string RenderDraft(DocumentData source, DateTime? reported, DateTime performed, string findings,
-        bool shortRoutes = false, bool shortWithdrawals = false)
+        bool shortRoutes = false, bool shortWithdrawals = false,
+        bool withdrawalBySpecies = false, string selectedSpecies = "")
     {
         var clinic = clinicService.Load().Settings;
         var fields = new Dictionary<string, string>
@@ -172,6 +176,8 @@ internal sealed class CardArchiveService(ConnectionSettingsStore connectionStore
             ["Wyniki badań"] = findings,
             ["Skróty dróg podania"] = shortRoutes.ToString(),
             ["Skróty karencji"] = shortWithdrawals.ToString(),
+            ["Karencja wg gatunku"] = withdrawalBySpecies.ToString(),
+            ["Gatunek karty"] = selectedSpecies,
             ["Dokument źródłowy"] = source.Number,
             ["Zakres mapowania towarów"] = source.Scope
         };
