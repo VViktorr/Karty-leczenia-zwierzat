@@ -1,3 +1,4 @@
+import ExpandableTextArea from "./ExpandableTextArea";
 import {createPortal} from "react-dom";
 import Modal from "./AppModal";
 import Table from "./AppTable";
@@ -74,9 +75,10 @@ export default function CataloguePage({
 }: {
   toolbar?: HTMLDivElement | null;
   onDirtyChange?: (value: boolean) => void;
-  initialEntry: {symbol:string;direct:boolean} | null;
+  initialEntry: {symbol:string;direct:boolean;expanded?:boolean} | null;
   onPickerOpened: () => void;
 }) {
+  const [expanded,setExpanded]=useState(false);
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [list, setList] = useState<CatalogueListing[]>([]);
@@ -177,6 +179,7 @@ export default function CataloguePage({
   useEffect(() => {
     if (!initialEntry || handledEntry.current === initialEntry) return;
     handledEntry.current = initialEntry;
+    if(initialEntry.expanded)setExpanded(true);
     onPickerOpened();
     if (initialEntry.direct) {
       void openSubiektProduct(initialEntry.symbol);
@@ -451,11 +454,11 @@ export default function CataloguePage({
     ...textFields.map(({ key, title, width }) => ({
       title, key, width,
       render: (_: unknown, row: UiVariant) =>
-        key === "milk" && isPoultry(row.species) ? "—" : <Input.TextArea
+        key === "milk" && isPoultry(row.species) ? "—" : <ExpandableTextArea
           aria-label={title + " " + row.key}
           value={row[key]??""}
           autoSize={{ minRows: 1, maxRows: 4 }}
-          onChange={event => changeVariant(row.key, key, event.target.value)}
+          onValueChange={next=> changeVariant(row.key, key, next)}
         />
     })),
     {
@@ -505,8 +508,8 @@ export default function CataloguePage({
       title="Zmiany kliniczne zweryfikuj z aktualną ChPL. Dołączenie PDF nie zmienia gatunku, dawkowania ani karencji. Zapis zatwierdzasz osobno."/>
     {error && <Alert className="notice" type="error" showIcon title={error} />}
     {savedNotice && <Alert className="notice" type="success" showIcon title={savedNotice} />}
-    <div className="catalogue-layout">
-      <Card className="catalogue-list fill-list-card">
+    <div className={"catalogue-layout"+(expanded?" catalogue-layout-expanded":"")}>
+      <Card className="catalogue-list fill-list-card" hidden={expanded}>
         <Input.Search allowClear value={input}
           placeholder="Nazwa lub symbol leku..."
           onSearch={value=>{
@@ -532,7 +535,7 @@ export default function CataloguePage({
         </Typography.Text>
       </Card>
       <Card className="catalogue-editor fill-list-card">
-        {!editing ? <Empty description="Wybierz lek z katalogu" /> : <>
+        {!editing ? <Empty description="Wybierz lek z katalogu">{expanded&&<Button onClick={()=>setExpanded(false)}>Przywróć listę leków</Button>}</Empty> : <>
           <div className="catalogue-editor-heading">
             <div>
               <Typography.Title level={4} style={{ marginBottom: 4 }}>
@@ -544,6 +547,9 @@ export default function CataloguePage({
               </Space>
             </div>
             <Space>
+              <Button onClick={()=>setExpanded(value=>!value)}>
+                {expanded?"Przywróć listę leków":"Powiększ edytor"}
+              </Button>
               <Button disabled={working} onClick={() => {
                 if (original) loadProduct(original);
                 else {setEditing(null);setVariants([]);setDirty(false);}
@@ -561,9 +567,9 @@ export default function CataloguePage({
                 onChange={event => changeField("rplId", event.target.value)} />
             </label>
             <label>Opis (opcjonalny)
-              <Input.TextArea placeholder="Np. postać leku, wielkość opakowania lub uwaga do kartoteki" autoSize={{ minRows: 1, maxRows: 3 }}
+              <ExpandableTextArea placeholder="Np. postać leku, wielkość opakowania lub uwaga do kartoteki" autoSize={{ minRows: 1, maxRows: 3 }}
                 value={editing.description}
-                onChange={event => changeField("description", event.target.value)} />
+                onValueChange={next=> changeField("description", next)} />
             </label>
           </div>
           {!editing.revision&&<Checkbox checked={!!editing.nonMedicine} disabled={working}
@@ -688,18 +694,18 @@ export default function CataloguePage({
           scroll={{x:1100,y:230}}
           columns={[
             {title:"Gatunek",dataIndex:"species",width:120,
-              render:(value:string,_row,index)=><Input.TextArea aria-label={"Gatunek — pozycja "+(index+1)}
+              render:(value:string,_row,index)=><ExpandableTextArea aria-label={"Gatunek — pozycja "+(index+1)}
                 size="small" autoSize={{minRows:1,maxRows:3}} value={value}
-                onChange={event=>editProposal(index,"species",event.target.value)}/>} ,
+                onValueChange={next=>editProposal(index,"species",next)}/>} ,
             {title:"Droga podania",dataIndex:"route",width:135,
-              render:(value:string,_row,index)=><Input.TextArea aria-label={"Droga podania — pozycja "+(index+1)}
+              render:(value:string,_row,index)=><ExpandableTextArea aria-label={"Droga podania — pozycja "+(index+1)}
                 size="small" autoSize={{minRows:1,maxRows:3}} value={value}
-                onChange={event=>editProposal(index,"route",event.target.value)}/>} ,
+                onValueChange={next=>editProposal(index,"route",next)}/>} ,
             {title:"Wskazanie",dataIndex:"indication",width:245,ellipsis:true},
             {title:"Dawkowanie",dataIndex:"dose",width:255,
-              render:(value:string,_row,index)=><Input.TextArea aria-label={"Dawkowanie — pozycja "+(index+1)}
+              render:(value:string,_row,index)=><ExpandableTextArea aria-label={"Dawkowanie — pozycja "+(index+1)}
                 size="small" autoSize={{minRows:1,maxRows:3}} value={value}
-                onChange={event=>editProposal(index,"dose",event.target.value)}/>} ,
+                onValueChange={next=>editProposal(index,"dose",next)}/>} ,
             {title:"Tkanki",dataIndex:"tissues",width:180,ellipsis:true},
             {title:"Mleko",dataIndex:"milk",width:160,ellipsis:true}
           ]}/>

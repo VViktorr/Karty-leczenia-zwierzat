@@ -1,3 +1,4 @@
+import ExpandableTextArea from "./ExpandableTextArea";
 import {createPortal} from "react-dom";
 import {QueryClient} from "@tanstack/react-query";
 import TreatmentShortcuts from "./TreatmentShortcuts";
@@ -1238,7 +1239,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
             title="Potwierdzenie nabycia produktu (sekcja III)"
             checked={value==="III"} disabled={applyBusy||busy}
             onChange={event=>{void update(row.index,"section",event.target.checked?"III":"II");}}/>
-        : <Input.TextArea autoSize={{minRows:1,maxRows:3}}
+        : <ExpandableTextArea autoSize={{minRows:1,maxRows:3}}
         aria-label={title} data-treatment-field={key}
         value={key==="route"&&editingRouteIndex!==row.index?formatWizardRoute(value??"",showRouteCodes):value}
         onFocus={key==="route"?()=>setEditingRouteIndex(row.index):undefined}
@@ -1247,8 +1248,12 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         onKeyDown={key==="description"?event=>{
           if(event.key==="F4"){event.preventDefault();openAnimalEdit(row);}
         }:undefined} disabled={applyBusy||busy}
-        onChange={e => {
-          const next=e.target.value;
+        editValue={value} onApply={next=>{
+          if(key==="species")setRows(current=>current.map(item=>item.index===row.index?{...item,defaultSpecies:false}:item));
+          setEditingRouteIndex(null);
+          void update(row.index,key,next);
+        }}
+        onValueChange={next => {
           setRows(current => current.map(item => item.index===row.index ? {...item,[key]:next,...(key==="species"?{defaultSpecies:false}:{})} : item));
         }}
         onBlur={e => {
@@ -1417,8 +1422,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
           </div>}
           options={animalDescriptions.map(value=>({value,label:value.toUpperCase()}))}/>}
         <label>Numery zwierząt
-          <Input.TextArea value={groupDescription} autoSize={{minRows:4,maxRows:12}}
-            onChange={event=>{setGroupDescription(event.target.value.toUpperCase());setError("");}}/>
+          <ExpandableTextArea value={groupDescription} autoSize={{minRows:4,maxRows:12}}
+            onValueChange={next=>{setGroupDescription(next.toUpperCase());setError("");}}/>
         </label>
         <label>Liczba leczonych zwierząt
           <Input value={groupCount} inputMode="numeric"
@@ -1430,8 +1435,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       </Space>
     </Card>}
     {wizard&&step===3&&<Card title="Rozpoznanie (opcjonalne)">
-      <Input.TextArea aria-label="Rozpoznanie" value={diagnosis} autoSize={{minRows:3,maxRows:8}}
-        onChange={event=>setDiagnosis(event.target.value)}/>
+      <ExpandableTextArea aria-label="Rozpoznanie" value={diagnosis} autoSize={{minRows:3,maxRows:8}}
+        onValueChange={next=>setDiagnosis(next)}/>
       <label>Wyniki badań
         <Input value={findings} onChange={event=>setFindings(event.target.value)}/>
       </label>
@@ -1487,8 +1492,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
               {item.index+1}. {item.product}{item.batch&&" · "+item.batch}
             </Checkbox>)}</Space>
         </Checkbox.Group>}
-        <label>Numery zwierząt / opis grupy <Input.TextArea required={animalEdit.beforeSave} rows={4} value={animalEdit.description}
-          onChange={e=>setAnimalEdit({...animalEdit,description:e.target.value})}/></label>
+        <label>Numery zwierząt / opis grupy <ExpandableTextArea required={animalEdit.beforeSave} rows={4} value={animalEdit.description}
+          onValueChange={next=>setAnimalEdit({...animalEdit,description:next})}/></label>
         <label>Liczba leczonych zwierząt (wymagane) <Input required value={animalEdit.count}
           onChange={e=>setAnimalEdit({...animalEdit,count:e.target.value})}/></label>
       </Space>}
@@ -1698,7 +1703,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   </>;
 }
 
-function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: boolean) => void; toolbar:HTMLDivElement|null}) {
+function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: boolean, expanded?: boolean) => void; toolbar:HTMLDivElement|null}) {
   const [activePriceSymbol,setActivePriceSymbol]=useState("");
   const levels=useRemote<PriceLevel[]>("priceLevels",{},[]);
   const [level,setLevel]=useState<number|null>(null);
@@ -1763,7 +1768,13 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
     {title:"Karencja z katalogu",key:"withdrawal",width:440,ellipsis:true,
       render:(_value,row)=> {
         const text=withdrawalText(row,settings);
-        return text||<Typography.Text type="secondary" title="Brak karencji w wybranym formacie katalogu SQL">—</Typography.Text>;
+        return <Dropdown trigger={["contextMenu"]} menu={{items:[
+          {key:"expand",label:"Otwórz w większym oknie edycji",onClick:()=>onCatalogue(row.symbol,true,true)}
+        ]}}>
+          <div onContextMenu={event=>event.stopPropagation()}>
+            {text ? <TableTextPreview text={text}>{text}</TableTextPreview> : "—"}
+          </div>
+        </Dropdown>;
       }},
     {title:"Katalog",key:"status",width:135,
       render:(_value,row)=>row.needsCompletion
@@ -2244,9 +2255,9 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
                     placeholder="K/25/2026"
                     onChange={event=>editHeader(key,event.target.value)}/>
               : editing&&archivedEditableFields.has(key)
-                ? <Input.TextArea aria-label={key} value={value} autoSize={{minRows:1,maxRows:3}}
+                ? <ExpandableTextArea aria-label={key} value={value} autoSize={{minRows:1,maxRows:3}}
                     placeholder={key.includes("data i godzina")?"dd.MM.rrrr gg:mm":undefined}
-                    onChange={event=>editHeader(key,event.target.value)}/>
+                    onValueChange={next=>editHeader(key,next)}/>
                 : value
             }))}/>
         <Table size="small" dataSource={editing&&editDraft?editDraft.rows:card.rows}
@@ -2267,9 +2278,9 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
                         aria-label={"Nabycie produktu — pozycja "+(index+1)}
                         title="Potwierdzenie nabycia produktu (sekcja III)"
                         onChange={event=>editRow(index,key,event.target.checked?"III":"II")}/>
-                    : <Input.TextArea aria-label={title+" pozycji "+(index+1)}
+                    : <ExpandableTextArea aria-label={title+" pozycji "+(index+1)}
                         autoSize={{minRows:1,maxRows:3}} value={value??""}
-                        onChange={event=>editRow(index,key,event.target.value)}/>
+                        onValueChange={next=>editRow(index,key,next)}/>
                   : <span>{key==="Sekcja (II lub III)"?(value==="III"?"Tak":"Nie"):value||"—"}</span>
             }))
           ]}/>
@@ -2435,11 +2446,11 @@ function ClinicSettingsPanel() {
     <ErrorNotice error={error}/>
     {notice&&<Alert type="success" showIcon className="notice" title={notice}/>}
     <Form form={form} layout="vertical" onFinish={values=>{void save(values);}}>
-      <Form.Item label="Nazwa lecznicy" name="name" rules={[{required:true}]}>
-        <Input.TextArea autoSize={{minRows:3,maxRows:8}}/>
+      <Form.Item label="Nazwa lecznicy" name="name" trigger="onValueChange" rules={[{required:true}]}>
+        <ExpandableTextArea autoSize={{minRows:3,maxRows:8}}/>
       </Form.Item>
-      <Form.Item label="Adres" name="address" rules={[{required:true}]}>
-        <Input.TextArea autoSize/>
+      <Form.Item label="Adres" name="address" trigger="onValueChange" rules={[{required:true}]}>
+        <ExpandableTextArea autoSize/>
       </Form.Item>
       <Form.Item label="Lekarz i numer prawa wykonywania zawodu" name="doctor" rules={[{required:true}]}>
         <Input/>
@@ -2850,7 +2861,7 @@ export default function App() {
   const [cacheDocuments,setCacheDocuments]=useLocalToggle("kl.cacheDocuments");
   const [virtualWarnings,setVirtualWarnings]=useLocalToggle("kl.virtualWarnings");
   const [catalogueDirty,setCatalogueDirty]=useState(false);
-  const [catalogueEntry,setCatalogueEntry]=useState<{symbol:string;direct:boolean}|null>(null);
+  const [catalogueEntry,setCatalogueEntry]=useState<{symbol:string;direct:boolean;expanded?:boolean}|null>(null);
   const navigate=(next:Section)=>{
     if(next===section)return;
     if(section==="catalogue"&&catalogueDirty){
@@ -3022,7 +3033,7 @@ export default function App() {
       aria-label="Tryb długiej listy ostrzeżeń"/> Tryb długiej listy ostrzeżeń w podsumowaniu</label>
   </>;
   const content=section==="documents"||section==="treatment"?null:
-    section==="prices"?<Prices toolbar={sectionToolbar} onCatalogue={(symbol,direct=false)=>{setCatalogueEntry({symbol,direct});setSection("catalogue");}}/>:
+    section==="prices"?<Prices toolbar={sectionToolbar} onCatalogue={(symbol,direct=false,expanded=false)=>{setCatalogueEntry({symbol,direct,expanded});setSection("catalogue");}}/>:
     section==="catalogue"?<CataloguePage toolbar={sectionToolbar} onDirtyChange={setCatalogueDirty}
       initialEntry={catalogueEntry} onPickerOpened={()=>setCatalogueEntry(null)}/>:
     section==="expiry"?<Expiry/>:

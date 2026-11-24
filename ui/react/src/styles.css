@@ -524,3 +524,20 @@ html[data-kl-tooltip-style="contrast"] .ant-tooltip {
   filter: drop-shadow(2px 0 #fff) drop-shadow(-2px 0 #fff)
     drop-shadow(0 2px #fff) drop-shadow(0 -2px #fff);
 }
+
+.fill-list-content > .catalogue-layout-expanded {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  flex-basis: 360px;
+}
+.catalogue-layout-expanded > .catalogue-list[hidden] {
+  display: none;
+}
+.kl-dialog-expanded-text textarea {
+  height: min(52vh, 500px);
+  resize: vertical;
+}
+.kl-rnd-dialog-maximized .kl-dialog-expanded-text textarea,
+.kl-dialog-expanded-text .kl-rnd-dialog-maximized textarea {
+  height: 74vh;
+}
