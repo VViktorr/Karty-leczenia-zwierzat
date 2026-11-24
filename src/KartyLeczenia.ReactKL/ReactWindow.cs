@@ -391,7 +391,7 @@ internal sealed class ReactWindow : Form
                 return;
             }
             cancel = new CancellationTokenSource(action is "backupDatabase" or "restoreDatabase"
-                ? TimeSpan.FromMinutes(45) : action is "saveCardPdf" or "emailCardPdf"
+                ? TimeSpan.FromMinutes(45) : action is "saveCardPdf" or "emailCardPdf" or "savePricePdf"
                     ? TimeSpan.FromMinutes(3) : action == "missingCatalogueProducts"
                     ? TimeSpan.FromMinutes(2) : action == "installUpdate"
                     ? TimeSpan.FromMinutes(15) : action == "publishPendingUpdate"
@@ -443,6 +443,35 @@ internal sealed class ReactWindow : Form
         }
         if (action == "getPricePrintSettings")
             return PricePrintOptionsStore.Load();
+        if (action == "savePricePdf")
+        {
+            string html = ReadTextField(root, "html", 8 * 1024 * 1024);
+            if (html.Length == 0) throw new ArgumentException("Brak stron cennika do zapisania.");
+            using var save = new SaveFileDialog
+            {
+                Title = "Zapisz cennik jako PDF",
+                Filter = "Dokument PDF (*.pdf)|*.pdf",
+                AddExtension = true, DefaultExt = "pdf",
+                FileName = "cennik-lekow.pdf", OverwritePrompt = true
+            };
+            if (save.ShowDialog(this) != DialogResult.OK)
+                return new { cancelled = true, fileName = "" };
+
+            string temporary = await CardPdfService.RenderAsync(this, html, token,
+                landscape: Flag(root, "landscape"), marginMm: 0, allowScripts: false);
+            try
+            {
+                token.ThrowIfCancellationRequested();
+                CardPdfService.MoveToDestination(temporary, save.FileName);
+                return new { cancelled = false, fileName = Path.GetFileName(save.FileName) };
+            }
+            finally
+            {
+                try { File.Delete(temporary); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
         if (action == "savePricePrintSettings")
         {
             if (!root.TryGetProperty("settings", out var value) ||
