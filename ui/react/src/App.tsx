@@ -1112,6 +1112,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       <Checkbox checked={wrapVariantRows}
         onChange={event=>setWrapVariantRows(event.target.checked)}>Zawijaj treść wierszy</Checkbox>
     </Space>);
+  const variantTableWidth=variantLayout.columns.reduce((total,column)=>
+    total+(typeof column.width==="number"?column.width:0),0);
   const variantsPagination=useListPagination("treatment-variants",variantModal?.variants.length??0,12);
   useEffect(()=>{
     if(active&&wizard&&step===4&&performed)void printPreview(true);
@@ -1654,7 +1656,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         showIcon closable title={variantError}/>}
       <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> wrapRows={wrapVariantRows} wrapHeaders={wrapVariantHeaders} {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantRows} size="small"
-        pagination={variantsPagination} scroll={{x:"max-content",y:"100%"}}
+        pagination={variantsPagination} tableLayout="fixed" scroll={{x:variantTableWidth,y:"100%"}}
         columns={variantLayout.columns}/></ListParametersMenu>
       {showRouteCodes&&<RouteCodesLegend routes={variantRows.map(row=>row.route)}/> }
     </Card>}
