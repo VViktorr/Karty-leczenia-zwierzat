@@ -1,7 +1,7 @@
 import Modal from "./AppModal";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Checkbox, Divider, InputNumber, Select, Space, Switch, Typography } from "antd";
-import { invoke } from "./bridge";
+import { invoke, isDesktop } from "./bridge";
 import {useComponents, updateComponents} from "./componentSettings";
 
 export interface PricePrintRow {
@@ -343,6 +343,9 @@ export function PricePrintPreview({
   const [pages,setPages]=useState(1);
   const [page,setPage]=useState(1);
   const [frameReady,setFrameReady]=useState(0);
+  const [savingPdf,setSavingPdf]=useState(false);
+  const [pdfError,setPdfError]=useState("");
+  const [savedPdf,setSavedPdf]=useState("");
   const documentText=useMemo(()=>pricePrintHtml(rows,settings,heading),[rows,settings,heading]);
   // The price-list renderer paginates asynchronously after fonts load.
   // Observe its actual generated page nodes rather than guessing row counts.
@@ -362,11 +365,33 @@ export function PricePrintPreview({
     observer.observe(container,{childList:true});
     return()=>observer.disconnect();
   },[documentText,mode,page,frameReady]);
+  async function savePdf(){
+    const document=frame.current?.contentDocument;
+    const pages=document?.getElementById("pages");
+    const style=document?.head.querySelector("style");
+    if(!pages?.querySelector(".sheet")||!style){
+      setPdfError("Poczekaj, aż podgląd wczyta strony cennika.");
+      return;
+    }
+    const copy=pages.cloneNode(true) as HTMLElement;
+    copy.querySelectorAll<HTMLElement>(".sheet").forEach(sheet=>{sheet.style.removeProperty("display");});
+    const html="<!doctype html><html lang=\"pl\"><head><meta charset=\"utf-8\">"+
+      style.outerHTML+"</head><body>"+copy.outerHTML+"</body></html>";
+    setSavingPdf(true);setPdfError("");setSavedPdf("");
+    try{
+      const result=await invoke<{cancelled:boolean;fileName:string}>("savePricePdf",{
+        html,landscape:settings.landscape
+      });
+      if(!result.cancelled)setSavedPdf("Zapisano "+result.fileName);
+    }catch(error){setPdfError(error instanceof Error?error.message:String(error));}
+    finally{setSavingPdf(false);}
+  }
   return <Modal className="kl-dialog-price-preview" open width="96vw" title={"Podgląd wielostronicowy — "+rows.length+" leków"}
     onCancel={onClose} destroyOnHidden
     footer={<Space wrap>
       <Typography.Text type="secondary">Każda kartka ma własny nagłówek tabeli i numer strony.</Typography.Text>
       <Button onClick={onClose}>Zamknij</Button>
+      {isDesktop()&&<Button loading={savingPdf} disabled={!frameReady} onClick={()=>{void savePdf();}}>Zapisz PDF</Button>}
       <Button type="primary" onClick={()=>{
         // All pages must be visible when the print engine paginates.
         frame.current?.contentDocument?.querySelectorAll<HTMLElement>(".sheet")
@@ -374,6 +399,8 @@ export function PricePrintPreview({
         frame.current?.contentWindow?.print();
       }}>Drukuj</Button>
     </Space>}>
+    {pdfError&&<Alert type="error" showIcon title={pdfError}/>}
+    {savedPdf&&<Alert type="success" showIcon title={savedPdf}/>}
     <Space wrap style={{marginBottom:8}}>
       <Button onClick={()=>updateComponents("pdf",{mode:mode==="pages"?"scroll":"pages"})}>
         {mode==="pages"?"Przewijanie":"Tryb stron"}
