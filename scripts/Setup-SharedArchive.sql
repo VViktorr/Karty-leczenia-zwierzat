@@ -19,7 +19,9 @@ BEGIN
         card_json nvarchar(max) NOT NULL,
         print_json nvarchar(max) NOT NULL
     );
-    CREATE INDEX IX_treatment_cards_date ON dbo.treatment_cards (treatment_date DESC, archive_order DESC);
+    IF NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID(N'dbo.treatment_cards')
+                   AND name = N'IX_treatment_cards_date')
+        EXEC(N'CREATE INDEX IX_treatment_cards_date ON dbo.treatment_cards (treatment_date DESC, archive_order DESC);');
 END;
 
 IF COL_LENGTH(N'dbo.treatment_cards', N'deleted_at_utc') IS NULL
@@ -59,7 +61,9 @@ BEGIN
         description nvarchar(max) NOT NULL,
         last_used bigint NOT NULL
     );
-    CREATE INDEX IX_animal_descriptions_payer ON dbo.animal_descriptions (payer_id, last_used DESC);
+    IF NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID(N'dbo.animal_descriptions')
+                   AND name = N'IX_animal_descriptions_payer')
+        EXEC(N'CREATE INDEX IX_animal_descriptions_payer ON dbo.animal_descriptions (payer_id, last_used DESC);');
 END;
 
 IF OBJECT_ID(N'dbo.clinic_settings', N'U') IS NULL
@@ -112,7 +116,9 @@ BEGIN
         pdf_path nvarchar(450) COLLATE Latin1_General_100_BIN2 NULL REFERENCES dbo.catalog_documents(path),
         withdrawal_short nvarchar(max) NULL
     );
-    CREATE INDEX IX_catalog_variants_symbol ON dbo.catalog_variants(symbol);
+    IF NOT EXISTS (SELECT 1 FROM sys.stats WHERE object_id = OBJECT_ID(N'dbo.catalog_variants')
+                   AND name = N'IX_catalog_variants_symbol')
+        EXEC(N'CREATE INDEX IX_catalog_variants_symbol ON dbo.catalog_variants(symbol);');
     CREATE TABLE dbo.catalog_price_withdrawal (
         id int NOT NULL PRIMARY KEY REFERENCES dbo.catalog_variants(id) ON DELETE CASCADE,
         compact_text nvarchar(max) NOT NULL
@@ -165,7 +171,7 @@ BEGIN
 END;
 
 IF DATABASE_PRINCIPAL_ID(N'KartyLeczeniaOperator') IS NULL
-    CREATE ROLE KartyLeczeniaOperator AUTHORIZATION dbo;
+    EXEC(N'CREATE ROLE KartyLeczeniaOperator AUTHORIZATION dbo;');
 
 -- Operator may make native, checksum-verified copies of the SQL archive
 -- without broad sysadmin or destructive database permissions.
