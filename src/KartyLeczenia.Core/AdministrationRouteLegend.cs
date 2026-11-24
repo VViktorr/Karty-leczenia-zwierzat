@@ -2,7 +2,7 @@ namespace KartyLeczenia;
 
 public static class AdministrationRouteLegend
 {
-    public const string Description = "IM – domięśniowo, IV – dożylnie, SC – podskórnie, ID – śródskórnie, IP – dootrzewnowo, IA – dostawowo, PO – doustnie, IUT – domacicznie, IMM – dowymieniowo, IVAG – dopochwowo, TOP / EXT – miejscowo / zewnętrznie, POUR-ON – przez polewanie, SPOT-ON – punktowo na skórę, OPH – do oka, OT / AUR – do ucha, PR – doodbytniczo.";
+    public const string Description = "IM – domięśniowo, IV – dożylnie, SC – podskórnie, ID – śródskórnie, IP – dootrzewnowo, IA – dostawowo, PO – doustnie (dopisek wskazuje sposób podania), IUT – domacicznie, IMM – dowymieniowo, IVAG – dopochwowo, TOP / EXT – miejscowo / zewnętrznie, POUR-ON – przez polewanie, SPOT-ON – punktowo na skórę, OPH – do oka, OT / AUR – do ucha, PR – doodbytniczo.";
 
     // Canonical codes are upper-case. Both current and archived ChPL spellings
     // are accepted, without rewriting the original clinical source in SQL.
@@ -28,6 +28,20 @@ public static class AdministrationRouteLegend
         if (lower is "i.m." or "im." or "i.m") return "IM";
         if (lower is "s.c." or "sc." or "s.c") return "SC";
         if (lower is "p.o." or "p.o" or "p.o.") return "PO";
+
+        var parts = value.Split('/', StringSplitOptions.TrimEntries);
+        if (parts.Length > 1 && parts.All(RouteCodes.ContainsKey))
+            return string.Join(" / ", parts.Select(part => part.ToUpperInvariant()));
+
+        if (lower is "w wodzie do picia" or "doustnie w wodzie do picia"
+            or "doustna — woda do picia" or "doustnie, przez wodę do picia"
+            or "doustnie w wodzie" or "po (woda do picia)" or "po (w wodzie do picia)")
+            return "PO (w wodzie do picia)";
+
+        // Preserve administration instructions that distinguish water, feed or milk.
+        if (lower.Contains("wodzie") || lower.Contains("wodę") ||
+            lower.Contains("woda") || lower.Contains("pasz") || lower.Contains("mlek"))
+            return value;
 
         // Compound routes retain both codes in their original order.
         if (lower.Contains("wewnątrzmacicz") || lower.Contains("domacicz"))
@@ -69,6 +83,7 @@ public static class AdministrationRouteLegend
         // Expand full Polish route names as-is, and canonical codes using
         // one shared dictionary; for unknown routes preserve the source.
         string shortened = Abbreviate(route);
+        if (shortened == "PO (w wodzie do picia)") return "doustnie w wodzie do picia";
         return string.Join(" / ", shortened.Split('/', StringSplitOptions.TrimEntries)
             .Select(part => RouteCodes.TryGetValue(part, out string? name) ? name : part));
     }
