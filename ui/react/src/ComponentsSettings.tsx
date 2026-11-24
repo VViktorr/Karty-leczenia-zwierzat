@@ -143,7 +143,7 @@ export function TableSettings() {
         <label>Rozmiar tekstu{" "}
           <Select aria-label="Rozmiar tekstu dymka" disabled={!settings.tableTextPreview.enabled}
             value={settings.tableTextPreview.fontSize} style={{width:100}}
-            options={[14,16,18,20,22,24].map(value=>({value,label:value+" px"}))}
+            options={Array.from({length:31},(_,index)=>index+10).map(value=>({value,label:value+" px"}))}
             onChange={fontSize=>updateComponents("tableTextPreview",{fontSize})}/>
         </label>
       </Space>

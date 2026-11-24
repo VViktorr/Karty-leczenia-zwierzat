@@ -514,3 +514,13 @@ html[data-kl-segment-style="outline"] .ant-segmented:not(.ant-segmented-disabled
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+html[data-kl-tooltip-style="outline"] .ant-tooltip {
+  filter: drop-shadow(1px 0 var(--kl-toggle-accent)) drop-shadow(-1px 0 var(--kl-toggle-accent))
+    drop-shadow(0 1px var(--kl-toggle-accent)) drop-shadow(0 -1px var(--kl-toggle-accent));
+}
+
+html[data-kl-tooltip-style="contrast"] .ant-tooltip {
+  filter: drop-shadow(2px 0 #fff) drop-shadow(-2px 0 #fff)
+    drop-shadow(0 2px #fff) drop-shadow(0 -2px #fff);
+}

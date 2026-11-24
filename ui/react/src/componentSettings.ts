@@ -74,7 +74,7 @@ export function normalizeComponents(raw: unknown): ComponentPreferences {
       enabled: typeof preview.enabled === "boolean" ? preview.enabled : defaults.tableTextPreview.enabled,
       delaySeconds: [1,2,3,4,5].includes(Number(preview.delaySeconds))
         ? Number(preview.delaySeconds) : defaults.tableTextPreview.delaySeconds,
-      fontSize: [14,16,18,20,22,24].includes(Number(preview.fontSize))
+      fontSize: Number.isInteger(Number(preview.fontSize)) && Number(preview.fontSize) >= 10 && Number(preview.fontSize) <= 40
         ? Number(preview.fontSize) : defaults.tableTextPreview.fontSize,
     },
     agGrid: {

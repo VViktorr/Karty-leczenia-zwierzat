@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert, Button, Card, Checkbox, ConfigProvider, DatePicker, Descriptions, Dropdown, Empty,
   Form, Input, InputNumber, Popover, Segmented, Select, Space, Spin, Steps, Switch,
-  Tag, Tabs, Typography, Progress, theme
+  Tag, Tabs, Tooltip, Typography, Progress, theme
 } from "antd";
 import type {ThemeConfig} from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -2801,7 +2801,7 @@ export default function App() {
   const compact=preset?.dense||windows||layout==="compact";
   const topTabs=components.navigation==="top";
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
-  const [tooltipStyle,setTooltipStyle]=useState(()=>saved("kl.tooltipStyle",["dark","light"] as const,"dark"));
+  const [tooltipStyle,setTooltipStyle]=useState(()=>saved("kl.tooltipStyle",["dark","light","outline","contrast"] as const,"dark"));
   const [switchStyle,setSwitchStyle]=useState(()=>saved("kl.switchStyle",["skin","solid","outline","soft"] as const,"skin"));
   const [segmentStyle,setSegmentStyle]=useState(()=>saved("kl.segmentStyle",["skin","solid","outline"] as const,"skin"));
   const [uiScale,setUiScale]=useState<number>(()=>{
@@ -2901,7 +2901,9 @@ export default function App() {
           colorText:colors?.text??(dark?"#f5f5f5":"#242424"),colorBgElevated:panel,
           colorFillAlter:surface,colorPrimaryBg:selection}:{})},
       components:{
-        Tooltip:tooltipStyle==="light"?{colorBgSpotlight:"#fff",colorTextLightSolid:"#242424"}:{},
+        Tooltip:tooltipStyle==="light"||tooltipStyle==="outline"
+          ? {colorBgSpotlight:"#fff",colorTextLightSolid:"#242424"}
+          : tooltipStyle==="contrast"?{colorBgSpotlight:"#000",colorTextLightSolid:"#fff"}:{},
         Segmented:{itemSelectedBg:primary,itemSelectedColor:"#fff"},
         Table:{
           headerBg:desktop?surface:(dark?"#273447":"#f3f6fa"),
@@ -2939,6 +2941,7 @@ export default function App() {
   },[layout,windows,fluent,preset,appearance]);
   useEffect(()=>{
     const root=document.documentElement;
+    root.dataset.klTooltipStyle=tooltipStyle;
     root.dataset.klSwitchStyle=switchStyle;
     root.dataset.klSegmentStyle=segmentStyle;
     root.style.setProperty("--kl-toggle-accent",primary);
@@ -2949,6 +2952,7 @@ export default function App() {
       localStorage.setItem("kl.segmentStyle",segmentStyle);
     }catch{/* Current selection remains available in this window. */}
     return()=>{
+      delete root.dataset.klTooltipStyle;
       delete root.dataset.klSwitchStyle;
       delete root.dataset.klSegmentStyle;
       root.style.removeProperty("--kl-toggle-accent");
@@ -2981,8 +2985,13 @@ export default function App() {
     </label>
     <label>Dymki
       <Select aria-label="Styl dymków" value={tooltipStyle} onChange={setTooltipStyle}
-        options={[{value:"dark",label:"Ciemne tło, jasny tekst"},{value:"light",label:"Białe tło, ciemny tekst"}]}/>
+        options={[{value:"dark",label:"Ciemne tło, jasny tekst"},{value:"light",label:"Białe tło, ciemny tekst"},
+          {value:"outline",label:"Jasny z konturem skórki"},{value:"contrast",label:"Wysoki kontrast"}]}/>
     </label>
+    <Tooltip placement="top" trigger={["hover","focus"]}
+      title={<span style={{fontSize:components.tableTextPreview.fontSize}}>Pełna nazwa kontrahenta</span>}>
+      <Button>Podgląd dymka</Button>
+    </Tooltip>
     <label>Przełączniki włącz/wyłącz
       <Select aria-label="Styl przełączników włącz/wyłącz" value={switchStyle} onChange={setSwitchStyle}
         options={[{value:"skin",label:"Zgodnie ze skórką"},{value:"solid",label:"Z wypełnieniem"},
