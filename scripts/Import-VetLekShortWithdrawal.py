@@ -108,6 +108,11 @@ def prohibition_short_text(value, commodity):
     label, separator, rest = value.partition(":")
     if separator and COMMODITIES.get(label) == commodity:
         value = rest.strip()
+    if commodity == "milk" and value == (
+        "niedopuszczony u bydła produkującego mleko do spożycia przez ludzi, także w zasuszeniu. "
+        "nie stosować w drugiej połowie ciąży u jałówek przeznaczonych do takiej produkcji"
+    ):
+        return "Niedopuszczony"
     if commodity == "milk" and re.fullmatch(
         r"(?:produkt )?niedopuszcz(?:ony|ona|one|ono) u zwierząt produkujących mleko do spożycia przez ludzi",
         value,
