@@ -103,15 +103,20 @@ def vetlek_periods(text, species):
     return result
 
 
-def is_unconditionally_prohibited(value, commodity):
+def prohibition_short_text(value, commodity):
     value = normalized(value).rstrip(".")
     label, separator, rest = value.partition(":")
     if separator and COMMODITIES.get(label) == commodity:
         value = rest.strip()
-    return bool(re.fullmatch(
+    if commodity == "milk" and re.fullmatch(
+        r"(?:produkt )?niedopuszcz(?:ony|ona|one|ono) u zwierząt produkujących mleko do spożycia przez ludzi",
+        value,
+    ):
+        return "Niedopuszczony"
+    return "Niedopuszczone" if re.fullmatch(
         r"(?:produkt )?niedopuszcz(?:ony|ona|one|ono)(?: do spożycia przez ludzi)?",
         value,
-    ))
+    ) else ""
 
 
 def rows(cursor, catalog, prohibited_only=False):
@@ -142,7 +147,8 @@ def rows(cursor, catalog, prohibited_only=False):
             if prohibited_only:
                 if "niedopuszcz" not in normalized(full):
                     continue
-                reason = "ready" if is_unconditionally_prohibited(full, commodity) else "withdrawal_requires_review"
+                prohibited_short = prohibition_short_text(full, commodity)
+                reason = "ready" if prohibited_short else "withdrawal_requires_review"
             elif catalog is None:
                 reason = "ready" if candidate else "withdrawal_requires_review"
             elif not text:
@@ -158,7 +164,7 @@ def rows(cursor, catalog, prohibited_only=False):
                 reason = "ready"
             short = ""
             if reason == "ready" and prohibited_only:
-                short = "Niedopuszczone"
+                short = prohibited_short
             elif reason == "ready":
                 count, unit = candidate
                 short = f"{count} " + ("h" if unit == "hours" else ("dzień" if count == 1 else "dni"))
