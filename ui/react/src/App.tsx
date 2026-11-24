@@ -94,7 +94,7 @@ interface MedicineExpiry {
   name: string; batch: string; expires: string | null; received: string | null; remaining: number;
   warehouseName: string; deliveriesConfirmed: boolean; productId: number; movementId: number;
 }
-interface SavedCard { id: string; date: string; client: string; document: string; number: string; }
+interface SavedCard { id: string; date: string; client: string; shortClient?: string; document: string; number: string; }
 interface SaveResult {duplicate: boolean; duplicateId: string | null; number: string | null; id: string | null; html: string | null;}
 interface StoredCard {
   fields: Record<string, string>;
@@ -2124,7 +2124,8 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
 
           {title:"Numer karty",dataIndex:"number",width:150},
           {title:"Data",dataIndex:"date",render:date,width:145},
-          {title:"Kontrahent",dataIndex:"client",ellipsis:true},
+          {title:"Kontrahent",dataIndex:"client",ellipsis:{showTitle:false},
+            render:(client:string,row)=><TableTextPreview text={client}>{row.shortClient||client}</TableTextPreview>},
           {title:"Dokument",dataIndex:"document",width:175},
           {key:"actions",title:"Czynności",width:650,render:(_,row)=><Space wrap>
             <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>

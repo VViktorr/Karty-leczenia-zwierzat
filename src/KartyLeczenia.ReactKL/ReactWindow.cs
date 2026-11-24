@@ -1702,14 +1702,14 @@ internal sealed class ReactWindow : Form
         // free-text queries retain the legacy search_text behavior. Never
         // derive a scan-heavy computed number per row.
         string sql = number.HasValue ? """
-            SELECT TOP (500) id, treatment_date, client, document, card_year, card_sequence
+            SELECT TOP (500) id, treatment_date, client, document, card_year, card_sequence, source_scope, payer_id
             FROM dbo.treatment_cards
             WHERE ((@trash=0 AND deleted_at_utc IS NULL) OR (@trash=1 AND deleted_at_utc IS NOT NULL))
               AND card_year=@year AND card_sequence=@sequence
               AND (@date IS NULL OR treatment_date=@date)
             ORDER BY treatment_date DESC, archive_order DESC;
             """ : """
-            SELECT TOP (500) id, treatment_date, client, document, card_year, card_sequence
+            SELECT TOP (500) id, treatment_date, client, document, card_year, card_sequence, source_scope, payer_id
             FROM dbo.treatment_cards
             WHERE ((@trash=0 AND deleted_at_utc IS NULL) OR (@trash=1 AND deleted_at_utc IS NOT NULL))
               AND (@query=N'' OR CHARINDEX(@query,search_text)>0)
@@ -1730,17 +1730,65 @@ internal sealed class ReactWindow : Form
         else
             cmd.Parameters.Add("@query", System.Data.SqlDbType.NVarChar,-1).Value =
                 query.Trim().ToUpperInvariant();
-        var result = new List<object>();
-        await using var reader = await cmd.ExecuteReaderAsync(token);
-        while (await reader.ReadAsync(token))
+        var cards = new List<(string Id, DateTime Date, string Client, string Document,
+            string Number, string Scope, int? PayerId)>();
+        await using (var reader = await cmd.ExecuteReaderAsync(token))
         {
-            string printedNumber = reader.IsDBNull(4) || reader.IsDBNull(5) ? "" :
-                $"K/{reader.GetInt64(5)}/{reader.GetInt32(4):D4}";
-            result.Add(new { id = reader.GetGuid(0).ToString("N"),
-                date = reader.GetDateTime(1), client = reader.GetString(2),
-                document = reader.GetString(3), number = printedNumber });
+            while (await reader.ReadAsync(token))
+            {
+                string printedNumber = reader.IsDBNull(4) || reader.IsDBNull(5) ? "" :
+                    $"K/{reader.GetInt64(5)}/{reader.GetInt32(4):D4}";
+                cards.Add((reader.GetGuid(0).ToString("N"), reader.GetDateTime(1),
+                    reader.GetString(2), reader.GetString(3), printedNumber, reader.GetString(6),
+                    reader.IsDBNull(7) ? null : reader.GetInt32(7)));
+            }
         }
-        return result;
+
+        var shortNames = new Dictionary<(string Scope, string Document, int? PayerId), string>();
+        var source = cards.Count == 0 ? null : subiekt.Load().Options;
+        if (source is not null)
+        {
+            string scope = source.Server.ToUpperInvariant() + "|" + source.Database.ToUpperInvariant();
+            var keys = cards.Where(card => card.Scope == scope && card.PayerId is > 0 &&
+                card.Document.Length is > 0 and <= 256)
+                .Select(card => (card.Document, card.PayerId)).Distinct().ToArray();
+            if (keys.Length > 0)
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                timeout.CancelAfter(TimeSpan.FromSeconds(3));
+                try
+                {
+                    await using var subiektDb = new SqlConnection(source.BuildConnectionString());
+                    await subiektDb.OpenAsync(timeout.Token);
+                    var values = keys.Select((_, index) => $"(@doc{index}, @payer{index})");
+                    using var names = new SqlCommand($"""
+                        SELECT k.document, k.payer, MIN(LTRIM(RTRIM(a.adrh_Nazwa)))
+                        FROM (VALUES {string.Join(",", values)}) k(document, payer)
+                        JOIN dbo.dok__Dokument d ON d.dok_NrPelny=k.document AND d.dok_PlatnikId=k.payer
+                        JOIN dbo.adr_Historia a ON a.adrh_Id=d.dok_PlatnikAdreshId
+                        WHERE NULLIF(LTRIM(RTRIM(a.adrh_Nazwa)), N'') IS NOT NULL
+                        GROUP BY k.document, k.payer
+                        HAVING COUNT(DISTINCT LTRIM(RTRIM(a.adrh_Nazwa))) = 1;
+                        """, subiektDb);
+                    for (int index = 0; index < keys.Length; index++)
+                    {
+                        names.Parameters.Add("@doc" + index, System.Data.SqlDbType.NVarChar, 256).Value = keys[index].Document;
+                        names.Parameters.Add("@payer" + index, System.Data.SqlDbType.Int).Value = keys[index].PayerId!.Value;
+                    }
+                    await using var namesReader = await names.ExecuteReaderAsync(timeout.Token);
+                    while (await namesReader.ReadAsync(timeout.Token))
+                        shortNames[(scope, namesReader.GetString(0), namesReader.GetInt32(1))] = namesReader.GetString(2);
+                }
+                catch (Exception ex) when (ex is SqlException or InvalidOperationException ||
+                    ex is OperationCanceledException && !token.IsCancellationRequested)
+                {
+                    CrashLog.Write("ReactKL.SavedCards.ShortPayer", ex);
+                }
+            }
+        }
+
+        return cards.Select(card => new { card.Id, card.Date, card.Client, card.Document, card.Number,
+            ShortClient = shortNames.GetValueOrDefault((card.Scope, card.Document, card.PayerId)) }).ToArray();
     }
 
     private async Task<object> ReadSavedCard(CancellationToken token, string id, bool trash)
