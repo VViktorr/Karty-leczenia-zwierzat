@@ -585,11 +585,11 @@ export default function CataloguePage({
               Istniejące warianty nie są kasowane przez pominięcie w edytorze.
             </Typography.Text>
           </div>
-          <ListParametersMenu fillHeight onOpen={variantsLayout.openColumns}><Table<UiVariant> {...variantsLayout.tableProps}
+          <ListParametersMenu onOpen={variantsLayout.openColumns}><Table<UiVariant> {...variantsLayout.tableProps}
             className={"catalogue-variants "+variantsLayout.tableProps.className}
             rowKey="key" dataSource={variants} size="small" pagination={false}
             loading={working}
-            scroll={{ x: 1990, y: "100%" }}
+            scroll={{ x: 1990 }}
             rowSelection={{
               selectedRowKeys: selected,
               onChange: keys => setSelected(keys.map(String))
