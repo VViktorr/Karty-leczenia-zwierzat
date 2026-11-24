@@ -15,8 +15,8 @@ type GridOptions = {
  * Keep Ant Design for special row-selection/expandable/grouped tables
  * until the corresponding interactions have AG Grid equivalents.
  */
-export default function AppTable<T extends object>({grid, className, style, wrapRows, ...props}:
-  TableProps<T> & {grid?: GridOptions; wrapRows?: boolean}) {
+export default function AppTable<T extends object>({grid, className, style, wrapRows, wrapHeaders = true, ...props}:
+  TableProps<T> & {grid?: GridOptions; wrapRows?: boolean; wrapHeaders?: boolean}) {
   const {table} = useComponents();
   const complexColumns = props.columns?.some(column => "children" in column && !!column.children);
   const canUseGrid = !complexColumns && !props.rowSelection &&
@@ -25,7 +25,7 @@ export default function AppTable<T extends object>({grid, className, style, wrap
       !!("key" in column && typeof column.key === "string")) !== false;
   return table.mode === "ag" && canUseGrid
     ? <Suspense fallback={<Spin aria-label="Ładowanie tabeli"/>}>
-        <DataGrid<T> {...props} wrapRows={wrapRows} style={style} resize={grid?.resize} move={grid?.move}/>
+        <DataGrid<T> {...props} wrapRows={wrapRows} wrapHeaders={wrapHeaders} style={style} resize={grid?.resize} move={grid?.move}/>
       </Suspense>
-    : <Table<T> {...props} className={className} style={style}/>;
+    : <Table<T> {...props} className={[className, !wrapHeaders && "kl-table-nowrap-headers"].filter(Boolean).join(" ")} style={style}/>;
 }
