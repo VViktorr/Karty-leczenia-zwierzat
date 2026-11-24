@@ -69,6 +69,51 @@ export default function ComponentsSettings() {
           description="Podgląd HTML pozostaje dostępny awaryjnie, gdy wygenerowanie PDF się nie powiedzie."/>
       </Space>
     </Card>
+    <Card size="small" title="Skróty klawiaturowe — React Hotkeys Hook">
+      <Space direction="vertical" size={12}>
+        <Switch checked={settings.shortcuts.enabled} aria-label="Włącz skróty klawiaturowe"
+          onChange={enabled=>updateComponents("shortcuts",{enabled})}/>
+        {shortcutActions.map(action=><label key={action} style={{display:"block"}}>
+          {shortcutLabels[action]}
+          <Select aria-label={shortcutLabels[action]} style={{display:"flex",width:260}}
+            disabled={!settings.shortcuts.enabled}
+            value={settings.shortcuts[action]} options={shortcutOptions}
+            onChange={value=>changeShortcut(action,value)}/>
+        </label>)}
+        {duplicateShortcuts.length>0&&<Alert type="warning"
+          title="Dwa działania nie mogą mieć tego samego skrótu."/>}
+        <Typography.Text type="secondary">
+          Ustawienia powyżej dotyczą kreatora karty. W widoku Dokumenty działają także:
+          {" "}<kbd>Alt+1</kbd> — Faktury, <kbd>Alt+2</kbd> — Paragony,
+          {" "}<kbd>Alt+4</kbd> — WZ i <kbd>F5</kbd> — odświeżenie listy.
+          {" "}<kbd>Ctrl+Shift+L</kbd> otwiera parametry listy.
+        </Typography.Text>
+      </Space>
+    </Card>
+    <Card size="small" title="Buforowanie danych React (TanStack Query)">
+      <Space direction="vertical" size={12}>
+        <label>Czas świeżości danych klienta
+          <Select aria-label="Czas świeżości danych" style={{display:"flex",width:200}}
+            value={settings.cache.staleSeconds}
+            options={[5,15,30,60].map(value=>({value,label:value+" sekund"}))}
+            onChange={staleSeconds=>updateComponents("cache",{staleSeconds})}/>
+        </label>
+        <Checkbox checked={settings.cache.retry}
+          onChange={event=>updateComponents("cache",{retry:event.target.checked})}>
+          Ponów raz nieudane pobieranie danych
+        </Checkbox>
+        <Typography.Text type="secondary">
+          Ustawienia dotyczą bufora UI; limitów zapytań i bezpieczeństwa SQL nie zmieniamy.
+        </Typography.Text>
+      </Space>
+    </Card>
+    <Button onClick={resetComponents}>Przywróć domyślne ustawienia komponentów i tabel</Button>
+  </Space>;
+}
+
+export function TableSettings() {
+  const settings = useComponents();
+  return <Space orientation="vertical" size={16} style={{width:"100%"}}>
     <Card size="small" title="Tabele i układ kolumn">
       <Space direction="vertical" size={12}>
         <label>Domyślny widok tabel
@@ -129,44 +174,5 @@ export default function ComponentsSettings() {
         </Typography.Text>
       </Space>
     </Card>
-    <Card size="small" title="Skróty klawiaturowe — React Hotkeys Hook">
-      <Space direction="vertical" size={12}>
-        <Switch checked={settings.shortcuts.enabled} aria-label="Włącz skróty klawiaturowe"
-          onChange={enabled=>updateComponents("shortcuts",{enabled})}/>
-        {shortcutActions.map(action=><label key={action} style={{display:"block"}}>
-          {shortcutLabels[action]}
-          <Select aria-label={shortcutLabels[action]} style={{display:"flex",width:260}}
-            disabled={!settings.shortcuts.enabled}
-            value={settings.shortcuts[action]} options={shortcutOptions}
-            onChange={value=>changeShortcut(action,value)}/>
-        </label>)}
-        {duplicateShortcuts.length>0&&<Alert type="warning"
-          title="Dwa działania nie mogą mieć tego samego skrótu."/>}
-        <Typography.Text type="secondary">
-          Ustawienia powyżej dotyczą kreatora karty. W widoku Dokumenty działają także:
-          {" "}<kbd>Alt+1</kbd> — Faktury, <kbd>Alt+2</kbd> — Paragony,
-          {" "}<kbd>Alt+4</kbd> — WZ i <kbd>F5</kbd> — odświeżenie listy.
-          {" "}<kbd>Ctrl+Shift+L</kbd> otwiera parametry listy.
-        </Typography.Text>
-      </Space>
-    </Card>
-    <Card size="small" title="Buforowanie danych React (TanStack Query)">
-      <Space direction="vertical" size={12}>
-        <label>Czas świeżości danych klienta
-          <Select aria-label="Czas świeżości danych" style={{display:"flex",width:200}}
-            value={settings.cache.staleSeconds}
-            options={[5,15,30,60].map(value=>({value,label:value+" sekund"}))}
-            onChange={staleSeconds=>updateComponents("cache",{staleSeconds})}/>
-        </label>
-        <Checkbox checked={settings.cache.retry}
-          onChange={event=>updateComponents("cache",{retry:event.target.checked})}>
-          Ponów raz nieudane pobieranie danych
-        </Checkbox>
-        <Typography.Text type="secondary">
-          Ustawienia dotyczą bufora UI; limitów zapytań i bezpieczeństwa SQL nie zmieniamy.
-        </Typography.Text>
-      </Space>
-    </Card>
-    <Button onClick={resetComponents}>Przywróć domyślne ustawienia komponentów</Button>
   </Space>;
 }
