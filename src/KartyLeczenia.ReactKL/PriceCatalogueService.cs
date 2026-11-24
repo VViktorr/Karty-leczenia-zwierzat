@@ -13,7 +13,8 @@ internal sealed record PriceVariant(
     internal string Withdrawal => string.Join(", ", new[]
     {
         Tissues.Length == 0 ? "" : "Tkanki: " + Tissues,
-        Milk.Length == 0 ? "" : "Mleko: " + Milk
+        Milk.Length == 0 ? "" : "Mleko: " + Milk,
+        Eggs.Length == 0 ? "" : "Jaja: " + Eggs
     }.Where(value => value.Length > 0));
 
     internal string EffectiveTissues => Prefer(ShortTissues, Tissues);
@@ -113,6 +114,24 @@ internal sealed class PriceCatalogueSnapshot(
                 ? AdministrationRouteLegend.Abbreviate(route)
                 : AdministrationRouteLegend.Expand(route);
 
+            static string CompactValue(string value, string curated = "")
+            {
+                if (!string.IsNullOrWhiteSpace(curated))
+                    return curated.Trim().ReplaceLineEndings(" ");
+                if (!PriceVariant.IsApplicable(value)) return "";
+                var text = Regex.Replace(value.Trim(), @"\s+", " ");
+                return text.Length <= 100 ? text : "szczegóły w pełnej karencji";
+            }
+
+            string VariantWithdrawal(PriceVariant variant) => string.Join("; ", new[]
+            {
+                (Label: "Tkanki", Value: CompactValue(variant.Tissues, variant.ShortTissues)),
+                (Label: "Mleko", Value: CompactValue(variant.Milk, variant.ShortMilk)),
+                (Label: "Jaja", Value: CompactValue(variant.Eggs, variant.ShortEggs)),
+                (Label: "Ograniczenia", Value: CompactValue(variant.FoodRestriction, variant.ShortFoodRestriction))
+            }.Where(entry => PriceVariant.IsApplicable(entry.Value))
+             .Select(entry => entry.Label + ": " + entry.Value));
+
             var withWithdrawal = all.Where(v => v.Withdrawal.Length > 0 &&
                 v.CompactText is not null && !string.IsNullOrWhiteSpace(v.Route) &&
                 !string.IsNullOrWhiteSpace(v.Dose)).ToArray();
@@ -141,19 +160,25 @@ internal sealed class PriceCatalogueSnapshot(
                     return groups.Length == 0 ? "" : label + ": " + string.Join(", ", groups);
                 }
 
-                var sections = new[] { Group("Tkanki", v => v.EffectiveTissues, true),
-                    Group("Mleko", v => v.EffectiveMilk, true), Group("Jaja", v => v.EffectiveEggs, true) };
-                var restrictions = all.Select(v => v.FoodRestriction.Trim())
+                var sections = new[] { Group("Tkanki", v => CompactValue(v.Tissues, v.ShortTissues), true),
+                    Group("Mleko", v => CompactValue(v.Milk, v.ShortMilk), true),
+                    Group("Jaja", v => CompactValue(v.Eggs, v.ShortEggs), true) };
+                var restrictions = all.Select(v => CompactValue(v.FoodRestriction, v.ShortFoodRestriction))
+                    .Select(value => value == "szczegóły w pełnej karencji" ? "Ograniczenia: " + value : value)
                     .Where(value => value.Length > 0).Distinct();
                 return string.Join("; ", sections.Concat(restrictions).Where(value => value.Length > 0));
             }
             if (format == 0)
-                return string.Join(" | ", withWithdrawal.Select(v =>
-                    $"{v.Species} {Route(v.Route)} · {v.Withdrawal}").Distinct());
+                return string.Join(" | ", all.Select(v => (Variant: v, Text: string.Join("; ",
+                        new[] { v.Withdrawal, string.IsNullOrWhiteSpace(v.FoodRestriction) ? "" : v.Restrictions }
+                            .Where(value => !string.IsNullOrWhiteSpace(value)))))
+                    .Where(v => v.Text.Length > 0)
+                    .Select(v => $"{v.Variant.Species} {Route(v.Variant.Route)} · {v.Text}").Distinct());
 
             var compact = all.Where(v => v.HasShort || withWithdrawal.Contains(v))
                 .Select(v => (v.Species, Route: Route(v.Route),
-                    Text: (v.HasShort ? v.ShortWithdrawal : v.CompactText ?? "").ReplaceLineEndings(" ").Trim()))
+                    Text: v.HasShort || (v.CompactText?.Length ?? 0) > 100
+                        ? VariantWithdrawal(v) : CompactValue(v.CompactText ?? "")))
                 .Where(v => v.Text.Length > 0).Distinct().ToArray();
             return string.Join("; ", compact.Select(v => $"{v.Species} {v.Route}: {v.Text}"));
         }
