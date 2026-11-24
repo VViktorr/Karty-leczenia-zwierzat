@@ -1051,6 +1051,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     }catch(e){setVariantError(e instanceof Error?e.message:String(e));}
     finally{setVariantBusy(false);}
   }
+  const [wrapVariantRows,setWrapVariantRows]=useLocalToggle("kl.treatmentVariant.wrapRows");
   const variantColumns:ColumnsType<TreatmentVariantChoice> = [
           {title:"Gatunek",dataIndex:"species",width:170,
             render:(species:string,row:TreatmentVariantChoice)=>
@@ -1077,10 +1078,15 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
               : "Brak"}
         ];
   for(const column of variantColumns){
-    column.onCell=()=>({style:{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}});
+    if(wrapVariantRows)column.onCell=()=>({style:{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}});
+    else if("dataIndex" in column && typeof column.dataIndex==="string" &&
+        ["dose","tissues","milk","eggs","indication"].includes(column.dataIndex))
+      column.ellipsis=true;
   }
 
-  const variantLayout=useListColumnLayout("treatment-variant",variantColumns,false,"species");
+  const variantLayout=useListColumnLayout("treatment-variant",variantColumns,false,"species",
+    <Checkbox checked={wrapVariantRows} style={{marginBottom:12}}
+      onChange={event=>setWrapVariantRows(event.target.checked)}>Zawijaj treść wierszy</Checkbox>);
   const variantsPagination=useListPagination("treatment-variants",variantModal?.variants.length??0,12);
   useEffect(()=>{
     if(active&&wizard&&step===4&&performed)void printPreview(true);
@@ -1607,7 +1613,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
       <ErrorNotice error={choiceError}/>
       <ErrorNotice error={variantError}/>
 
-      <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> wrapRows {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
+      <ListParametersMenu fillHeight onOpen={variantLayout.openColumns}><Table<TreatmentVariantChoice> wrapRows={wrapVariantRows} {...variantLayout.tableProps} rowKey="id" loading={variantBusy}
         dataSource={variantRows} size="small"
         pagination={variantsPagination} scroll={{x:"max-content",y:"100%"}}
         columns={variantLayout.columns}/></ListParametersMenu>
