@@ -25,7 +25,7 @@ interface CatalogueVariant {
 }
 interface CatalogueProduct {
   symbol: string; name: string; rplId: string; description: string;
-  revision: string; variants: CatalogueVariant[];
+  revision: string; variants: CatalogueVariant[]; nonMedicine?: boolean;
 }
 interface ChplProposal {
   variants: CatalogueVariant[];
@@ -406,7 +406,7 @@ export default function CataloguePage({
       setError("Wpisz symbol i nazwę kartoteki leku.");
       return;
     }
-    if (variants.some(v => v.id === null && (!v.species.trim() || !v.route.trim() || !v.dose.trim()))) {
+    if (!editing.nonMedicine && variants.some(v => v.id === null && (!v.species.trim() || !v.route.trim() || !v.dose.trim()))) {
       setError("Nowy wariant musi zawierać gatunek, drogę podania i dawkowanie.");
       return;
     }
@@ -416,9 +416,18 @@ export default function CataloguePage({
     try {
       const product: CatalogueProduct = {
         ...editing,
-        variants: variants.map(({ key: _key, ...rest }) => rest)
+        variants: editing.nonMedicine ? [] : variants.map(({ key: _key, ...rest }) => rest)
       };
       await invoke("saveCatalogueProduct", { product });
+      if (product.nonMedicine) {
+        setEditing(null);
+        setVariants([]);
+        setSelected([]);
+        setDirty(false);
+        setSavedNotice("Zapisano oznaczenie „To nie lek”.");
+        setVersion(value => value + 1);
+        return;
+      }
       const fresh = await invoke<CatalogueProduct>("readCatalogueProduct", {
         symbol: editing.symbol
       });
@@ -550,6 +559,13 @@ export default function CataloguePage({
                 onChange={event => changeField("description", event.target.value)} />
             </label>
           </div>
+          {!editing.revision&&<Checkbox checked={!!editing.nonMedicine} disabled={working}
+            style={{marginBottom:8}} onChange={event=>{
+              const nonMedicine=event.target.checked;
+              setEditing(current=>current?{...current,nonMedicine}:current);
+              setDirty(true);
+            }}>To nie lek</Checkbox>}
+          {!editing.nonMedicine&&<>
           <div className="catalogue-variant-toolbar">
             <Space wrap>
 
@@ -580,6 +596,7 @@ export default function CataloguePage({
             }}
             columns={variantsLayout.columns}
           /></ListParametersMenu>
+          </>}
         </>}
       </Card>
     </div>
