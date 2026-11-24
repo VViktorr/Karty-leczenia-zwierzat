@@ -3,6 +3,9 @@ import {Spin, Table, Tooltip} from "antd";
 import {lazy, Suspense, useMemo} from "react";
 import {useComponents} from "./componentSettings";
 
+// Tooltip forwards this positioning option to its underlying trigger.
+const cursorTooltipPosition = {alignPoint: true};
+
 const DataGrid = lazy(() => import("./DataGrid")) as typeof import("./DataGrid").default;
 
 type GridOptions = {
@@ -28,7 +31,8 @@ export default function AppTable<T extends object>({grid, className, style, wrap
           const output=column.render ? column.render(value,row,index) : value;
           if(typeof output!=="string" && typeof output!=="number")return output;
           if(typeof output==="string" && !output.trim())return output;
-          return <Tooltip mouseEnterDelay={tableTextPreview.delaySeconds}
+          return <Tooltip {...cursorTooltipPosition} placement="top"
+            mouseEnterDelay={tableTextPreview.delaySeconds}
             styles={{root:{maxWidth:"min(560px, 80vw)"}}}
             title={<div style={{fontSize:tableTextPreview.fontSize,whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>
               {output}
