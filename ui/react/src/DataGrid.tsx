@@ -100,8 +100,8 @@ function Cell<T extends object>({data, value, node, columnDefinition}: CustomCel
 }
 
 export default function DataGrid<T extends object>({columns, dataSource, pagination, loading,
-  rowKey, scroll, size, rowClassName, style, onRow, locale, resize, move}:
-  TableProps<T> & {resize?: (key: string, width: number) => void; move?: (order: string[]) => void}) {
+  rowKey, scroll, size, rowClassName, style, onRow, locale, resize, move, wrapRows}:
+  TableProps<T> & {wrapRows?: boolean; resize?: (key: string, width: number) => void; move?: (order: string[]) => void}) {
   const preferences=useComponents().agGrid;
   const viewport = useRef<HTMLDivElement>(null);
   const [api, setApi] = useState<GridApi<T>>();
@@ -139,6 +139,8 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
     return [{
       colId: id,
       headerName,
+      wrapText: wrapRows,
+      autoHeight: wrapRows,
       wrapHeaderText: true,
       autoHeaderHeight: true,
       width: typeof column.width === "number" ? column.width : 160,
@@ -162,6 +164,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
           color: style?.color ?? "",
           backgroundColor: style?.backgroundColor ?? "",
           textAlign: style?.textAlign ?? column.align ?? "left",
+          ...(wrapRows ? {whiteSpace:"pre-wrap",overflowWrap:"anywhere"} : {}),
         };
       },
       headerStyle: {backgroundColor: headerStyle?.backgroundColor ?? ""},
@@ -169,7 +172,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
         style: headerStyle
       }}
     }];
-  }), [columns,preferences.sortable,preferences.filters]);
+  }), [columns,preferences.sortable,preferences.filters,wrapRows]);
   const rowClassRules = useMemo(() => {
     if (typeof rowClassName !== "function") return undefined;
     const matches = (className: string) => (params: import("ag-grid-community").RowClassParams<T>) =>
