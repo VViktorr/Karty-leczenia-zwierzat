@@ -6,7 +6,7 @@ namespace KartyLeczenia.ReactKL;
 
 internal sealed record PriceVariant(
     string Species, string Route, string Indication, string Dose,
-    string Tissues, string Milk, string? CompactText)
+    string Tissues, string Milk, string? CompactText, string Eggs = "", string Restrictions = "")
 {
     internal string Withdrawal => string.Join(", ", new[]
     {
@@ -89,6 +89,40 @@ internal sealed class PriceCatalogueSnapshot(
             var withWithdrawal = all.Where(v => v.Withdrawal.Length > 0 &&
                 v.CompactText is not null && !string.IsNullOrWhiteSpace(v.Route) &&
                 !string.IsNullOrWhiteSpace(v.Dose)).ToArray();
+            if (format == 2)
+            {
+                static string Species(string name) => name.Trim() switch
+                {
+                    "Bydło (cielęta)" => "Bydło",
+                    "Świnie" => "Świnia",
+                    "Indyki" => "Indyk",
+                    "Kury" => "Kura",
+                    _ => name.Trim()
+                };
+                static bool Applies(string text) => !string.IsNullOrWhiteSpace(text) &&
+                    !text.TrimStart().StartsWith("Nie dotyczy", StringComparison.OrdinalIgnoreCase) &&
+                    !text.TrimStart().StartsWith("Nie podano", StringComparison.OrdinalIgnoreCase);
+                string Group(string label, Func<PriceVariant, string> period, bool omitMissing)
+                {
+                    var entries = all.Select(v => (Species: Species(v.Species), Text: period(v).Trim(), v.Route))
+                        .Where(v => v.Species.Length > 0 && v.Text.Length > 0 &&
+                            (!omitMissing || Applies(v.Text))).Distinct().ToArray();
+                    var withDifferentPeriods = entries.GroupBy(v => v.Species)
+                        .Where(group => group.Select(v => v.Text).Distinct().Skip(1).Any())
+                        .Select(group => group.Key).ToHashSet();
+                    var groups = entries.GroupBy(v => v.Text).Select(group =>
+                        string.Join(", ", group.Select(v => withDifferentPeriods.Contains(v.Species)
+                            ? v.Species + " (" + Route(v.Route) + ")" : v.Species).Distinct()) +
+                        " — " + group.Key).ToArray();
+                    return groups.Length == 0 ? "" : label + ": " + string.Join(", ", groups);
+                }
+
+                var sections = new[] { Group("Tkanki", v => v.Tissues, false),
+                    Group("Mleko", v => v.Milk, true), Group("Jaja", v => v.Eggs, true) };
+                var restrictions = all.Select(v => v.Restrictions.Trim())
+                    .Where(value => value.Length > 0).Distinct();
+                return string.Join("; ", sections.Concat(restrictions).Where(value => value.Length > 0));
+            }
             if (format == 0)
                 return string.Join(" | ", withWithdrawal.Select(v =>
                     $"{v.Species} {Route(v.Route)} · {v.Withdrawal}").Distinct());
@@ -97,10 +131,7 @@ internal sealed class PriceCatalogueSnapshot(
                 .Select(v => (v.Species, Route: Route(v.Route),
                     Text: (v.CompactText ?? "").ReplaceLineEndings(" ").Trim()))
                 .Where(v => v.Text.Length > 0).Distinct().ToArray();
-            return format == 2
-                ? string.Join("; ", compact.GroupBy(v => v.Species).Select(group =>
-                    $"{group.Key} — {string.Join(" / ", group.Select(v => $"{v.Route}: {v.Text}"))}"))
-                : string.Join("; ", compact.Select(v => $"{v.Species} {v.Route}: {v.Text}"));
+            return string.Join("; ", compact.Select(v => $"{v.Species} {v.Route}: {v.Text}"));
         }
 
         return new(price.Symbol, price.Name, price.Gross, price.LatestBatch,
@@ -129,9 +160,11 @@ internal sealed class PriceCatalogueService(ConnectionSettingsStore archive)
             options.BuildConnectionString("KartyLeczenia"))
         { ApplicationIntent = ApplicationIntent.ReadOnly }.ConnectionString);
         await db.OpenAsync(token).ConfigureAwait(false);
-        using var cmd = new SqlCommand("""
+        using var probe = new SqlCommand("SELECT COL_LENGTH(N'dbo.catalog_variants', N'eggs');", db);
+        string eggs = await probe.ExecuteScalarAsync(token).ConfigureAwait(false) is DBNull or null ? "NULL" : "v.eggs";
+        using var cmd = new SqlCommand($"""
             SELECT p.symbol, v.species, v.route, v.indication, v.dose,
-                   v.edible_tissues, v.milk, w.compact_text
+                   v.edible_tissues, v.milk, w.compact_text, {eggs}, v.restrictions
             FROM dbo.catalog_products p
             JOIN dbo.catalog_variants v ON v.symbol = p.symbol
             LEFT JOIN dbo.catalog_price_withdrawal w ON w.id = v.id
@@ -149,7 +182,7 @@ internal sealed class PriceCatalogueService(ConnectionSettingsStore archive)
         {
             string Value(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i);
             rows.Add((Value(0), new PriceVariant(Value(1), Value(2), Value(3),
-                Value(4), Value(5), Value(6), reader.IsDBNull(7) ? null : Value(7))));
+                Value(4), Value(5), Value(6), reader.IsDBNull(7) ? null : Value(7), Value(8), Value(9))));
         }
         var classifications = new List<(string Symbol, string Decision, string Status)>();
         if (await reader.NextResultAsync(token).ConfigureAwait(false))
