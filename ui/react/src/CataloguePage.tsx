@@ -22,6 +22,7 @@ interface CatalogueVariant {
   species: string; indication: string; route: string; dose: string;
   tissues: string; milk: string; eggs: string; remarks: string; source: string;
   short: string; price: string; pdf: string;
+  shortTissues?: string; shortMilk?: string; shortEggs?: string; shortFoodRestriction?: string;
 }
 interface CatalogueProduct {
   symbol: string; name: string; rplId: string; description: string;
@@ -48,6 +49,10 @@ const textFields = [
   { key: "eggs", title: "Jaja", width: 145 },
   { key: "remarks", title: "Uwagi", width: 190 },
   { key: "source", title: "Źródło danych", width: 160 },
+  { key: "shortTissues", title: "Krótka karencja — tkanki", width: 170 },
+  { key: "shortMilk", title: "Krótka karencja — mleko", width: 170 },
+  { key: "shortEggs", title: "Krótka karencja — jaja", width: 170 },
+  { key: "shortFoodRestriction", title: "Krótki zapis ograniczeń spożycia", width: 210 },
   { key: "short", title: "Skrót karencji", width: 160 },
   { key: "price", title: "Karencja w cenniku", width: 200 }
 ] as const;
@@ -241,7 +246,9 @@ export default function CataloguePage({
   }
 
   function changeVariant(key: string, field: keyof CatalogueVariant, value: string) {
-    setVariants(current => current.map(row => row.key === key ? { ...row, [field]: value } : row));
+    setVariants(current => current.map(row => row.key === key ? { ...row, [field]: value,
+      ...(field==="tissues"?{shortTissues:""}:field==="milk"?{shortMilk:""}:
+        field==="eggs"?{shortEggs:""}:field==="remarks"?{shortFoodRestriction:""}:{}) } : row));
     setDirty(true);
   }
 
@@ -446,7 +453,7 @@ export default function CataloguePage({
       render: (_: unknown, row: UiVariant) =>
         key === "milk" && isPoultry(row.species) ? "—" : <Input.TextArea
           aria-label={title + " " + row.key}
-          value={row[key]}
+          value={row[key]??""}
           autoSize={{ minRows: 1, maxRows: 4 }}
           onChange={event => changeVariant(row.key, key, event.target.value)}
         />
@@ -589,7 +596,7 @@ export default function CataloguePage({
             className={"catalogue-variants "+variantsLayout.tableProps.className}
             rowKey="key" dataSource={variants} size="small" pagination={false}
             loading={working}
-            scroll={{ x: 1990 }}
+            scroll={{ x: "max-content" }}
             rowSelection={{
               selectedRowKeys: selected,
               onChange: keys => setSelected(keys.map(String))

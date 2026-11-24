@@ -52,6 +52,13 @@ internal static class TreatmentVariantApplier
         row.Set("Dawkowanie i okres stosowania", choice.Dose);
         // An absent withdrawal means UNKNOWN, never the previous species' time.
         row.Set("Karencja", withdrawal);
+        var printable = new PriceVariant(choice.Species, choice.Route, choice.Indication, choice.Dose,
+            choice.Tissues, choice.Milk, choice.Price, choice.Eggs, choice.Remarks,
+            choice.ShortTissues, choice.ShortMilk, choice.ShortEggs, choice.ShortFoodRestriction);
+        row.Set("Krótka karencja z katalogu", printable.HasShort ? printable.ShortWithdrawal : "", false);
+        row.Set("Pełna karencja odpowiadająca skrótowi", withdrawal, false);
+        row.Set("Gatunek odpowiadający skrótowi", choice.Species, false);
+        row.Set("Droga odpowiadająca skrótowi", choice.Route, false);
         row.Set("Wskazanie ChPL", choice.Indication);
         row.Set("Źródło karencji", choice.Source);
         row.Set("Status karencji", "Wariant katalogu SQL — zweryfikuj z aktualną ChPL");

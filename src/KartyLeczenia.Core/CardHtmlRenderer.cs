@@ -192,6 +192,12 @@ public static class CardHtmlRenderer
                 string route = string.IsNullOrWhiteSpace(routeText) ? "" :
                     "<br>" + E(shortRoutes ? AdministrationRouteLegend.Abbreviate(routeText) : routeText);
                 string withdrawal = row.GetValueOrDefault("Karencja") ?? "";
+                string verifiedShort = row.GetValueOrDefault("Krótka karencja z katalogu") ?? "";
+                if ((shortWithdrawals || withdrawalBySpecies) && verifiedShort.Length > 0 &&
+                    withdrawal == row.GetValueOrDefault("Pełna karencja odpowiadająca skrótowi") &&
+                    row.GetValueOrDefault("Gatunek") == row.GetValueOrDefault("Gatunek odpowiadający skrótowi") &&
+                    routeText == row.GetValueOrDefault("Droga odpowiadająca skrótowi"))
+                    withdrawal = verifiedShort;
                 if (withdrawalBySpecies)
                 {
                     string species = GeneralSpecies(row.GetValueOrDefault("Gatunek") ?? "");

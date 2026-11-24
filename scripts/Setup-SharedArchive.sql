@@ -126,6 +126,22 @@ IF COL_LENGTH(N'dbo.catalog_variants', N'eggs') IS NULL
     ALTER TABLE dbo.catalog_variants ADD eggs nvarchar(max) NULL;
 
 
+IF OBJECT_ID(N'dbo.catalog_variant_withdrawal', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.catalog_variant_withdrawal (
+        variant_id int NOT NULL REFERENCES dbo.catalog_variants(id) ON DELETE CASCADE,
+        commodity varchar(12) NOT NULL CHECK (commodity IN ('tissues','milk','eggs','food')),
+        short_text nvarchar(1000) NOT NULL,
+        status varchar(20) NOT NULL CHECK (status IN
+            ('period','not_applicable','not_reported','not_authorized','condition')),
+        duration int NULL CHECK (duration >= 0),
+        unit varchar(5) NULL CHECK (unit IN ('hours','days')),
+        condition_text nvarchar(1000) NULL,
+        source_text nvarchar(max) NOT NULL,
+        CONSTRAINT PK_catalog_variant_withdrawal PRIMARY KEY (variant_id, commodity)
+    );
+END;
+
 IF OBJECT_ID(N'dbo.treatment_choices', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.treatment_choices (
@@ -167,6 +183,7 @@ GRANT SELECT, INSERT, UPDATE ON dbo.catalog_products TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT ON dbo.catalog_documents TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.catalog_variants TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.catalog_price_withdrawal TO KartyLeczeniaOperator;
+GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.catalog_variant_withdrawal TO KartyLeczeniaOperator;
 GRANT SELECT ON dbo.catalog_import TO KartyLeczeniaOperator;
 GRANT SELECT, INSERT, UPDATE ON dbo.treatment_choices TO KartyLeczeniaOperator;
 

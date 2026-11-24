@@ -326,9 +326,26 @@ static class Program
             Check(formatted.VariantsCodes.Contains("Bydło IM: T: 7 dni, M: 60 h") &&
                   formatted.VariantsCodes.Contains("Świnie PO: T: 3 dni"),
                 "variant compact format should come from catalog_price_withdrawal");
-            Check(formatted.SpeciesCodes.Contains("Bydło — IM:") &&
-                  formatted.SpeciesNames.Contains("Świnie — doustnie:"),
-                "species compact grouping should retain route and species");
+            Check(formatted.SpeciesCodes.Contains("Tkanki: Bydło — 7 dni, Świnia — 3 dni") &&
+                  formatted.SpeciesNames.Contains("Mleko: Bydło — 60 godzin"),
+                "species compact grouping prints only applicable withdrawal data");
+            var curatedPrice = PriceCatalogueSnapshot.FromRows(
+            [
+                ("LEK-D", new PriceVariant("Bydło","IM","Wskazanie","1 ml","11 dni",
+                    "Nie dotyczy","stary tekst", Restrictions:"Wstrząsnąć",
+                    ShortTissues:"11 dni",ShortFoodRestriction:"Jaja — niedopuszczone")),
+                ("LEK-D", new PriceVariant("Świnie","PO","Wskazanie","1 ml","11 dni",
+                    "Nie dotyczy",""))
+            ]).Format(new KartyLeczenia.MedicinePrice("Próba", 12m) { Symbol = "LEK-D" });
+            Check(curatedPrice.SpeciesCodes.Contains("Tkanki: Bydło, Świnia — 11 dni") &&
+                  curatedPrice.SpeciesCodes.Contains("Jaja — niedopuszczone") &&
+                  !curatedPrice.SpeciesCodes.Contains("Wstrząsnąć") &&
+                  !curatedPrice.SpeciesCodes.Contains("Mleko"),
+                "only food withdrawal and reviewed restrictions appear in the compact list");
+            Check(CatalogueWithdrawalSql.Classify("0 dni") == ("period", 0, "days") &&
+                  CatalogueWithdrawalSql.Classify("Nie podano").Status == "not_reported" &&
+                  CatalogueWithdrawalSql.Classify("2 dni po wycieleniu").Status == "condition",
+                "zero withdrawal, missing data and conditional periods are different");
             Check(!formatted.NeedsCompletion,
                 "complete official catalogue variants should not be flagged missing");
             var unknownPrice = cataloguePrices.Format(

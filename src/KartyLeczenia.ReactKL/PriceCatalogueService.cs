@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.RegularExpressions;
 using KartyLeczenia;
 using Microsoft.Data.SqlClient;
 
@@ -6,13 +7,39 @@ namespace KartyLeczenia.ReactKL;
 
 internal sealed record PriceVariant(
     string Species, string Route, string Indication, string Dose,
-    string Tissues, string Milk, string? CompactText, string Eggs = "", string Restrictions = "")
+    string Tissues, string Milk, string? CompactText, string Eggs = "", string Restrictions = "",
+    string ShortTissues = "", string ShortMilk = "", string ShortEggs = "", string ShortFoodRestriction = "")
 {
     internal string Withdrawal => string.Join(", ", new[]
     {
         Tissues.Length == 0 ? "" : "Tkanki: " + Tissues,
         Milk.Length == 0 ? "" : "Mleko: " + Milk
     }.Where(value => value.Length > 0));
+
+    internal string EffectiveTissues => Prefer(ShortTissues, Tissues);
+    internal string EffectiveMilk => Prefer(ShortMilk, Milk);
+    internal string EffectiveEggs => Prefer(ShortEggs, Eggs);
+    internal string FoodRestriction => string.IsNullOrWhiteSpace(ShortFoodRestriction)
+        ? Regex.IsMatch(Restrictions, @"spoży|konsump|rzeź|produkcj.{0,30}(?:jaj|mlek|miod)|przeznacz.{0,35}(?:jaj|mlek|miod|tkank)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) ? Restrictions : ""
+        : ShortFoodRestriction;
+    internal bool HasShort => new[] { ShortTissues, ShortMilk, ShortEggs, ShortFoodRestriction }
+        .Any(value => !string.IsNullOrWhiteSpace(value));
+
+    internal static string Prefer(string shortText, string fullText) =>
+        string.IsNullOrWhiteSpace(shortText) ? fullText : shortText;
+
+    internal string ShortWithdrawal => string.Join("; ", new[]
+    {
+        EffectiveTissues.Length == 0 ? "" : "Tkanki: " + EffectiveTissues,
+        IsApplicable(EffectiveMilk) ? "Mleko: " + EffectiveMilk : "",
+        IsApplicable(EffectiveEggs) ? "Jaja: " + EffectiveEggs : "",
+        FoodRestriction
+    }.Where(value => value.Length > 0));
+
+    internal static bool IsApplicable(string text) => !string.IsNullOrWhiteSpace(text) &&
+        !text.TrimStart().StartsWith("Nie dotyczy", StringComparison.OrdinalIgnoreCase) &&
+        !text.TrimStart().StartsWith("Nie podano", StringComparison.OrdinalIgnoreCase);
 
     internal bool Incomplete =>
         string.IsNullOrWhiteSpace(Species) ||
@@ -99,14 +126,11 @@ internal sealed class PriceCatalogueSnapshot(
                     "Kury" => "Kura",
                     _ => name.Trim()
                 };
-                static bool Applies(string text) => !string.IsNullOrWhiteSpace(text) &&
-                    !text.TrimStart().StartsWith("Nie dotyczy", StringComparison.OrdinalIgnoreCase) &&
-                    !text.TrimStart().StartsWith("Nie podano", StringComparison.OrdinalIgnoreCase);
                 string Group(string label, Func<PriceVariant, string> period, bool omitMissing)
                 {
                     var entries = all.Select(v => (Species: Species(v.Species), Text: period(v).Trim(), v.Route))
                         .Where(v => v.Species.Length > 0 && v.Text.Length > 0 &&
-                            (!omitMissing || Applies(v.Text))).Distinct().ToArray();
+                            (!omitMissing || PriceVariant.IsApplicable(v.Text))).Distinct().ToArray();
                     var withDifferentPeriods = entries.GroupBy(v => v.Species)
                         .Where(group => group.Select(v => v.Text).Distinct().Skip(1).Any())
                         .Select(group => group.Key).ToHashSet();
@@ -117,9 +141,9 @@ internal sealed class PriceCatalogueSnapshot(
                     return groups.Length == 0 ? "" : label + ": " + string.Join(", ", groups);
                 }
 
-                var sections = new[] { Group("Tkanki", v => v.Tissues, false),
-                    Group("Mleko", v => v.Milk, true), Group("Jaja", v => v.Eggs, true) };
-                var restrictions = all.Select(v => v.Restrictions.Trim())
+                var sections = new[] { Group("Tkanki", v => v.EffectiveTissues, true),
+                    Group("Mleko", v => v.EffectiveMilk, true), Group("Jaja", v => v.EffectiveEggs, true) };
+                var restrictions = all.Select(v => v.FoodRestriction.Trim())
                     .Where(value => value.Length > 0).Distinct();
                 return string.Join("; ", sections.Concat(restrictions).Where(value => value.Length > 0));
             }
@@ -127,9 +151,9 @@ internal sealed class PriceCatalogueSnapshot(
                 return string.Join(" | ", withWithdrawal.Select(v =>
                     $"{v.Species} {Route(v.Route)} · {v.Withdrawal}").Distinct());
 
-            var compact = withWithdrawal
+            var compact = all.Where(v => v.HasShort || withWithdrawal.Contains(v))
                 .Select(v => (v.Species, Route: Route(v.Route),
-                    Text: (v.CompactText ?? "").ReplaceLineEndings(" ").Trim()))
+                    Text: (v.HasShort ? v.ShortWithdrawal : v.CompactText ?? "").ReplaceLineEndings(" ").Trim()))
                 .Where(v => v.Text.Length > 0).Distinct().ToArray();
             return string.Join("; ", compact.Select(v => $"{v.Species} {v.Route}: {v.Text}"));
         }
@@ -162,9 +186,10 @@ internal sealed class PriceCatalogueService(ConnectionSettingsStore archive)
         await db.OpenAsync(token).ConfigureAwait(false);
         using var probe = new SqlCommand("SELECT COL_LENGTH(N'dbo.catalog_variants', N'eggs');", db);
         string eggs = await probe.ExecuteScalarAsync(token).ConfigureAwait(false) is DBNull or null ? "NULL" : "v.eggs";
+        string shortColumns = CatalogueWithdrawalSql.Columns(CatalogueWithdrawalSql.Exists(db), eggs);
         using var cmd = new SqlCommand($"""
             SELECT p.symbol, v.species, v.route, v.indication, v.dose,
-                   v.edible_tissues, v.milk, w.compact_text, {eggs}, v.restrictions
+                   v.edible_tissues, v.milk, w.compact_text, {eggs}, v.restrictions, {shortColumns}
             FROM dbo.catalog_products p
             JOIN dbo.catalog_variants v ON v.symbol = p.symbol
             LEFT JOIN dbo.catalog_price_withdrawal w ON w.id = v.id
@@ -182,7 +207,7 @@ internal sealed class PriceCatalogueService(ConnectionSettingsStore archive)
         {
             string Value(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i);
             rows.Add((Value(0), new PriceVariant(Value(1), Value(2), Value(3),
-                Value(4), Value(5), Value(6), reader.IsDBNull(7) ? null : Value(7), Value(8), Value(9))));
+                Value(4), Value(5), Value(6), reader.IsDBNull(7) ? null : Value(7), Value(8), Value(9), Value(10), Value(11), Value(12), Value(13))));
         }
         var classifications = new List<(string Symbol, string Decision, string Status)>();
         if (await reader.NextResultAsync(token).ConfigureAwait(false))

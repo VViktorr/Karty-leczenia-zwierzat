@@ -10,7 +10,8 @@ internal sealed record CatalogueListing(string Symbol, string Name, string Statu
 internal sealed record CatalogueVariantModel(
     int? Id = null, string Species = "", string Indication = "", string Route = "",
     string Dose = "", string Tissues = "", string Milk = "", string Remarks = "",
-    string Source = "", string Short = "", string Price = "", string Pdf = "", string Eggs = "");
+    string Source = "", string Short = "", string Price = "", string Pdf = "", string Eggs = "",
+    string ShortTissues = "", string ShortMilk = "", string ShortEggs = "", string ShortFoodRestriction = "");
 internal sealed record CatalogueProductModel(
     string Symbol, string Name, string RplId, string Description,
     string Revision, List<CatalogueVariantModel> Variants, bool NonMedicine = false);
@@ -129,10 +130,11 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
 
         var variants = new List<CatalogueVariantModel>();
         string eggs = HasEggsColumn(db, tx) ? "v.eggs" : "NULL";
+        string shortColumns = CatalogueWithdrawalSql.Columns(CatalogueWithdrawalSql.Exists(db, tx), eggs);
         using (var command = Command(db, $"""
             SELECT v.id,v.species,v.indication,v.route,v.dose,v.edible_tissues,
                    v.milk,v.restrictions,v.source,v.withdrawal_short,
-                   COALESCE(w.compact_text,N''),v.pdf_path,{eggs}
+                   COALESCE(w.compact_text,N''),v.pdf_path,{eggs},{shortColumns}
             FROM dbo.catalog_variants v
             LEFT JOIN dbo.catalog_price_withdrawal w ON w.id=v.id
             WHERE v.symbol=@symbol ORDER BY v.id;
@@ -145,7 +147,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 string Value(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i);
                 variants.Add(new(reader.GetInt32(0),Value(1),Value(2),Value(3),
                     Value(4),Value(5),Value(6),Value(7),Value(8),
-                    Value(9),Value(10),Value(11),Value(12)));
+                    Value(9),Value(10),Value(11),Value(12),Value(13),Value(14),Value(15),Value(16)));
             }
         }
         tx.Commit();
@@ -172,13 +174,14 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
         using var db = Open();
         CheckImported(db);
         string eggs = HasEggsColumn(db) ? "v.eggs" : "NULL";
+        string shortColumns = CatalogueWithdrawalSql.Columns(CatalogueWithdrawalSql.Exists(db), eggs);
         foreach (var batch in unique.Chunk(90))
         {
             var args = batch.Select((_, i) => "@symbol" + i).ToArray();
             string query = $"""
                 SELECT p.symbol,v.id,v.species,v.indication,v.route,v.dose,
                        v.edible_tissues,v.milk,v.restrictions,v.source,
-                       v.withdrawal_short,COALESCE(w.compact_text,N''),v.pdf_path,COALESCE(p.decision,N''),{eggs}
+                       v.withdrawal_short,COALESCE(w.compact_text,N''),v.pdf_path,COALESCE(p.decision,N''),{eggs},{shortColumns}
                 FROM dbo.catalog_products p
                 LEFT JOIN dbo.catalog_variants v ON v.symbol=p.symbol
                 LEFT JOIN dbo.catalog_price_withdrawal w ON w.id=v.id
@@ -210,7 +213,7 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 }
                 variants.Add(new(reader.GetInt32(1),Value(2),Value(3),
                     Value(4),Value(5),Value(6),Value(7),Value(8),
-                    Value(9),Value(10),Value(11),Value(12),Value(14)));
+                    Value(9),Value(10),Value(11),Value(12),Value(14),Value(15),Value(16),Value(17),Value(18)));
             }
         }
         return (result, nonMedicines);
@@ -253,11 +256,17 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 v.Milk,v.Eggs,v.Remarks,v.Source,v.Short,v.Price,v.Pdf })
                 if (value.Length > 10000)
                     throw new ArgumentException("Pole wariantu jest zbyt długie.");
+            if (new[] {v.ShortTissues,v.ShortMilk,v.ShortEggs,v.ShortFoodRestriction}.Any(value => value.Length > 1000))
+                throw new ArgumentException("Skrócony zapis może mieć maksymalnie 1000 znaków.");
             if (v.Pdf.Length > 450) throw new ArgumentException("Za długa ścieżka PDF.");
         }
 
         using var db = Open();
         CheckImported(db);
+        bool hasShortWithdrawal = CatalogueWithdrawalSql.Exists(db);
+        if (!hasShortWithdrawal && product.Variants.Any(v =>
+            new[] {v.ShortTissues,v.ShortMilk,v.ShortEggs,v.ShortFoodRestriction}.Any(value => !string.IsNullOrWhiteSpace(value))))
+            throw new InvalidOperationException("Na serwerze uruchom scripts/Setup-SharedArchive.sql przed zapisem krótkich karencji.");
         bool hasEggs = HasEggsColumn(db);
         if (!hasEggs && product.Variants.Any(v => !string.IsNullOrWhiteSpace(v.Eggs)))
             throw new InvalidOperationException("Przed zapisaniem karencji dla jaj uruchom na serwerze scripts/Upgrade-CatalogueEggWithdrawal.sql.");
@@ -381,6 +390,8 @@ internal sealed class CatalogueService(ConnectionSettingsStore archiveSettings)
                 !string.IsNullOrWhiteSpace(priceText)?priceText:
                 !string.IsNullOrWhiteSpace(shortText)?shortText:full;
             price.ExecuteNonQuery();
+            if (hasShortWithdrawal)
+                CatalogueWithdrawalSql.Save(db, tx, savedId, variant);
         }
         tx.Commit();
     }
