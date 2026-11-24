@@ -9,6 +9,7 @@ export type ComponentPreferences = {
   pdf: {mode: PageMode; viewer: ViewerMode; zoom: number; rememberZoom: boolean;
     textLayer: boolean; annotations: boolean; preloadPages: number};
   table: {mode: GridMode; rememberColumns: boolean};
+  tableTextPreview: {enabled: boolean; delaySeconds: number; fontSize: number};
   agGrid: {
     rowHeight: number;
     headerHeight: number;
@@ -27,6 +28,7 @@ export const defaultComponents: ComponentPreferences = {
   pdf: {mode: "scroll", viewer: "react", zoom: 100, rememberZoom: true,
     textLayer: true, annotations: true, preloadPages: 2},
   table: {mode: "antd", rememberColumns: true},
+  tableTextPreview: {enabled: true, delaySeconds: 3, fontSize: 16},
   agGrid: {rowHeight: 36, headerHeight: 40, sortable: true, filters: false,
     animateRows: false, resizableColumns: true, rowBuffer: 10},
   cache: {staleSeconds: 15, retry: false},
@@ -48,7 +50,7 @@ export function normalizeComponents(raw: unknown): ComponentPreferences {
     value && typeof value === "object" && !Array.isArray(value)
       ? value as Record<string, unknown> : {};
   const pdf = obj(data.pdf), table = obj(data.table), cache = obj(data.cache);
-  const agGrid = obj(data.agGrid);
+  const agGrid = obj(data.agGrid), preview = obj(data.tableTextPreview);
   const shortcuts = obj(data.shortcuts);
   const zoom = Number(pdf.zoom);
   const staleSeconds = Number(cache.staleSeconds);
@@ -67,6 +69,13 @@ export function normalizeComponents(raw: unknown): ComponentPreferences {
       mode: enumValue(table.mode, ["antd","ag"], defaults.table.mode),
       rememberColumns: typeof table.rememberColumns === "boolean"
         ? table.rememberColumns : defaults.table.rememberColumns,
+    },
+    tableTextPreview: {
+      enabled: typeof preview.enabled === "boolean" ? preview.enabled : defaults.tableTextPreview.enabled,
+      delaySeconds: [1,2,3,4,5].includes(Number(preview.delaySeconds))
+        ? Number(preview.delaySeconds) : defaults.tableTextPreview.delaySeconds,
+      fontSize: [14,16,18,20,22,24].includes(Number(preview.fontSize))
+        ? Number(preview.fontSize) : defaults.tableTextPreview.fontSize,
     },
     agGrid: {
       rowHeight: [28,32,36,40,44,48,52].includes(Number(agGrid.rowHeight))
@@ -113,7 +122,7 @@ export function setComponents(next: ComponentPreferences) {
   try { localStorage.setItem(key, JSON.stringify(current)); } catch { /* session fallback */ }
   notify();
 }
-export function updateComponents<K extends "pdf" | "table" | "agGrid" | "cache" | "shortcuts">(
+export function updateComponents<K extends "pdf" | "table" | "tableTextPreview" | "agGrid" | "cache" | "shortcuts">(
   section: K, patch: Partial<ComponentPreferences[K]>) {
   setComponents({...current, [section]: {...current[section], ...patch}});
 }
