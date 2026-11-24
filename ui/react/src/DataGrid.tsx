@@ -100,8 +100,8 @@ function Cell<T extends object>({data, value, node, columnDefinition}: CustomCel
 }
 
 export default function DataGrid<T extends object>({columns, dataSource, pagination, loading,
-  rowKey, scroll, size, rowClassName, style, onRow, locale, resize, move, wrapRows}:
-  TableProps<T> & {wrapRows?: boolean; resize?: (key: string, width: number) => void; move?: (order: string[]) => void}) {
+  rowKey, scroll, size, rowClassName, style, onRow, locale, resize, move, wrapRows, wrapHeaders = true}:
+  TableProps<T> & {wrapRows?: boolean; wrapHeaders?: boolean; resize?: (key: string, width: number) => void; move?: (order: string[]) => void}) {
   const preferences=useComponents().agGrid;
   const viewport = useRef<HTMLDivElement>(null);
   const [api, setApi] = useState<GridApi<T>>();
@@ -141,8 +141,8 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
       headerName,
       wrapText: wrapRows,
       autoHeight: wrapRows,
-      wrapHeaderText: true,
-      autoHeaderHeight: true,
+      wrapHeaderText: wrapHeaders,
+      autoHeaderHeight: wrapHeaders,
       width: typeof column.width === "number" ? column.width : 160,
       flex: column.width === undefined ? 1 : null,
       sortable:preferences.sortable && typeof index === "string",
@@ -169,10 +169,12 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
       },
       headerStyle: {backgroundColor: headerStyle?.backgroundColor ?? ""},
       headerComponentParams: {innerHeaderComponent: Header, innerHeaderComponentParams: {
-        style: headerStyle
+        style: wrapHeaders ? headerStyle : {
+          ...headerStyle, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"
+        }
       }}
     }];
-  }), [columns,preferences.sortable,preferences.filters,wrapRows]);
+  }), [columns,preferences.sortable,preferences.filters,wrapRows,wrapHeaders]);
   const rowClassRules = useMemo(() => {
     if (typeof rowClassName !== "function") return undefined;
     const matches = (className: string) => (params: import("ag-grid-community").RowClassParams<T>) =>
