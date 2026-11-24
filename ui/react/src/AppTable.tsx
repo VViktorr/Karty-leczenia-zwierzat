@@ -26,7 +26,8 @@ export default function AppTable<T extends object>({grid, className, style, wrap
         if(!column.render && column.dataIndex===undefined)return column;
         return {...column,render:(value,row,index)=>{
           const output=column.render ? column.render(value,row,index) : value;
-          if(typeof output!=="string" || (output.length<60 && !output.includes("\n")))return output;
+          if(typeof output!=="string" && typeof output!=="number")return output;
+          if(typeof output==="string" && !output.trim())return output;
           return <Tooltip mouseEnterDelay={tableTextPreview.delaySeconds}
             styles={{root:{maxWidth:"min(560px, 80vw)"}}}
             title={<div style={{fontSize:tableTextPreview.fontSize,whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>
