@@ -30,6 +30,16 @@ SPECIES_ALIASES = {
     "świnie": "świnia", "kury": "kura", "indyki": "indyk",
     "konie": "koń", "gołębie": "gołąb", "psy": "pies", "koty": "kot",
     "owce": "owca", "kozy": "koza", "króliki": "królik",
+    "cielę": "cielęta", "cielęta bydła": "cielęta", "bydło (cielęta)": "cielęta",
+    "świnie (prosięta)": "prosięta", "owce (jagnięta)": "jagnięta",
+    "krowy w okresie zasuszenia": "krowy zasuszone",
+    "bydło (krowy w okresie zasuszenia)": "krowy zasuszone",
+    "bydło (krowy zasuszone)": "krowy zasuszone",
+    "bydło (krowy w laktacji)": "krowy w laktacji",
+}
+SPECIES_PARENTS = {
+    "cielęta": "bydło", "krowy zasuszone": "bydło", "krowy w laktacji": "bydło",
+    "prosięta": "świnia", "jagnięta": "owca",
 }
 ROUTE_ALIASES = {
     "im": "domięśniowo", "domięśniowa": "domięśniowo",
@@ -37,6 +47,12 @@ ROUTE_ALIASES = {
     "sc": "podskórnie", "podskórna": "podskórnie",
     "po": "doustnie", "doustna": "doustnie",
     "imm": "dowymieniowo", "dowymieniowa": "dowymieniowo",
+    "doustnie w wodzie do picia": "w wodzie do picia",
+    "doustna — woda do picia": "w wodzie do picia",
+    "doustnie, przez wodę do picia": "w wodzie do picia",
+    "po (woda do picia)": "w wodzie do picia",
+    "doustnie w wodzie": "w wodzie do picia",
+    "polewanie (pour-on)": "pour-on",
 }
 
 
@@ -71,7 +87,7 @@ def vetlek_periods(text, species):
     for line in text.splitlines():
         line = line.strip()
         heading = species_key(line.rstrip(":"))
-        if heading in species:
+        if heading in species or SPECIES_PARENTS.get(heading) in species:
             current_species = heading
             continue
         label, sep, value = line.partition(":")
@@ -112,7 +128,8 @@ def rows(cursor, catalog):
             matches = values.get((species_key(species), commodity))
             if not text:
                 reason = "missing_vetlek_source"
-            elif species_key(species) not in species_names or not species_key(species):
+            elif (species_key(species) not in species_names and
+                  SPECIES_PARENTS.get(species_key(species)) not in species_names):
                 reason = "species_requires_review"
             elif routes != {route_key(route)} or not route_key(route):
                 reason = "route_requires_review"
