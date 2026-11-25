@@ -1693,11 +1693,26 @@ internal sealed class ReactWindow : Form
                 // each time the user changes between levels or net/gross.
                 var stock = await expiryLists.ReadAsync(stockKey, refresh,
                     stockToken => MedicineStockService.Expiries(options, stockToken), ct);
-                return await MedicineStockService.Prices(options, level, ct,
-                    net: net, knownExpiries: stock.Value);
+                try
+                {
+                    return await MedicineStockService.Prices(options, level, ct,
+                        net: net, knownExpiries: stock.Value);
+                }
+                catch (SqlException ex) when (!ct.IsCancellationRequested)
+                {
+                    throw new InvalidOperationException(
+                        $"Cennik — odczyt cen z Subiekta GT (SQL {ex.Number}). {SubiektConnectionService.FriendlyError(ex)}", ex);
+                }
             }, token);
-            var catalogueRows = await priceCatalogueLists.ReadAsync("price-catalogue", refresh,
-                ct => priceCatalogueService.ReadAsync(ct), token);
+            var catalogueRows = await priceCatalogueLists.ReadAsync("price-catalogue", refresh, async ct =>
+            {
+                try { return await priceCatalogueService.ReadAsync(ct); }
+                catch (SqlException ex) when (!ct.IsCancellationRequested)
+                {
+                    throw new InvalidOperationException(
+                        $"Cennik — odczyt katalogu z bazy KartyLeczenia (SQL {ex.Number}). {SubiektConnectionService.FriendlyError(ex)}", ex);
+                }
+            }, token);
             return catalogueRows.Value.FormatPrices(priced.Value);
         }
         if (action == "saveDraft" || action == "previewDraft")
