@@ -568,3 +568,46 @@ html[data-kl-tooltip-style="contrast"] .ant-tooltip {
 }
 
 .nav-item > .navigation-icon { margin-inline-end: 0.45em; }
+
+/* Material 3 Expressive skin, including overlays rendered outside the app shell. */
+html[data-kl-skin="material-expressive"] {
+  --kl-expressive-motion: 220ms cubic-bezier(.2,.8,.2,1);
+}
+.layout-material-expressive .topbar-title > strong {
+  font-weight: 720;
+  letter-spacing: -.02em;
+}
+.layout-material-expressive .top-navigation { padding: 8px 12px; }
+.layout-material-expressive .main-nav .nav-item {
+  border-radius: 999px;
+  transition: background-color var(--kl-expressive-motion), color var(--kl-expressive-motion),
+    border-radius var(--kl-expressive-motion);
+}
+.layout-material-expressive .main-nav .nav-item.is-active {
+  border-radius: 16px;
+  border-color: transparent;
+}
+.layout-material-expressive .nav-item:focus-visible,
+html[data-kl-skin="material-expressive"] .ant-btn:focus-visible {
+  outline-offset: 3px;
+}
+html[data-kl-skin="material-expressive"] .ant-btn {
+  font-weight: 600;
+  transition: background-color var(--kl-expressive-motion), border-color var(--kl-expressive-motion),
+    color var(--kl-expressive-motion), transform var(--kl-expressive-motion);
+}
+html[data-kl-skin="material-expressive"] .ant-btn:active:not(:disabled) { transform: scale(.97); }
+html[data-kl-skin="material-expressive"] .ant-segmented {
+  border-radius: 999px;
+  padding: 3px;
+}
+html[data-kl-skin="material-expressive"] .ant-segmented :is(.ant-segmented-item, .ant-segmented-thumb) {
+  border-radius: 999px;
+}
+html[data-kl-skin="material-expressive"] :is(.ant-modal-container, .ant-modal-content) { border-radius: 28px; }
+html[data-kl-skin="material-expressive"] :is(.ant-dropdown-menu, .ant-select-dropdown) { border-radius: 18px; }
+@media (prefers-reduced-motion: reduce) {
+  .layout-material-expressive .main-nav .nav-item,
+  html[data-kl-skin="material-expressive"] .ant-btn { transition: none; }
+  html[data-kl-skin="material-expressive"] .ant-btn:active:not(:disabled) { transform: none; }
+}

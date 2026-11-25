@@ -33,6 +33,12 @@ export const skinPresets = {
     light: {background:"#f5f2fb",panel:"#fff",toolbar:"#eae2f7",line:"#d7cbdf",text:"#292335",muted:"#5c5269",accent:"#67439c",selection:"#eaddff"},
     dark: {background:"#201b27",panel:"#2a2433",toolbar:"#362d44",line:"#574b63",text:"#f5eafa",muted:"#ccc0d5",accent:"#7549b0",selection:"#493562"},
   },
+  "material-expressive": {
+    label: "Material 3 Expressive", dense: false, radius: 24,
+    buttonRadius: 24, controlHeight: 36, fontFamily: 'Roboto,"Segoe UI",system-ui,sans-serif',
+    light: {background:"#f8f2fb",panel:"#fffbff",toolbar:"#eee4f5",line:"#dbcee2",text:"#22192a",muted:"#655870",accent:"#70438b",selection:"#efd8f9"},
+    dark: {background:"#18121e",panel:"#241b2c",toolbar:"#30253a",line:"#55465e",text:"#f6eaf9",muted:"#cebbd7",accent:"#824f9e",selection:"#493351"},
+  },
   aero: {
     label: "Aero Retro — inspiracja Windows 7", dense: true, radius: 4,
     buttonRadius: 3, controlHeight: 28, fontFamily: '"Segoe UI",system-ui,sans-serif',
