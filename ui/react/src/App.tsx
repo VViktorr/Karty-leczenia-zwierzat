@@ -8,7 +8,7 @@ import TreatmentWarningList from "./TreatmentWarningList";
 import type {ReactNode} from "react";
 import {skinPresets, presetNames, type PresetName} from "./skinPresets";
 import {initializeNavigation, setComponents, useComponents} from "./componentSettings";
-import ComponentsSettings, {TableSettings} from "./ComponentsSettings";
+import {PdfSettings, PerformanceSettings, ShortcutSettings, TableSettings} from "./ComponentsSettings";
 
 import type {CSSProperties} from "react";
 import dayjs from "dayjs";
@@ -2794,46 +2794,57 @@ function UpdatePanel(){
   </Card>;
 }
 
-function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowPreferences}: {
+function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowPreferences,documentPreferences}: {
   onSubiektSaved:()=>void;wizard:boolean;onWizardChange:(enabled:boolean)=>void;
-  appearance:ReactNode;workflowPreferences:ReactNode;
+  appearance:ReactNode;workflowPreferences:ReactNode;documentPreferences:ReactNode;
 }) {
+  const connections=["subiekt","program","administrator"];
+  const service=["backup","updates","performance"];
   const [active,setActive]=useState(()=>{
-    try{return localStorage.getItem("kl.settings.activeTab")||"subiekt";}
-    catch{return "subiekt";}
+    try{
+      const saved=localStorage.getItem("kl.settings.activeTab");
+      return saved==="components"?"pdf":saved||"subiekt";
+    }catch{return "subiekt";}
   });
   function choose(key:string){
     setActive(key);
     try{localStorage.setItem("kl.settings.activeTab",key);}
     catch{/* Workstation settings remain optional. */}
   }
-  return <>
-    <Tabs activeKey={active} onChange={choose} items={[
+  const section=connections.includes(active)?"connections":service.includes(active)?"service":active;
+  return <Tabs activeKey={section}
+    onChange={key=>choose(key==="connections"?"subiekt":key==="service"?"backup":key)} items={[
       {key:"appearance",label:"Wygląd",children:<Card>{appearance}</Card>},
       {key:"tables",label:"Tabele",children:<TableSettings/>},
-      {key:"components",label:"Komponenty",children:<ComponentsSettings/>},
-      {key:"treatment",label:"Karty leczenia",children:<Card>
-        <Space orientation="vertical" size={12}>
-        <Space wrap><Switch checked={wizard} onChange={onWizardChange} aria-label="Kreator kart leczenia"/>
-          <Typography.Text>Kreator kart leczenia</Typography.Text></Space>
-          {workflowPreferences}
-        </Space>
-      </Card>},
-      {key:"clinic",label:"Dane lecznicy",children:<ClinicSettingsPanel/>},
-      {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings onSaved={onSubiektSaved}/>},
-      {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
-      {key:"administrator",label:"Konto administratora SQL",children:<ProgramDatabaseSettings administrator/>},
-      {key:"backup",label:"Archiwizacja",children:<Space orientation="vertical" size={18}
-        style={{width:"100%"}}>
-        <Alert type="info" className="notice" showIcon
-          title="Archiwizacja dotyczy bazy KartyLeczenia — nie bazy Subiekta"
-          description="Kopia korzysta z połączenia „Baza Karty Leczenia”. Do odtwarzania używane jest „Konto administratora SQL”."/>
-        <BackupPanel/>
-        <RestorePanel/>
+      {key:"pdf",label:"PDF i drukowanie",children:<PdfSettings/>},
+      {key:"treatment",label:"Karty leczenia",children:<Space orientation="vertical" size={16} style={{width:"100%"}}>
+        <Card size="small" title="Kreator i podsumowanie">
+          <Space orientation="vertical" size={12}>
+            <label className="workflow-option"><Switch checked={wizard} onChange={onWizardChange}
+              aria-label="Kreator kart leczenia"/> Kreator kart leczenia</label>
+            {workflowPreferences}
+          </Space>
+        </Card>
+        <ShortcutSettings/>
       </Space>},
-      {key:"updates",label:"Aktualizacje",children:<UpdatePanel/>}
-    ]}/>
-  </>;
+      {key:"clinic",label:"Dane lecznicy",children:<ClinicSettingsPanel/>},
+      {key:"connections",label:"Połączenia SQL",children:<Tabs size="small" activeKey={active} onChange={choose} items={[
+        {key:"subiekt",label:"Subiekt GT",children:<SubiektDatabaseSettings onSaved={onSubiektSaved}/>},
+        {key:"program",label:"Baza Karty Leczenia",children:<ProgramDatabaseSettings/>},
+        {key:"administrator",label:"Konto administratora SQL",children:<ProgramDatabaseSettings administrator/>}
+      ]}/>},
+      {key:"service",label:"Serwis",children:<Tabs size="small" activeKey={active} onChange={choose} items={[
+        {key:"backup",label:"Archiwizacja",children:<Space orientation="vertical" size={18} style={{width:"100%"}}>
+          <Alert type="info" className="notice" showIcon
+            title="Archiwizacja bazy KartyLeczenia"
+            description="Do kopii służy połączenie „Baza Karty Leczenia”, a do odtwarzania konto administratora SQL."/>
+          <BackupPanel/>
+          <RestorePanel/>
+        </Space>},
+        {key:"updates",label:"Aktualizacje",children:<UpdatePanel/>},
+        {key:"performance",label:"Wydajność",children:<PerformanceSettings>{documentPreferences}</PerformanceSettings>}
+      ]}/>}
+    ]}/>;
 }
 
 function useLocalToggle(key:string) {
@@ -3093,13 +3104,11 @@ export default function App() {
     <label className="workflow-option"><Switch checked={shortcuts} onChange={setShortcuts}
       aria-label="Skróty klawiaturowe karty"/> Skróty klawiaturowe karty</label>
     {shortcuts&&<Typography.Text type="secondary">
-      Skróty przypisane w Ustawienia → Komponenty:
+      Skróty przypisane poniżej:
       {" "}wstecz: {components.shortcuts.back}, dalej: {components.shortcuts.next},
       {" "}podsumowanie: {components.shortcuts.summary}, zapisz: {components.shortcuts.save}.
-      {!components.shortcuts.enabled&&" Są obecnie wyłączone w ustawieniach komponentów."}
+      {!components.shortcuts.enabled&&" Są obecnie wyłączone w sekcji skrótów poniżej."}
     </Typography.Text>}
-    <label className="workflow-option"><Switch checked={cacheDocuments} onChange={setCacheDocuments}
-      aria-label="Podręczna lista dokumentów"/> Podręczna lista dokumentów przez 15 sekund</label>
     <label className="workflow-option"><Switch checked={virtualWarnings} onChange={setVirtualWarnings}
       aria-label="Tryb długiej listy ostrzeżeń"/> Tryb długiej listy ostrzeżeń w podsumowaniu</label>
   </>;
@@ -3110,7 +3119,10 @@ export default function App() {
     section==="expiry"?<Expiry/>:
     section==="saved"?<SavedCards initialCardId={savedCardToOpen?.id??null} initialEdit={savedCardToOpen?.edit??false}
       onInitialCardOpened={()=>setSavedCardToOpen(null)}/>:<SettingsPage wizard={wizard} onWizardChange={changeWizard} appearance={controls}
-        workflowPreferences={workflowPreferences} onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
+        workflowPreferences={workflowPreferences} documentPreferences={
+    <label className="workflow-option"><Switch checked={cacheDocuments} onChange={setCacheDocuments}
+      aria-label="Podręczna lista dokumentów"/> Podręczna lista dokumentów przez 15 sekund</label>
+        } onSubiektSaved={()=>setSubiektRevision(revision=>revision+1)}/>;
   const skinStyle=preset&&colors&&{
     "--shell-bg":colors.background, "--panel":colors.panel, "--skin-toolbar":colors.toolbar,
     "--line":colors.line, "--text":colors.text, "--subtle":colors.muted,

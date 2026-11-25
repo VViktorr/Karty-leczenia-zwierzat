@@ -13,22 +13,19 @@ const shortcutLabels: Record<ShortcutAction,string> = {
 };
 const shortcutActions: ShortcutAction[] = ["back","next","summary","save"];
 
-export default function ComponentsSettings() {
+export function PdfSettings() {
   const settings = useComponents();
-  const duplicateShortcuts = shortcutActions.filter((action,index) =>
-    shortcutActions.some((other,otherIndex) =>
-      otherIndex<index && settings.shortcuts[other]===settings.shortcuts[action]));
-  function changeShortcut(action:ShortcutAction, value:string) {
-    // Never configure the same shortcut for two simultaneous actions.
-    if (shortcutActions.some(other=>other!==action && settings.shortcuts[other]===value)) return;
-    updateComponents("shortcuts",{[action]:value});
-  }
-  return <Space direction="vertical" size={16} style={{width:"100%"}}>
-    <Typography.Paragraph type="secondary">
-      Ustawienia stanowiska dotyczą wszystkich okien korzystających z tych komponentów.
-      Nie zmieniają połączeń SQL ani danych archiwum.
-    </Typography.Paragraph>
-    <Card size="small" title="PDF — karty leczenia i dokumenty ChPL">
+  return <Space orientation="vertical" size={16} style={{width:"100%"}}>
+    <Card size="small" title="Drukowanie kart leczenia">
+        <label>Okno drukowania kart
+          <Select aria-label="Okno drukowania kart" style={{display:"flex",maxWidth:420}}
+            value={settings.pdf.cardPrintMode} onChange={cardPrintMode=>updateComponents("pdf",{cardPrintMode})}
+            options={[{value:"browser",label:"Podgląd wydruku WebView2"},
+              {value:"system",label:"Systemowe okno Windows"},
+              {value:"externalPdf",label:"Domyślna aplikacja PDF"}]}/>
+        </label>
+    </Card>
+    <Card size="small" title="Podgląd PDF">
       <Space direction="vertical" size={12} style={{width:"100%"}}>
         <label>Tryb przeglądania PDF
           <Select style={{display:"flex",maxWidth:420}} aria-label="Tryb przeglądania PDF"
@@ -41,13 +38,6 @@ export default function ComponentsSettings() {
             value={settings.pdf.viewer} onChange={viewer=>updateComponents("pdf",{viewer})}
             options={[{value:"react",label:"React-PDF / PDF.js"},
               {value:"native",label:"Natywny podgląd WebView2"}]}/>
-        </label>
-        <label>Okno drukowania kart
-          <Select aria-label="Okno drukowania kart" style={{display:"flex",maxWidth:420}}
-            value={settings.pdf.cardPrintMode} onChange={cardPrintMode=>updateComponents("pdf",{cardPrintMode})}
-            options={[{value:"browser",label:"Podgląd wydruku WebView2"},
-              {value:"system",label:"Systemowe okno Windows"},
-              {value:"externalPdf",label:"Domyślna aplikacja PDF"}]}/>
         </label>
         <label>Domyślne powiększenie
           <Select aria-label="Domyślne powiększenie PDF" style={{display:"flex",width:180}}
@@ -72,11 +62,22 @@ export default function ComponentsSettings() {
             options={[1,2,3,5].map(value=>({value,label:String(value)}))}
             onChange={preloadPages=>updateComponents("pdf",{preloadPages})}/>
         </label>
-        <Alert type="info" showIcon title="PDF generuje WebView2; PDF.js odpowiada za jego wyświetlanie."
-          description="Podgląd HTML pozostaje dostępny awaryjnie, gdy wygenerowanie PDF się nie powiedzie."/>
       </Space>
     </Card>
-    <Card size="small" title="Skróty klawiaturowe — React Hotkeys Hook">
+  </Space>;
+}
+
+export function ShortcutSettings() {
+  const settings = useComponents();
+  const duplicateShortcuts = shortcutActions.filter((action,index) =>
+    shortcutActions.some((other,otherIndex) =>
+      otherIndex<index && settings.shortcuts[other]===settings.shortcuts[action]));
+  function changeShortcut(action:ShortcutAction, value:string) {
+    // Never configure the same shortcut for two simultaneous actions.
+    if (shortcutActions.some(other=>other!==action && settings.shortcuts[other]===value)) return;
+    updateComponents("shortcuts",{[action]:value});
+  }
+  return <Card size="small" title="Skróty klawiaturowe — React Hotkeys Hook">
       <Space direction="vertical" size={12}>
         <Switch checked={settings.shortcuts.enabled} aria-label="Włącz skróty klawiaturowe"
           onChange={enabled=>updateComponents("shortcuts",{enabled})}/>
@@ -96,8 +97,13 @@ export default function ComponentsSettings() {
           {" "}<kbd>Ctrl+Shift+L</kbd> otwiera parametry listy.
         </Typography.Text>
       </Space>
-    </Card>
-    <Card size="small" title="Buforowanie danych React (TanStack Query)">
+    </Card>;
+}
+
+export function PerformanceSettings({children}:{children?:import("react").ReactNode}) {
+  const settings = useComponents();
+  return <Space orientation="vertical" size={16} style={{width:"100%"}}>
+    <Card size="small" title="Buforowanie danych">
       <Space direction="vertical" size={12}>
         <label>Czas świeżości danych klienta
           <Select aria-label="Czas świeżości danych" style={{display:"flex",width:200}}
@@ -109,12 +115,10 @@ export default function ComponentsSettings() {
           onChange={event=>updateComponents("cache",{retry:event.target.checked})}>
           Ponów raz nieudane pobieranie danych
         </Checkbox>
-        <Typography.Text type="secondary">
-          Ustawienia dotyczą bufora UI; limitów zapytań i bezpieczeństwa SQL nie zmieniamy.
-        </Typography.Text>
+        {children}
       </Space>
     </Card>
-    <Button onClick={resetComponents}>Przywróć domyślne ustawienia komponentów i tabel</Button>
+    <Button onClick={resetComponents}>Przywróć domyślne ustawienia PDF, skrótów, bufora, tabel i nawigacji</Button>
   </Space>;
 }
 
