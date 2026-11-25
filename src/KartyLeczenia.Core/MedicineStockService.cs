@@ -148,11 +148,38 @@ public static class MedicineStockService
         // Reuse a recent stock snapshot when supplied by the React desktop host.
         // Other callers retain the original fresh-query behavior.
         var deliveries = knownExpiries ?? await Expiries(options, token);
-        var latestBatches = deliveries.Where(row => row.DeliveriesConfirmed)
+        var latestBatches = deliveries.Where(row => row.DeliveriesConfirmed && !string.IsNullOrWhiteSpace(row.Batch))
             .GroupBy(row => row.ProductId)
             .Where(group => group.Count() == 1 || group.All(row => row.Received.HasValue))
             .ToDictionary(group => group.Key, group => group.OrderByDescending(row => row.Received)
                 .ThenByDescending(row => row.MovementId).First().Batch);
+        int[] missing = prices.Select(row => row.ProductId).Distinct()
+            .Where(id => !latestBatches.ContainsKey(id)).ToArray();
+        if (missing.Length > 0)
+        {
+            string dateColumn = await DocumentService.DateColumn(connection, token);
+            string order = dateColumn.Length == 0 ? "" : $"d.{dateColumn} DESC, ";
+            using var fallback = new SqlCommand($"""
+                WITH Ranked AS (
+                    SELECT r.mr_TowId, LTRIM(RTRIM(p.ob_NumerSeryjny)) AS Batch,
+                           ROW_NUMBER() OVER (PARTITION BY r.mr_TowId ORDER BY {order}r.mr_Id DESC) AS Position
+                    FROM STRING_SPLIT(@products, N',') ids
+                    JOIN dbo.dok_MagRuch r ON r.mr_TowId = TRY_CONVERT(int, ids.value)
+                    JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
+                    JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
+                    WHERE d.dok_MagId = @warehouseId
+                      AND (r.mr_DoId IS NULL OR r.mr_DoId = 0)
+                      AND r.mr_Ilosc > 0 AND r.mr_Pozostalo > 0
+                      AND NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), N'') IS NOT NULL
+                )
+                SELECT mr_TowId, Batch FROM Ranked WHERE Position = 1;
+                """, connection);
+            fallback.Parameters.Add("@products", SqlDbType.NVarChar, -1).Value = string.Join(",", missing);
+            fallback.Parameters.Add("@warehouseId", SqlDbType.Int).Value = (object?)options.WarehouseId ?? DBNull.Value;
+            await using var reader = await fallback.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+                latestBatches[reader.GetInt32(0)] = reader.GetString(1);
+        }
         return prices.Select(row => row.Price with { LatestBatch = latestBatches.GetValueOrDefault(row.ProductId, "") }).ToList();
     }
 
