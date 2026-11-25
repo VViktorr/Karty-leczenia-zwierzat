@@ -161,16 +161,21 @@ public static class MedicineStockService
             string order = dateColumn.Length == 0 ? "" : $"d.{dateColumn} DESC, ";
             using var fallback = new SqlCommand($"""
                 WITH Ranked AS (
-                    SELECT r.mr_TowId, LTRIM(RTRIM(p.ob_NumerSeryjny)) AS Batch,
+                    SELECT r.mr_TowId, COALESCE(NULLIF(LTRIM(RTRIM(receipt.ob_NumerSeryjny)), N''),
+                               NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), N'')) AS Batch,
                            ROW_NUMBER() OVER (PARTITION BY r.mr_TowId ORDER BY {order}r.mr_Id DESC) AS Position
                     FROM STRING_SPLIT(@products, N',') ids
                     JOIN dbo.dok_MagRuch r ON r.mr_TowId = TRY_CONVERT(int, ids.value)
                     JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
-                    JOIN dbo.dok__Dokument d ON d.dok_Id = COALESCE(NULLIF(p.ob_DokMagId, 0), p.ob_DokHanId)
+                    LEFT JOIN dbo.dok_Pozycja receipt ON receipt.ob_Id = p.ob_DoId
+                     AND receipt.ob_TowId = p.ob_TowId AND NULLIF(receipt.ob_DokMagId, 0) IS NOT NULL
+                    JOIN dbo.dok__Dokument d ON d.dok_Id = COALESCE(
+                        NULLIF(receipt.ob_DokMagId, 0), NULLIF(p.ob_DokMagId, 0), p.ob_DokHanId)
                     WHERE d.dok_MagId = @warehouseId
                       AND (r.mr_DoId IS NULL OR r.mr_DoId = 0)
                       AND r.mr_Ilosc > 0 AND r.mr_Pozostalo > 0
-                      AND NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), N'') IS NOT NULL
+                      AND COALESCE(NULLIF(LTRIM(RTRIM(receipt.ob_NumerSeryjny)), N''),
+                                   NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), N'')) IS NOT NULL
                 )
                 SELECT mr_TowId, Batch FROM Ranked WHERE Position = 1;
                 """, connection);
@@ -212,13 +217,18 @@ public static class MedicineStockService
                 HAVING SUM(stan.st_Stan) > 0
             ),
             Deliveries AS (
-                SELECT r.mr_TowId, r.mr_Id, p.ob_NumerSeryjny AS Batch, COALESCE(p.ob_Termin, r.mr_Termin) AS Expires,
+                SELECT r.mr_TowId, r.mr_Id, COALESCE(NULLIF(LTRIM(RTRIM(receipt.ob_NumerSeryjny)), N''),
+                                NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), N'')) AS Batch,
+                       COALESCE(receipt.ob_Termin, p.ob_Termin, r.mr_Termin) AS Expires,
                        r.mr_Pozostalo AS Remaining, {received} AS Received,
                        SUM(r.mr_Pozostalo) OVER (PARTITION BY r.mr_TowId) AS DeliveryTotal
                 FROM CurrentStock stock
                 JOIN dbo.dok_MagRuch r ON r.mr_TowId = stock.st_TowId
                 JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
-                JOIN dbo.dok__Dokument d ON d.dok_Id = COALESCE(NULLIF(p.ob_DokMagId, 0), p.ob_DokHanId)
+                LEFT JOIN dbo.dok_Pozycja receipt ON receipt.ob_Id = p.ob_DoId
+                     AND receipt.ob_TowId = p.ob_TowId AND NULLIF(receipt.ob_DokMagId, 0) IS NOT NULL
+                    JOIN dbo.dok__Dokument d ON d.dok_Id = COALESCE(
+                        NULLIF(receipt.ob_DokMagId, 0), NULLIF(p.ob_DokMagId, 0), p.ob_DokHanId)
                 WHERE d.dok_MagId = @warehouseId
                   AND (r.mr_DoId IS NULL OR r.mr_DoId = 0)
                   AND r.mr_Ilosc > 0 AND r.mr_Pozostalo > 0
