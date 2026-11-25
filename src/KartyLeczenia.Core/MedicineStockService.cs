@@ -161,8 +161,8 @@ public static class MedicineStockService
             string order = dateColumn.Length == 0 ? "" : $"d.{dateColumn} DESC, ";
             using var fallback = new SqlCommand($"""
                 WITH Ranked AS (
-                    SELECT r.mr_TowId, COALESCE(NULLIF(LTRIM(RTRIM(receipt.ob_NumerSeryjny)), N''),
-                               NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), N'')) AS Batch,
+                    SELECT r.mr_TowId, COALESCE(NULLIF(LTRIM(RTRIM(REPLACE(receipt.ob_NumerSeryjny, NCHAR(9), N' '))), N''),
+                               NULLIF(LTRIM(RTRIM(REPLACE(p.ob_NumerSeryjny, NCHAR(9), N' '))), N'')) AS Batch,
                            ROW_NUMBER() OVER (PARTITION BY r.mr_TowId ORDER BY {order}r.mr_Id DESC) AS Position
                     FROM STRING_SPLIT(@products, N',') ids
                     JOIN dbo.dok_MagRuch r ON r.mr_TowId = TRY_CONVERT(int, ids.value)
@@ -174,8 +174,8 @@ public static class MedicineStockService
                     WHERE d.dok_MagId = @warehouseId
                       AND (r.mr_DoId IS NULL OR r.mr_DoId = 0)
                       AND r.mr_Ilosc > 0 AND r.mr_Pozostalo > 0
-                      AND COALESCE(NULLIF(LTRIM(RTRIM(receipt.ob_NumerSeryjny)), N''),
-                                   NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), N'')) IS NOT NULL
+                      AND COALESCE(NULLIF(LTRIM(RTRIM(REPLACE(receipt.ob_NumerSeryjny, NCHAR(9), N' '))), N''),
+                                   NULLIF(LTRIM(RTRIM(REPLACE(p.ob_NumerSeryjny, NCHAR(9), N' '))), N'')) IS NOT NULL
                 )
                 SELECT mr_TowId, Batch FROM Ranked WHERE Position = 1;
                 """, connection);
@@ -204,8 +204,22 @@ public static class MedicineStockService
     {
         await using var connection = new SqlConnection(options.BuildConnectionString());
         await connection.OpenAsync(token);
-        string dateColumn = await DocumentService.DateColumn(connection, token);
-        string received = dateColumn.Length == 0 ? "CAST(NULL AS datetime)" : "d." + dateColumn;
+        using var dateProbe = new SqlCommand("""
+            SELECT CASE WHEN COL_LENGTH(N'dbo.dok__Dokument', N'dok_DataWyst') IS NULL THEN 0 ELSE 1 END,
+                   CASE WHEN COL_LENGTH(N'dbo.dok__Dokument', N'dok_DataDok') IS NULL THEN 0 ELSE 1 END;
+            """, connection);
+        string received;
+        await using (var dateReader = await dateProbe.ExecuteReaderAsync(token))
+        {
+            await dateReader.ReadAsync(token);
+            received = (dateReader.GetInt32(0), dateReader.GetInt32(1)) switch
+            {
+                (1, 1) => "COALESCE(d.dok_DataWyst, d.dok_DataDok)",
+                (1, _) => "d.dok_DataWyst",
+                (_, 1) => "d.dok_DataDok",
+                _ => "CAST(NULL AS datetime)"
+            };
+        }
         using var command = new SqlCommand($"""
             WITH CurrentStock AS (
                 SELECT stan.st_TowId, t.tw_Nazwa, SUM(stan.st_Stan) AS Quantity
@@ -217,8 +231,8 @@ public static class MedicineStockService
                 HAVING SUM(stan.st_Stan) > 0
             ),
             Deliveries AS (
-                SELECT r.mr_TowId, r.mr_Id, COALESCE(NULLIF(LTRIM(RTRIM(receipt.ob_NumerSeryjny)), N''),
-                                NULLIF(LTRIM(RTRIM(p.ob_NumerSeryjny)), N'')) AS Batch,
+                SELECT r.mr_TowId, r.mr_Id, COALESCE(NULLIF(LTRIM(RTRIM(REPLACE(receipt.ob_NumerSeryjny, NCHAR(9), N' '))), N''),
+                                NULLIF(LTRIM(RTRIM(REPLACE(p.ob_NumerSeryjny, NCHAR(9), N' '))), N'')) AS Batch,
                        COALESCE(receipt.ob_Termin, p.ob_Termin, r.mr_Termin) AS Expires,
                        r.mr_Pozostalo AS Remaining, {received} AS Received,
                        SUM(r.mr_Pozostalo) OVER (PARTITION BY r.mr_TowId) AS DeliveryTotal
