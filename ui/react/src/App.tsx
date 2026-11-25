@@ -1,3 +1,4 @@
+import {BookOutlined, CalendarOutlined, FileTextOutlined, FolderOpenOutlined, MedicineBoxOutlined, SettingOutlined, TagsOutlined} from "@ant-design/icons";
 import ExpandableTextArea from "./ExpandableTextArea";
 import {createPortal} from "react-dom";
 import {QueryClient} from "@tanstack/react-query";
@@ -137,6 +138,10 @@ const sections: Array<{id: Section; name: string}> = [
   {id: "treatment", name: "Karta leczenia"}, {id: "saved", name: "Zapisane karty"},
   {id: "expiry", name: "Terminy ważności"}, {id: "settings", name: "Ustawienia"}
 ];
+const sectionIcons = {
+  documents: FileTextOutlined, prices: TagsOutlined, catalogue: MedicineBoxOutlined,
+  treatment: BookOutlined, saved: FolderOpenOutlined, expiry: CalendarOutlined, settings: SettingOutlined
+} satisfies Record<Section, typeof FileTextOutlined>;
 function saved<T extends string>(key: string, values: readonly T[], fallback: T): T {
   try { const value = localStorage.getItem(key); return values.find(item => item === value) ?? fallback; }
   catch { return fallback; }
@@ -2825,6 +2830,8 @@ export default function App() {
   const compact=preset?.dense||windows||layout==="compact";
   const topTabs=components.navigation==="top";
   const [palette,setPalette]=useState<PaletteName>(()=>saved("kl.palette",palettes,"light"));
+  const [navigationIcons,setNavigationIcons]=useState(()=>saved("kl.navigationIcons",["off","antd"] as const,"off"));
+  useEffect(()=>{try{localStorage.setItem("kl.navigationIcons",navigationIcons);}catch{}},[navigationIcons]);
   const [tooltipStyle,setTooltipStyle]=useState(()=>saved("kl.tooltipStyle",["dark","light","outline","contrast"] as const,"dark"));
   const [switchStyle,setSwitchStyle]=useState(()=>saved("kl.switchStyle",["skin","solid","outline","soft"] as const,"skin"));
   const [segmentStyle,setSegmentStyle]=useState(()=>saved("kl.segmentStyle",["skin","solid","outline"] as const,"skin"));
@@ -2983,12 +2990,15 @@ export default function App() {
       root.style.removeProperty("--kl-toggle-text");
     };
   },[switchStyle,segmentStyle,primary,colors,dark,tooltipStyle]);
-  const navigationSections=isDesktop()?sections.filter(item=>item.id!=="treatment"):sections;
+  const navigationSections=(isDesktop()?sections.filter(item=>item.id!=="treatment"):sections).map(item=>{
+    const Icon=sectionIcons[item.id];
+    return {...item,icon:navigationIcons==="antd"?<Icon aria-hidden="true" className="navigation-icon"/>:undefined};
+  });
   const standardNav=<nav aria-label="Nawigacja Karty Leczenia" className="main-nav">
     {navigationSections.map(x=><button key={x.id} type="button"
       aria-current={section===x.id?"page":undefined}
       className={"nav-item "+(section===x.id?"is-active":"")}
-      onClick={()=>navigate(x.id)}>{x.name}</button>)}
+      onClick={()=>navigate(x.id)}>{x.icon}{x.name}</button>)}
   </nav>;
   const nav=fluent?<Suspense fallback={standardNav}>
     <FluentNavigation items={navigationSections} current={section} palette={palette} onNavigate={navigate}/>
@@ -3002,6 +3012,10 @@ export default function App() {
       <Select aria-label="Położenie menu" value={components.navigation}
         onChange={navigation=>setComponents({...components,navigation})}
         options={[{value:"side",label:"Menu boczne"},{value:"top",label:"Menu górne"}]}/>
+    </label>
+    <label>Ikony nawigacji
+      <Select aria-label="Ikony nawigacji" value={navigationIcons} onChange={setNavigationIcons}
+        options={[{value:"off",label:"Bez ikon"},{value:"antd",label:"Ant Design"}]}/>
     </label>
     <label>Motyw
       <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[

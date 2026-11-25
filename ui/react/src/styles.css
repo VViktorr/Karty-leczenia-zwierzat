@@ -556,3 +556,5 @@ html[data-kl-tooltip-style="contrast"] .ant-tooltip {
 .kl-dialog-expanded-text .kl-rnd-dialog-maximized textarea {
   height: 74vh;
 }
+
+.nav-item > .navigation-icon { margin-inline-end: 0.45em; }
