@@ -166,7 +166,7 @@ public static class MedicineStockService
                     FROM STRING_SPLIT(@products, N',') ids
                     JOIN dbo.dok_MagRuch r ON r.mr_TowId = TRY_CONVERT(int, ids.value)
                     JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
-                    JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
+                    JOIN dbo.dok__Dokument d ON d.dok_Id = COALESCE(NULLIF(p.ob_DokMagId, 0), p.ob_DokHanId)
                     WHERE d.dok_MagId = @warehouseId
                       AND (r.mr_DoId IS NULL OR r.mr_DoId = 0)
                       AND r.mr_Ilosc > 0 AND r.mr_Pozostalo > 0
@@ -218,15 +218,15 @@ public static class MedicineStockService
                 FROM CurrentStock stock
                 JOIN dbo.dok_MagRuch r ON r.mr_TowId = stock.st_TowId
                 JOIN dbo.dok_Pozycja p ON p.ob_Id = r.mr_PozId
-                JOIN dbo.dok__Dokument d ON d.dok_Id = p.ob_DokMagId
+                JOIN dbo.dok__Dokument d ON d.dok_Id = COALESCE(NULLIF(p.ob_DokMagId, 0), p.ob_DokHanId)
                 WHERE d.dok_MagId = @warehouseId
                   AND (r.mr_DoId IS NULL OR r.mr_DoId = 0)
                   AND r.mr_Ilosc > 0 AND r.mr_Pozostalo > 0
             )
             SELECT stock.tw_Nazwa, lot.Batch, lot.Expires, COALESCE(lot.Remaining, stock.Quantity),
-                   @warehouseId, m.mag_Nazwa, lot.Received, CAST(CASE WHEN lot.mr_TowId IS NULL THEN 0 ELSE 1 END AS bit), stock.st_TowId, lot.mr_Id
+                   @warehouseId, m.mag_Nazwa, lot.Received, CAST(CASE WHEN lot.DeliveryTotal = stock.Quantity THEN 1 ELSE 0 END AS bit), stock.st_TowId, lot.mr_Id
             FROM CurrentStock stock
-            LEFT JOIN Deliveries lot ON lot.mr_TowId = stock.st_TowId AND lot.DeliveryTotal = stock.Quantity
+            LEFT JOIN Deliveries lot ON lot.mr_TowId = stock.st_TowId
             LEFT JOIN dbo.sl_Magazyn m ON m.mag_Id = @warehouseId
             ORDER BY stock.tw_Nazwa, lot.Expires
             """, connection);
