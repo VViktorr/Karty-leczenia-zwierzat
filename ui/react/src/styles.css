@@ -13,8 +13,6 @@
 .workspace{flex:1;min-width:0;display:flex;flex-direction:column}
 .topbar{height:72px;flex:0 0 72px;display:flex;align-items:center;justify-content:space-between;gap:15px;background:var(--panel);padding:0 28px;border-bottom:1px solid var(--line)}
 .topbar-title{display:flex;align-items:center;gap:12px;font-size:17px}
-.appearance-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.appearance-controls .ant-select:first-child{width:245px}.appearance-controls .ant-select:last-child{width:140px}
 .main-content{padding:16px 22px 12px;overflow-y:auto;flex:1;min-height:0}
 .page-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .page-heading .ant-typography{margin:0}.page-heading h3.ant-typography{margin-bottom:4px}
@@ -34,7 +32,7 @@
 .top-navigation .main-nav{flex-direction:row;gap:4px}.top-navigation .nav-item{border-radius:7px 7px 0 0;padding:10px 17px}
 .layout-classic .main-content{padding:20px 24px}.layout-classic .document-card{box-shadow:none}
 @media(max-width:1200px){.document-filters{grid-template-columns:1fr 1fr}.document-filters .ant-segmented{grid-column:1/-1}}
-@media(max-width:900px){.sidebar{width:182px;flex-basis:182px}.sidebar-brand strong{font-size:13px}.topbar{padding:0 14px}.main-content{padding:18px 14px}.document-filters{grid-template-columns:1fr}.document-filters .ant-segmented{grid-column:auto}.appearance-controls .ant-select:first-child{width:175px}}
+@media(max-width:900px){.sidebar{width:182px;flex-basis:182px}.sidebar-brand strong{font-size:13px}.topbar{padding:0 14px}.main-content{padding:18px 14px}.document-filters{grid-template-columns:1fr}.document-filters .ant-segmented{grid-column:auto}}
 
 /* ReactKL catalogue: master/detail layout. The editing grid scrolls independently
    so 11 ChPL fields remain usable at standard Windows DPI and zoom settings. */
@@ -133,9 +131,6 @@
   gap: 8px;
 }
 .layout-compact .topbar-title { font-size: 14px; }
-.layout-compact .appearance-controls { gap: 5px; }
-.layout-compact .appearance-controls .ant-select:first-child { width: 188px; }
-.layout-compact .appearance-controls .ant-select:last-child { width: 100px; }
 .layout-compact .main-content { padding: 8px 10px; }
 .layout-compact .page-heading { gap: 6px; margin-bottom: 8px; }
 .layout-compact .page-heading h3.ant-typography { font-size: 17px; margin: 0; }
@@ -372,11 +367,26 @@ html[data-kl-skin="orchard"] .ant-modal :is(.ant-modal-container, .ant-modal-con
 .treatment-summary-row { padding-block: 4px; border-bottom: 1px solid var(--line); }
 .treatment-summary-preview { display: block; width: 100%; min-height: 60vh; border: 0; }
 
-.settings-appearance { align-items: flex-start; gap: 16px; }
-.tooltip-appearance-controls { display: flex; align-items: flex-end; gap: 8px; }
-.settings-appearance label { display: grid; gap: 6px; }
-.settings-appearance label .ant-select { min-width: 150px; }
-.settings-appearance > label:first-child .ant-select { width: min(300px, 70vw); }
+.settings-appearance {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 12px;
+  max-width: 960px;
+}
+.appearance-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  gap: 12px;
+}
+.settings-appearance label {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+.settings-appearance label .ant-select { width: 100%; min-width: 0; }
+.tooltip-appearance-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.tooltip-appearance-controls label { flex: 1 1 195px; }
 .workflow-option { display: flex; align-items: center; gap: 8px; }
 .treatment-warning-scroll { max-height: 300px; overflow: auto; }
 

@@ -2814,7 +2814,7 @@ function SettingsPage({onSubiektSaved,wizard,onWizardChange,appearance,workflowP
   const section=connections.includes(active)?"connections":service.includes(active)?"service":active;
   return <Tabs activeKey={section}
     onChange={key=>choose(key==="connections"?"subiekt":key==="service"?"backup":key)} items={[
-      {key:"appearance",label:"Wygląd",children:<Card>{appearance}</Card>},
+      {key:"appearance",label:"Wygląd",children:appearance},
       {key:"tables",label:"Tabele",children:<TableSettings/>},
       {key:"pdf",label:"PDF i drukowanie",children:<PdfSettings/>},
       {key:"treatment",label:"Karty leczenia",children:<Space orientation="vertical" size={16} style={{width:"100%"}}>
@@ -3056,49 +3056,63 @@ export default function App() {
   const nav=fluent?<Suspense fallback={standardNav}>
     <FluentNavigation items={navigationSections} current={section} palette={palette} onNavigate={navigate}/>
   </Suspense>:standardNav;
-  const controls=<div className="appearance-controls settings-appearance">
-    <label>Skórka
-      <Select aria-label="Skórka" value={layout} onChange={setLayout}
-        options={layouts.map(value=>({value,label:layoutLabel(value)}))}/>
-    </label>
-    <label>Położenie menu
-      <Select aria-label="Położenie menu" value={components.navigation}
-        onChange={navigation=>setComponents({...components,navigation})}
-        options={[{value:"side",label:"Menu boczne"},{value:"top",label:"Menu górne"}]}/>
-    </label>
-    <label>Ikony nawigacji
-      <Select aria-label="Ikony nawigacji" value={navigationIcons} onChange={setNavigationIcons}
-        options={[{value:"off",label:"Bez ikon"},{value:"antd",label:"Ant Design"}]}/>
-    </label>
-    <label>Motyw
-      <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
-        {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
-    </label>
-    <div className="tooltip-appearance-controls">
-      <label>Dymki
-        <Select aria-label="Styl dymków" value={tooltipStyle} onChange={setTooltipStyle}
-          options={[{value:"dark",label:"Ciemne tło, jasny tekst"},{value:"light",label:"Białe tło, ciemny tekst"},
-            {value:"outline",label:"Jasny z konturem skórki"},{value:"contrast",label:"Wysoki kontrast"}]}/>
-      </label>
-      <Tooltip placement="top" trigger={["hover","focus"]}
-        title={<span style={{fontSize:components.tableTextPreview.fontSize}}>Pełna nazwa kontrahenta</span>}>
-        <Button>Podgląd dymka</Button>
-      </Tooltip>
-    </div>
-    <label>Przełączniki włącz/wyłącz
-      <Select aria-label="Styl przełączników włącz/wyłącz" value={switchStyle} onChange={setSwitchStyle}
-        options={[{value:"skin",label:"Zgodnie ze skórką"},{value:"solid",label:"Z wypełnieniem"},
-          {value:"outline",label:"Z obrysem"},{value:"soft",label:"Z delikatnym tłem"}]}/>
-    </label>
-    <label>Przełączniki wielopozycyjne
-      <Select aria-label="Styl przełączników wielopozycyjnych" value={segmentStyle} onChange={setSegmentStyle}
-        options={[{value:"skin",label:"Zgodnie ze skórką"},{value:"solid",label:"Wypełniona aktywna opcja"},
-          {value:"outline",label:"Osobne obramowane opcje"}]}/>
-    </label>
-    <label>Skalowanie interfejsu
-      <Select aria-label="Skalowanie interfejsu" value={uiScale} onChange={setUiScale}
-        options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
-    </label>
+  const controls=<div className="settings-appearance">
+    <Card size="small" title="Motyw i skala">
+      <div className="appearance-fields">
+        <label>Skórka
+          <Select aria-label="Skórka" value={layout} onChange={setLayout}
+            options={layouts.map(value=>({value,label:layoutLabel(value)}))}/>
+        </label>
+        <label>Motyw
+          <Select aria-label="Motyw" value={palette} onChange={setPalette} options={[
+            {label:"Jasny",value:"light"}, {label:"Ciemny",value:"dark"}, {label:"Morski",value:"sea"}]}/>
+        </label>
+        <label>Skalowanie interfejsu
+          <Select aria-label="Skalowanie interfejsu" value={uiScale} onChange={setUiScale}
+            options={[80,90,100,110,125,150,175,200].map(value=>({value,label:value+"%"}))}/>
+        </label>
+      </div>
+    </Card>
+    <Card size="small" title="Nawigacja">
+      <div className="appearance-fields">
+        <label>Położenie menu
+          <Select aria-label="Położenie menu" value={components.navigation}
+            onChange={navigation=>setComponents({...components,navigation})}
+            options={[{value:"side",label:"Menu boczne"},{value:"top",label:"Menu górne"}]}/>
+        </label>
+        <label>Ikony nawigacji
+          <Select aria-label="Ikony nawigacji" value={navigationIcons} onChange={setNavigationIcons}
+            options={[{value:"off",label:"Bez ikon"},{value:"antd",label:"Ant Design"}]}/>
+        </label>
+      </div>
+    </Card>
+    <Card size="small" title="Przełączniki">
+      <div className="appearance-fields">
+        <label>Przełączniki włącz/wyłącz
+          <Select aria-label="Styl przełączników włącz/wyłącz" value={switchStyle} onChange={setSwitchStyle}
+            options={[{value:"skin",label:"Zgodnie ze skórką"},{value:"solid",label:"Z wypełnieniem"},
+              {value:"outline",label:"Z obrysem"},{value:"soft",label:"Z delikatnym tłem"}]}/>
+        </label>
+        <label>Przełączniki wielopozycyjne
+          <Select aria-label="Styl przełączników wielopozycyjnych" value={segmentStyle} onChange={setSegmentStyle}
+            options={[{value:"skin",label:"Zgodnie ze skórką"},{value:"solid",label:"Wypełniona aktywna opcja"},
+              {value:"outline",label:"Osobne obramowane opcje"}]}/>
+        </label>
+      </div>
+    </Card>
+    <Card size="small" title="Dymki">
+      <div className="tooltip-appearance-controls">
+        <label>Styl dymków
+          <Select aria-label="Styl dymków" value={tooltipStyle} onChange={setTooltipStyle}
+            options={[{value:"dark",label:"Ciemne tło, jasny tekst"},{value:"light",label:"Białe tło, ciemny tekst"},
+              {value:"outline",label:"Jasny z konturem skórki"},{value:"contrast",label:"Wysoki kontrast"}]}/>
+        </label>
+        <Tooltip placement="top" trigger={["hover","focus"]}
+          title={<span style={{fontSize:components.tableTextPreview.fontSize}}>Pełna nazwa kontrahenta</span>}>
+          <Button>Podgląd dymka</Button>
+        </Tooltip>
+      </div>
+    </Card>
   </div>;
   const workflowPreferences=<>
     <label className="workflow-option"><Switch checked={shortcuts} onChange={setShortcuts}
