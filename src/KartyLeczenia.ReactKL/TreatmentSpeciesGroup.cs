@@ -8,7 +8,7 @@ namespace KartyLeczenia.ReactKL;
 /// </summary>
 internal static class TreatmentSpeciesGroup
 {
-    internal static readonly string[] Values = ["all", "cattle", "swine", "poultry", "dog", "cat"];
+    internal static readonly string[] Values = ["all", "cattle", "swine", "poultry", "horse", "dog", "cat"];
 
     private static readonly (string Group, Regex Pattern)[] Patterns =
     [
@@ -17,6 +17,8 @@ internal static class TreatmentSpeciesGroup
         ("swine", new(@"\b(?:świń|świni|prosi|warchlak|tucznik|loch|losz)\p{L}*",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled)),
         ("poultry", new(@"\b(?:drób|drobi|kur|brojler|niosk|indyk|indycz|kaczk|gęś|gęsi|przepiór|kuropatw)\p{L}*",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled)),
+        ("horse", new(@"\b(?:koń|konia|koniowi|koniem|koniu|konie|koni|koniom|końmi|koniach|(?:źrebi|źrebię|źrebiąt|klacz|ogier|wałach)\p{L}*)\b",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled)),
         ("dog", new(@"\b(?:pies|psy|psa|psów|suk[aięom])\p{L}*",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled)),

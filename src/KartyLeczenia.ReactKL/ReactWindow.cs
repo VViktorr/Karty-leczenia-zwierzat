@@ -1628,7 +1628,7 @@ internal sealed class ReactWindow : Form
             string selectedSpecies = ReadTextField(root, "speciesGroup", 10) switch
             {
                 "cattle" => "Bydło", "swine" => "Świnie", "poultry" => "Drób",
-                "dog" => "Pies", "cat" => "Kot", _ => ""
+                "horse" => "Koń", "dog" => "Pies", "cat" => "Kot", _ => ""
             };
             if (action == "previewDraft")
                 return new { html = await Task.Run(() => cards.RenderDraft(snapshot, reported, performed, findings, shortRoutes, shortWithdrawals, withdrawalBySpecies, selectedSpecies), token) };

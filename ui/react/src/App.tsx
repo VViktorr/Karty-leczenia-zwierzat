@@ -71,7 +71,7 @@ interface TreatmentSuggestionList {
   items:TreatmentSuggestion[];
   compatibility:Array<{index:number;groups:SpeciesGroup[];currentSpecies?:string;currentGroups?:SpeciesGroup[]}>;
 }
-type SpeciesGroup="all"|"cattle"|"swine"|"poultry"|"dog"|"cat";
+type SpeciesGroup="all"|"cattle"|"swine"|"poultry"|"horse"|"dog"|"cat";
 interface SavedChoice {symbol:string;species:string;route:string;variantId?:number|null;}
 interface SavedChoiceList {items:SavedChoice[];}
 const speciesGroups:Array<{value:SpeciesGroup;label:string}>=[
@@ -79,6 +79,7 @@ const speciesGroups:Array<{value:SpeciesGroup;label:string}>=[
   {value:"cattle",label:"Bydło (także cielęta)"},
   {value:"swine",label:"Świnie"},
   {value:"poultry",label:"Drób"},
+  {value:"horse",label:"Koń"},
   {value:"dog",label:"Pies"},
   {value:"cat",label:"Kot"}
 ];
