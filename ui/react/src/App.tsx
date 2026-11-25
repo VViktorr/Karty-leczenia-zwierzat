@@ -542,8 +542,8 @@ const treatmentSteps=["Gatunek","Warianty leków","Zwierzęta","Rozpoznanie","Po
 const validAnimalCount=(value:string)=>/^\d+$/.test(value.trim()) &&
   Number(value)>0 && Number(value)<=2147483647;
 
-function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, virtualWarnings, onDocuments, onOpenSaved,onSavedChange}: {
-  draft: Draft | null; compact: boolean; active:boolean; wizard:boolean;shortcuts:boolean;virtualWarnings:boolean; onDocuments: () => void; onOpenSaved: (id:string)=>void;
+function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shortcuts, virtualWarnings, onDocuments, onOpenSaved,onSavedChange}: {
+  draft: Draft | null; compact: boolean; active:boolean; toolbar:HTMLDivElement|null; wizard:boolean;shortcuts:boolean;virtualWarnings:boolean; onDocuments: () => void; onOpenSaved: (id:string)=>void;
   onSavedChange:(saved:boolean)=>void;
 }) {
   const [rows, setRows] = useState<DraftRow[]>(draft?.rows ?? []);
@@ -1272,6 +1272,11 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     }))
   ];
   return <>
+    {active&&toolbar&&createPortal(<Space size={4}>
+      <Switch aria-label="Asystent AI" checked={withdrawalAssistant}
+        disabled={busy||applyBusy||!!variantModal||!rows.some(row=>row.withdrawal?.trim())} onChange={setWithdrawalAssistant}/>
+      Asystent AI
+    </Space>,toolbar)}
     {active&&shortcuts&&!withdrawalAssistant&&!changingStepBlocked&&!preview&&!variantModal&&!referenceEdit&&
       !animalEdit&&!dateStep&&!saveReview&&!duplicateId&&!suggestReviewOpen&&!showColumns&&!variantPdfUrl&&
       <TreatmentShortcuts
@@ -1319,11 +1324,6 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
             onChange={value=>setShowRouteCodes(value==="codes")}
             options={[{value:"full",label:"Pełna"},{value:"codes",label:"Skrót"}]}/>
         </Space>
-        {!variantModal&&<Space size={4}>
-          <Switch aria-label="Asystent AI" checked={withdrawalAssistant}
-            disabled={busy||applyBusy||!rows.some(row=>row.withdrawal?.trim())} onChange={setWithdrawalAssistant}/>
-          Asystent AI
-        </Space>}
         <Popover trigger="click" title="Podpowiedzi z katalogu SQL" placement="bottomLeft"
           content={<div style={{width:"min(540px, 75vw)"}}>
       <Space wrap>
@@ -1823,6 +1823,12 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
   const pagination=useListPagination("prices",rows.length,40);
   return <>
     {toolbar&&createPortal(<Space wrap>
+        <Space size={4}>
+          <Switch aria-label="Asystent AI" checked={withdrawalAssistant}
+            disabled={!assistantPrices.length} onChange={setWithdrawalAssistant}/>
+          Asystent AI
+        </Space>
+        {withdrawalOverrides.size>0&&<Button onClick={()=>setWithdrawalOverrides(new Map())}>Cofnij skróty wydruku</Button>}
       <Button onClick={prices.reload} disabled={level===null} loading={prices.busy}>Odśwież z SQL</Button>
       <Button onClick={()=>setShowSettings(true)} disabled={settingsBusy||!all.length}>
         Ustawienia wydruku
@@ -1855,12 +1861,6 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
           onClick={()=>setOnlyMissing(prev=>!prev)}>
           Do uzupełnienia ({missingCount})
         </Button>
-        <Space size={4}>
-          <Switch aria-label="Asystent AI" checked={withdrawalAssistant}
-            disabled={!assistantPrices.length} onChange={setWithdrawalAssistant}/>
-          Asystent AI
-        </Space>
-        {withdrawalOverrides.size>0&&<Button onClick={()=>setWithdrawalOverrides(new Map())}>Cofnij skróty wydruku</Button>}
         <Button onClick={()=>onCatalogue(rows.some(row=>row.symbol===activePriceSymbol) ? activePriceSymbol : "")}>
           Dodaj / edytuj w katalogu
         </Button>
@@ -2886,6 +2886,7 @@ export default function App() {
     catch{return 100;}
   });
   const [sectionToolbar,setSectionToolbar]=useState<HTMLDivElement|null>(null);
+  const [treatmentToolbar,setTreatmentToolbar]=useState<HTMLDivElement|null>(null);
   const [section,setSection]=useState<Section>(treatmentWindow?"treatment":"documents");
   const [subiektRevision,setSubiektRevision]=useState(0);
   const [savedCardToOpen,setSavedCardToOpen]=useState<{id:string;edit:boolean}|null>(null);
@@ -3138,7 +3139,10 @@ export default function App() {
             {section==="prices"&&<span className="topbar-note">Ceny i stany z Subiekta, karencje z katalogu KartyLeczenia SQL.</span>}
             {section==="catalogue"&&<span className="topbar-note">Dane wariantów i dokumenty urzędowe z bazy KartyLeczenia SQL.</span>}
           </div>
-          {treatmentWindow&&<Button onClick={returnToDocuments}>Zamknij kartę</Button>}
+          {(treatmentWindow||section==="treatment")&&<Space wrap>
+            {section==="treatment"&&<div ref={setTreatmentToolbar}/>}
+            {treatmentWindow&&<Button onClick={returnToDocuments}>Zamknij kartę</Button>}
+          </Space>}
           {!treatmentWindow&&(section==="catalogue"||section==="documents"||section==="prices")&&
             <div className={section==="catalogue"||section==="prices"?"catalogue-toolbar":undefined} ref={setSectionToolbar}/>}
         </header>
@@ -3155,7 +3159,7 @@ export default function App() {
           {treatmentWindow&&!draft&&!windowError&&<Spin aria-label="Wczytywanie karty leczenia"/>}
           {treatmentWindow&&section==="saved"&&<Button onClick={()=>setSection("treatment")}>Wróć do tworzonej karty</Button>}
           <div hidden={section!=="treatment"} style={section==="treatment"?{display:"contents"}:undefined}>
-            {(!treatmentWindow||draft)&&<Treatment draft={draft} compact={compact} active={section==="treatment"} wizard={wizard} shortcuts={shortcuts} virtualWarnings={virtualWarnings} onSavedChange={setDraftSaved}
+            {(!treatmentWindow||draft)&&<Treatment draft={draft} toolbar={treatmentToolbar} compact={compact} active={section==="treatment"} wizard={wizard} shortcuts={shortcuts} virtualWarnings={virtualWarnings} onSavedChange={setDraftSaved}
               onDocuments={returnToDocuments}
               onOpenSaved={id=>{setSavedCardToOpen({id,edit:false});setSection("saved");}}/>}
           </div>
