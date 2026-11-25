@@ -535,6 +535,40 @@ internal sealed class ReactWindow : Form
             string symbol = ReadTextField(root, "symbol", 128);
             return await Task.Run(() => catalogue.Read(symbol), token);
         }
+        if (action == "deleteCatalogueVariant")
+        {
+            string symbol = ReadTextField(root, "symbol", 128);
+            int? variantId = Int(root, "variantId");
+            byte[] revision;
+            try { revision = Convert.FromBase64String(ReadTextField(root, "revision", 24)); }
+            catch (FormatException) { throw new ArgumentException("Niepoprawna wersja kartoteki."); }
+            if (symbol.Length == 0 || variantId is null or <= 0 || revision.Length != 8)
+                throw new ArgumentException("Wybierz zapisany wariant leku.");
+            var admin = AdministratorOptions();
+            if (!await WindowsHelloConsent.VerifyAsync(this, "trwałe usunięcie wariantu leku z katalogu SQL"))
+                return new { deleted = false };
+
+            await using var db = AdministratorDb(admin, "KartyLeczenia");
+            await db.OpenAsync(token);
+            await using var tx = (SqlTransaction)await db.BeginTransactionAsync(token);
+            using var delete = new SqlCommand("""
+                UPDATE dbo.catalog_products SET name=name WHERE symbol=@symbol AND revision=@revision;
+                IF @@ROWCOUNT <> 1
+                    THROW 50004,N'Kartoteka zmieniła się na innym stanowisku. Odśwież ją.',1;
+
+                DELETE FROM dbo.catalog_variants WHERE symbol=@symbol AND id=@id;
+                IF @@ROWCOUNT <> 1
+                    THROW 50005,N'Wariant nie istnieje w tej kartotece. Odśwież ją.',1;
+                """, db, tx);
+            delete.Parameters.Add("@symbol", System.Data.SqlDbType.NVarChar, 128).Value = symbol;
+            delete.Parameters.Add("@revision", System.Data.SqlDbType.Binary, 8).Value = revision;
+            delete.Parameters.Add("@id", System.Data.SqlDbType.Int).Value = variantId.Value;
+            await delete.ExecuteNonQueryAsync(token);
+            await tx.CommitAsync(token);
+            priceCatalogueLists.Clear();
+            priceLists.Clear();
+            return new { deleted = true };
+        }
         if (action == "saveCatalogueProduct")
         {
             if (!root.TryGetProperty("product", out var data) ||
