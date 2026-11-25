@@ -1069,7 +1069,8 @@ internal sealed class ReactWindow : Form
         {
             // Preview the exact PDF engine used for downloads and e-mail,
             // without modifying the archive or writing a user-visible file.
-            string id = ReadTextField(root, "id", 40);
+            string id = ReadTextField(root, "draftId", 30).Length > 0
+                ? "" : ReadTextField(root, "id", 40);
             string html;
             if (id.Length > 0)
             {
@@ -1111,7 +1112,8 @@ internal sealed class ReactWindow : Form
             // The archived SQL card is the single authoritative source. An
             // old preview must not produce a stale PDF after another station
             // changed the clinical data.
-            string id = ReadTextField(root, "id", 40);
+            string id = ReadTextField(root, "draftId", 30).Length > 0
+                ? "" : ReadTextField(root, "id", 40);
             bool trash = Flag(root, "trash");
             Guid cardId = Guid.Empty;
             DocumentData? draft = null;
