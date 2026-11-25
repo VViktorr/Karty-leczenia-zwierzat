@@ -1,5 +1,6 @@
 import {BookOutlined, CalendarOutlined, FileTextOutlined, FolderOpenOutlined, MedicineBoxOutlined, SettingOutlined, TagsOutlined} from "@ant-design/icons";
 import ExpandableTextArea from "./ExpandableTextArea";
+import WithdrawalAssistant from "./WithdrawalAssistant";
 import {createPortal} from "react-dom";
 import {QueryClient} from "@tanstack/react-query";
 import TreatmentShortcuts from "./TreatmentShortcuts";
@@ -624,6 +625,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
   }|null>(null);
   const [referenceBusy,setReferenceBusy]=useState(false);
   const [findings, setFindings] = useState("");
+  const [withdrawalAssistant,setWithdrawalAssistant]=useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [printingCard,setPrintingCard]=useState(false);
   const [previewSavedId,setPreviewSavedId]=useState<string|null>(null);
@@ -1270,7 +1272,7 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
     }))
   ];
   return <>
-    {active&&shortcuts&&!changingStepBlocked&&!preview&&!variantModal&&!referenceEdit&&
+    {active&&shortcuts&&!withdrawalAssistant&&!changingStepBlocked&&!preview&&!variantModal&&!referenceEdit&&
       !animalEdit&&!dateStep&&!saveReview&&!duplicateId&&!suggestReviewOpen&&!showColumns&&!variantPdfUrl&&
       <TreatmentShortcuts
         back={wizard&&step>0?()=>goToStep(step-1):undefined}
@@ -1317,6 +1319,8 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
             onChange={value=>setShowRouteCodes(value==="codes")}
             options={[{value:"full",label:"Pełna"},{value:"codes",label:"Skrót"}]}/>
         </Space>
+        {!variantModal&&<Button size="small" disabled={busy||applyBusy||!rows.some(row=>row.withdrawal?.trim())}
+          onClick={()=>setWithdrawalAssistant(true)}>Asystent karencji</Button>}
         <Popover trigger="click" title="Podpowiedzi z katalogu SQL" placement="bottomLeft"
           content={<div style={{width:"min(540px, 75vw)"}}>
       <Space wrap>
@@ -1685,6 +1689,15 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         <ChplPdfViewer key={variantPdfUrl} url={variantPdfUrl} name={variantPdfName}/>
       </Suspense>}
     </Modal>
+    {withdrawalAssistant&&<WithdrawalAssistant
+      entries={rows.filter(row=>row.withdrawal?.trim()).map(row=>({
+        id:String(row.index), label:(row.index+1)+". "+row.product, source:row.withdrawal
+      }))}
+      onClose={()=>setWithdrawalAssistant(false)}
+      onApply={(id,value)=>{
+        void update(Number(id),"withdrawal",value);
+        setWithdrawalAssistant(false);
+      }}/>}
     <Modal className="kl-dialog-treatment-preview" width="92vw" open={preview!==null} title="Podgląd karty leczenia" onCancel={()=>setPreview(null)}
       footer={<Space wrap>
         <Button onClick={()=>setPreview(null)}>Zamknij</Button>
@@ -1737,6 +1750,7 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
   const [settingsError,setSettingsError]=useState("");
   const [showSettings,setShowSettings]=useState(false);
   const [showPreview,setShowPreview]=useState(false);
+  const [withdrawalAssistant,setWithdrawalAssistant]=useState(false);
   const [filter,setFilter]=useState("");
   const [onlyMissing,setOnlyMissing]=useState(false);
   const [excluded,setExcluded]=useState<Set<string>>(()=>new Set());
@@ -1754,6 +1768,7 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
     (!q||row.name.toLocaleLowerCase("pl").includes(q)||row.symbol.toLocaleLowerCase("pl").includes(q))
     &&(!onlyMissing||row.needsCompletion));
   const selected=rows.filter(row=>!excluded.has(row.symbol));
+  const assistantPrice=rows.find(row=>row.symbol===activePriceSymbol);
   const missingCount=all.filter(row=>row.needsCompletion).length;
   const toggle=(symbol:string,value:boolean)=>setExcluded(current=>{
     const next=new Set(current);
@@ -1828,6 +1843,8 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
           onClick={()=>setOnlyMissing(prev=>!prev)}>
           Do uzupełnienia ({missingCount})
         </Button>
+        <Button disabled={!assistantPrice?.fullNames?.trim()}
+          onClick={()=>setWithdrawalAssistant(true)}>Asystent karencji</Button>
         <Button onClick={()=>onCatalogue(rows.some(row=>row.symbol===activePriceSymbol) ? activePriceSymbol : "")}>
           Dodaj / edytuj w katalogu
         </Button>
@@ -1850,6 +1867,10 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
       </Typography.Text>
     </Card>
     {listLayout.dialog}
+    {withdrawalAssistant&&assistantPrice&&<WithdrawalAssistant
+      entries={[{id:assistantPrice.symbol,label:assistantPrice.name,source:assistantPrice.fullNames}]}
+      onClose={()=>setWithdrawalAssistant(false)}
+      onCatalogue={id=>onCatalogue(id,true,true)}/>}
     {showSettings&&<PricePrintSettingsPanel initial={settings}
       onSave={setSettings} onClose={()=>setShowSettings(false)}
       onPreview={values=>{
