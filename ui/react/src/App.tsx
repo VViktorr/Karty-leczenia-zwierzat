@@ -930,7 +930,7 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
     finally {setSavingSql(false);setBusy(false);}
   }
   async function pdfFromPreview(mail:boolean) {
-    if(!draft||pdfBusy)return;
+    if(!draft||pdfBusy||(mail&&!previewSavedId))return;
     setPdfBusy(mail?"mail":"pdf");setPdfMessage("");
     try{
       const request=previewSavedId
@@ -1707,7 +1707,8 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
         <Button onClick={()=>setPreview(null)}>Zamknij</Button>
         <Button loading={pdfBusy==="pdf"} disabled={!!pdfBusy}
           onClick={()=>{void pdfFromPreview(false);}}>Zapisz PDF</Button>
-        <Button loading={pdfBusy==="mail"} disabled={!!pdfBusy}
+        <Button loading={pdfBusy==="mail"} disabled={!!pdfBusy||!previewSavedId}
+          title={!previewSavedId?"Najpierw zapisz kartę do SQL":undefined}
           onClick={()=>{void pdfFromPreview(true);}}>Wyślij mailem</Button>
         <Button type="primary" loading={printingCard} disabled={!!pdfBusy} onClick={async()=>{
           if(!isDesktop()){previewFrame.current?.contentWindow?.print();return;}
