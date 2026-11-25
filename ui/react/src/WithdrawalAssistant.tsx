@@ -17,7 +17,13 @@ function shorten(source:string) {
     .replace(/\bTkanki jadalne\s*:/giu, "Tkanki:")
     .replace(/\bOkres karencji\s*:\s*/giu, "")
     .replace(/(^|[.;]\s+|\n)codziennie przygotować świeży roztwór[.;](?=\s|$)/giu, "$1")
-    .replace(/[^\S\r\n]{2,}/gu, " ");
+    .replace(/[^\S\r\n]{2,}/gu, " ")
+    .split(/\s+\|\s+/u)
+    .map(part=>part.trim().replace(
+      /^(Indyki|Kury) PO \(w wodzie do picia\) · Tkanki: (\d+ dni), Jaja: niedopuszczony; Jaja konsumpcyjne: produkt niedopuszczony; (nie stosować \d+ tyg\. przed nieśnością)\.?$/iu,
+      "$1 Tkanki: $2, Jaja: niedopuszczony ($3)."
+    ))
+    .join(" | ");
 }
 
 export default function WithdrawalAssistant({entries,onClose,onApply,onCatalogue,onApplyAll,applyAllLabel}:Props) {

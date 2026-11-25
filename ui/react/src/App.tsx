@@ -1272,11 +1272,7 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
     }))
   ];
   return <>
-    {active&&toolbar&&createPortal(<Space size={4}>
-      <Switch aria-label="Asystent AI" checked={withdrawalAssistant}
-        disabled={busy||applyBusy||!!variantModal||!rows.some(row=>row.withdrawal?.trim())} onChange={setWithdrawalAssistant}/>
-      Asystent AI
-    </Space>,toolbar)}
+    {active&&toolbar&&createPortal(<Button disabled={busy||applyBusy||!!variantModal||!rows.some(row=>row.withdrawal?.trim())} onClick={()=>setWithdrawalAssistant(true)}>Asystent AI</Button>,toolbar)}
     {active&&shortcuts&&!withdrawalAssistant&&!changingStepBlocked&&!preview&&!variantModal&&!referenceEdit&&
       !animalEdit&&!dateStep&&!saveReview&&!duplicateId&&!suggestReviewOpen&&!showColumns&&!variantPdfUrl&&
       <TreatmentShortcuts
@@ -1823,11 +1819,7 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
   const pagination=useListPagination("prices",rows.length,40);
   return <>
     {toolbar&&createPortal(<Space wrap>
-        <Space size={4}>
-          <Switch aria-label="Asystent AI" checked={withdrawalAssistant}
-            disabled={!assistantPrices.length} onChange={setWithdrawalAssistant}/>
-          Asystent AI
-        </Space>
+        <Button disabled={!assistantPrices.length} onClick={()=>setWithdrawalAssistant(true)}>Asystent AI</Button>
         {withdrawalOverrides.size>0&&<Button onClick={()=>setWithdrawalOverrides(new Map())}>Cofnij skróty wydruku</Button>}
       <Button onClick={prices.reload} disabled={level===null} loading={prices.busy}>Odśwież z SQL</Button>
       <Button onClick={()=>setShowSettings(true)} disabled={settingsBusy||!all.length}>
