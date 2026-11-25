@@ -535,6 +535,102 @@ internal sealed class ReactWindow : Form
             string symbol = ReadTextField(root, "symbol", 128);
             return await Task.Run(() => catalogue.Read(symbol), token);
         }
+        if (action is "previewRplVariantDeletion" or "deleteRplVariants")
+        {
+            string symbol = ReadTextField(root, "symbol", 128);
+            int? variantId = Int(root, "variantId");
+            byte[] revision;
+            try { revision = Convert.FromBase64String(ReadTextField(root, "revision", 24)); }
+            catch (FormatException) { throw new ArgumentException("Niepoprawna wersja kartoteki."); }
+            if (symbol.Length == 0 || variantId is null or <= 0 || revision.Length != 8)
+                throw new ArgumentException("Wybierz zapisany wariant leku.");
+
+            bool deleting = action == "deleteRplVariants";
+            string expected = ReadTextField(root, "signature", 64);
+            var admin = deleting ? AdministratorOptions() : null;
+            if (deleting && (expected.Length != 64 || !await WindowsHelloConsent.VerifyAsync(this,
+                "trwałe usunięcie potwierdzonych kopii wariantu leku z katalogu SQL")))
+                return new { deleted = 0 };
+
+            await using var db = admin is null ? ArchiveDb() : AdministratorDb(admin, "KartyLeczenia");
+            await db.OpenAsync(token);
+            await using var tx = (SqlTransaction)await db.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, token);
+            using var find = new SqlCommand("""
+                SELECT v.id,p.symbol,p.name,p.revision,sourceRpl.value
+                FROM dbo.catalog_variants source
+                JOIN dbo.catalog_products original ON original.symbol=source.symbol
+                CROSS APPLY (VALUES(COALESCE(NULLIF(TRIM(source.rpl_id),N''),NULLIF(TRIM(original.rpl_id),N''))))
+                    sourceRpl(value)
+                JOIN dbo.catalog_variants v ON 1=1
+                JOIN dbo.catalog_products p ON p.symbol=v.symbol
+                WHERE source.id=@id AND source.symbol=@symbol AND original.revision=@revision
+                  AND sourceRpl.value IS NOT NULL
+                  AND sourceRpl.value COLLATE Latin1_General_100_BIN2 =
+                      COALESCE(NULLIF(TRIM(v.rpl_id),N''),NULLIF(TRIM(p.rpl_id),N''))
+                  AND EXISTS (
+                      SELECT source.species COLLATE Latin1_General_100_BIN2,
+                             source.route COLLATE Latin1_General_100_BIN2,
+                             source.indication COLLATE Latin1_General_100_BIN2,
+                             source.dose COLLATE Latin1_General_100_BIN2,
+                             source.edible_tissues COLLATE Latin1_General_100_BIN2,
+                             source.milk COLLATE Latin1_General_100_BIN2,
+                             source.eggs COLLATE Latin1_General_100_BIN2,
+                             source.restrictions COLLATE Latin1_General_100_BIN2,
+                             source.scope COLLATE Latin1_General_100_BIN2
+                      INTERSECT
+                      SELECT v.species,v.route,v.indication,v.dose,v.edible_tissues,v.milk,v.eggs,
+                             v.restrictions,v.scope)
+                ORDER BY v.id;
+                """, db, tx) { CommandTimeout = 15 };
+            find.Parameters.Add("@id", System.Data.SqlDbType.Int).Value = variantId.Value;
+            find.Parameters.Add("@symbol", System.Data.SqlDbType.NVarChar, 128).Value = symbol;
+            find.Parameters.Add("@revision", System.Data.SqlDbType.Binary, 8).Value = revision;
+            var matches = new List<(int Id, string Symbol, string Name, string Revision, string Rpl)>();
+            await using (var reader = await find.ExecuteReaderAsync(token))
+            {
+                while (await reader.ReadAsync(token))
+                    matches.Add((reader.GetInt32(0),reader.GetString(1),reader.GetString(2),
+                        Convert.ToBase64String(reader.GetFieldValue<byte[]>(3)),reader.GetString(4)));
+            }
+            if (matches.Count == 0)
+                throw new InvalidOperationException("Brak numeru RPL lub kartoteka się zmieniła. Odśwież kartotekę.");
+            string signature = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(matches.Select(row =>
+                    new { row.Id,row.Symbol,row.Revision,row.Rpl })))));
+            if (!deleting)
+            {
+                await tx.CommitAsync(token);
+                return new { rpl = matches[0].Rpl, signature,
+                    items = matches.Select(row => new { row.Id,row.Symbol,row.Name }).ToArray() };
+            }
+            if (!string.Equals(signature, expected, StringComparison.Ordinal))
+                throw new InvalidOperationException("Lista wariantów zmieniła się. Wczytaj podgląd ponownie.");
+
+            using var remove = new SqlCommand("""
+                DELETE FROM dbo.catalog_variants WHERE id=@variantId AND symbol=@productSymbol;
+                IF @@ROWCOUNT <> 1 THROW 50005,N'Wariant zmienił się podczas usuwania.',1;
+                """, db, tx);
+            var idParameter = remove.Parameters.Add("@variantId", System.Data.SqlDbType.Int);
+            var symbolParameter = remove.Parameters.Add("@productSymbol", System.Data.SqlDbType.NVarChar, 128);
+            foreach (var row in matches)
+            {
+                idParameter.Value = row.Id;
+                symbolParameter.Value = row.Symbol;
+                await remove.ExecuteNonQueryAsync(token);
+            }
+            using var bump = new SqlCommand("UPDATE dbo.catalog_products SET name=name WHERE symbol=@symbol;", db, tx);
+            var productParameter = bump.Parameters.Add("@symbol", System.Data.SqlDbType.NVarChar, 128);
+            foreach (var productSymbol in matches.Select(row => row.Symbol).Distinct())
+            {
+                productParameter.Value = productSymbol;
+                await bump.ExecuteNonQueryAsync(token);
+            }
+            await tx.CommitAsync(token);
+            priceCatalogueLists.Clear();
+            priceLists.Clear();
+            return new { deleted = matches.Count };
+        }
         if (action == "deleteCatalogueVariant")
         {
             string symbol = ReadTextField(root, "symbol", 128);

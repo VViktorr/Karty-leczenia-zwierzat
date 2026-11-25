@@ -453,30 +453,53 @@ export default function CataloguePage({
   const deletableVariant = selected.length === 1
     ? variants.find(row => row.key === selected[0] && row.id !== null)
     : undefined;
-  function confirmDeleteVariant() {
+  async function confirmDeleteVariant(allRpl = false) {
     if (!editing?.revision || !deletableVariant || dirty || working) return;
     const {symbol, revision, name} = editing;
     const variant = deletableVariant;
+    const request = {symbol, revision, variantId:variant.id};
+    let preview: {rpl:string;signature:string;items:Array<{id:number;symbol:string;name:string}>} | undefined;
+    if (allRpl) {
+      setWorking(true);
+      setError("");
+      try {
+        preview = await invoke<{rpl:string;signature:string;items:Array<{id:number;symbol:string;name:string}>}>("previewRplVariantDeletion",request);
+      } catch (error) {
+        setError(error instanceof Error ? error.message : String(error));
+        return;
+      } finally {
+        setWorking(false);
+      }
+    }
     Modal.confirm({
       className:"kl-dialog-delete-catalogue-variant",
-      title:"Trwale usunąć wariant leku?",
-      content:<>{name} · {variant.species} · {variant.route} · {variant.indication}</>,
+      title:preview ? "Trwale usunąć kopie wariantu według RPL?" : "Trwale usunąć wariant leku?",
+      content:<>
+        {name} · {variant.species} · {variant.route} · {variant.indication}
+        {preview&&<>
+          <p>RPL {preview.rpl} · Liczba wariantów: {preview.items.length}</p>
+          <ul style={{maxHeight:"35vh",overflowY:"auto"}}>
+            {preview.items.map(item=><li key={item.id}>{item.name} ({item.symbol}) · wariant {item.id}</li>)}
+          </ul>
+        </>}
+      </>,
       okText:"Usuń wariant", cancelText:"Anuluj", okButtonProps:{danger:true},
       onOk:async()=>{
         setWorking(true);
         setError("");
         setSavedNotice("");
         try {
-          const result = await invoke<{deleted:boolean}>("deleteCatalogueVariant", {
-            symbol, revision, variantId:variant.id
-          });
+          const result = await invoke<{deleted:boolean|number}>(
+            preview ? "deleteRplVariants" : "deleteCatalogueVariant",
+            {...request, ...(preview ? {signature:preview.signature} : {})});
           if (!result.deleted) return;
-          setVariants(current=>current.filter(row=>row.id!==variant.id));
+          const deletedIds = new Set(preview ? preview.items.map(item=>item.id) : [variant.id]);
+          setVariants(current=>current.filter(row=>!deletedIds.has(row.id)));
           setSelected([]);
           setVersion(value=>value+1);
           const fresh = await invoke<CatalogueProduct>("readCatalogueProduct", {symbol});
           loadProduct(fresh);
-          setSavedNotice("Usunięto wariant z katalogu SQL.");
+          setSavedNotice(preview ? "Usunięto warianty z katalogu SQL: "+result.deleted : "Usunięto wariant z katalogu SQL.");
         } catch (error) {
           setError(error instanceof Error ? error.message : String(error));
         } finally {
@@ -620,7 +643,9 @@ export default function CataloguePage({
 
               <Button onClick={addVariant}>Dodaj wariant</Button>
               <Button danger disabled={working||dirty||!deletableVariant||!editing.revision}
-                onClick={confirmDeleteVariant}>Usuń zaznaczony wariant</Button>
+                onClick={()=>{void confirmDeleteVariant();}}>Usuń zaznaczony wariant</Button>
+              <Button danger disabled={working||dirty||!deletableVariant||!editing.revision}
+                onClick={()=>{void confirmDeleteVariant(true);}}>Usuń zgodne warianty wg RPL</Button>
               <Button disabled={!selected.length || working}
                 onClick={() => { void choosePdf(); }}>
                 Dołącz PDF do zaznaczonych ({selected.length})
