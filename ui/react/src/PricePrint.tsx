@@ -147,7 +147,7 @@ export function pricePrintHtml(
         current.body.children.length===1)current.sheet.classList.add('oversized');
     }
     created.forEach(function(item,index){
-      item.footer.textContent='Strona '+(index+1)+' / '+created.length;
+      item.footer.textContent=(index+1)+'/'+created.length;
     });
     document.getElementById('total-pages').textContent=String(created.length);
   }

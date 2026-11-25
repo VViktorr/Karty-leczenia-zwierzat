@@ -32,7 +32,14 @@ public static class CardHtmlRenderer
             <!doctype html><html lang="pl"><head><meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1"><title>Karta leczenia zwierząt</title>
             <style>
-            @page { size:A4 landscape; margin:7mm; }
+            @page {
+                size:A4 landscape;
+                margin:7mm;
+                @bottom-right {
+                    content:counter(page) "/" counter(pages);
+                    font:8pt Arial,sans-serif;
+                }
+            }
             * {box-sizing:border-box} html,body {margin:0;padding:0;background:#fff;color:#000}
             body {font:8.5pt Arial,sans-serif} .sheet {width:100%;margin:0 auto}
             h1 {font-size:10pt;line-height:1.2;text-align:center;margin:0 0 4mm;font-weight:700}
