@@ -1319,8 +1319,11 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
             onChange={value=>setShowRouteCodes(value==="codes")}
             options={[{value:"full",label:"Pełna"},{value:"codes",label:"Skrót"}]}/>
         </Space>
-        {!variantModal&&<Button size="small" disabled={busy||applyBusy||!rows.some(row=>row.withdrawal?.trim())}
-          onClick={()=>setWithdrawalAssistant(true)}>Asystent karencji</Button>}
+        {!variantModal&&<Space size={4}>
+          <Switch aria-label="Asystent AI" checked={withdrawalAssistant}
+            disabled={busy||applyBusy||!rows.some(row=>row.withdrawal?.trim())} onChange={setWithdrawalAssistant}/>
+          Asystent AI
+        </Space>}
         <Popover trigger="click" title="Podpowiedzi z katalogu SQL" placement="bottomLeft"
           content={<div style={{width:"min(540px, 75vw)"}}>
       <Space wrap>
@@ -1694,6 +1697,11 @@ function Treatment({draft, compact, active, wizard: wizardEnabled, shortcuts, vi
         id:String(row.index), label:(row.index+1)+". "+row.product, source:row.withdrawal
       }))}
       onClose={()=>setWithdrawalAssistant(false)}
+      applyAllLabel="Zastosuj propozycje do karty"
+      onApplyAll={async changes=>{
+        for(const change of changes)await update(Number(change.id),"withdrawal",change.value);
+        setWithdrawalAssistant(false);
+      }}
       onApply={(id,value)=>{
         void update(Number(id),"withdrawal",value);
         setWithdrawalAssistant(false);
@@ -1768,7 +1776,11 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
     (!q||row.name.toLocaleLowerCase("pl").includes(q)||row.symbol.toLocaleLowerCase("pl").includes(q))
     &&(!onlyMissing||row.needsCompletion));
   const selected=rows.filter(row=>!excluded.has(row.symbol));
-  const assistantPrice=rows.find(row=>row.symbol===activePriceSymbol);
+  const [withdrawalOverrides,setWithdrawalOverrides]=useState<Map<string,{source:string;value:string}>>(()=>new Map());
+  const assistantPrices=selected.map(row=>({
+    id:row.symbol,label:row.name,source:withdrawalText(row,settings)
+  })).filter(entry=>entry.source?.trim());
+  const printRows=selected.map(row=>({...row,withdrawalOverride:withdrawalOverrides.get(row.symbol)}));
   const missingCount=all.filter(row=>row.needsCompletion).length;
   const toggle=(symbol:string,value:boolean)=>setExcluded(current=>{
     const next=new Set(current);
@@ -1843,8 +1855,12 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
           onClick={()=>setOnlyMissing(prev=>!prev)}>
           Do uzupełnienia ({missingCount})
         </Button>
-        <Button disabled={!assistantPrice?.fullNames?.trim()}
-          onClick={()=>setWithdrawalAssistant(true)}>Asystent karencji</Button>
+        <Space size={4}>
+          <Switch aria-label="Asystent AI" checked={withdrawalAssistant}
+            disabled={!assistantPrices.length} onChange={setWithdrawalAssistant}/>
+          Asystent AI
+        </Space>
+        {withdrawalOverrides.size>0&&<Button onClick={()=>setWithdrawalOverrides(new Map())}>Cofnij skróty wydruku</Button>}
         <Button onClick={()=>onCatalogue(rows.some(row=>row.symbol===activePriceSymbol) ? activePriceSymbol : "")}>
           Dodaj / edytuj w katalogu
         </Button>
@@ -1867,16 +1883,25 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
       </Typography.Text>
     </Card>
     {listLayout.dialog}
-    {withdrawalAssistant&&assistantPrice&&<WithdrawalAssistant
-      entries={[{id:assistantPrice.symbol,label:assistantPrice.name,source:assistantPrice.fullNames}]}
+    {withdrawalAssistant&&<WithdrawalAssistant entries={assistantPrices}
       onClose={()=>setWithdrawalAssistant(false)}
+      applyAllLabel="Zastosuj propozycje do wydruku"
+      onApplyAll={changes=>{
+        setWithdrawalOverrides(current=>{
+          const next=new Map(current);
+          for(const change of changes)next.set(change.id,{source:change.source,value:change.value});
+          return next;
+        });
+        setWithdrawalAssistant(false);
+        setShowPreview(true);
+      }}
       onCatalogue={id=>onCatalogue(id,true,true)}/>}
     {showSettings&&<PricePrintSettingsPanel initial={settings}
       onSave={setSettings} onClose={()=>setShowSettings(false)}
       onPreview={values=>{
         setSettings(values);setShowSettings(false);setShowPreview(true);
       }}/>}
-    {showPreview&&<PricePrintPreview rows={selected}
+    {showPreview&&<PricePrintPreview rows={printRows}
       settings={settings} heading={priceHeading} onClose={()=>setShowPreview(false)}/>}
   </>;
 }

@@ -9,6 +9,7 @@ export interface PricePrintRow {
   fullCodes: string; fullNames: string;
   variantsCodes: string; variantsNames: string;
   speciesCodes: string; speciesNames: string; needsCompletion: boolean;
+  withdrawalOverride?: {source:string;value:string};
 }
 export interface PricePrintOptions {
   landscape: boolean; margin: number; rowHeight: number; padding: number;
@@ -37,11 +38,12 @@ export const priceRouteLegend =
   "IM – domięśniowo, IV – dożylnie, SC – podskórnie, ID – śródskórnie, IP – dootrzewnowo, IA – dostawowo, PO – doustnie, IUT – domacicznie, IMM – dowymieniowo, IVAG – dopochwowo, TOP / EXT – miejscowo / zewnętrznie, POUR-ON – przez polewanie, SPOT-ON – punktowo na skórę, OPH – do oka, OT / AUR – do ucha, PR – doodbytniczo.";
 
 export function withdrawalText(row:PricePrintRow, settings:PricePrintOptions):string {
-  return settings.withdrawalFormat === 0
+  const original = settings.withdrawalFormat === 0
     ? (settings.routeCodes?row.fullCodes:row.fullNames)
     : settings.withdrawalFormat === 2
       ? (settings.routeCodes?row.speciesCodes:row.speciesNames)
       : (settings.routeCodes?row.variantsCodes:row.variantsNames);
+  return row.withdrawalOverride?.source === original ? row.withdrawalOverride.value : original;
 }
 export function normalizePriceSettings(input:Partial<PricePrintOptions>|null):PricePrintOptions {
   if(!input)return {...defaultPricePrint};
