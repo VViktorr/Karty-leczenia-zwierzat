@@ -25,23 +25,36 @@ internal static class CardPdfService
         double marginMm = 7, bool allowScripts = true)
         => RenderOrPrintAsync(owner, html, token, landscape, marginMm, allowScripts);
 
-    internal static async Task<bool> PrintAsync(Form owner, string html, CancellationToken token)
+    internal static async Task<bool> PrintAsync(Form owner, string html, CancellationToken token, string mode)
     {
+        if (mode == "externalPdf")
+        {
+            await OpenExternalPdfAsync(owner, html, token);
+            return true;
+        }
+        var dialogKind = mode switch
+        {
+            "" or "browser" => CoreWebView2PrintDialogKind.Browser,
+            "system" => CoreWebView2PrintDialogKind.System,
+            _ => throw new ArgumentException("Nieznany tryb drukowania karty.")
+        };
         if (owner.OwnedForms.FirstOrDefault(form => form.Name == "CardWebViewPrintPreview") is Form existing)
         {
             existing.Activate();
+            existing.Controls.OfType<WebView2>().FirstOrDefault()?.CoreWebView2?.ShowPrintUI(dialogKind);
             return true;
         }
-        await RenderOrPrintAsync(owner, html, token, true, 7, true, showPrintPreview: true);
+        await RenderOrPrintAsync(owner, html, token, true, 7, true, dialogKind: dialogKind);
         return true;
     }
 
     private static async Task<string> RenderOrPrintAsync(
         Form owner, string html, CancellationToken token, bool landscape,
-        double marginMm, bool allowScripts, bool showPrintPreview = false)
+        double marginMm, bool allowScripts, CoreWebView2PrintDialogKind? dialogKind = null)
     {
         if (string.IsNullOrWhiteSpace(html))
             throw new ArgumentException("Brak treści karty do wygenerowania PDF.");
+        bool showPrintPreview = dialogKind.HasValue;
         var name = Guid.NewGuid().ToString("N");
         string source = Path.Combine(Path.GetTempPath(), $"reactkl-print-{name}.html");
         string output = Path.Combine(Path.GetTempPath(), $"reactkl-print-{name}.pdf");
@@ -97,7 +110,7 @@ internal static class CardPdfService
                 shell.Opacity = 1;
                 shell.Activate();
                 browser.Focus();
-                browser.CoreWebView2.ShowPrintUI(CoreWebView2PrintDialogKind.Browser);
+                browser.CoreWebView2.ShowPrintUI(dialogKind!.Value);
                 keepPreviewOpen = true;
                 return "";
             }
@@ -133,6 +146,34 @@ internal static class CardPdfService
                 DeleteTemporarySource(source);
             }
         }
+    }
+
+    private static async Task OpenExternalPdfAsync(Form owner, string html, CancellationToken token)
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "ReactKL-CardPrint");
+        Directory.CreateDirectory(folder);
+        foreach (string file in Directory.EnumerateFiles(folder, "karta-leczenia-*.pdf"))
+        {
+            if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddDays(-1))
+                DeleteTemporarySource(file);
+        }
+        string path = await RenderAsync(owner, html, token);
+        string target = Path.Combine(folder, $"karta-leczenia-{Guid.NewGuid():N}.pdf");
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            File.Move(path, target);
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            DeleteTemporarySource(target);
+            throw;
+        }
+        finally { DeleteTemporarySource(path); }
     }
 
     private static void DeleteTemporarySource(string source)

@@ -1,12 +1,13 @@
 import {useSyncExternalStore} from "react";
 
 export type PageMode = "pages" | "scroll";
+export type CardPrintMode = "browser" | "system" | "externalPdf";
 export type ViewerMode = "react" | "native";
 export type GridMode = "antd" | "ag";
 export type NavigationMode = "top" | "side";
 export type ShortcutAction = "back" | "next" | "summary" | "save";
 export type ComponentPreferences = {
-  pdf: {mode: PageMode; viewer: ViewerMode; zoom: number; rememberZoom: boolean;
+  pdf: {mode: PageMode; viewer: ViewerMode; cardPrintMode: CardPrintMode; zoom: number; rememberZoom: boolean;
     textLayer: boolean; annotations: boolean; preloadPages: number};
   table: {mode: GridMode; rememberColumns: boolean};
   tableTextPreview: {enabled: boolean; delaySeconds: number; fontSize: number};
@@ -25,7 +26,7 @@ export type ComponentPreferences = {
 };
 
 export const defaultComponents: ComponentPreferences = {
-  pdf: {mode: "scroll", viewer: "react", zoom: 100, rememberZoom: true,
+  pdf: {mode: "scroll", viewer: "react", cardPrintMode: "browser", zoom: 100, rememberZoom: true,
     textLayer: true, annotations: true, preloadPages: 2},
   table: {mode: "antd", rememberColumns: true},
   tableTextPreview: {enabled: true, delaySeconds: 3, fontSize: 16},
@@ -59,6 +60,7 @@ export function normalizeComponents(raw: unknown): ComponentPreferences {
     pdf: {
       mode: enumValue(pdf.mode, ["pages","scroll"], defaults.pdf.mode),
       viewer: enumValue(pdf.viewer, ["react","native"], defaults.pdf.viewer),
+      cardPrintMode: enumValue(pdf.cardPrintMode, ["browser","system","externalPdf"], defaults.pdf.cardPrintMode),
       zoom: [50,75,100,125,150,175,200].includes(zoom)?zoom:defaults.pdf.zoom,
       rememberZoom: typeof pdf.rememberZoom === "boolean" ? pdf.rememberZoom : defaults.pdf.rememberZoom,
       textLayer: typeof pdf.textLayer === "boolean" ? pdf.textLayer : defaults.pdf.textLayer,

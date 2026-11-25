@@ -42,6 +42,13 @@ export default function ComponentsSettings() {
             options={[{value:"react",label:"React-PDF / PDF.js"},
               {value:"native",label:"Natywny podgląd WebView2"}]}/>
         </label>
+        <label>Okno drukowania kart
+          <Select aria-label="Okno drukowania kart" style={{display:"flex",maxWidth:420}}
+            value={settings.pdf.cardPrintMode} onChange={cardPrintMode=>updateComponents("pdf",{cardPrintMode})}
+            options={[{value:"browser",label:"Podgląd wydruku WebView2"},
+              {value:"system",label:"Systemowe okno Windows"},
+              {value:"externalPdf",label:"Domyślna aplikacja PDF"}]}/>
+        </label>
         <label>Domyślne powiększenie
           <Select aria-label="Domyślne powiększenie PDF" style={{display:"flex",width:180}}
             value={settings.pdf.zoom} options={zoomOptions}

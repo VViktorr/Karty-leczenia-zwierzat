@@ -628,6 +628,7 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
   const [withdrawalAssistant,setWithdrawalAssistant]=useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [printingCard,setPrintingCard]=useState(false);
+  const printMode=useComponents().pdf.cardPrintMode;
   const [previewSavedId,setPreviewSavedId]=useState<string|null>(null);
   const [pdfBusy,setPdfBusy]=useState<"pdf"|"mail"|null>(null);
   const [pdfMessage,setPdfMessage]=useState("");
@@ -1716,8 +1717,8 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
           setPrintingCard(true);
           setPdfMessage("");
           try{
-            await invoke("printCard",previewSavedId ? {id:previewSavedId,trash:false}
-              : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals,withdrawalBySpecies,speciesGroup});
+            await invoke("printCard",previewSavedId ? {id:previewSavedId,trash:false,printMode}
+              : {draftId:draft.draftId,reported,performed,findings,rows,shortRoutes,shortWithdrawals,withdrawalBySpecies,speciesGroup,printMode});
           }catch(error){setPdfMessage(error instanceof Error?error.message:String(error));}
           finally{setPrintingCard(false);}
         }}>Drukuj</Button>
@@ -1989,6 +1990,7 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
   const [editConfirm,setEditConfirm]=useState(false);
   const [printHtml,setPrintHtml]=useState<string|null>(null);
   const [printingCard,setPrintingCard]=useState(false);
+  const printMode=useComponents().pdf.cardPrintMode;
   const [previewBusy,setPreviewBusy]=useState<string|null>(null);
   const [printTarget,setPrintTarget]=useState<SavedCard|null>(null);
   const [pdfBusy,setPdfBusy]=useState<string|null>(null);
@@ -2370,7 +2372,7 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
           if(printingCard)return;
           setPrintingCard(true);
           setError("");
-          try{if(printTarget)await invoke("printCard",{id:printTarget.id,trash});}
+          try{if(printTarget)await invoke("printCard",{id:printTarget.id,trash,printMode});}
           catch(error){setError(error instanceof Error?error.message:String(error));}
           finally{setPrintingCard(false);}
         }}>Drukuj</Button>

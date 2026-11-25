@@ -1084,7 +1084,8 @@ internal sealed class ReactWindow : Form
                     throw new InvalidDataException("Nie udało się przygotować karty do podglądu PDF.");
             }
             if (action == "printCard")
-                return new { printed = await CardPdfService.PrintAsync(this, html, token) };
+                return new { opened = await CardPdfService.PrintAsync(this, html, token,
+                    ReadTextField(root, "printMode", 20)) };
             string temporary = await CardPdfService.RenderAsync(this, html, token);
             try
             {
