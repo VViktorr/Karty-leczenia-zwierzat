@@ -10,9 +10,9 @@ function renderFrame({className, title, modalRender}: ModalProps | ModalFuncProp
 }
 
 function AppModal(props:ModalProps) {
-  return <AntModal {...props} modalRender={renderFrame(props)}/>;
+  return <AntModal {...props} style={{top:12,...props.style}} modalRender={renderFrame(props)}/>;
 }
 
 export default Object.assign(AppModal, {
-  confirm: (props:ModalFuncProps) => AntModal.confirm({...props, modalRender:renderFrame(props)})
+  confirm: (props:ModalFuncProps) => AntModal.confirm({...props, style:{top:12,...props.style}, modalRender:renderFrame(props)})
 });

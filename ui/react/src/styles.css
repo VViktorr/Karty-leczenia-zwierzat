@@ -65,7 +65,7 @@
 
 .ant-modal:is(.kl-dialog-treatment-pdf, .kl-dialog-treatment-preview,
   .kl-dialog-saved-preview, .kl-dialog-catalogue-pdf, .kl-dialog-price-preview)
-  .kl-rnd-dialog-frame > .ant-modal-content > .ant-modal-body {
+  .kl-rnd-dialog-frame > :is(.ant-modal-container, .ant-modal-content) > .ant-modal-body {
   display: flex;
   flex-direction: column;
 }
@@ -74,6 +74,8 @@
   inset: 6px;
   width: auto !important;
   height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
   transform: none !important;
 }
 .kl-rnd-dialog-maximized .ant-modal-body > iframe {
@@ -182,16 +184,28 @@
 }
 
 .kl-rnd-dialog-frame { pointer-events: auto; }
-.kl-rnd-dialog-frame > .ant-modal-content {
+.kl-rnd-dialog-frame > :is(.ant-modal-container, .ant-modal-content) {
+  box-sizing: border-box;
   height: 100%;
+  max-height: inherit;
   display: flex;
   flex-direction: column;
+}
+.kl-rnd-dialog-maximized > :is(.ant-modal-container, .ant-modal-content) {
+  max-height: 100%;
+}
+.kl-rnd-dialog-frame :is(.ant-modal-header, .ant-modal-footer) {
+  flex-shrink: 0;
+}
+.kl-dialog-resize-handles > div {
+  z-index: 2;
 }
 .kl-rnd-dialog-frame .ant-modal-header {
   cursor: move;
   user-select: none;
 }
 .kl-rnd-dialog-frame .ant-modal-body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
 }
@@ -346,8 +360,8 @@ html[data-kl-skin="carbon"] .ant-switch { border-radius: 3px; }
 html[data-kl-skin="aero"] .ant-switch .ant-switch-handle::before,
 html[data-kl-skin="carbon"] .ant-switch .ant-switch-handle::before { border-radius: 2px; }
 html[data-kl-skin="carbon"] .ant-table-thead th { font-weight: 700; }
-html[data-kl-skin="material"] .ant-modal .ant-modal-content { border-radius: 22px; }
-html[data-kl-skin="orchard"] .ant-modal .ant-modal-content { border-radius: 12px; }
+html[data-kl-skin="material"] .ant-modal :is(.ant-modal-container, .ant-modal-content) { border-radius: 22px; }
+html[data-kl-skin="orchard"] .ant-modal :is(.ant-modal-container, .ant-modal-content) { border-radius: 12px; }
 
 .treatment-stepper {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
