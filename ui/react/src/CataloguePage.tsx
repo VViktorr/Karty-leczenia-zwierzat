@@ -450,6 +450,42 @@ export default function CataloguePage({
     } finally { setWorking(false); }
   }
 
+  const deletableVariant = selected.length === 1
+    ? variants.find(row => row.key === selected[0] && row.id !== null)
+    : undefined;
+  function confirmDeleteVariant() {
+    if (!editing?.revision || !deletableVariant || dirty || working) return;
+    const {symbol, revision, name} = editing;
+    const variant = deletableVariant;
+    Modal.confirm({
+      className:"kl-dialog-delete-catalogue-variant",
+      title:"Trwale usunąć wariant leku?",
+      content:<>{name} · {variant.species} · {variant.route} · {variant.indication}</>,
+      okText:"Usuń wariant", cancelText:"Anuluj", okButtonProps:{danger:true},
+      onOk:async()=>{
+        setWorking(true);
+        setError("");
+        setSavedNotice("");
+        try {
+          const result = await invoke<{deleted:boolean}>("deleteCatalogueVariant", {
+            symbol, revision, variantId:variant.id
+          });
+          if (!result.deleted) return;
+          setVariants(current=>current.filter(row=>row.id!==variant.id));
+          setSelected([]);
+          setVersion(value=>value+1);
+          const fresh = await invoke<CatalogueProduct>("readCatalogueProduct", {symbol});
+          loadProduct(fresh);
+          setSavedNotice("Usunięto wariant z katalogu SQL.");
+        } catch (error) {
+          setError(error instanceof Error ? error.message : String(error));
+        } finally {
+          setWorking(false);
+        }
+      }
+    });
+  }
+
   const columns: ColumnsType<UiVariant> = [
     ...textFields.map(({ key, title, width }) => ({
       title, key, width,
@@ -583,6 +619,8 @@ export default function CataloguePage({
             <Space wrap>
 
               <Button onClick={addVariant}>Dodaj wariant</Button>
+              <Button danger disabled={working||dirty||!deletableVariant||!editing.revision}
+                onClick={confirmDeleteVariant}>Usuń zaznaczony wariant</Button>
               <Button disabled={!selected.length || working}
                 onClick={() => { void choosePdf(); }}>
                 Dołącz PDF do zaznaczonych ({selected.length})
