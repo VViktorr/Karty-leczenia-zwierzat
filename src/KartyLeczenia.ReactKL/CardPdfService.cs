@@ -1,4 +1,3 @@
-using System.Drawing.Printing;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -7,7 +6,7 @@ namespace KartyLeczenia.ReactKL;
 /// <summary>
 /// Print pipeline from the final WinForms app: render the core Card HTML with
 /// WebView2 to a real PDF, not a renamed HTML file. Runs on the UI STA thread.
-/// The temporary renderer is never a user-facing WinForms screen.
+/// PDF export uses a hidden renderer; interactive printing owns a separate preview window.
 /// </summary>
 internal static class CardPdfService
 {
@@ -28,27 +27,18 @@ internal static class CardPdfService
 
     internal static async Task<bool> PrintAsync(Form owner, string html, CancellationToken token)
     {
-        using var dialog = new PrintDialog
+        if (owner.OwnedForms.FirstOrDefault(form => form.Name == "CardWebViewPrintPreview") is Form existing)
         {
-            UseEXDialog = true,
-            AllowSomePages = true,
-            PrinterSettings = new PrinterSettings
-            {
-                MinimumPage = 1,
-                MaximumPage = 9999,
-                FromPage = 1,
-                ToPage = 1,
-                PrintRange = PrintRange.AllPages
-            }
-        };
-        if (dialog.ShowDialog(owner) != DialogResult.OK) return false;
-        await RenderOrPrintAsync(owner, html, token, true, 7, true, dialog.PrinterSettings);
+            existing.Activate();
+            return true;
+        }
+        await RenderOrPrintAsync(owner, html, token, true, 7, true, showPrintPreview: true);
         return true;
     }
 
     private static async Task<string> RenderOrPrintAsync(
         Form owner, string html, CancellationToken token, bool landscape,
-        double marginMm, bool allowScripts, PrinterSettings? printer = null)
+        double marginMm, bool allowScripts, bool showPrintPreview = false)
     {
         if (string.IsNullOrWhiteSpace(html))
             throw new ArgumentException("Brak treści karty do wygenerowania PDF.");
@@ -60,16 +50,19 @@ internal static class CardPdfService
         string profile = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "KartyLeczenia", "WebView2", "Print");
-        using var shell = new Form
+        var shell = new Form
         {
-            FormBorderStyle = FormBorderStyle.None,
+            Name = showPrintPreview ? "CardWebViewPrintPreview" : "",
+            Text = "Podgląd wydruku karty leczenia",
+            FormBorderStyle = showPrintPreview ? FormBorderStyle.Sizable : FormBorderStyle.None,
             ShowInTaskbar = false,
-            StartPosition = FormStartPosition.Manual,
+            StartPosition = showPrintPreview ? FormStartPosition.CenterParent : FormStartPosition.Manual,
             Location = owner.Location,
             Size = new Size(900, 640),
             Opacity = 0
         };
-        using var browser = new WebView2 { Dock = DockStyle.Fill };
+        var browser = new WebView2 { Dock = DockStyle.Fill };
+        bool keepPreviewOpen = false;
         shell.Controls.Add(browser);
         try
         {
@@ -98,6 +91,17 @@ internal static class CardPdfService
             }
             finally { browser.CoreWebView2.NavigationCompleted -= navigation; }
             token.ThrowIfCancellationRequested();
+            if (showPrintPreview)
+            {
+                shell.FormClosed += (_, _) => DeleteTemporarySource(source);
+                shell.Opacity = 1;
+                shell.Activate();
+                browser.Focus();
+                browser.CoreWebView2.ShowPrintUI(CoreWebView2PrintDialogKind.Browser);
+                keepPreviewOpen = true;
+                return "";
+            }
+
             var print = browser.CoreWebView2.Environment.CreatePrintSettings();
             print.Orientation = landscape ? CoreWebView2PrintOrientation.Landscape : CoreWebView2PrintOrientation.Portrait;
             print.PageWidth = 210 / 25.4;
@@ -105,17 +109,6 @@ internal static class CardPdfService
             print.MarginTop = print.MarginBottom = print.MarginLeft =
                 print.MarginRight = marginMm / 25.4;
             print.ShouldPrintBackgrounds = true;
-            if (printer is not null)
-            {
-                print.PrinterName = printer.PrinterName;
-                print.Copies = Math.Max(1, (int)printer.Copies);
-                if (printer.PrintRange == PrintRange.SomePages)
-                    print.PageRanges = $"{printer.FromPage}-{printer.ToPage}";
-                var status = await browser.CoreWebView2.PrintAsync(print);
-                if (status != CoreWebView2PrintStatus.Succeeded)
-                    throw new IOException($"Nie udało się wysłać karty do drukarki: {status}.");
-                return "";
-            }
             if (!await browser.CoreWebView2.PrintToPdfAsync(output, print) ||
                 !File.Exists(output) || new FileInfo(output).Length < 100)
                 throw new IOException("Nie udało się utworzyć dokumentu PDF.");
@@ -134,11 +127,19 @@ internal static class CardPdfService
         }
         finally
         {
-            if (!shell.IsDisposed) shell.Close();
-            try { File.Delete(source); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            if (!keepPreviewOpen)
+            {
+                shell.Dispose();
+                DeleteTemporarySource(source);
+            }
         }
+    }
+
+    private static void DeleteTemporarySource(string source)
+    {
+        try { File.Delete(source); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     internal static void MoveToDestination(string source, string target)
