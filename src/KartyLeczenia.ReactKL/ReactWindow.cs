@@ -391,7 +391,7 @@ internal sealed class ReactWindow : Form
                 return;
             }
             cancel = new CancellationTokenSource(action is "backupDatabase" or "restoreDatabase"
-                ? TimeSpan.FromMinutes(45) : action is "saveCardPdf" or "emailCardPdf" or "savePricePdf"
+                ? TimeSpan.FromMinutes(45) : action is "printCard" or "saveCardPdf" or "emailCardPdf" or "savePricePdf"
                     ? TimeSpan.FromMinutes(3) : action == "missingCatalogueProducts"
                     ? TimeSpan.FromMinutes(2) : action == "installUpdate"
                     ? TimeSpan.FromMinutes(15) : action == "publishPendingUpdate"
@@ -1114,6 +1114,8 @@ internal sealed class ReactWindow : Form
             // changed the clinical data.
             string id = ReadTextField(root, "draftId", 30).Length > 0
                 ? "" : ReadTextField(root, "id", 40);
+            if (action == "emailCardPdf" && !Guid.TryParseExact(id, "N", out _))
+                throw new InvalidOperationException("Najpierw zapisz kartę leczenia do SQL.");
             bool trash = Flag(root, "trash");
             Guid cardId = Guid.Empty;
             DocumentData? draft = null;
