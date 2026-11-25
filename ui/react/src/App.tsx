@@ -660,6 +660,7 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
       : row));
   }
   const [compatibility,setCompatibility]=useState<Record<number,SpeciesGroup[]>>({});
+  const [chosenVariants,setChosenVariants]=useState<Record<number,Pick<DraftRow,"species"|"route"|"dosing"|"withdrawal"|"replacement">>>({});
   const [restoredVariants,setRestoredVariants]=useState<Record<number,boolean>>({});
   const [rowSpeciesGroups,setRowSpeciesGroups]=useState<Record<number,{species:string;groups:SpeciesGroup[]}>>({});
   const [compatibilityDraftId,setCompatibilityDraftId]=useState("");
@@ -693,7 +694,7 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
       : localDateTime();
     setReported(draft?.documentDate ? initial : "");
     setPerformed(initial);
-    setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});setRowSpeciesGroups({});setRestoredVariants({});
+    setSpeciesGroup("cattle");setCompatibilityDraftId("");setCompatibility({});setRowSpeciesGroups({});setRestoredVariants({});setChosenVariants({});
     setSavedChoices({});setAnimalDescriptions([]);setAnimalError("");
     setGroupDescription("");setGroupCount("");setDiagnosis("");setGroupSpecies("");setGroupSection("II");
   }, [draft]);
@@ -1076,6 +1077,10 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
           index:variantModal.index,variantId:id,remember:rememberForVariant,speciesGroup});
       setRows(current=>current.map(row=>row.index===variantModal.index
         ? {...row,...result,defaultSpecies:false,description:row.descriptionGroup?row.description:result.description} : row));
+      const chosenRow=rows.find(row=>row.index===variantModal.index);
+      if(chosenRow)setChosenVariants(current=>({...current,[variantModal.index]:{
+        ...result,replacement:chosenRow.replacement
+      }}));
       setRestoredVariants(current=>Object.fromEntries(Object.entries(current).filter(([key])=>Number(key)!==variantModal.index)));
       setVariantModal(null);
       setSuggestTick(tick=>tick+1);
@@ -1224,11 +1229,14 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
       render:(_value:unknown,row:DraftRow)=>{
         const item=rowSuggestions.get(row.index);
         if(!item)return "—";
-        const label=item.nonMedicine?"To nie lek":
+        const chosen=chosenVariants[row.index];
+        const isChosen=chosen && chosen.species===row.species && chosen.route===row.route &&
+          chosen.dosing===row.dosing && chosen.withdrawal===row.withdrawal && chosen.replacement===row.replacement;
+        const label=isChosen?"Wybrany wariant":item.nonMedicine?"To nie lek":
           item.variantCount===0?"Brak":
           item.status==="review"?"Do uzupełnienia":
           isUnambiguous(row)?"Jednoznaczny":"Kilka wariantów";
-        const color=label==="Jednoznaczny"?"green":
+        const color=isChosen?"blue":label==="Jednoznaczny"?"green":
           item.variantCount>0?"gold":"default";
         if(item.nonMedicine||!item.hasCatalogueVariants)
           return <Tag title={item.nonMedicine?"Produkt oznaczony w katalogu jako nieleczniczy":item.message}>{label}</Tag>;
