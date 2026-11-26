@@ -55,10 +55,29 @@ export default function AppTable<T extends object>({grid, className, style, wrap
     !props.expandable && !props.summary &&
     props.columns?.every(column => !!("dataIndex" in column && typeof column.dataIndex === "string") ||
       !!("key" in column && typeof column.key === "string")) !== false;
-  return table.mode === "ag" && canUseGrid
+  const useAgGrid = table.mode === "ag" && canUseGrid;
+  const lockWidths = !useAgGrid && !complexColumns && !!columns?.length &&
+    !!className?.split(/\s+/).includes("kl-mouse-table");
+  let antColumns = columns;
+  let antScroll = props.scroll?.y === "100%" ? {...props.scroll, y:undefined} : props.scroll;
+  if (lockWidths && columns) {
+    const sized = columns.map(column=>({...column,width:typeof column.width==="number"?column.width:160}));
+    const firstRight = sized.findIndex(column=>column.fixed==="right");
+    const spacerAt = firstRight < 0 ? sized.length : firstRight;
+    // A flexible spacer absorbs spare viewport width instead of stretching user-sized columns.
+    antColumns = [...sized.slice(0,spacerAt), {key:"kl-column-spacer",className:"kl-column-spacer"},
+      ...sized.slice(spacerAt)];
+    const selectionWidth = props.rowSelection
+      ? (typeof props.rowSelection.columnWidth==="number"?props.rowSelection.columnWidth:48) : 0;
+    const expandWidth = props.expandable
+      ? (typeof props.expandable.columnWidth==="number"?props.expandable.columnWidth:48) : 0;
+    const width = sized.reduce((sum,column)=>sum+column.width,selectionWidth+expandWidth+1);
+    antScroll = {...antScroll,x:Math.max(width,typeof antScroll?.x==="number"?antScroll.x:0)};
+  }
+  return useAgGrid
     ? <Suspense fallback={<Spin aria-label="Ładowanie tabeli"/>}>
         <DataGrid<T> {...props} columns={columns} wrapRows={wrapRows} wrapHeaders={wrapHeaders} style={style} resize={grid?.resize} move={grid?.move}/>
       </Suspense>
-    : <Table<T> {...props} columns={columns}
-        scroll={props.scroll?.y === "100%" ? {...props.scroll, y:undefined} : props.scroll} className={[className, !wrapHeaders && "kl-table-nowrap-headers"].filter(Boolean).join(" ")} style={style}/>;
+    : <Table<T> {...props} columns={antColumns} tableLayout={lockWidths?"fixed":props.tableLayout}
+        scroll={antScroll} className={[className, !wrapHeaders && "kl-table-nowrap-headers"].filter(Boolean).join(" ")} style={style}/>;
 }
