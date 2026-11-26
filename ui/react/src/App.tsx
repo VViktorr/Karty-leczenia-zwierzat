@@ -1985,7 +1985,7 @@ function Expiry() {
     <div className="page-heading list-heading-actions"><Space>
       <Button onClick={remote.reload} loading={remote.busy}>Odśwież z SQL</Button></Space></div>
     <Card className="fill-list-card">
-      <Space wrap style={{marginBottom:12}}>
+      <Space wrap align="end" style={{marginBottom:12}}>
         <Segmented className="expiry-filters" value={range} onChange={setRange} options={[
           {label:"Wszystkie",value:"all"}, {label:"Przeterminowane",value:"expired"},
           {label:"Do 30 dni",value:"30"}, {label:"Do 60 dni",value:"60"}]}/>
@@ -2268,7 +2268,7 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
         options={[{label:"Archiwum",value:"active"},{label:"Kosz",value:"trash"}]}/>
       <Button onClick={remote.reload}>Odśwież</Button></Space></div>
     <Card className="fill-list-card">
-      <Space wrap style={{marginBottom:12}}>
+      <Space wrap align="end" style={{marginBottom:12}}>
         <Input.Search allowClear value={query} onChange={e=>setQuery(e.target.value)}
           onSearch={value=>{
             const trimmed=value.trim();
