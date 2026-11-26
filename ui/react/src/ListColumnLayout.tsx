@@ -9,7 +9,7 @@ import type {ColumnsType} from "antd/es/table";
 /** Workstation-local, WinForms-style column visibility, order and widths. */
 export function useListColumnLayout<T extends object>(
   listId:string,columns:ColumnsType<T>,shortcutEnabled=true,requiredColumn?:string,
-  formattingOptions?:import("react").ReactNode
+  formattingOptions?:import("react").ReactNode, visibleWhenNew:readonly string[]=[]
 ) {
   const rememberColumns=useComponents().table.rememberColumns;
   const identity=(column:ColumnsType<T>[number]):string =>
@@ -40,7 +40,7 @@ export function useListColumnLayout<T extends object>(
               Number.isFinite(value)&&value>=60&&value<=1000))
           : {};
         return {
-          visible:savedVisible.length?savedVisible:keys,
+          visible:savedVisible.length?[...new Set([...savedVisible,...visibleWhenNew.filter(key=>keys.includes(key)&&!savedOrder.includes(key))])]:keys,
           order:[...savedOrder,...keys.filter(key=>!savedOrder.includes(key))],
           widths
         };

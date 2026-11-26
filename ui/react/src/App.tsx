@@ -259,6 +259,22 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved
   const {data, busy, error, reload} = useRemote<DocumentsResult>(
     "searchDocuments", {kind, period, query: search, startDate:from, endDate:until},
     [kind, period, search, from, until], true, true, cacheScope);
+  const documentNumbers=Array.from(new Set(data?.items.map(item=>item.number)??[]));
+  const relatedCards=useRemote<Array<{document:string;number:string}>>(
+    "documentTreatmentCards",{numbers:documentNumbers},documentNumbers,active&&documentNumbers.length>0,true);
+  useEffect(()=>{
+    if(!active)return;
+    const refresh=(event:StorageEvent)=>{if(event.key===savedCardsChangeKey)relatedCards.reload();};
+    window.addEventListener("storage",refresh);
+    return()=>window.removeEventListener("storage",refresh);
+  },[active,relatedCards.reload]);
+  const cardsByDocument=new Map<string,string[]>();
+  for(const card of relatedCards.data??[]){
+    const numbers=cardsByDocument.get(card.document)??[];
+    numbers.push(card.number);
+    cardsByDocument.set(card.document,numbers);
+  }
+  const refreshDocuments=()=>{reload();relatedCards.reload();};
   useEffect(()=>{setPage(1);},[kind,period,search,from,until]);
   const allPageSize=Math.max(500,data?.items.length??0);
   const effectivePageSize=pageSize==="all"?allPageSize:pageSize;
@@ -298,7 +314,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved
   useEffect(() => {
     if (!active) return;
     const key = (event: KeyboardEvent) => {
-      if (event.key === "F5") { event.preventDefault(); reload(); return; }
+      if (event.key === "F5") { event.preventDefault(); refreshDocuments(); return; }
       if(event.altKey && !event.ctrlKey && !event.shiftKey){
         const chosen = event.code==="Digit1"?"invoices":
           event.code==="Digit2"?"receipts":event.code==="Digit4"?"warehouse":null;
@@ -330,9 +346,11 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved
     {title:"Brutto",dataIndex:"gross",align:"right",width:145,
       render:(value:number|null,row)=>currency(value,row.currency||"zł"),
       sorter:(a,b)=>(a.gross??0)-(b.gross??0)},
-    {title:"Powiązania",dataIndex:"relatedText",ellipsis:true,width:230}
+    {title:"Powiązania",dataIndex:"relatedText",ellipsis:true,width:230},
+    {title:"Powiązane karty leczenia",key:"treatmentCards",width:205,ellipsis:{showTitle:false},
+      render:(_,row)=>cardsByDocument.get(row.number)?.join(", ")||"—"}
   ];
-  const listLayout=useListColumnLayout("documents",columns,active);
+  const listLayout=useListColumnLayout("documents",columns,active,undefined,undefined,["treatmentCards"]);
   const columnMenu=[
     {key:"columns",label:"Parametry listy",onClick:listLayout.openColumns},
     {key:"fit",label:"Dopasuj szerokości",onClick:()=>{if(tableRef.current)listLayout.fitColumns(tableRef.current);}},
@@ -363,7 +381,7 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved
     {label:"Dowolny okres",value:"custom"}
   ];
   return <>
-    {active&&toolbar&&createPortal(<Button onClick={reload} loading={busy}>Odśwież · F5</Button>,toolbar)}
+    {active&&toolbar&&createPortal(<Button onClick={refreshDocuments} loading={busy}>Odśwież · F5</Button>,toolbar)}
     <Card className={"fill-list-card"+(compact?" compact-documents":"")}>
       <div className={"document-filters"+(compact?" compact-document-toolbar":"")}>
         <Segmented block size={compact?"middle":"large"} value={kind} onChange={value=>{setKind(value as DocumentKind);setSelectedId(null);}}
@@ -386,6 +404,8 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved
         </>}
       </div>
       <ErrorNotice error={readError || (!data ? error : "")}/>
+      {relatedCards.error&&<Alert type="warning" showIcon className="notice compact-notice"
+        title="Nie udało się odczytać powiązanych kart leczenia."/>}
       {data&&(data.warning||error)&&<Alert className="notice" type="warning" showIcon
         title="Nie udało się odświeżyć dokumentów. Pokazuję ostatnią wczytaną listę."
         description={data.warning||error}/>}

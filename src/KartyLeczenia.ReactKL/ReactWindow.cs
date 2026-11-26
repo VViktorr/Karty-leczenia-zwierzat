@@ -1285,6 +1285,38 @@ internal sealed class ReactWindow : Form
         }
         var options = subiekt.Load().Options ??
             throw new InvalidOperationException("Brak konfiguracji Subiekta. Uzupełnij ustawienia połączenia.");
+        if (action == "documentTreatmentCards")
+        {
+            if (archive.Load().Options is null) return Array.Empty<object>();
+            if (!root.TryGetProperty("numbers", out var values) || values.ValueKind != JsonValueKind.Array ||
+                values.GetArrayLength() > 501)
+                throw new ArgumentException("Niepoprawna lista dokumentów.");
+            var numbers = values.EnumerateArray().Select(value =>
+                value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "")
+                .Where(number => number.Length is > 0 and <= 256).Distinct(StringComparer.Ordinal).ToArray();
+            if (numbers.Length == 0) return Array.Empty<object>();
+            await using var db = ArchiveDb();
+            await db.OpenAsync(token);
+            var parameters = numbers.Select((_, index) => "@document" + index).ToArray();
+            using var cmd = new SqlCommand($"""
+                SELECT document, card_year, card_sequence
+                FROM dbo.treatment_cards
+                WHERE source_scope=@scope AND deleted_at_utc IS NULL
+                  AND card_year IS NOT NULL AND card_sequence IS NOT NULL
+                  AND document COLLATE Latin1_General_100_BIN2 IN ({string.Join(",", parameters)})
+                ORDER BY archive_order DESC;
+                """, db) { CommandTimeout = 8 };
+            cmd.Parameters.Add("@scope", System.Data.SqlDbType.NVarChar, -1).Value =
+                options.Server.ToUpperInvariant() + "|" + options.Database.ToUpperInvariant();
+            for (int index = 0; index < numbers.Length; index++)
+                cmd.Parameters.Add(parameters[index], System.Data.SqlDbType.NVarChar, 256).Value = numbers[index];
+            var links = new List<object>();
+            await using var reader = await cmd.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+                links.Add(new { document = reader.GetString(0),
+                    number = $"K/{reader.GetInt64(2)}/{reader.GetInt32(1):D4}" });
+            return links;
+        }
         if (action == "searchDocuments")
         {
             string category = ReadTextField(root, "kind", 20);
