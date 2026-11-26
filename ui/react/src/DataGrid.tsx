@@ -145,7 +145,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
       autoHeaderHeight: wrapHeaders,
       width: typeof column.width === "number" ? column.width : 160,
       flex: column.width === undefined ? 1 : null,
-      sortable:preferences.sortable && typeof index === "string",
+      sortable:preferences.sortable && (typeof index === "string" || !!columnSort),
       filter: preferences.filters && typeof index === "string",
       floatingFilter: preferences.filters && typeof index === "string",
       comparator: columnSort ? (_a, _b, a, b) => a.data && b.data ? columnSort(a.data, b.data) : 0 : undefined,

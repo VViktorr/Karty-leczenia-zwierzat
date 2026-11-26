@@ -335,19 +335,23 @@ function Documents({active, compact, cacheScope, beforeOpen, onOpen, onEditSaved
     {title:"Data",dataIndex:"date",width:125,render:date,
       sorter:(a,b)=>(a.date||"").localeCompare(b.date||"")},
     {title:"Numer",dataIndex:"number",width:175,
-      sorter:(a,b)=>a.number.localeCompare(b.number),
+      sorter:(a,b)=>a.number.localeCompare(b.number,"pl",{numeric:true}),
       render:(number:string,row)=><Button type="link" size="small" style={{paddingInline:0,fontSize:"inherit"}}
         aria-label={"Otwórz kartę leczenia dla dokumentu "+number}
         onClick={()=>{void open(row);}} onDoubleClick={event=>event.stopPropagation()}>
         {number}
       </Button>},
     {title:"Kontrahent",dataIndex:"shortPayer",ellipsis:{showTitle:false},
+      sorter:(a,b)=>(a.shortPayer||a.payer).localeCompare(b.shortPayer||b.payer,"pl"),
       render:(value:string,row)=><TableTextPreview text={row.payer||value}>{value||row.payer}</TableTextPreview>},
     {title:"Brutto",dataIndex:"gross",align:"right",width:145,
       render:(value:number|null,row)=>currency(value,row.currency||"zł"),
       sorter:(a,b)=>(a.gross??0)-(b.gross??0)},
-    {title:"Powiązania",dataIndex:"relatedText",ellipsis:true,width:230},
+    {title:"Powiązania",dataIndex:"relatedText",ellipsis:true,width:230,
+      sorter:(a,b)=>a.relatedText.localeCompare(b.relatedText,"pl",{numeric:true})},
     {title:"Powiązane karty leczenia",key:"treatmentCards",width:205,ellipsis:{showTitle:false},
+      sorter:(a,b)=>(cardsByDocument.get(a.number)?.[0]??"").localeCompare(
+        cardsByDocument.get(b.number)?.[0]??"","pl",{numeric:true}),
       render:(_,row)=>cardsByDocument.get(row.number)?.join(", ")||"—"}
   ];
   const listLayout=useListColumnLayout("documents",columns,active,undefined,undefined,["treatmentCards"]);
@@ -1115,6 +1119,7 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
   const [wrapVariantHeaders,setWrapVariantHeaders]=useLocalToggle("kl.treatmentVariant.wrapHeaders");
   const variantColumns:ColumnsType<TreatmentVariantChoice> = [
           {title:"Gatunek",dataIndex:"species",width:170,
+            sorter:(a,b)=>a.species.localeCompare(b.species,"pl"),
             render:(species:string,row:TreatmentVariantChoice)=>
               <Space orientation="vertical" size={2}>
                 <Button type="primary" size="small" disabled={variantBusy ||
@@ -1125,13 +1130,15 @@ function Treatment({draft, compact, active, toolbar, wizard: wizardEnabled, shor
                   <Tag color="blue">Ostatni wybór</Tag>}
               </Space>},
           {title:"Droga podania",dataIndex:"route",width:140,
+            sorter:(a,b)=>formatWizardRoute(a.route??"",showRouteCodes).localeCompare(formatWizardRoute(b.route??"",showRouteCodes),"pl"),
             render:(value:string)=>formatWizardRoute(value??"",showRouteCodes)},
           {title:"Dawkowanie",dataIndex:"dose",width:230},
           {title:"Karencja — tkanki",dataIndex:"tissues",width:180},
           {title:"Karencja — mleko",dataIndex:"milk",width:145,
             render:(value:string,row)=>isPoultry(row.species) ? "—" : value},
           {title:"Karencja — jaja",dataIndex:"eggs",width:145},
-          {title:"Wskazanie",dataIndex:"indication",width:225},
+          {title:"Wskazanie",dataIndex:"indication",width:225,
+            sorter:(a,b)=>(a.indication??"").localeCompare(b.indication??"","pl")},
           {title:"PDF ChPL",dataIndex:"pdf",width:130,
             render:(value:string)=>value
               ? <Button size="small" disabled={variantBusy}
@@ -1830,9 +1837,10 @@ function Prices({onCatalogue,toolbar}: {onCatalogue: (symbol: string, direct?: b
     {title:"Lek",dataIndex:"name",width:260,
       sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
     {title:priceHeading,dataIndex:"gross",width:140,align:"right",
+      sorter:(a,b)=>(a.gross??-Infinity)===(b.gross??-Infinity)?0:(a.gross??-Infinity)-(b.gross??-Infinity),
       render:(n:number|null)=>currency(n)},
     ...(settings.batch?[{title:"Ostatnia seria",dataIndex:"latestBatch",
-      width:140} as ColumnsType<PricePrintRow>[number]]:[]),
+      width:140,sorter:(a:PricePrintRow,b:PricePrintRow)=>a.latestBatch.localeCompare(b.latestBatch,"pl",{numeric:true})} as ColumnsType<PricePrintRow>[number]]:[]),
     {title:"Karencja z katalogu",key:"withdrawal",width:440,ellipsis:true,
       render:(_value,row)=> {
         const text=withdrawalText(row,settings);
@@ -1956,7 +1964,8 @@ function Expiry() {
   });
   const expiryColumns:ColumnsType<MedicineExpiry> = [
           {key:"name",title:"Lek",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
-          {key:"batch",title:"Seria",dataIndex:"batch",width:150},
+          {key:"batch",title:"Seria",dataIndex:"batch",width:150,
+            sorter:(a,b)=>a.batch.localeCompare(b.batch,"pl",{numeric:true})},
           {key:"received",title:"Data przyjęcia",dataIndex:"received",width:160,render:date,
             sorter:(a,b)=>(a.received??"").localeCompare(b.received??"")},
           {key:"expires",title:"Data ważności",dataIndex:"expires",width:160,render:date,
@@ -1964,7 +1973,8 @@ function Expiry() {
             sorter:(a,b)=>(a.expires??"9999").localeCompare(b.expires??"9999")},
           {key:"remaining",title:"Pozostało",dataIndex:"remaining",align:"right",width:125,
             sorter:(a,b)=>a.remaining-b.remaining},
-          {key:"warehouseName",title:"Magazyn",dataIndex:"warehouseName",width:160},
+          {key:"warehouseName",title:"Magazyn",dataIndex:"warehouseName",width:160,
+            sorter:(a,b)=>a.warehouseName.localeCompare(b.warehouseName,"pl")},
           {key:"status",title:"Status",width:145,render:(_,row)=>days(row)===null ?
             <Tag>Brak daty</Tag> : days(row)!<0 ? <Tag color="red">Przeterminowane</Tag> :
               days(row)!<=30 ? <Tag color="orange">Do 30 dni</Tag> : <Tag color="green">Aktualne</Tag>}

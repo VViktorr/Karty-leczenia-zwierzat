@@ -544,8 +544,8 @@ export default function CataloguePage({
   ];
 
   const productsLayout = useListColumnLayout<CatalogueListing>("catalogue-products", [
-    { title: "Lek", dataIndex: "name", ellipsis: true },
-    { title: "Warianty", dataIndex: "variants", width: 85, align: "right" }
+    { title: "Lek", dataIndex: "name", ellipsis: true, sorter:(a,b)=>a.name.localeCompare(b.name,"pl") },
+    { title: "Warianty", dataIndex: "variants", width: 85, align: "right", sorter:(a,b)=>a.variants-b.variants }
   ], false);
   const variantsLayout = useListColumnLayout("catalogue-variants", columns, false);
 
@@ -707,8 +707,8 @@ export default function CataloguePage({
           onDoubleClick: () => { void openSubiektProduct(row.symbol); }
         })}
         columns={[
-          { title: "Symbol", dataIndex: "symbol", width: 180 },
-          { title: "Nazwa", dataIndex: "name" }
+          { title: "Symbol", dataIndex: "symbol", width: 180, sorter:(a,b)=>a.symbol.localeCompare(b.symbol,"pl",{numeric:true}) },
+          { title: "Nazwa", dataIndex: "name", sorter:(a,b)=>a.name.localeCompare(b.name,"pl") }
         ]} />
     </Modal>
     <Modal className="kl-dialog-catalogue-missing" open={missingOpen}
@@ -724,9 +724,9 @@ export default function CataloguePage({
       <Table<SubiektProduct> rowKey="symbol" size="small"
         dataSource={missingRows??[]} pagination={missingPagination}
         scroll={{y:420}} columns={[
-          {title:"Symbol Subiekta",dataIndex:"symbol",width:210},
-          {title:"Nazwa leku",dataIndex:"name"},
-          {title:"Powód",dataIndex:"reason",width:260},
+          {title:"Symbol Subiekta",dataIndex:"symbol",width:210,sorter:(a,b)=>a.symbol.localeCompare(b.symbol,"pl",{numeric:true})},
+          {title:"Nazwa leku",dataIndex:"name",sorter:(a,b)=>a.name.localeCompare(b.name,"pl")},
+          {title:"Powód",dataIndex:"reason",width:260,sorter:(a,b)=>(a.reason??"").localeCompare(b.reason??"","pl")},
           {title:"Otwórz",key:"open",width:105,
             render:(_value,row)=><Button size="small" loading={working}
               onClick={()=>{void openSubiektProduct(row.symbol);}}>Uzupełnij</Button>}
