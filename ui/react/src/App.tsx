@@ -1962,7 +1962,8 @@ function Expiry() {
           {key:"expires",title:"Data ważności",dataIndex:"expires",width:160,render:date,
             defaultSortOrder:"ascend",
             sorter:(a,b)=>(a.expires??"9999").localeCompare(b.expires??"9999")},
-          {key:"remaining",title:"Pozostało",dataIndex:"remaining",align:"right",width:125},
+          {key:"remaining",title:"Pozostało",dataIndex:"remaining",align:"right",width:125,
+            sorter:(a,b)=>a.remaining-b.remaining},
           {key:"warehouseName",title:"Magazyn",dataIndex:"warehouseName",width:160},
           {key:"status",title:"Status",width:145,render:(_,row)=>days(row)===null ?
             <Tag>Brak daty</Tag> : days(row)!<0 ? <Tag color="red">Przeterminowane</Tag> :
@@ -2219,11 +2220,19 @@ function SavedCards({initialCardId,initialEdit,onInitialCardOpened}:{
 
   const savedColumns:ColumnsType<SavedCard>=[
 
-          {title:"Numer karty",dataIndex:"number",width:150},
-          {title:"Data",dataIndex:"date",render:date,width:145},
+          {title:"Numer karty",dataIndex:"number",width:150,sorter:(a,b)=>{
+            const [,sequenceA="",yearA=""]=a.number.split("/");
+            const [,sequenceB="",yearB=""]=b.number.split("/");
+            return yearA.localeCompare(yearB,"pl",{numeric:true}) ||
+              sequenceA.localeCompare(sequenceB,"pl",{numeric:true});
+          }},
+          {title:"Data",dataIndex:"date",render:date,width:145,
+            sorter:(a,b)=>a.date.localeCompare(b.date)},
           {title:"Kontrahent",dataIndex:"client",ellipsis:{showTitle:false},
+            sorter:(a,b)=>(a.shortClient||a.client).localeCompare(b.shortClient||b.client,"pl"),
             render:(client:string,row)=><TableTextPreview text={client}>{row.shortClient||client}</TableTextPreview>},
-          {title:"Dokument",dataIndex:"document",width:175},
+          {title:"Dokument",dataIndex:"document",width:175,
+            sorter:(a,b)=>a.document.localeCompare(b.document,"pl",{numeric:true})},
           {key:"actions",title:"Czynności",width:650,render:(_,row)=><Space wrap>
             <Button size="small" onClick={()=>{void open(row);}}>Otwórz</Button>
             <Button size="small" loading={previewBusy===row.id}
