@@ -115,7 +115,17 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
     fontFamily: token.fontFamily,
     fontSize: token.fontSize,
   }), [token]);
-  const rows = useMemo(() => [...(dataSource ?? [])], [dataSource]);
+  // AG Grid requires mutable rowData, while Ant Design's source can be readonly.
+  // Copy at most once per source array; row ID lookup below remains O(n).
+  const rows = useMemo(() => Array.from(dataSource ?? []), [dataSource]);
+  // Function rowKey needs the original array position. AG Grid resolves IDs
+  // once per row, so avoid an O(n) indexOf scan for every ID (O(n²) overall).
+  const rowIndices = useMemo(() => {
+    const indices = new WeakMap<T, number>();
+    if (typeof rowKey === "function")
+      rows.forEach((row, index) => { if (!indices.has(row)) indices.set(row, index); });
+    return indices;
+  }, [rowKey, rows]);
   const pages = pagination === false ? undefined : pagination;
   const [localPage, setLocalPage] = useState(1);
   const pageSize = pages?.pageSize ?? 25;
@@ -201,7 +211,7 @@ export default function DataGrid<T extends object>({columns, dataSource, paginat
         loadingOverlayComponent={() => <Spin aria-label="Ładowanie danych"/>}
         noRowsOverlayComponent={() => locale?.emptyText ?? <Empty description="Brak danych"/>}
         pagination={!!pages} paginationPageSize={pageSize} paginationPageSizeSelector={false} suppressPaginationPanel
-        getRowId={({data}) => String(typeof rowKey === "function" ? rowKey(data, rows.indexOf(data)) :
+        getRowId={({data}) => String(typeof rowKey === "function" ? rowKey(data, rowIndices.get(data) ?? 0) :
           (data as Record<string, unknown>)[String(rowKey ?? "key")])}
         onGridReady={event => setApi(event.api)}
         rowClass={typeof rowClassName === "string" ? rowClassName : undefined}

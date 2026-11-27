@@ -160,16 +160,21 @@ function getSkinPreset(layout: LayoutName) {
   return Object.hasOwn(skinPresets,layout)?skinPresets[layout as PresetName]:undefined;
 }
 const palettes = ["light", "dark", "sea"] as const;
+// Formatters are reused by every table cell rather than reconstructed
+// hundreds of times on each list render.
+const numberFormatter = new Intl.NumberFormat("pl-PL", {
+  minimumFractionDigits: 2, maximumFractionDigits: 2
+});
+const dateFormatter = new Intl.DateTimeFormat("pl-PL");
 const currency = (n: number | null, unit = "zł") =>
-  n === null ? "—" : new Intl.NumberFormat("pl-PL", {minimumFractionDigits: 2, maximumFractionDigits: 2})
-    .format(n) + " " + unit;
+  n === null ? "—" : numberFormatter.format(n) + " " + unit;
 function localDateTime() {
   const d = new Date();
   const local = new Date(d.getTime() - d.getTimezoneOffset()*60000);
   return local.toISOString().slice(0,16);
 }
 const date = (value: string | null) => value
-  ? new Intl.DateTimeFormat("pl-PL").format(new Date(value)) : "—";
+  ? dateFormatter.format(new Date(value)) : "—";
 function ErrorNotice({error}: {error: string}) {
   return error ? <Alert className="notice" type="error" showIcon title={error}/> : null;
 }
@@ -200,6 +205,10 @@ function useRemote<T>(action: string, payload: Record<string, unknown>, deps: un
       refresh ? {...payload,refresh:true}:payload,undefined,
       signal?AbortSignal.any([controller.signal,signal]):controller.signal);
     const pending=cacheScope!==undefined&&!refresh
+      // Keep this shared QueryClient fetch independent of a single component's
+      // effect lifetime. React.StrictMode mounts, cleans up and mounts again;
+      // cancelling the shared query on cleanup can discard the initial list.
+      // Uncached requests use the component's AbortController via load().
       ? readCache.fetchQuery({queryKey,queryFn:({signal})=>invoke<T>(action,payload,undefined,signal)})
       : load();
     pending.then(result=>{
